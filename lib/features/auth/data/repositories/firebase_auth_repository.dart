@@ -83,6 +83,17 @@ class FirebaseAuthRepository implements AuthRepository {
   }
 
   @override
+  Future<AppUser?> signInAnonymously() async {
+    try {
+      final credential = await _firebaseAuth.signInAnonymously();
+      return _userFromFirebase(credential.user);
+    } catch (e) {
+      debugPrint("Anonymous Sign In failed: \$e");
+      rethrow;
+    }
+  }
+
+  @override
   Future<void> signOut() async {
     await _firebaseAuth.signOut();
   }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:easy_localization/easy_localization.dart';
 
 import '../providers/auth_providers.dart';
 
@@ -47,6 +48,22 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Error: \$e')),
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  void _signInAnonymously() async {
+    setState(() => _isLoading = true);
+    final authRepo = ref.read(authRepositoryProvider);
+
+    try {
+      await authRepo.signInAnonymously();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: \$e')),
       );
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -110,6 +127,15 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                   _isLogin
                       ? "Don't have an account? Sign up"
                       : "Already have an account? Login",
+                ),
+              ),
+              const Divider(height: 32),
+              OutlinedButton.icon(
+                onPressed: _isLoading ? null : _signInAnonymously,
+                icon: const Icon(Icons.person_outline),
+                label: Text('login'.tr()), // Using the translated "Login Anonymously" key
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
                 ),
               ),
             ],
