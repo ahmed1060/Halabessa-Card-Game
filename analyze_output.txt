@@ -1,0 +1,10 @@
+Analyzing Halabessa-Card-Game...                                
+
+   info - Use 'const' with the constructor to improve performance - lib\features\auth\presentation\pages\auth_screen.dart:76:9 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\features\auth\presentation\pages\auth_screen.dart:76:27 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\features\auth\presentation\pages\auth_screen.dart:90:9 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\features\auth\presentation\pages\auth_screen.dart:90:27 - prefer_const_constructors
+   info - Use the null-aware operator '?.' rather than an explicit 'null' comparison - lib\features\game\domain\models\match_state.dart:151:24 - prefer_null_aware_operators
+  error - Invalid constant value - lib\features\game\presentation\pages\game_board_screen.dart:32:27 - invalid_constant
+  error - Invalid constant value - lib\features\game\presentation\pages\game_board_screen.dart:41:38 - invalid_constant
+

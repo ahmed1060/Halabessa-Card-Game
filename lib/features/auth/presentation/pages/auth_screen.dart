@@ -80,6 +80,20 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     }
   }
 
+  void _signInWithSocial(Future<void> Function() signInMethod) async {
+    setState(() => _isLoading = true);
+    try {
+      await signInMethod();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: \$e')),
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -138,6 +152,26 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                       ? "Don't have an account? Sign up"
                       : "Already have an account? Login",
                 ),
+              ),
+              const Divider(height: 32),
+              const Text('Or connect with', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.g_mobiledata, size: 48, color: Colors.red),
+                    onPressed: _isLoading ? null : () => _signInWithSocial(() => ref.read(authRepositoryProvider).signInWithGoogle()),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.facebook, size: 40, color: Colors.blue),
+                    onPressed: _isLoading ? null : () => _signInWithSocial(() => ref.read(authRepositoryProvider).signInWithFacebook()),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.apple, size: 40),
+                    onPressed: _isLoading ? null : () => _signInWithSocial(() => ref.read(authRepositoryProvider).signInWithApple()),
+                  ),
+                ],
               ),
               const Divider(height: 32),
               TextField(

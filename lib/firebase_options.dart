@@ -50,7 +50,7 @@ class DefaultFirebaseOptions {
     authDomain: 'halabessa-card-game1.firebaseapp.com',
     storageBucket: 'halabessa-card-game1.firebasestorage.app',
     measurementId: 'G-P42HX4EXYW',
-    databaseURL: 'https://halabessa-card-game1-default-rtdb.firebaseio.com',
+    databaseURL: 'https://halabessa-card-game1.firebaseio.com',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
@@ -59,7 +59,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '54223815037',
     projectId: 'halabessa-card-game1',
     storageBucket: 'halabessa-card-game1.firebasestorage.app',
-    databaseURL: 'https://halabessa-card-game1-default-rtdb.firebaseio.com',
+    databaseURL: 'https://halabessa-card-game1.firebaseio.com',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
@@ -69,7 +69,7 @@ class DefaultFirebaseOptions {
     projectId: 'halabessa-card-game1',
     storageBucket: 'halabessa-card-game1.firebasestorage.app',
     iosBundleId: 'com.example.halabessa',
-    databaseURL: 'https://halabessa-card-game1-default-rtdb.firebaseio.com',
+    databaseURL: 'https://halabessa-card-game1.firebaseio.com',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
@@ -79,6 +79,6 @@ class DefaultFirebaseOptions {
     projectId: 'halabessa-card-game1',
     storageBucket: 'halabessa-card-game1.firebasestorage.app',
     iosBundleId: 'com.example.halabessa',
-    databaseURL: 'https://halabessa-card-game1-default-rtdb.firebaseio.com',
+    databaseURL: 'https://halabessa-card-game1.firebaseio.com',
   );
 }

@@ -23,22 +23,22 @@ class GameBoardScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Column(
+        title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('7alabessa Match'),
+            const Text('7alabessa Match'),
             Text(
-              'Room ID: \${matchState.id}',
-              style: TextStyle(fontSize: 12, color: Colors.white70),
+              'Room ID: ${matchState.id}',
+              style: const TextStyle(fontSize: 12, color: Colors.white70),
             ),
           ],
         ),
         actions: [
-          const Center(
+          Center(
              child: Padding(
-               padding: EdgeInsets.symmetric(horizontal: 16.0),
-               child: Text('Score: \${matchState.teamAScore} - \${matchState.teamBScore}', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+               padding: const EdgeInsets.symmetric(horizontal: 16.0),
+               child: Text('Score: ${matchState.teamAScore} - ${matchState.teamBScore}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
              ),
           ),
           IconButton(icon: const Icon(Icons.settings), onPressed: () {}),
@@ -139,36 +139,46 @@ class GameBoardScreen extends ConsumerWidget {
                        timerDurationSeconds: matchState.timerDurationSeconds,
                        activeEmoji: matchState.playerEmojis[currentUser.uid],
                     ),
-                    const SizedBox(height: 16),
-                    // Player Hand
-                    SizedBox(
-                      height: 120, // Enough height for the card
-                      child: ListView.separated(
-                        shrinkWrap: true,
-                        scrollDirection: Axis.horizontal,
-                        itemCount: matchState.handCards[currentUser.uid]?.length ?? 0,
-                        separatorBuilder: (_, __) => const SizedBox(width: 8),
-                        itemBuilder: (context, index) {
-                          final card = matchState.handCards[currentUser.uid]![index];
-                          return CardWidget(
-                            card: card,
-                            onTap: () {
-                               ref.read(matchStateProvider.notifier).playCard(currentUser.uid, card);
-                            },
-                          );
-                        },
+                    if ((matchState.handCards[currentUser.uid]?.length ?? 0) > 0) ...[
+                      const SizedBox(height: 16),
+                      // Player Hand
+                      SizedBox(
+                        height: 120, // Enough height for the card
+                        child: ListView.separated(
+                          shrinkWrap: true,
+                          scrollDirection: Axis.horizontal,
+                          itemCount: matchState.handCards[currentUser.uid]!.length,
+                          separatorBuilder: (_, __) => const SizedBox(width: 8),
+                          itemBuilder: (context, index) {
+                            final card = matchState.handCards[currentUser.uid]![index];
+                            return CardWidget(
+                              card: card,
+                              onTap: () {
+                                 ref.read(matchStateProvider.notifier).playCard(currentUser.uid, card);
+                              },
+                            );
+                          },
+                        ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
               ),
             ),
             
             // Phase indicator overlay
+             if (matchState.phase == GamePhase.waitingForPlayers)
+               _buildLobbyOverlay(context, ref, matchState, currentUser.uid),
              if (matchState.phase == GamePhase.preRoundCut)
                _buildPhaseOverlay('Waiting for the Cut...'),
              if (matchState.phase == GamePhase.dealingFasha)
                _buildPhaseOverlay('Memorize the Fasha! 5s...'),
+             if (matchState.phase == GamePhase.shuffleVoting)
+               _buildShuffleVoteOverlay(context, ref, matchState, currentUser.uid),
+             if (matchState.phase == GamePhase.rematchVoting)
+               _buildRematchVoteOverlay(context, ref, matchState, currentUser.uid),
+             if (matchState.phase == GamePhase.matchOver)
+               _buildPhaseOverlay('Match Finalized.'),
           ],
         ),
       ),
@@ -179,10 +189,133 @@ class GameBoardScreen extends ConsumerWidget {
      return Center(
        child: Container(
           padding: const EdgeInsets.all(16),
-          color: Colors.black54,
+          color: Colors.black87,
           child: Text(
             text, 
             style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)
+          ),
+       ),
+     );
+  }
+
+   Widget _buildLobbyOverlay(BuildContext context, WidgetRef ref, MatchState state, String currentUid) {
+      final isReady = state.botInjectionVotes.containsKey(currentUid);
+      final readyCount = state.botInjectionVotes.length;
+      final totalPlayers = state.playerIds.length;
+      
+      return Center(
+        child: Container(
+           padding: const EdgeInsets.all(24),
+           decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(16)),
+           child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('Waiting for Players...', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 16),
+                Text('Room ID: ${state.id}', style: const TextStyle(color: Colors.orangeAccent, fontSize: 16, fontWeight: FontWeight.w500)),
+                const SizedBox(height: 24),
+                const Text('Connected Players:', style: TextStyle(color: Colors.white70, fontSize: 14)),
+                const SizedBox(height: 8),
+                ...state.playerIds.map((id) => Padding(
+                   padding: const EdgeInsets.symmetric(vertical: 4.0),
+                   child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                         Icon(Icons.person, color: id == currentUid ? Colors.green : Colors.white54, size: 20),
+                         const SizedBox(width: 8),
+                         Text(id == currentUid ? "You" : "Player (UUID: ${id.substring(0, 5)}...)", style: TextStyle(color: id == currentUid ? Colors.green : Colors.white)),
+                         if (state.botInjectionVotes.containsKey(id))
+                            const Padding(
+                              padding: EdgeInsets.only(left: 8.0),
+                              child: Icon(Icons.check_circle, color: Colors.green, size: 16),
+                            ),
+                      ],
+                   ),
+                )),
+                const SizedBox(height: 24),
+                if (totalPlayers < 4) ...[
+                   if (!isReady)
+                      ElevatedButton.icon(
+                        onPressed: () => ref.read(matchStateProvider.notifier).voteForBots(currentUid),
+                        icon: const Icon(Icons.smart_toy),
+                        label: const Text('Ready (Fill empty seats with Bots)'),
+                        style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
+                      )
+                   else
+                      Text('Waiting for human consent ($readyCount/$totalPlayers Ready)...', style: const TextStyle(color: Colors.orangeAccent, fontStyle: FontStyle.italic)),
+                ] else
+                   const Text('Room Full! Starting shortly...', style: TextStyle(color: Colors.green)),
+              ],
+           ),
+        ),
+      );
+   }
+
+  Widget _buildShuffleVoteOverlay(BuildContext context, WidgetRef ref, MatchState state, String currentUid) {
+     final hasVoted = state.shuffleVotes.containsKey(currentUid);
+     return Center(
+       child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(16)),
+          child: Column(
+             mainAxisSize: MainAxisSize.min,
+             children: [
+               const Text('Deck Finished!', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+               const SizedBox(height: 16),
+               Text('Shuffle votes: ${state.shuffleVotes.length} / 4', style: const TextStyle(color: Colors.white70)),
+               const SizedBox(height: 24),
+               if (!hasVoted) Row(
+                 mainAxisSize: MainAxisSize.min,
+                 children: [
+                   ElevatedButton(
+                     onPressed: () => ref.read(matchStateProvider.notifier).voteShuffle(currentUid, true),
+                     child: const Text('Shuffle (Yes)'),
+                   ),
+                   const SizedBox(width: 16),
+                   ElevatedButton(
+                     style: ElevatedButton.styleFrom(backgroundColor: Colors.blueGrey),
+                     onPressed: () => ref.read(matchStateProvider.notifier).voteShuffle(currentUid, false),
+                     child: const Text('Keep Sequence (No)', style: TextStyle(color: Colors.white)),
+                   ),
+                 ],
+               ) else const Text('Waiting for other players...', style: TextStyle(color: Colors.white)),
+             ],
+          ),
+       ),
+     );
+  }
+
+  Widget _buildRematchVoteOverlay(BuildContext context, WidgetRef ref, MatchState state, String currentUid) {
+     final hasVoted = state.rematchVotes.containsKey(currentUid);
+     final bool aWins = state.teamAScore >= state.teamBScore;
+     return Center(
+       child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(16)),
+          child: Column(
+             mainAxisSize: MainAxisSize.min,
+             children: [
+               const Text('Match Over!', style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold)),
+               Text(aWins ? 'Team A Wins!' : 'Team B Wins!', style: const TextStyle(color: Colors.greenAccent, fontSize: 20)),
+               const SizedBox(height: 16),
+               Text('Rematch votes: ${state.rematchVotes.length} / 4', style: const TextStyle(color: Colors.white70)),
+               const SizedBox(height: 24),
+               if (!hasVoted) Row(
+                 mainAxisSize: MainAxisSize.min,
+                 children: [
+                   ElevatedButton(
+                     onPressed: () => ref.read(matchStateProvider.notifier).voteRematch(currentUid, true),
+                     child: const Text('Best of 3 (Yes)'),
+                   ),
+                   const SizedBox(width: 16),
+                   ElevatedButton(
+                     style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                     onPressed: () => ref.read(matchStateProvider.notifier).voteRematch(currentUid, false),
+                     child: const Text('Leave Match (No)', style: TextStyle(color: Colors.white)),
+                   ),
+                 ],
+               ) else const Text('Waiting for other players...', style: TextStyle(color: Colors.white)),
+             ],
           ),
        ),
      );

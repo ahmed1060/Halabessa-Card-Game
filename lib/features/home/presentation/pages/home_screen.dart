@@ -111,7 +111,7 @@ class HomeScreen extends ConsumerWidget {
                     Navigator.pop(dialogContext);
                     try {
                       ref.read(matchStateProvider.notifier).initializeMatch(
-                         [playerId, 'bot1', 'bot2', 'bot3'], // Placeholder for 4 players
+                         [playerId], // Only instantiate the creator
                          GameMode.classic,
                          timerDurationSeconds: selectedTimerSeconds,
                       );
@@ -131,7 +131,7 @@ class HomeScreen extends ConsumerWidget {
                     Navigator.pop(dialogContext);
                     try {
                       ref.read(matchStateProvider.notifier).initializeMatch(
-                         [playerId, 'bot1', 'bot2', 'bot3'], // Placeholder
+                         [playerId], // Only instantiate the creator
                          GameMode.tafweet,
                          timerDurationSeconds: selectedTimerSeconds,
                       );
@@ -176,7 +176,7 @@ class HomeScreen extends ConsumerWidget {
                  final roomId = roomController.text.trim();
                  if (roomId.isNotEmpty) {
                     Navigator.pop(dialogContext);
-                    ref.read(matchStateProvider.notifier).bindToMatch(roomId);
+                    ref.read(matchStateProvider.notifier).joinMatch(roomId, playerId);
                     Navigator.pushNamed(context, '/game');
                  }
                },

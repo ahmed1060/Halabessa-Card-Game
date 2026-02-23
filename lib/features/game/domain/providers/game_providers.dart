@@ -29,33 +29,75 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
   }
 
   void initializeMatch(List<String> playerIds, GameMode mode, {int timerDurationSeconds = 10}) {
-    const newId = 'match_\${DateTime.now().millisecondsSinceEpoch}';
+    final newId = 'match_${DateTime.now().millisecondsSinceEpoch}';
     final initial = MatchState(
       id: newId,
       mode: mode,
       playerIds: playerIds,
       dealerIndex: 0,
       currentTurnIndex: 1, // Player after dealer starts
-      phase: GamePhase.preRoundCut,
+      phase: GamePhase.waitingForPlayers, // Start in Lobby phase
       timerDurationSeconds: timerDurationSeconds,
     );
     ref.read(multiplayerSyncServiceProvider).createMatch(initial);
     state = initial;
     bindToMatch(newId);
-    _setupNewRound(isFirstRound: true);
   }
 
-  void _setupNewRound({bool isFirstRound = false}) {
+  void joinMatch(String matchId, String playerId) async {
+    bindToMatch(matchId);
+    // Add an artificial delay to allow bindToMatch to seed the local state
+    await Future.delayed(const Duration(milliseconds: 1000));
+    
+    if (state != null && state!.phase == GamePhase.waitingForPlayers && state!.playerIds.length < 4) {
+      if (!state!.playerIds.contains(playerId)) {
+         final newPlayers = List<String>.from(state!.playerIds)..add(playerId);
+         _publishState(state!.copyWith(playerIds: newPlayers));
+      }
+    }
+  }
+
+  void voteForBots(String playerId) {
+    if (state == null || state!.phase != GamePhase.waitingForPlayers) return;
+    
+    final votes = Map<String, bool>.from(state!.botInjectionVotes);
+    votes[playerId] = true; // Mark as "Ready"
+    
+    MatchState newState = state!.copyWith(botInjectionVotes: votes);
+    
+    // Check if ALL currently connected humans are Ready
+    if (votes.length == newState.playerIds.length) {
+       // Unanimous Human Consent reached! Generate bots for empty seats.
+       final finalPlayers = List<String>.from(newState.playerIds);
+       int botCount = 1;
+       while (finalPlayers.length < 4) {
+          finalPlayers.add('bot_$botCount');
+          botCount++;
+       }
+       state = newState.copyWith(playerIds: finalPlayers, botInjectionVotes: {});
+       _setupNewRound(isFirstRound: true);
+    } else {
+       _publishState(newState);
+    }
+  }
+
+  void _setupNewRound({bool isFirstRound = false, bool forceShuffle = false}) {
     if (state == null) return;
-    final deck = Deck.standard();
+    
+    Deck deck;
     
     // In Memory Mode, we should NOT shuffle unless dictated, but for Classic/Initial we do:
-    if (isFirstRound || state!.roundsSinceLastShuffle >= 5) {
+    if (isFirstRound) {
+      deck = Deck.standard();
+      deck.shuffle();
+      state = state!.copyWith(roundsSinceLastShuffle: 0);
+    } else if (forceShuffle || state!.roundsSinceLastShuffle >= 5) {
+      deck = Deck.standard();
       deck.shuffle();
       state = state!.copyWith(roundsSinceLastShuffle: 0);
     } else {
-       // logic for restoring stack order goes here
-       deck.shuffle(); // Placeholder for actual strict sequence restoration
+       // Restore strictly from harvest array (Memory Mode)
+       deck = Deck.restoreFromHarvest(state!.harvestStacks);
        state = state!.copyWith(roundsSinceLastShuffle: state!.roundsSinceLastShuffle + 1);
     }
 
@@ -64,6 +106,9 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
       board: [],
       recentFasha: [],
       handCards: { for (var id in state!.playerIds) id: [] },
+      harvestStacks: { 'teamA': [], 'teamB': [] },
+      shuffleVotes: {},
+      rematchVotes: {},
       phase: GamePhase.preRoundCut,
       roundCount: state!.roundCount + (isFirstRound ? 0 : 1),
     ));
@@ -160,9 +205,33 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     final capturedCards = GameEngineUtils.calculateCapture(card, board);
     final teamId = _getTeamOfPlayer(playerId);
 
+    int newConsecutive = state!.consecutiveTafweetCount;
+
     if (capturedCards.isEmpty) {
       board.add(card);
+      newConsecutive = 0;
+      state = state!.copyWith(consecutiveTafweetCount: newConsecutive);
     } else {
+      bool isTafweetMode = state!.mode == GameMode.tafweet;
+      bool isFirstMoveOfRound = state!.harvestStacks['teamA']!.isEmpty && state!.harvestStacks['teamB']!.isEmpty && board.length == 4;
+      bool isBasra = GameEngineUtils.isBasra(card, capturedCards, board);
+      
+      if (isTafweetMode && isBasra) {
+         newConsecutive += 1;
+      } else {
+         newConsecutive = 0;
+      }
+      bool isConsecutiveTafweet = newConsecutive > 1;
+
+      int pointsEarned = GameEngineUtils.calculatePoints(
+         playedCard: card,
+         capturedCards: capturedCards,
+         boardBeforeCapture: board,
+         isTafweetMode: isTafweetMode,
+         isFirstMoveOfRound: isFirstMoveOfRound,
+         isConsecutiveTafweet: isConsecutiveTafweet,
+      );
+
       // Remove captured cards from board
       for (var c in capturedCards) {
         board.remove(c);
@@ -171,23 +240,10 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
       // Add to harvest stack
       harvest[teamId]?.addAll(capturedCards);
       
-      // Calculate Points & Update 
-      bool isTafweetMode = state!.mode == GameMode.tafweet;
-      bool isFirstMoveOfRound = harvest['teamA']!.isEmpty && harvest['teamB']!.isEmpty && board.length == 4;
-      
-      int pointsEarned = GameEngineUtils.calculatePoints(
-         playedCard: card,
-         capturedCards: capturedCards,
-         boardBeforeCapture: board,
-         isTafweetMode: isTafweetMode,
-         isFirstMoveOfRound: isFirstMoveOfRound,
-         isConsecutiveTafweet: false, // Tracked separately if needed
-      );
-      
       if (teamId == 'teamA') {
-        state = state!.copyWith(teamAScore: state!.teamAScore + pointsEarned);
+        state = state!.copyWith(teamAScore: state!.teamAScore + pointsEarned, consecutiveTafweetCount: newConsecutive);
       } else {
-        state = state!.copyWith(teamBScore: state!.teamBScore + pointsEarned);
+        state = state!.copyWith(teamBScore: state!.teamBScore + pointsEarned, consecutiveTafweetCount: newConsecutive);
       }
       
       state = state!.copyWith(lastCaptureTeam: teamId);
@@ -242,11 +298,64 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     
     // Check Match Win Condition
     if (pointsA >= endPhase.maxPoints || pointsB >= endPhase.maxPoints) {
-       _publishState(endPhase.copyWith(phase: GamePhase.matchOver));
+       _publishState(endPhase.copyWith(phase: GamePhase.rematchVoting));
     } else {
-       // Rotate dealer, setup next round usually happens after UI prompt for Shuffle/No-Shuffle
-       _publishState(endPhase.copyWith(dealerIndex: (endPhase.dealerIndex + 1) % 4));
+       // Rotate dealer, trigger UI prompt for Shuffle/No-Shuffle
+       _publishState(endPhase.copyWith(
+          dealerIndex: (endPhase.dealerIndex + 1) % 4,
+          phase: GamePhase.shuffleVoting,
+       ));
     }
+  }
+
+  void voteShuffle(String playerId, bool wantsShuffle) {
+     if (state == null || state!.phase != GamePhase.shuffleVoting) return;
+     
+     final votes = Map<String, bool>.from(state!.shuffleVotes);
+     votes[playerId] = wantsShuffle;
+     
+     MatchState newState = state!.copyWith(shuffleVotes: votes);
+     
+     // Check if all 4 players voted
+     if (votes.length == 4) {
+        // If anyone voted yes, force shuffle (Memory Mode broken)
+        bool forceShuffle = votes.values.any((v) => v == true);
+        state = newState; 
+        _setupNewRound(forceShuffle: forceShuffle);
+     } else {
+        _publishState(newState);
+     }
+  }
+
+  void voteRematch(String playerId, bool wantsRematch) {
+     if (state == null || state!.phase != GamePhase.rematchVoting) return;
+     
+     final votes = Map<String, bool>.from(state!.rematchVotes);
+     votes[playerId] = wantsRematch;
+     
+     MatchState newState = state!.copyWith(rematchVotes: votes);
+     
+     if (votes.length == 4) {
+        bool unanimous = votes.values.every((v) => v == true);
+        if (unanimous) {
+           // Reset Match Completely
+           _publishState(newState.copyWith(
+              teamAScore: 0,
+              teamBScore: 0,
+              roundCount: 1,
+              roundsSinceLastShuffle: 0,
+              consecutiveTafweetCount: 0,
+              rematchVotes: {},
+              shuffleVotes: {},
+           ));
+           _setupNewRound(isFirstRound: true);
+        } else {
+           // End Match completely
+           _publishState(newState.copyWith(phase: GamePhase.matchOver));
+        }
+     } else {
+        _publishState(newState);
+     }
   }
 
   String _getTeamOfPlayer(String playerId) {

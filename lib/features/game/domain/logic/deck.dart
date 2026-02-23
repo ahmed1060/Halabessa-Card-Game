@@ -15,6 +15,19 @@ class Deck {
     return Deck(cards);
   }
 
+  factory Deck.restoreFromHarvest(Map<String, List<game_card.Card>> harvestStacks) {
+    // Simply stack Team B's harvest on top of Team A's harvest.
+    // Since draw() uses removeLast(), Team B's most recently captured cards will be dealt first.
+    final restoredCards = <game_card.Card>[];
+    if (harvestStacks.containsKey('teamA')) {
+      restoredCards.addAll(harvestStacks['teamA']!);
+    }
+    if (harvestStacks.containsKey('teamB')) {
+      restoredCards.addAll(harvestStacks['teamB']!);
+    }
+    return Deck(restoredCards);
+  }
+
   void shuffle() {
     cards.shuffle();
   }

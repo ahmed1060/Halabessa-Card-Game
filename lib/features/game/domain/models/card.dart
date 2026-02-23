@@ -47,7 +47,7 @@ class Card {
 
   @override
   String toString() {
-    return '\${rank.name} of \${suit.name}';
+    return '${rank.name} of ${suit.name}';
   }
 
   Map<String, dynamic> toJson() => {

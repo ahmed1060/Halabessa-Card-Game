@@ -1,5 +1,8 @@
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'package:flutter/foundation.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import '../../domain/models/app_user.dart';
 import '../../domain/repositories/auth_repository.dart';
 
@@ -62,24 +65,61 @@ class FirebaseAuthRepository implements AuthRepository {
 
   @override
   Future<AppUser?> signInWithGoogle() async {
-    // Basic stub for Google Sign-In. Full implementation requires google_sign_in package
-    // and Firebase Options configuration for the platform.
-    debugPrint("Google Sign In - To be implemented");
-    return null;
+    try {
+       final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
+       if (googleUser == null) return null;
+
+       final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+       final credential = firebase_auth.GoogleAuthProvider.credential(
+          accessToken: googleAuth.accessToken,
+          idToken: googleAuth.idToken,
+       );
+
+       final userCredential = await _firebaseAuth.signInWithCredential(credential);
+       return _userFromFirebase(userCredential.user);
+    } catch (e) {
+       debugPrint("Google Sign In failed: $e");
+       rethrow;
+    }
   }
 
   @override
   Future<AppUser?> signInWithFacebook() async {
-    // Basic stub for Facebook Sign-In. Requires flutter_facebook_auth package.
-    debugPrint("Facebook Sign In - To be implemented");
-    return null;
+    try {
+       final LoginResult result = await FacebookAuth.instance.login();
+       if (result.status == LoginStatus.success) {
+          final credential = firebase_auth.FacebookAuthProvider.credential(result.accessToken!.tokenString);
+          final userCredential = await _firebaseAuth.signInWithCredential(credential);
+          return _userFromFirebase(userCredential.user);
+       }
+       return null;
+    } catch (e) {
+       debugPrint("Facebook Sign In failed: $e");
+       rethrow;
+    }
   }
 
   @override
   Future<AppUser?> signInWithApple() async {
-    // Basic stub for Apple Sign-In. Requires sign_in_with_apple package.
-    debugPrint("Apple Sign In - To be implemented");
-    return null;
+    try {
+       final credential = await SignInWithApple.getAppleIDCredential(
+          scopes: [
+             AppleIDAuthorizationScopes.email,
+             AppleIDAuthorizationScopes.fullName,
+          ],
+       );
+       
+       final oAuthCredential = firebase_auth.OAuthProvider('apple.com').credential(
+          idToken: credential.identityToken,
+          accessToken: credential.authorizationCode,
+       );
+       
+       final userCredential = await _firebaseAuth.signInWithCredential(oAuthCredential);
+       return _userFromFirebase(userCredential.user);
+    } catch (e) {
+       debugPrint("Apple Sign In failed: $e");
+       rethrow;
+    }
   }
 
   @override

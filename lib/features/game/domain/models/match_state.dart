@@ -1,6 +1,6 @@
 import 'card.dart' as game_card;
 
-enum GamePhase { preRoundCut, dealingFasha, dealingCards, playing, roundScoring, matchOver }
+enum GamePhase { waitingForPlayers, preRoundCut, dealingFasha, dealingCards, playing, roundScoring, shuffleVoting, rematchVoting, matchOver }
 enum GameMode { classic, tafweet }
 
 class MatchState {
@@ -37,11 +37,15 @@ class MatchState {
   // Round Counter & Memory Shuffle tracker
   final int roundCount;
   final int roundsSinceLastShuffle;
+  final int consecutiveTafweetCount;
 
   // Turn Timers & Reactions
   final DateTime? turnStartTime;
   final int timerDurationSeconds;
   final Map<String, String> playerEmojis;
+  final Map<String, bool> shuffleVotes;
+  final Map<String, bool> rematchVotes;
+  final Map<String, bool> botInjectionVotes;
 
   MatchState({
     required this.id,
@@ -61,9 +65,13 @@ class MatchState {
     this.lastCaptureTeam,
     this.roundCount = 1,
     this.roundsSinceLastShuffle = 0,
+    this.consecutiveTafweetCount = 0,
     this.turnStartTime,
     this.timerDurationSeconds = 10,
     this.playerEmojis = const {},
+    this.shuffleVotes = const {},
+    this.rematchVotes = const {},
+    this.botInjectionVotes = const {},
   });
 
   MatchState copyWith({
@@ -84,9 +92,13 @@ class MatchState {
     String? lastCaptureTeam,
     int? roundCount,
     int? roundsSinceLastShuffle,
+    int? consecutiveTafweetCount,
     DateTime? turnStartTime,
     int? timerDurationSeconds,
     Map<String, String>? playerEmojis,
+    Map<String, bool>? shuffleVotes,
+    Map<String, bool>? rematchVotes,
+    Map<String, bool>? botInjectionVotes,
   }) {
     return MatchState(
       id: id ?? this.id,
@@ -106,9 +118,13 @@ class MatchState {
       lastCaptureTeam: lastCaptureTeam ?? this.lastCaptureTeam,
       roundCount: roundCount ?? this.roundCount,
       roundsSinceLastShuffle: roundsSinceLastShuffle ?? this.roundsSinceLastShuffle,
+      consecutiveTafweetCount: consecutiveTafweetCount ?? this.consecutiveTafweetCount,
       turnStartTime: turnStartTime ?? this.turnStartTime,
       timerDurationSeconds: timerDurationSeconds ?? this.timerDurationSeconds,
       playerEmojis: playerEmojis ?? this.playerEmojis,
+      shuffleVotes: shuffleVotes ?? this.shuffleVotes,
+      rematchVotes: rematchVotes ?? this.rematchVotes,
+      botInjectionVotes: botInjectionVotes ?? this.botInjectionVotes,
     );
   }
 
@@ -131,9 +147,13 @@ class MatchState {
       'lastCaptureTeam': lastCaptureTeam,
       'roundCount': roundCount,
       'roundsSinceLastShuffle': roundsSinceLastShuffle,
+      'consecutiveTafweetCount': consecutiveTafweetCount,
       'turnStartTime': turnStartTime == null ? null : turnStartTime!.toIso8601String(),
       'timerDurationSeconds': timerDurationSeconds,
       'playerEmojis': playerEmojis,
+      'shuffleVotes': shuffleVotes,
+      'rematchVotes': rematchVotes,
+      'botInjectionVotes': botInjectionVotes,
     };
   }
 
@@ -170,9 +190,13 @@ class MatchState {
       lastCaptureTeam: json['lastCaptureTeam'] as String?,
       roundCount: json['roundCount'] as int? ?? 1,
       roundsSinceLastShuffle: json['roundsSinceLastShuffle'] as int? ?? 0,
+      consecutiveTafweetCount: json['consecutiveTafweetCount'] as int? ?? 0,
       turnStartTime: json['turnStartTime'] != null ? DateTime.parse(json['turnStartTime'] as String) : null,
       timerDurationSeconds: json['timerDurationSeconds'] as int? ?? 10,
       playerEmojis: (json['playerEmojis'] as Map?)?.cast<String, String>() ?? const {},
+      shuffleVotes: (json['shuffleVotes'] as Map?)?.cast<String, bool>() ?? const {},
+      rematchVotes: (json['rematchVotes'] as Map?)?.cast<String, bool>() ?? const {},
+      botInjectionVotes: (json['botInjectionVotes'] as Map?)?.cast<String, bool>() ?? const {},
     );
   }
 }
