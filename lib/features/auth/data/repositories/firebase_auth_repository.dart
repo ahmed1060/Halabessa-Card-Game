@@ -22,7 +22,7 @@ class FirebaseAuthRepository implements AuthRepository {
 
   @override
   Stream<AppUser?> get authStateChanges {
-    return _firebaseAuth.authStateChanges().map(_userFromFirebase);
+    return _firebaseAuth.userChanges().map(_userFromFirebase);
   }
 
   @override
@@ -90,8 +90,12 @@ class FirebaseAuthRepository implements AuthRepository {
         await credential.user?.updateDisplayName(displayName.trim());
         // We need to reload the user to get the updated display name in the returned AppUser
         await credential.user?.reload();
+        // Force token refresh to trigger authStateChanges listener with new data
+        await credential.user?.getIdToken(true);
       }
-      return _userFromFirebase(_firebaseAuth.currentUser);
+      // Re-fetch the current user instance from Firebase after reload to ensure we have the latest payload
+      final updatedUser = _firebaseAuth.currentUser;
+      return _userFromFirebase(updatedUser);
     } catch (e) {
       debugPrint("Anonymous Sign In failed: \$e");
       rethrow;

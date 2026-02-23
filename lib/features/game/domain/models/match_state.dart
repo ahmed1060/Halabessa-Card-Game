@@ -131,7 +131,7 @@ class MatchState {
       'lastCaptureTeam': lastCaptureTeam,
       'roundCount': roundCount,
       'roundsSinceLastShuffle': roundsSinceLastShuffle,
-      'turnStartTime': turnStartTime?.toIso8601String(),
+      'turnStartTime': turnStartTime == null ? null : turnStartTime!.toIso8601String(),
       'timerDurationSeconds': timerDurationSeconds,
       'playerEmojis': playerEmojis,
     };

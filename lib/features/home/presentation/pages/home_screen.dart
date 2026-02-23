@@ -31,11 +31,11 @@ class HomeScreen extends ConsumerWidget {
             const Icon(Icons.casino, size: 100, color: Colors.teal),
             const SizedBox(height: 24),
             Text(
-              'Welcome, \${user?.displayName ?? "Player"}!',
+              'Welcome, ${user?.displayName ?? "Player"}!',
               style: Theme.of(context).textTheme.headlineSmall,
             ),
             const SizedBox(height: 8),
-            const Text('Points: \${user?.points ?? 0} | Rank: \${user?.rank ?? 0}'),
+            Text('Points: ${user?.points ?? 0} | Rank: ${user?.rank ?? 0}'),
             const SizedBox(height: 32),
             ElevatedButton.icon(
               onPressed: () {
@@ -107,26 +107,42 @@ class HomeScreen extends ConsumerWidget {
                   child: const Text('Cancel'),
                 ),
                 ElevatedButton(
-                  onPressed: () {
+                  onPressed: () async {
                     Navigator.pop(dialogContext);
-                    ref.read(matchStateProvider.notifier).initializeMatch(
-                       [playerId, 'bot1', 'bot2', 'bot3'], // Placeholder for 4 players
-                       GameMode.classic,
-                       timerDurationSeconds: selectedTimerSeconds,
-                    );
-                    Navigator.pushNamed(context, '/game');
+                    try {
+                      ref.read(matchStateProvider.notifier).initializeMatch(
+                         [playerId, 'bot1', 'bot2', 'bot3'], // Placeholder for 4 players
+                         GameMode.classic,
+                         timerDurationSeconds: selectedTimerSeconds,
+                      );
+                      Navigator.pushNamed(context, '/game');
+                    } catch (e) {
+                      debugPrint('Match init error: $e');
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Firebase Warning: $e (Continuing locally...)')));
+                        Navigator.pushNamed(context, '/game');
+                      }
+                    }
                   },
                   child: const Text('Classic Mode'),
                 ),
                 ElevatedButton(
-                  onPressed: () {
+                  onPressed: () async {
                     Navigator.pop(dialogContext);
-                    ref.read(matchStateProvider.notifier).initializeMatch(
-                       [playerId, 'bot1', 'bot2', 'bot3'], // Placeholder
-                       GameMode.tafweet,
-                       timerDurationSeconds: selectedTimerSeconds,
-                    );
-                    Navigator.pushNamed(context, '/game');
+                    try {
+                      ref.read(matchStateProvider.notifier).initializeMatch(
+                         [playerId, 'bot1', 'bot2', 'bot3'], // Placeholder
+                         GameMode.tafweet,
+                         timerDurationSeconds: selectedTimerSeconds,
+                      );
+                      Navigator.pushNamed(context, '/game');
+                    } catch (e) {
+                      debugPrint('Match init error: $e');
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Firebase Warning: $e (Continuing locally...)')));
+                        Navigator.pushNamed(context, '/game');
+                      }
+                    }
                   },
                   child: const Text('Tafweet Mode'),
                 ),
