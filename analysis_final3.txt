@@ -1,0 +1,6 @@
+Analyzing Halabessa-Card-Game...                                
+
+   info - Use 'const' with the constructor to improve performance - lib\features\auth\presentation\pages\auth_wrapper.dart:27:37 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\features\auth\presentation\pages\auth_wrapper.dart:28:15 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\features\auth\presentation\pages\auth_wrapper.dart:29:18 - prefer_const_constructors
+

@@ -1,0 +1,7 @@
+{
+  "status": "success",
+  "result": {
+    "fileName": "GoogleService-Info.plist",
+    "fileContents": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n<plist version=\"1.0\">\n<dict>\n\t<key>API_KEY</key>\n\t<string>AIzaSyAIuSJXCHGPw3WT1iZ4OIIhE_-QzzfwEFk</string>\n\t<key>GCM_SENDER_ID</key>\n\t<string>54223815037</string>\n\t<key>PLIST_VERSION</key>\n\t<string>1</string>\n\t<key>BUNDLE_ID</key>\n\t<string>com.example.halabessa</string>\n\t<key>PROJECT_ID</key>\n\t<string>halabessa-card-game1</string>\n\t<key>STORAGE_BUCKET</key>\n\t<string>halabessa-card-game1.firebasestorage.app</string>\n\t<key>IS_ADS_ENABLED</key>\n\t<false></false>\n\t<key>IS_ANALYTICS_ENABLED</key>\n\t<false></false>\n\t<key>IS_APPINVITE_ENABLED</key>\n\t<true></true>\n\t<key>IS_GCM_ENABLED</key>\n\t<true></true>\n\t<key>IS_SIGNIN_ENABLED</key>\n\t<true></true>\n\t<key>GOOGLE_APP_ID</key>\n\t<string>1:54223815037:ios:16014a0cc65fa3700b4c14</string>\n</dict>\n</plist>"
+  }
+}

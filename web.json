@@ -1,0 +1,18 @@
+{
+  "status": "success",
+  "result": {
+    "fileName": "firebase-js-config.json",
+    "fileContents": "{\n  \"projectId\": \"halabessa-card-game1\",\n  \"appId\": \"1:54223815037:web:429f2b6bb0e6cf410b4c14\",\n  \"storageBucket\": \"halabessa-card-game1.firebasestorage.app\",\n  \"apiKey\": \"AIzaSyC0zJJ488zNCBcy1ndWob5bx41gGbPnU5k\",\n  \"authDomain\": \"halabessa-card-game1.firebaseapp.com\",\n  \"messagingSenderId\": \"54223815037\",\n  \"measurementId\": \"G-P42HX4EXYW\",\n  \"projectNumber\": \"54223815037\",\n  \"version\": \"2\"\n}",
+    "sdkConfig": {
+      "projectId": "halabessa-card-game1",
+      "appId": "1:54223815037:web:429f2b6bb0e6cf410b4c14",
+      "storageBucket": "halabessa-card-game1.firebasestorage.app",
+      "apiKey": "AIzaSyC0zJJ488zNCBcy1ndWob5bx41gGbPnU5k",
+      "authDomain": "halabessa-card-game1.firebaseapp.com",
+      "messagingSenderId": "54223815037",
+      "measurementId": "G-P42HX4EXYW",
+      "projectNumber": "54223815037",
+      "version": "2"
+    }
+  }
+}

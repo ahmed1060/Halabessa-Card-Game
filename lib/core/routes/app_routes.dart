@@ -1,0 +1,32 @@
+import 'package:flutter/material.dart';
+
+import '../../features/auth/presentation/pages/auth_wrapper.dart';
+import '../../features/home/presentation/pages/home_screen.dart';
+import '../../features/game/presentation/pages/game_board_screen.dart';
+
+class AppRoutes {
+  static const String initial = '/';
+  static const String home = '/home';
+  static const String game = '/game';
+  static const String profile = '/profile';
+
+  static Map<String, WidgetBuilder> get routes => {
+        initial: (context) => const AuthWrapper(),
+        home: (context) => const HomeScreen(),
+        game: (context) => const GameBoardScreen(),
+        profile: (context) => const PlaceholderView(title: 'Profile'),
+      };
+}
+
+class PlaceholderView extends StatelessWidget {
+  final String title;
+  const PlaceholderView({super.key, required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text(title)),
+      body: Center(child: Text('Placeholder: $title')),
+    );
+  }
+}
