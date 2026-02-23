@@ -71,9 +71,9 @@ class HomeScreen extends ConsumerWidget {
 
     showDialog(
       context: context,
-      builder: (context) {
+      builder: (dialogContext) {
         return StatefulBuilder(
-          builder: (context, setState) {
+          builder: (builderContext, setState) {
             return AlertDialog(
               title: const Text('Create Room'),
               content: Column(
@@ -103,12 +103,12 @@ class HomeScreen extends ConsumerWidget {
               ),
               actions: [
                 TextButton(
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: () => Navigator.pop(dialogContext),
                   child: const Text('Cancel'),
                 ),
                 ElevatedButton(
                   onPressed: () {
-                    Navigator.pop(context);
+                    Navigator.pop(dialogContext);
                     ref.read(matchStateProvider.notifier).initializeMatch(
                        [playerId, 'bot1', 'bot2', 'bot3'], // Placeholder for 4 players
                        GameMode.classic,
@@ -120,7 +120,7 @@ class HomeScreen extends ConsumerWidget {
                 ),
                 ElevatedButton(
                   onPressed: () {
-                    Navigator.pop(context);
+                    Navigator.pop(dialogContext);
                     ref.read(matchStateProvider.notifier).initializeMatch(
                        [playerId, 'bot1', 'bot2', 'bot3'], // Placeholder
                        GameMode.tafweet,
@@ -143,7 +143,7 @@ class HomeScreen extends ConsumerWidget {
     
     showDialog(
       context: context,
-      builder: (context) {
+      builder: (dialogContext) {
         return AlertDialog(
           title: const Text('Join Room'),
           content: TextField(
@@ -152,14 +152,14 @@ class HomeScreen extends ConsumerWidget {
           ),
           actions: [
              TextButton(
-               onPressed: () => Navigator.pop(context),
+               onPressed: () => Navigator.pop(dialogContext),
                child: const Text('Cancel'),
              ),
              ElevatedButton(
                onPressed: () {
                  final roomId = roomController.text.trim();
                  if (roomId.isNotEmpty) {
-                    Navigator.pop(context);
+                    Navigator.pop(dialogContext);
                     ref.read(matchStateProvider.notifier).bindToMatch(roomId);
                     Navigator.pushNamed(context, '/game');
                  }

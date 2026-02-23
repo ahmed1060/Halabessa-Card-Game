@@ -15,6 +15,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _nameController = TextEditingController();
+  final _guestNameController = TextEditingController();
 
   bool _isLogin = true;
   bool _isLoading = false;
@@ -24,6 +25,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     _emailController.dispose();
     _passwordController.dispose();
     _nameController.dispose();
+    _guestNameController.dispose();
     super.dispose();
   }
 
@@ -55,11 +57,19 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   }
 
   void _signInAnonymously() async {
+    final guestName = _guestNameController.text.trim();
+    if (guestName.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a nickname first.')),
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
     final authRepo = ref.read(authRepositoryProvider);
 
     try {
-      await authRepo.signInAnonymously();
+      await authRepo.signInAnonymously(displayName: guestName);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -130,6 +140,14 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                 ),
               ),
               const Divider(height: 32),
+              TextField(
+                controller: _guestNameController,
+                decoration: InputDecoration(
+                  labelText: 'guest_nickname'.tr(),
+                  prefixIcon: const Icon(Icons.badge_outlined),
+                ),
+              ),
+              const SizedBox(height: 16),
               OutlinedButton.icon(
                 onPressed: _isLoading ? null : _signInAnonymously,
                 icon: const Icon(Icons.person_outline),

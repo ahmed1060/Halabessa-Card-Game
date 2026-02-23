@@ -9,7 +9,7 @@ abstract class AuthRepository {
   Future<AppUser?> signInWithGoogle();
   Future<AppUser?> signInWithFacebook();
   Future<AppUser?> signInWithApple();
-  Future<AppUser?> signInAnonymously();
+  Future<AppUser?> signInAnonymously({String? displayName});
   
   Future<void> signOut();
   Future<void> resetPassword(String email);
