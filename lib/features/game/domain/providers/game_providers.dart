@@ -8,6 +8,7 @@ import '../../domain/logic/game_engine_utils.dart';
 import '../../data/repositories/multiplayer_sync_service.dart';
 import 'package:firebase_core/firebase_core.dart';
 import '../../../../firebase_options.dart';
+import '../../../../features/auth/presentation/providers/auth_providers.dart';
 
 final multiplayerSyncServiceProvider = Provider<MultiplayerSyncService>((ref) {
   // Explicitly initialize with the databaseURL to fix Flutter Web resolution bug
@@ -31,8 +32,63 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     ref.read(multiplayerSyncServiceProvider).watchMatch(matchId).listen((serverState) {
       if (serverState != null) {
         state = serverState;
+        _evaluateBotActions(serverState);
       }
     });
+  }
+
+  Future<void> _evaluateBotActions(MatchState serverState) async {
+    // Determine if the LOCAL client is the Host (index 0) of the match.
+    // We only want ONE client (the Host) to execute Bot logic to prevent duplicate Firebase writes.
+    final currentUser = ref.read(currentUserProvider);
+    if (currentUser == null || serverState.playerIds.isEmpty) return;
+    
+    final isHost = serverState.playerIds.indexOf(currentUser.uid) == 0;
+    if (!isHost) return;
+
+    // Determine active turning logic
+    if (serverState.phase == GamePhase.preRoundCut) {
+       int cutterIdx = (serverState.dealerIndex + 3) % 4;
+       String cutterId = serverState.playerIds[cutterIdx];
+       if (cutterId.startsWith('bot_')) {
+          await Future.delayed(const Duration(milliseconds: 1500));
+          // Make sure state didn't change while waiting
+          if (state?.phase == GamePhase.preRoundCut) {
+             performCut(Random().nextInt(serverState.deck.length - 10) + 5); 
+          }
+       }
+    } else if (serverState.phase == GamePhase.playing) {
+       String activePlayerId = serverState.playerIds[serverState.currentTurnIndex];
+       if (activePlayerId.startsWith('bot_')) {
+          await Future.delayed(const Duration(milliseconds: 2000));
+          // Validate state is still playing and it's still their turn
+          if (state?.phase == GamePhase.playing && state!.playerIds[state!.currentTurnIndex] == activePlayerId) {
+             _executeBotPlayCard(activePlayerId);
+          }
+       }
+    } else if (serverState.phase == GamePhase.shuffleVoting || serverState.phase == GamePhase.rematchVoting) {
+       // Bots auto-vote immediately
+       for (var playerId in serverState.playerIds) {
+          if (playerId.startsWith('bot_')) {
+              if (serverState.phase == GamePhase.shuffleVoting && !serverState.shuffleVotes.containsKey(playerId)) {
+                 voteShuffle(playerId, false); // Bots prefer memory mode
+              } else if (serverState.phase == GamePhase.rematchVoting && !serverState.rematchVotes.containsKey(playerId)) {
+                 voteRematch(playerId, true); // Bots always want to play again
+              }
+          }
+       }
+    }
+  }
+
+  void _executeBotPlayCard(String botId) {
+    if (state == null) return;
+    final hand = state!.handCards[botId];
+    if (hand == null || hand.isEmpty) return;
+
+    // Really simple bot: just plays a random card for now.
+    // Future Enhancement: Implement Basra heuristics and pattern matching.
+    final cardToPlay = hand[Random().nextInt(hand.length)];
+    playCard(botId, cardToPlay);
   }
 
   String _generateRoomId() {
