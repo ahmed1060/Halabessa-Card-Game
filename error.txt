@@ -1,0 +1,12 @@
+Analyzing Halabessa-Card-Game...                                
+
+   info - Use 'const' with the constructor to improve performance - lib\features\auth\presentation\pages\auth_screen.dart:76:9 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\features\auth\presentation\pages\auth_screen.dart:76:27 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\features\auth\presentation\pages\auth_screen.dart:90:9 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\features\auth\presentation\pages\auth_screen.dart:90:27 - prefer_const_constructors
+   info - Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check - lib\features\auth\presentation\pages\auth_screen.dart:122:40 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check - lib\features\auth\presentation\pages\auth_screen.dart:128:40 - use_build_context_synchronously
+   info - Use the null-aware operator '?.' rather than an explicit 'null' comparison - lib\features\game\domain\models\match_state.dart:151:24 - prefer_null_aware_operators
+  error - Target of URI doesn't exist: '../../firebase_options.dart' - lib\features\game\domain\providers\game_providers.dart:10:8 - uri_does_not_exist
+  error - Undefined name 'DefaultFirebaseOptions' - lib\features\game\domain\providers\game_providers.dart:16:20 - undefined_identifier
+
