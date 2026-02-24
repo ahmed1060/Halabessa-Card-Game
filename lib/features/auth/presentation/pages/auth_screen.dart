@@ -141,7 +141,32 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('7alabessa Auth')),
+      appBar: AppBar(
+        title: const Text('7alabessa Auth'),
+        actions: [
+          PopupMenuButton<Locale>(
+            icon: const Icon(Icons.language),
+            tooltip: 'Select Language',
+            onSelected: (Locale newLocale) {
+              context.setLocale(newLocale);
+            },
+            itemBuilder: (BuildContext context) => <PopupMenuEntry<Locale>>[
+              const PopupMenuItem<Locale>(
+                value: Locale('en', 'US'),
+                child: Text('English (US)'),
+              ),
+              const PopupMenuItem<Locale>(
+                value: Locale('ar', 'EG'),
+                child: Text('العربية (مصر)'),
+              ),
+              const PopupMenuItem<Locale>(
+                value: Locale('ar', 'SA'),
+                child: Text('العربية (السعودية)'),
+              ),
+            ],
+          ),
+        ],
+      ),
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
@@ -175,7 +200,16 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                 decoration: const InputDecoration(labelText: 'Password'),
                 obscureText: true,
               ),
-              const SizedBox(height: 24),
+              if (_isLogin)
+                Align(
+                  alignment: AlignmentDirectional.centerEnd,
+                  child: TextButton(
+                    onPressed: () => _showForgotPasswordDialog(context, ref),
+                    child: const Text('Forgot Password?'),
+                  ),
+                )
+              else
+                const SizedBox(height: 24),
               if (_isLoading)
                 const Center(child: CircularProgressIndicator())
               else
@@ -197,11 +231,6 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                       : "Already have an account? Login",
                 ),
               ),
-              if (_isLogin)
-                TextButton(
-                  onPressed: () => _showForgotPasswordDialog(context, ref),
-                  child: const Text('Forgot Password?'),
-                ),
               const Divider(height: 32),
               const Text('Or connect with', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold)),
               const SizedBox(height: 16),
