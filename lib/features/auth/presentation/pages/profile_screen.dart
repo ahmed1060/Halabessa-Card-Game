@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:easy_localization/easy_localization.dart';
 
 import '../providers/auth_providers.dart';
 
@@ -19,13 +20,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       await ref.read(authRepositoryProvider).sendEmailVerification();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Verification email sent! Please check your inbox.')),
+          SnackBar(content: Text('verification_sent'.tr())),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
+          SnackBar(content: Text('error_general'.tr(args: [e.toString()]))),
         );
       }
     } finally {
@@ -38,16 +39,16 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Change Email Address'),
+        title: Text('change_email_address'.tr()),
         content: TextField(
           controller: emailController,
-          decoration: const InputDecoration(labelText: 'New Email Address'),
+          decoration: InputDecoration(labelText: 'new_email_address'.tr()),
           keyboardType: TextInputType.emailAddress,
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancel'),
+            child: Text('cancel'.tr()),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -60,20 +61,20 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 await ref.read(authRepositoryProvider).updateEmail(newEmail);
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Firebase has sent a confirmation link to your new address to verify the change.')),
+                    SnackBar(content: Text('email_change_confirm'.tr())),
                   );
                 }
               } catch (e) {
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Error: $e\n(You may need to log out and log back in first)')),
+                    SnackBar(content: Text('error_general'.tr(args: ['$e\n(You may need to log out and log back in first)']))),
                   );
                 }
               } finally {
                 if (mounted) setState(() => _isLoading = false);
               }
             },
-            child: const Text('Update'),
+            child: Text('update'.tr()),
           ),
         ],
       ),
@@ -85,8 +86,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final user = ref.watch(currentUserProvider);
 
     if (user == null) {
-      return const Scaffold(
-        body: Center(child: Text('Not logged in.')),
+      return Scaffold(
+        body: Center(child: Text('not_logged_in'.tr())),
       );
     }
 
@@ -94,7 +95,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Player Profile'),
+        title: Text('player_profile'.tr()),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24.0),
@@ -120,7 +121,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              isAnonymous ? 'Guest Account' : user.email,
+              isAnonymous ? 'guest_account'.tr() : user.email,
               style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                 color: Colors.white70,
               ),
@@ -135,20 +136,20 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   user.isEmailVerified ? Icons.check_circle : Icons.warning,
                   color: user.isEmailVerified ? Colors.green : Colors.orange,
                 ),
-                title: Text(user.isEmailVerified ? 'Email Verified' : 'Email Not Verified'),
+                title: Text(user.isEmailVerified ? 'email_verified'.tr() : 'email_not_verified'.tr()),
                 trailing: user.isEmailVerified 
                     ? null 
                     : (_isLoading 
                         ? const CircularProgressIndicator() 
                         : TextButton(
                             onPressed: _sendVerificationEmail,
-                            child: const Text('Send Link'),
+                            child: Text('send_link'.tr()),
                           )),
               ),
               const Divider(),
               ListTile(
                 leading: const Icon(Icons.email),
-                title: const Text('Change Email Address'),
+                title: Text('change_email_address'.tr()),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: _isLoading ? null : _showChangeEmailDialog,
               ),
@@ -156,7 +157,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             const Divider(),
             ListTile(
               leading: const Icon(Icons.logout, color: Colors.red),
-              title: const Text('Log Out', style: TextStyle(color: Colors.red)),
+              title: Text('log_out'.tr(), style: const TextStyle(color: Colors.red)),
               onTap: () {
                 ref.read(authRepositoryProvider).signOut();
                 Navigator.pop(context); // Go back home/login

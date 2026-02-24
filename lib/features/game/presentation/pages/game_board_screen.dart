@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:easy_localization/easy_localization.dart';
 
 import '../../domain/providers/game_providers.dart';
 import '../../domain/models/match_state.dart';
@@ -70,7 +71,7 @@ class GameBoardScreen extends ConsumerWidget {
           Center(
              child: Padding(
                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-               child: Text('Score: ${matchState.teamAScore} - ${matchState.teamBScore}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+               child: Text('score'.tr(args: [matchState.teamAScore.toString(), matchState.teamBScore.toString()]), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
              ),
           ),
           IconButton(icon: const Icon(Icons.settings), onPressed: () {}),
@@ -243,12 +244,12 @@ class GameBoardScreen extends ConsumerWidget {
           child: Column(
              mainAxisSize: MainAxisSize.min,
              children: [
-               const Text('Pre-Round Cut', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+               const Text('pre_round_cut', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)).tr(),
                const SizedBox(height: 16),
                if (isMyCut) ...[
-                  const Text('It is your turn to cut the deck!', style: TextStyle(color: Colors.white70)),
+                  const Text('your_turn_cut_deck', style: TextStyle(color: Colors.white70)).tr(),
                ] else ...[
-                  const Text('Waiting for the deck to be cut...', style: TextStyle(color: Colors.white70)),
+                  const Text('waiting_deck_cut', style: TextStyle(color: Colors.white70)).tr(),
                ],
                const SizedBox(height: 24),
                ElevatedButton(
@@ -273,11 +274,11 @@ class GameBoardScreen extends ConsumerWidget {
            child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text('Waiting for Players...', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+                Text('waiting_for_players'.tr(), style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 16),
                 Text('Room ID: ${state.id}', style: const TextStyle(color: Colors.orangeAccent, fontSize: 16, fontWeight: FontWeight.w500)),
                 const SizedBox(height: 24),
-                const Text('Connected Players:', style: TextStyle(color: Colors.white70, fontSize: 14)),
+                Text('connected_players'.tr(), style: const TextStyle(color: Colors.white70, fontSize: 14)),
                 const SizedBox(height: 8),
                 ...state.playerIds.map((id) => Padding(
                    padding: const EdgeInsets.symmetric(vertical: 4.0),
@@ -286,7 +287,7 @@ class GameBoardScreen extends ConsumerWidget {
                       children: [
                          Icon(Icons.person, color: id == currentUid ? Colors.green : Colors.white54, size: 20),
                          const SizedBox(width: 8),
-                         Text(id == currentUid ? "You" : "Player (UUID: ${id.substring(0, 5)}...)", style: TextStyle(color: id == currentUid ? Colors.green : Colors.white)),
+                         Text(id == currentUid ? "you".tr() : "player_uuid".tr(args: [id.substring(0, 5)]), style: TextStyle(color: id == currentUid ? Colors.green : Colors.white)),
                          if (state.botInjectionVotes.containsKey(id))
                             const Padding(
                               padding: EdgeInsets.only(left: 8.0),
@@ -301,13 +302,13 @@ class GameBoardScreen extends ConsumerWidget {
                       ElevatedButton.icon(
                         onPressed: () => ref.read(matchStateProvider.notifier).voteForBots(currentUid),
                         icon: const Icon(Icons.smart_toy),
-                        label: const Text('Ready (Fill empty seats with Bots)'),
+                        label: Text('ready_fill_bots'.tr()),
                         style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
                       )
                    else
-                      Text('Waiting for human consent ($readyCount/$totalPlayers Ready)...', style: const TextStyle(color: Colors.orangeAccent, fontStyle: FontStyle.italic)),
+                      Text('waiting_human_consent'.tr(args: [readyCount.toString(), totalPlayers.toString()]), style: const TextStyle(color: Colors.orangeAccent, fontStyle: FontStyle.italic)),
                 ] else
-                   const Text('Room Full! Starting shortly...', style: TextStyle(color: Colors.green)),
+                   Text('room_full_starting'.tr(), style: const TextStyle(color: Colors.green)),
               ],
            ),
         ),
@@ -323,25 +324,25 @@ class GameBoardScreen extends ConsumerWidget {
           child: Column(
              mainAxisSize: MainAxisSize.min,
              children: [
-               const Text('Deck Finished!', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+               Text('deck_finished'.tr(), style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
                const SizedBox(height: 16),
-               Text('Shuffle votes: ${state.shuffleVotes.length} / 4', style: const TextStyle(color: Colors.white70)),
+               Text('shuffle_votes'.tr(args: [state.shuffleVotes.length.toString()]), style: const TextStyle(color: Colors.white70)),
                const SizedBox(height: 24),
                if (!hasVoted) Row(
                  mainAxisSize: MainAxisSize.min,
                  children: [
                    ElevatedButton(
                      onPressed: () => ref.read(matchStateProvider.notifier).voteShuffle(currentUid, true),
-                     child: const Text('Shuffle (Yes)'),
+                     child: Text('shuffle_yes'.tr()),
                    ),
                    const SizedBox(width: 16),
                    ElevatedButton(
                      style: ElevatedButton.styleFrom(backgroundColor: Colors.blueGrey),
                      onPressed: () => ref.read(matchStateProvider.notifier).voteShuffle(currentUid, false),
-                     child: const Text('Keep Sequence (No)', style: TextStyle(color: Colors.white)),
+                     child: Text('keep_sequence_no'.tr(), style: const TextStyle(color: Colors.white)),
                    ),
                  ],
-               ) else const Text('Waiting for other players...', style: TextStyle(color: Colors.white)),
+               ) else Text('waiting_for_other_players'.tr(), style: const TextStyle(color: Colors.white)),
              ],
           ),
        ),
@@ -358,26 +359,26 @@ class GameBoardScreen extends ConsumerWidget {
           child: Column(
              mainAxisSize: MainAxisSize.min,
              children: [
-               const Text('Match Over!', style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold)),
-               Text(aWins ? 'Team A Wins!' : 'Team B Wins!', style: const TextStyle(color: Colors.greenAccent, fontSize: 20)),
+               Text('match_over'.tr(), style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold)),
+               Text('team_wins'.tr(args: [aWins ? "A" : "B"]), style: const TextStyle(color: Colors.greenAccent, fontSize: 20)),
                const SizedBox(height: 16),
-               Text('Rematch votes: ${state.rematchVotes.length} / 4', style: const TextStyle(color: Colors.white70)),
+               Text('rematch_votes'.tr(args: [state.rematchVotes.length.toString()]), style: const TextStyle(color: Colors.white70)),
                const SizedBox(height: 24),
                if (!hasVoted) Row(
                  mainAxisSize: MainAxisSize.min,
                  children: [
                    ElevatedButton(
                      onPressed: () => ref.read(matchStateProvider.notifier).voteRematch(currentUid, true),
-                     child: const Text('Best of 3 (Yes)'),
+                     child: Text('best_of_3_yes'.tr()),
                    ),
                    const SizedBox(width: 16),
                    ElevatedButton(
                      style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
                      onPressed: () => ref.read(matchStateProvider.notifier).voteRematch(currentUid, false),
-                     child: const Text('Leave Match (No)', style: TextStyle(color: Colors.white)),
+                     child: Text('leave_match_no'.tr(), style: const TextStyle(color: Colors.white)),
                    ),
                  ],
-               ) else const Text('Waiting for other players...', style: TextStyle(color: Colors.white)),
+               ) else Text('waiting_for_other_players'.tr(), style: const TextStyle(color: Colors.white)),
              ],
           ),
        ),

@@ -99,16 +99,16 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Reset Password'),
+        title: Text('reset_password'.tr()),
         content: TextField(
           controller: resetEmailController,
-          decoration: const InputDecoration(labelText: 'Email Address'),
+          decoration: InputDecoration(labelText: 'email_address'.tr()),
           keyboardType: TextInputType.emailAddress,
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancel'),
+            child: Text('cancel'.tr()),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -120,18 +120,18 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                 await ref.read(authRepositoryProvider).resetPassword(email);
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Password reset email sent! Check your inbox.')),
+                    SnackBar(content: Text('verification_sent'.tr())),
                   );
                 }
               } catch (e) {
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Error: $e')),
+                    SnackBar(content: Text('error_general'.tr(args: [e.toString()]))),
                   );
                 }
               }
             },
-            child: const Text('Send Link'),
+            child: Text('send_link'.tr()),
           ),
         ],
       ),
@@ -142,7 +142,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('7alabessa Auth'),
+        title: Text('title'.tr()),
         actions: [
           PopupMenuButton<Locale>(
             icon: const Icon(Icons.language),
@@ -177,7 +177,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
               const Icon(Icons.style, size: 80, color: Colors.teal),
               const SizedBox(height: 24),
               Text(
-                _isLogin ? 'Welcome Back' : 'Create Account',
+                _isLogin ? 'welcome_back'.tr() : 'create_account'.tr(),
                 style: Theme.of(context).textTheme.headlineMedium,
                 textAlign: TextAlign.center,
               ),
@@ -185,19 +185,19 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
               if (!_isLogin) ...[
                 TextField(
                   controller: _nameController,
-                  decoration: const InputDecoration(labelText: 'Display Name'),
+                  decoration: InputDecoration(labelText: 'display_name'.tr()),
                 ),
                 const SizedBox(height: 16),
               ],
               TextField(
                 controller: _emailController,
-                decoration: const InputDecoration(labelText: 'Email Address'),
+                decoration: InputDecoration(labelText: 'email_address'.tr()),
                 keyboardType: TextInputType.emailAddress,
               ),
               const SizedBox(height: 16),
               TextField(
                 controller: _passwordController,
-                decoration: const InputDecoration(labelText: 'Password'),
+                decoration: InputDecoration(labelText: 'password'.tr()),
                 obscureText: true,
               ),
               if (_isLogin)
@@ -205,7 +205,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                   alignment: AlignmentDirectional.centerEnd,
                   child: TextButton(
                     onPressed: () => _showForgotPasswordDialog(context, ref),
-                    child: const Text('Forgot Password?'),
+                    child: Text('forgot_password'.tr()),
                   ),
                 )
               else
@@ -218,7 +218,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
-                  child: Text(_isLogin ? 'Login' : 'Sign Up'),
+                  child: Text(_isLogin ? 'login_btn'.tr() : 'sign_up'.tr()),
                 ),
               const SizedBox(height: 16),
               TextButton(
@@ -227,12 +227,12 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                 },
                 child: Text(
                   _isLogin
-                      ? "Don't have an account? Sign up"
-                      : "Already have an account? Login",
+                      ? 'dont_have_account'.tr()
+                      : 'already_have_account'.tr(),
                 ),
               ),
               const Divider(height: 32),
-              const Text('Or connect with', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold)),
+              Text('or_connect_with'.tr(), textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.bold)),
               const SizedBox(height: 16),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,

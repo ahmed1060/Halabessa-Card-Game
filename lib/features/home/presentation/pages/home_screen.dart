@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:easy_localization/easy_localization.dart';
 
 import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../game/domain/providers/game_providers.dart';
@@ -37,18 +38,18 @@ class HomeScreen extends ConsumerWidget {
             const Icon(Icons.casino, size: 100, color: Colors.teal),
             const SizedBox(height: 24),
             Text(
-              'Welcome, ${user?.displayName ?? "Player"}!',
+              'welcome_player'.tr(args: [user?.displayName ?? "Player"]),
               style: Theme.of(context).textTheme.headlineSmall,
             ),
             const SizedBox(height: 8),
-            Text('Points: ${user?.points ?? 0} | Rank: ${user?.rank ?? 0}'),
+            Text('points_and_rank'.tr(args: [user?.points.toString() ?? '0', user?.rank.toString() ?? '0'])),
             const SizedBox(height: 32),
             ElevatedButton.icon(
               onPressed: () {
                 _showCreateRoomDialog(context, ref, user?.uid ?? 'unknown');
               },
               icon: const Icon(Icons.add),
-              label: const Text('Create Game Room'),
+              label: Text('create_game_room'.tr()),
               style: ElevatedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 16),
                 textStyle: const TextStyle(fontSize: 18),
@@ -60,7 +61,7 @@ class HomeScreen extends ConsumerWidget {
                  _showJoinRoomDialog(context, ref, user?.uid ?? 'unknown');
               },
               icon: const Icon(Icons.group_add),
-              label: const Text('Join Game Room'),
+              label: Text('join_game_room'.tr()),
               style: OutlinedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 16),
                 textStyle: const TextStyle(fontSize: 18),
@@ -81,21 +82,21 @@ class HomeScreen extends ConsumerWidget {
         return StatefulBuilder(
           builder: (builderContext, setState) {
             return AlertDialog(
-              title: const Text('Create Room'),
+              title: Text('create_room'.tr()),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                   const Text('Select turn timer duration:'),
+                   Text('select_timer'.tr()),
                    const SizedBox(height: 8),
                    DropdownButton<int>(
                      value: selectedTimerSeconds,
                      isExpanded: true,
-                     items: const [
-                        DropdownMenuItem(value: 5, child: Text("5 Seconds")),
-                        DropdownMenuItem(value: 10, child: Text("10 Seconds (Default)")),
-                        DropdownMenuItem(value: 15, child: Text("15 Seconds")),
-                        DropdownMenuItem(value: 0, child: Text("Infinity / No Timer")),
+                     items: [
+                        DropdownMenuItem(value: 5, child: Text('5_seconds'.tr())),
+                        DropdownMenuItem(value: 10, child: Text('10_seconds_default'.tr())),
+                        DropdownMenuItem(value: 15, child: Text('15_seconds'.tr())),
+                        DropdownMenuItem(value: 0, child: Text('no_timer'.tr())),
                      ],
                      onChanged: (val) {
                        if (val != null) {
@@ -104,13 +105,13 @@ class HomeScreen extends ConsumerWidget {
                      },
                    ),
                    const SizedBox(height: 16),
-                   const Text('Select game mode to create match:'),
+                   Text('select_game_mode'.tr()),
                 ],
               ),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(dialogContext),
-                  child: const Text('Cancel'),
+                  child: Text('cancel'.tr()),
                 ),
                 ElevatedButton(
                   onPressed: () async {
@@ -130,7 +131,7 @@ class HomeScreen extends ConsumerWidget {
                       }
                     }
                   },
-                  child: const Text('Classic Mode'),
+                  child: Text('classic_mode'.tr()),
                 ),
                 ElevatedButton(
                   onPressed: () async {
@@ -150,7 +151,7 @@ class HomeScreen extends ConsumerWidget {
                       }
                     }
                   },
-                  child: const Text('Tafweet Mode'),
+                  child: Text('tafweet_mode'.tr()),
                 ),
               ],
             );
@@ -167,15 +168,15 @@ class HomeScreen extends ConsumerWidget {
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          title: const Text('Join Room'),
+          title: Text('join_room'.tr()),
           content: TextField(
             controller: roomController,
-            decoration: const InputDecoration(labelText: 'Room ID'),
+            decoration: InputDecoration(labelText: 'room_code'.tr()),
           ),
           actions: [
              TextButton(
                onPressed: () => Navigator.pop(dialogContext),
-               child: const Text('Cancel'),
+               child: Text('cancel'.tr()),
              ),
              ElevatedButton(
                onPressed: () {
@@ -186,7 +187,7 @@ class HomeScreen extends ConsumerWidget {
                     Navigator.pushNamed(context, '/game');
                  }
                },
-               child: const Text('Join'),
+               child: Text('join'.tr()),
              ),
           ],
         );
