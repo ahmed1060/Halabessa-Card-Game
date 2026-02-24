@@ -1,6 +1,7 @@
 class AppUser {
   final String uid;
   final String email;
+  final bool isEmailVerified;
   final String displayName;
   final String? avatarUrl;
   final int points;
@@ -9,6 +10,7 @@ class AppUser {
   AppUser({
     required this.uid,
     required this.email,
+    this.isEmailVerified = false,
     required this.displayName,
     this.avatarUrl,
     this.points = 0,
@@ -19,6 +21,7 @@ class AppUser {
     return AppUser(
       uid: uid,
       email: json['email'] ?? '',
+      isEmailVerified: json['isEmailVerified'] ?? false,
       displayName: json['displayName'] ?? 'Player',
       avatarUrl: json['avatarUrl'],
       points: json['points'] ?? 0,
@@ -29,6 +32,7 @@ class AppUser {
   Map<String, dynamic> toJson() {
     return {
       'email': email,
+      'isEmailVerified': isEmailVerified,
       'displayName': displayName,
       'avatarUrl': avatarUrl,
       'points': points,
@@ -39,6 +43,7 @@ class AppUser {
   AppUser copyWith({
     String? uid,
     String? email,
+    bool? isEmailVerified,
     String? displayName,
     String? avatarUrl,
     int? points,
@@ -47,6 +52,7 @@ class AppUser {
     return AppUser(
       uid: uid ?? this.uid,
       email: email ?? this.email,
+      isEmailVerified: isEmailVerified ?? this.isEmailVerified,
       displayName: displayName ?? this.displayName,
       avatarUrl: avatarUrl ?? this.avatarUrl,
       points: points ?? this.points,

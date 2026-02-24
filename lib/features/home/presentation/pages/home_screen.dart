@@ -17,6 +17,12 @@ class HomeScreen extends ConsumerWidget {
         title: const Text('7alabessa'),
         actions: [
           IconButton(
+            icon: const Icon(Icons.person),
+            onPressed: () {
+              Navigator.pushNamed(context, '/profile');
+            },
+          ),
+          IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () {
               ref.read(authRepositoryProvider).signOut();

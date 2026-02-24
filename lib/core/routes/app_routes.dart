@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../features/auth/presentation/pages/auth_wrapper.dart';
 import '../../features/home/presentation/pages/home_screen.dart';
 import '../../features/game/presentation/pages/game_board_screen.dart';
+import '../../features/auth/presentation/pages/profile_screen.dart';
 
 class AppRoutes {
   static const String initial = '/';
@@ -14,7 +15,7 @@ class AppRoutes {
         initial: (context) => const AuthWrapper(),
         home: (context) => const HomeScreen(),
         game: (context) => const GameBoardScreen(),
-        profile: (context) => const PlaceholderView(title: 'Profile'),
+        profile: (context) => const ProfileScreen(),
       };
 }
 

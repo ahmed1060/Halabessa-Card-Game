@@ -151,4 +151,20 @@ class FirebaseAuthRepository implements AuthRepository {
   Future<void> resetPassword(String email) async {
     await _firebaseAuth.sendPasswordResetEmail(email: email);
   }
+
+  @override
+  Future<void> sendEmailVerification() async {
+    final user = _firebaseAuth.currentUser;
+    if (user != null && !user.emailVerified) {
+      await user.sendEmailVerification();
+    }
+  }
+
+  @override
+  Future<void> updateEmail(String newEmail) async {
+    final user = _firebaseAuth.currentUser;
+    if (user != null) {
+      await user.verifyBeforeUpdateEmail(newEmail);
+    }
+  }
 }

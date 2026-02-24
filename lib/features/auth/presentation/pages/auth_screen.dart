@@ -94,6 +94,50 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     }
   }
 
+  void _showForgotPasswordDialog(BuildContext context, WidgetRef ref) {
+    final resetEmailController = TextEditingController(text: _emailController.text);
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Reset Password'),
+        content: TextField(
+          controller: resetEmailController,
+          decoration: const InputDecoration(labelText: 'Email Address'),
+          keyboardType: TextInputType.emailAddress,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final email = resetEmailController.text.trim();
+              if (email.isEmpty) return;
+              Navigator.pop(dialogContext); // Close dialog
+              
+              try {
+                await ref.read(authRepositoryProvider).resetPassword(email);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Password reset email sent! Check your inbox.')),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Error: $e')),
+                  );
+                }
+              }
+            },
+            child: const Text('Send Link'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -153,6 +197,11 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                       : "Already have an account? Login",
                 ),
               ),
+              if (_isLogin)
+                TextButton(
+                  onPressed: () => _showForgotPasswordDialog(context, ref),
+                  child: const Text('Forgot Password?'),
+                ),
               const Divider(height: 32),
               const Text('Or connect with', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold)),
               const SizedBox(height: 16),
