@@ -57,6 +57,19 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
              performCut(Random().nextInt(serverState.deck.length - 10) + 5); 
           }
        }
+    } else if (serverState.phase == GamePhase.dealingFasha) {
+       await Future.delayed(const Duration(milliseconds: 1000));
+       if (state?.phase == GamePhase.dealingFasha) {
+          dealInitialCards();
+       }
+    } else if (serverState.phase == GamePhase.dealingCards) {
+       await Future.delayed(const Duration(milliseconds: 5000)); // 5s memorize phase
+       if (state?.phase == GamePhase.dealingCards) {
+          _publishState(state!.copyWith(
+             phase: GamePhase.playing,
+             turnStartTime: DateTime.now(),
+          ));
+       }
     } else if (serverState.phase == GamePhase.playing) {
        String activePlayerId = serverState.playerIds[serverState.currentTurnIndex];
        if (activePlayerId.startsWith('bot_')) {
