@@ -1,6 +1,12 @@
 {
     "rules": {
-        ".read": true,
-        ".write": true
+        "matches": {
+            ".read": "true",
+            ".write": "true"
+        },
+        "matchmaking_queue": {
+            ".read": "true",
+            ".write": "true"
+        }
     }
 }
