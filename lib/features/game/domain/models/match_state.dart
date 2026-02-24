@@ -14,8 +14,8 @@ class MatchState {
   final List<String> playerIds;
 
   // Deck & Board State
-  final List<game_card.Card> deck; // Remaining Deck
-  final List<game_card.Card> board; // Cards present on the ground
+  // Removed shared deck list for security (Anti-Cheat)
+  final List<game_card.Card> board; 
   final List<game_card.Card> recentFasha; // Temporarily holds the layout of Fasha for 5s preview
 
   // Player Hands: Map<PlayerId, List<game_card.Card>>
@@ -46,13 +46,15 @@ class MatchState {
   final Map<String, bool> shuffleVotes;
   final Map<String, bool> rematchVotes;
   final Map<String, bool> botInjectionVotes;
+  final int deckCount;
+  final Map<String, List<game_card.Card>> skippedMatches;
+  final List<game_card.Card> playHistory;
 
   MatchState({
     required this.id,
     required this.mode,
     this.maxPoints = 41,
     required this.playerIds,
-    this.deck = const [],
     this.board = const [],
     this.recentFasha = const [],
     this.handCards = const {},
@@ -72,6 +74,9 @@ class MatchState {
     this.shuffleVotes = const {},
     this.rematchVotes = const {},
     this.botInjectionVotes = const {},
+    this.deckCount = 0,
+    this.skippedMatches = const {},
+    this.playHistory = const [],
   });
 
   MatchState copyWith({
@@ -79,7 +84,6 @@ class MatchState {
     GameMode? mode,
     int? maxPoints,
     List<String>? playerIds,
-    List<game_card.Card>? deck,
     List<game_card.Card>? board,
     List<game_card.Card>? recentFasha,
     Map<String, List<game_card.Card>>? handCards,
@@ -99,13 +103,15 @@ class MatchState {
     Map<String, bool>? shuffleVotes,
     Map<String, bool>? rematchVotes,
     Map<String, bool>? botInjectionVotes,
+    int? deckCount,
+    Map<String, List<game_card.Card>>? skippedMatches,
+    List<game_card.Card>? playHistory,
   }) {
     return MatchState(
       id: id ?? this.id,
       mode: mode ?? this.mode,
       maxPoints: maxPoints ?? this.maxPoints,
       playerIds: playerIds ?? this.playerIds,
-      deck: deck ?? this.deck,
       board: board ?? this.board,
       recentFasha: recentFasha ?? this.recentFasha,
       handCards: handCards ?? this.handCards,
@@ -125,6 +131,9 @@ class MatchState {
       shuffleVotes: shuffleVotes ?? this.shuffleVotes,
       rematchVotes: rematchVotes ?? this.rematchVotes,
       botInjectionVotes: botInjectionVotes ?? this.botInjectionVotes,
+      deckCount: deckCount ?? this.deckCount,
+      skippedMatches: skippedMatches ?? this.skippedMatches,
+      playHistory: playHistory ?? this.playHistory,
     );
   }
 
@@ -134,11 +143,13 @@ class MatchState {
       'mode': mode.name,
       'maxPoints': maxPoints,
       'playerIds': playerIds,
-      'deck': deck.map((c) => c.toJson()).toList(),
+      'deckCount': deckCount,
       'board': board.map((c) => c.toJson()).toList(),
       'recentFasha': recentFasha.map((c) => c.toJson()).toList(),
       'handCards': handCards.map((k, v) => MapEntry(k, v.map((c) => c.toJson()).toList())),
       'harvestStacks': harvestStacks.map((k, v) => MapEntry(k, v.map((c) => c.toJson()).toList())),
+      'skippedMatches': skippedMatches.map((k, v) => MapEntry(k, v.map((c) => c.toJson()).toList())),
+      'playHistory': playHistory.map((c) => c.toJson()).toList(),
       'teamAScore': teamAScore,
       'teamBScore': teamBScore,
       'dealerIndex': dealerIndex,
@@ -160,11 +171,20 @@ class MatchState {
   factory MatchState.fromJson(Map<dynamic, dynamic> json) {
     List<game_card.Card> parseCards(dynamic list) {
       if (list == null) return [];
+      if (list is Map) {
+         // Firebase RTDB sometimes returns lists as maps with integer keys
+         final sortedKeys = list.keys.map((e) => int.tryParse(e.toString())).whereType<int>().toList()..sort();
+         return sortedKeys.map((k) => game_card.Card.fromJson(Map<String, dynamic>.from(list[k.toString()] as Map))).toList();
+      }
       return (list as List).map((i) => game_card.Card.fromJson(Map<String, dynamic>.from(i as Map))).toList();
     }
 
     List<Capture> parseCaptures(dynamic list) {
       if (list == null) return [];
+      if (list is Map) {
+         final sortedKeys = list.keys.map((e) => int.tryParse(e.toString())).whereType<int>().toList()..sort();
+         return sortedKeys.map((k) => Capture.fromJson(Map<String, dynamic>.from(list[k.toString()] as Map))).toList();
+      }
       return (list as List).map((i) => Capture.fromJson(Map<String, dynamic>.from(i as Map))).toList();
     }
     
@@ -195,7 +215,6 @@ class MatchState {
       mode: GameMode.values.byName(json['mode'] as String? ?? 'classic'),
       maxPoints: json['maxPoints'] as int? ?? 41,
       playerIds: (json['playerIds'] as List?)?.map((e) => e.toString()).toList() ?? [],
-      deck: parseCards(json['deck']),
       board: parseCards(json['board']),
       recentFasha: parseCards(json['recentFasha']),
       handCards: parseCardMap(json['handCards']),
@@ -215,6 +234,9 @@ class MatchState {
       shuffleVotes: (json['shuffleVotes'] as Map?)?.cast<String, bool>() ?? const {},
       rematchVotes: (json['rematchVotes'] as Map?)?.cast<String, bool>() ?? const {},
       botInjectionVotes: (json['botInjectionVotes'] as Map?)?.cast<String, bool>() ?? const {},
+      deckCount: json['deckCount'] as int? ?? 0,
+      skippedMatches: parseCardMap(json['skippedMatches']),
+      playHistory: parseCards(json['playHistory']),
     );
   }
 }

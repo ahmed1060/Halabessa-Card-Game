@@ -38,8 +38,6 @@ class GameEngineUtils {
       final targetSum = playedCard.basraValue;
       
       // Basic recursive or combinatorial sum finder for cards on board
-      // Here we will implement a simple iteration for combinations up to 2-3 boards 
-      // (Full standard game requires subset sum, we use a basic subset generator)
       List<List<game_card.Card>> validSums = _findSubsetsWithSum(board, targetSum);
       
       for (var subset in validSums) {
@@ -95,47 +93,15 @@ class GameEngineUtils {
      
      if (clearedBoard && boardBeforeCapture.isNotEmpty) {
        // Jack sweeping the board is NOT a Basra unless the board itself was empty/jack
-       // In Halabessa, standard rules usually dictate Jacks don't score "Basra" points, just capture.
        if (playedCard.isJack && boardBeforeCapture.every((c) => !c.isJack)) {
          return false; 
        }
-       // 7 Diamond sweeping board is NOT a Basra natively unless checking specific game variations
+       // 7 Diamond sweeping board is NOT a Basra natively
        if (playedCard.isDiamondSeven && boardBeforeCapture.every((c) => !c.isDiamondSeven)) {
          return false;
        }
        return true;
      }
      return false;
-  }
-
-  /// Complete scoring matrix calculation based on the established 7alabessa rules.
-  static int calculatePoints({
-    required game_card.Card playedCard,
-    required List<game_card.Card> capturedCards,
-    required List<game_card.Card> boardBeforeCapture,
-    required bool isTafweetMode,
-    required bool isFirstMoveOfRound,
-    required bool isConsecutiveTafweet,
-  }) {
-    if (capturedCards.isEmpty) return 0;
-    
-    int points = 0;
-    bool basra = isBasra(playedCard, capturedCards, boardBeforeCapture);
-    
-    if (basra) {
-       points += 1; // Base Basra point
-       
-       if (isTafweetMode) {
-          if (isFirstMoveOfRound) {
-             points += 20; // Fasha Tafweet
-          } else if (isConsecutiveTafweet) {
-             points += 30; // Double Tafweet
-          } else {
-             points += 10; // Standard Tafweet
-          }
-       }
-    }
-    
-    return points;
   }
 }

@@ -94,7 +94,10 @@ class GameBoardScreen extends ConsumerWidget {
           Center(
              child: Padding(
                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-               child: Text('score'.tr(args: [matchState.teamAScore.toString(), matchState.teamBScore.toString()]), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+               child: Text(
+                 'score'.tr(args: [matchState.teamAScore.toString(), matchState.teamBScore.toString()]), 
+                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)
+               ),
              ),
           ),
           IconButton(icon: const Icon(Icons.settings), onPressed: () {}),
@@ -182,32 +185,54 @@ class GameBoardScreen extends ConsumerWidget {
                     final offsetX = (random.nextDouble() - 0.5) * 45;
                     final offsetY = (random.nextDouble() - 0.5) * 45;
                     
-                    return Transform.translate(
-                      offset: Offset(offsetX, offsetY),
-                      child: Transform.rotate(
-                        angle: rotation,
-                        child: Hero(
-                          tag: 'card_${card.suit.index}_${card.rank.index}',
-                          child: CardWidget(card: card),
-                        ),
-                      ),
-                    );
+                     return TweenAnimationBuilder<double>(
+                       duration: const Duration(milliseconds: 500),
+                       curve: Curves.easeOutBack,
+                       tween: Tween(begin: 0.0, end: 1.0),
+                       builder: (context, value, child) {
+                         // Animate from bottom (y=500) to current offset
+                         final targetX = offsetX;
+                         final targetY = offsetY;
+                         final currentX = targetX; 
+                         final currentY = 500.0 * (1 - value) + targetY * value;
+                         
+                         return Transform.translate(
+                           offset: Offset(currentX, currentY),
+                           child: Transform.rotate(
+                             angle: rotation * value,
+                             child: Transform.scale(
+                               scale: 0.5 + 0.5 * value,
+                               child: child,
+                             ),
+                           ),
+                         );
+                       },
+                       child: CardWidget(card: card),
+                     );
                   }).toList(),
                 ),
               ),
             ),
             
-            // Local Player (Bottom Center, Offset 0)
+            // Local Player (Bottom Left to clear center)
             Align(
-              alignment: Alignment.bottomCenter,
-              child: Container(
-                padding: const EdgeInsets.only(bottom: 16.0),
+              alignment: Alignment.bottomLeft,
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Reaction Bar
+                    PlayerAvatar(
+                       user: _getAvatarUser(ref, matchState, myUid, 0),
+                       isCurrentTurn: matchState.playerIds.isNotEmpty && matchState.currentTurnIndex == _getAbsoluteIndex(matchState, myUid, 0),
+                       turnStartTime: matchState.turnStartTime,
+                       timerDurationSeconds: matchState.timerDurationSeconds,
+                       activeEmoji: matchState.playerEmojis[myUid],
+                    ),
+                    const SizedBox(height: 8),
+                    // Reaction Bar (Small)
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
                       children: ['😂', '😡', '🤔', '😎'].map((e) => GestureDetector(
                         onTap: () {
                            ref.read(matchStateProvider.notifier).sendEmoji(myUid, e);
@@ -216,19 +241,25 @@ class GameBoardScreen extends ConsumerWidget {
                            });
                         },
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                          child: Text(e, style: const TextStyle(fontSize: 24)),
+                          padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                          child: Text(e, style: const TextStyle(fontSize: 18)),
                         ),
                       )).toList(),
                     ),
-                    const SizedBox(height: 8),
-                     PlayerAvatar(
-                       user: _getAvatarUser(ref, matchState, myUid, 0),
-                       isCurrentTurn: matchState.playerIds.isNotEmpty && matchState.currentTurnIndex == _getAbsoluteIndex(matchState, myUid, 0),
-                       turnStartTime: matchState.turnStartTime,
-                       timerDurationSeconds: matchState.timerDurationSeconds,
-                       activeEmoji: matchState.playerEmojis[myUid],
-                    ),
+                  ],
+                ),
+              ),
+            ),
+            
+            // Local Player's Hand (Bottom Center)
+            Align(
+              alignment: Alignment.bottomCenter,
+              child: Container(
+                padding: const EdgeInsets.only(bottom: 16.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const SizedBox(height: 16),
                     if ((matchState.handCards[myUid]?.length ?? 0) > 0) ...[
                       const SizedBox(height: 16),
                       // Player Hand

@@ -15,6 +15,7 @@
     "error": "Error occurred",
     "team_a": "Team A",
     "team_b": "Team B",
+    "score": "Score: {} - {}",
     "points": "Points",
     "round": "Round",
     "shuffle_vote": "Vote to Shuffle?",
