@@ -4,11 +4,41 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../domain/providers/game_providers.dart';
 import '../../domain/models/match_state.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
+import '../../../auth/domain/models/app_user.dart';
 import '../widgets/card_widget.dart';
 import '../widgets/player_avatar.dart';
 
 class GameBoardScreen extends ConsumerWidget {
   const GameBoardScreen({super.key});
+
+  AppUser _getAvatarUser(WidgetRef ref, MatchState matchState, String currentUserUid, int relativeOffset) {
+     int myIdx = matchState.playerIds.indexOf(currentUserUid);
+     if (myIdx == -1) return AppUser(uid: 'spectator', email: '', displayName: 'Spectator');
+     
+     // 0 = Bottom (Local Player), 1 = Left, 2 = Top (Opponent), 3 = Right
+     if (relativeOffset == 0) {
+        final realUser = ref.watch(currentUserProvider)!;
+        return realUser.copyWith(displayName: 'You (${realUser.displayName})');
+     }
+     
+     int targetIdx = (myIdx + relativeOffset) % 4;
+     if (targetIdx >= matchState.playerIds.length) return AppUser(uid: 'empty', email: '', displayName: 'Waiting...');
+     
+     String targetUid = matchState.playerIds[targetIdx];
+     
+     if (targetUid.startsWith('bot_')) {
+        return AppUser(uid: targetUid, email: '', displayName: '🤖 Bot ${targetUid.split('_')[1]}');
+     }
+     
+     String positionName = relativeOffset == 1 ? "Left Player" : relativeOffset == 2 ? "Opponent" : "Right Player";
+     return AppUser(uid: targetUid, email: '', displayName: positionName);
+  }
+
+  int _getAbsoluteIndex(MatchState matchState, String currentUserUid, int relativeOffset) {
+     int myIdx = matchState.playerIds.indexOf(currentUserUid);
+     if (myIdx == -1) return -1;
+     return (myIdx + relativeOffset) % 4;
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -20,6 +50,8 @@ class GameBoardScreen extends ConsumerWidget {
         body: Center(child: Text("Loading Match Environment...")),
       );
     }
+
+    final myUid = currentUser.uid;
 
     return Scaffold(
       appBar: AppBar(
@@ -52,47 +84,47 @@ class GameBoardScreen extends ConsumerWidget {
               decoration: BoxDecoration(color: Colors.green.shade800),
             ),
             
-            // Opponent (Top Center)
+            // Opponent (Top Center, Offset 2)
             Align(
               alignment: Alignment.topCenter,
               child: Padding(
                 padding: const EdgeInsets.only(top: 16.0),
                 child: PlayerAvatar(
-                   user: currentUser, // Placeholder: Use actual opponent from matchState.playerIds
-                   isCurrentTurn: matchState.currentTurnIndex == 2,
+                   user: _getAvatarUser(ref, matchState, myUid, 2),
+                   isCurrentTurn: matchState.currentTurnIndex == _getAbsoluteIndex(matchState, myUid, 2),
                    turnStartTime: matchState.turnStartTime,
                    timerDurationSeconds: matchState.timerDurationSeconds,
-                   activeEmoji: matchState.playerIds.length > 2 ? matchState.playerEmojis[matchState.playerIds[2]] : null,
+                   activeEmoji: matchState.playerIds.length > _getAbsoluteIndex(matchState, myUid, 2) ? matchState.playerEmojis[matchState.playerIds[_getAbsoluteIndex(matchState, myUid, 2)]] : null,
                 ),
               ),
             ),
 
-            // Left Player
+            // Left Player (Offset 1)
             Align(
               alignment: Alignment.centerLeft,
               child: Padding(
                 padding: const EdgeInsets.only(left: 16.0),
                 child: PlayerAvatar(
-                   user: currentUser, // Placeholder: Use actual left player
-                   isCurrentTurn: matchState.currentTurnIndex == 1,
+                   user: _getAvatarUser(ref, matchState, myUid, 1),
+                   isCurrentTurn: matchState.currentTurnIndex == _getAbsoluteIndex(matchState, myUid, 1),
                    turnStartTime: matchState.turnStartTime,
                    timerDurationSeconds: matchState.timerDurationSeconds,
-                   activeEmoji: matchState.playerIds.length > 1 ? matchState.playerEmojis[matchState.playerIds[1]] : null,
+                   activeEmoji: matchState.playerIds.length > _getAbsoluteIndex(matchState, myUid, 1) ? matchState.playerEmojis[matchState.playerIds[_getAbsoluteIndex(matchState, myUid, 1)]] : null,
                 ),
               ),
             ),
 
-            // Right Player
+            // Right Player (Offset 3)
             Align(
               alignment: Alignment.centerRight,
               child: Padding(
                 padding: const EdgeInsets.only(right: 16.0),
                 child: PlayerAvatar(
-                   user: currentUser, // Placeholder: Use actual right player
-                   isCurrentTurn: matchState.currentTurnIndex == 3,
+                   user: _getAvatarUser(ref, matchState, myUid, 3),
+                   isCurrentTurn: matchState.currentTurnIndex == _getAbsoluteIndex(matchState, myUid, 3),
                    turnStartTime: matchState.turnStartTime,
                    timerDurationSeconds: matchState.timerDurationSeconds,
-                   activeEmoji: matchState.playerIds.length > 3 ? matchState.playerEmojis[matchState.playerIds[3]] : null,
+                   activeEmoji: matchState.playerIds.length > _getAbsoluteIndex(matchState, myUid, 3) ? matchState.playerEmojis[matchState.playerIds[_getAbsoluteIndex(matchState, myUid, 3)]] : null,
                 ),
               ),
             ),
@@ -107,7 +139,7 @@ class GameBoardScreen extends ConsumerWidget {
               ),
             ),
             
-            // Local Player (Bottom Center)
+            // Local Player (Bottom Center, Offset 0)
             Align(
               alignment: Alignment.bottomCenter,
               child: Container(
@@ -120,9 +152,9 @@ class GameBoardScreen extends ConsumerWidget {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: ['😂', '😡', '🤔', '😎'].map((e) => GestureDetector(
                         onTap: () {
-                           ref.read(matchStateProvider.notifier).sendEmoji(currentUser.uid, e);
+                           ref.read(matchStateProvider.notifier).sendEmoji(myUid, e);
                            Future.delayed(const Duration(seconds: 3), () {
-                              ref.read(matchStateProvider.notifier).clearEmoji(currentUser.uid);
+                              ref.read(matchStateProvider.notifier).clearEmoji(myUid);
                            });
                         },
                         child: Padding(
@@ -133,13 +165,13 @@ class GameBoardScreen extends ConsumerWidget {
                     ),
                     const SizedBox(height: 8),
                      PlayerAvatar(
-                       user: currentUser,
-                       isCurrentTurn: matchState.playerIds.isNotEmpty && matchState.playerIds[matchState.currentTurnIndex] == currentUser.uid,
+                       user: _getAvatarUser(ref, matchState, myUid, 0),
+                       isCurrentTurn: matchState.playerIds.isNotEmpty && matchState.currentTurnIndex == _getAbsoluteIndex(matchState, myUid, 0),
                        turnStartTime: matchState.turnStartTime,
                        timerDurationSeconds: matchState.timerDurationSeconds,
-                       activeEmoji: matchState.playerEmojis[currentUser.uid],
+                       activeEmoji: matchState.playerEmojis[myUid],
                     ),
-                    if ((matchState.handCards[currentUser.uid]?.length ?? 0) > 0) ...[
+                    if ((matchState.handCards[myUid]?.length ?? 0) > 0) ...[
                       const SizedBox(height: 16),
                       // Player Hand
                       SizedBox(
@@ -147,14 +179,14 @@ class GameBoardScreen extends ConsumerWidget {
                         child: ListView.separated(
                           shrinkWrap: true,
                           scrollDirection: Axis.horizontal,
-                          itemCount: matchState.handCards[currentUser.uid]!.length,
+                          itemCount: matchState.handCards[myUid]!.length,
                           separatorBuilder: (_, __) => const SizedBox(width: 8),
                           itemBuilder: (context, index) {
-                            final card = matchState.handCards[currentUser.uid]![index];
+                            final card = matchState.handCards[myUid]![index];
                             return CardWidget(
                               card: card,
                               onTap: () {
-                                 ref.read(matchStateProvider.notifier).playCard(currentUser.uid, card);
+                                 ref.read(matchStateProvider.notifier).playCard(myUid, card);
                               },
                             );
                           },
@@ -168,15 +200,15 @@ class GameBoardScreen extends ConsumerWidget {
             
             // Phase indicator overlay
              if (matchState.phase == GamePhase.waitingForPlayers)
-               _buildLobbyOverlay(context, ref, matchState, currentUser.uid),
+               _buildLobbyOverlay(context, ref, matchState, myUid),
              if (matchState.phase == GamePhase.preRoundCut)
-               _buildPhaseOverlay('Waiting for the Cut...'),
+               _buildCutOverlay(context, ref, matchState, myUid),
              if (matchState.phase == GamePhase.dealingFasha)
                _buildPhaseOverlay('Memorize the Fasha! 5s...'),
              if (matchState.phase == GamePhase.shuffleVoting)
-               _buildShuffleVoteOverlay(context, ref, matchState, currentUser.uid),
+               _buildShuffleVoteOverlay(context, ref, matchState, myUid),
              if (matchState.phase == GamePhase.rematchVoting)
-               _buildRematchVoteOverlay(context, ref, matchState, currentUser.uid),
+               _buildRematchVoteOverlay(context, ref, matchState, myUid),
              if (matchState.phase == GamePhase.matchOver)
                _buildPhaseOverlay('Match Finalized.'),
           ],
@@ -193,6 +225,37 @@ class GameBoardScreen extends ConsumerWidget {
           child: Text(
             text, 
             style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)
+          ),
+       ),
+     );
+  }
+
+  Widget _buildCutOverlay(BuildContext context, WidgetRef ref, MatchState state, String currentUid) {
+     int myIdx = state.playerIds.indexOf(currentUid);
+     int cutterIdx = (state.dealerIndex + 3) % 4; // Right of dealer
+     bool isMyCut = myIdx == cutterIdx;
+     
+     // Note: we'll show the cut button to everyone for testing/debug, but highlight whose turn it really is
+     return Center(
+       child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(16)),
+          child: Column(
+             mainAxisSize: MainAxisSize.min,
+             children: [
+               const Text('Pre-Round Cut', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+               const SizedBox(height: 16),
+               if (isMyCut) ...[
+                  const Text('It is your turn to cut the deck!', style: TextStyle(color: Colors.white70)),
+               ] else ...[
+                  const Text('Waiting for the deck to be cut...', style: TextStyle(color: Colors.white70)),
+               ],
+               const SizedBox(height: 24),
+               ElevatedButton(
+                  onPressed: () => ref.read(matchStateProvider.notifier).performCut(20), // Placeholder random cut index
+                  child: Text(isMyCut ? 'Cut Deck' : 'Cut Deck (Force)'),
+               )
+             ],
           ),
        ),
      );

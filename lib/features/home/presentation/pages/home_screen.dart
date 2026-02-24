@@ -173,7 +173,7 @@ class HomeScreen extends ConsumerWidget {
              ),
              ElevatedButton(
                onPressed: () {
-                 final roomId = roomController.text.trim();
+                 final roomId = roomController.text.trim().toUpperCase();
                  if (roomId.isNotEmpty) {
                     Navigator.pop(dialogContext);
                     ref.read(matchStateProvider.notifier).joinMatch(roomId, playerId);

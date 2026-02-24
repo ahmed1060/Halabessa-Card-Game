@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'dart:math';
 import '../../domain/models/match_state.dart';
 import '../../domain/models/card.dart' as game_card;
 import '../../domain/logic/deck.dart';
@@ -28,8 +29,17 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     });
   }
 
+  String _generateRoomId() {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const digits = '0123456789';
+    final rnd = Random();
+    String c = String.fromCharCodes(Iterable.generate(3, (_) => chars.codeUnitAt(rnd.nextInt(chars.length))));
+    String d = String.fromCharCodes(Iterable.generate(5, (_) => digits.codeUnitAt(rnd.nextInt(digits.length))));
+    return c + d;
+  }
+
   void initializeMatch(List<String> playerIds, GameMode mode, {int timerDurationSeconds = 10}) {
-    final newId = 'match_${DateTime.now().millisecondsSinceEpoch}';
+    final newId = _generateRoomId();
     final initial = MatchState(
       id: newId,
       mode: mode,

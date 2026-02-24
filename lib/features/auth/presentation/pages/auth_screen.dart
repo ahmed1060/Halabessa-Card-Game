@@ -169,7 +169,11 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                   ),
                   IconButton(
                     icon: const Icon(Icons.apple, size: 40),
-                    onPressed: _isLoading ? null : () => _signInWithSocial(() => ref.read(authRepositoryProvider).signInWithApple()),
+                    onPressed: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Apple Sign-In is coming soon!')),
+                      );
+                    },
                   ),
                 ],
               ),

@@ -22,7 +22,5 @@ final authStateChangesProvider = StreamProvider<AppUser?>((ref) {
 
 // 4. Provides the current logged in user directly if available
 final currentUserProvider = Provider<AppUser?>((ref) {
-  // We can read the latest value directly from authStateChangesProvider if needed,
-  // or return the cached value inside AuthRepository.
-  return ref.watch(authRepositoryProvider).currentUser;
+  return ref.watch(authStateChangesProvider).value;
 });

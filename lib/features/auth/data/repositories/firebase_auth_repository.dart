@@ -18,7 +18,7 @@ class FirebaseAuthRepository implements AuthRepository {
     return AppUser(
       uid: user.uid,
       email: user.email ?? '',
-      displayName: user.displayName ?? 'Player',
+      displayName: (user.displayName != null && user.displayName!.trim().isNotEmpty) ? user.displayName! : 'Player',
       avatarUrl: user.photoURL,
     );
   }
