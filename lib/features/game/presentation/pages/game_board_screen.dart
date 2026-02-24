@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easy_localization/easy_localization.dart';
@@ -8,6 +9,8 @@ import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../auth/domain/models/app_user.dart';
 import '../widgets/card_widget.dart';
 import '../widgets/player_avatar.dart';
+import '../../domain/models/capture.dart';
+import '../../../../core/theme/theme_config.dart';
 
 class GameBoardScreen extends ConsumerWidget {
   const GameBoardScreen({super.key});
@@ -35,10 +38,30 @@ class GameBoardScreen extends ConsumerWidget {
      return AppUser(uid: targetUid, email: '', displayName: positionName);
   }
 
-  int _getAbsoluteIndex(MatchState matchState, String currentUserUid, int relativeOffset) {
-     int myIdx = matchState.playerIds.indexOf(currentUserUid);
-     if (myIdx == -1) return -1;
-     return (myIdx + relativeOffset) % 4;
+  Widget _buildTeamHarvestStack(MatchState matchState, String teamId, {required bool isMyTeam}) {
+    final captures = matchState.harvestStacks[teamId] ?? [];
+    if (captures.isEmpty) return const SizedBox.shrink();
+
+    // Alignment logic: Team A typically bottom/left-ish, Team B top/right-ish or vice versa.
+    // For now, let's put Team A harvest bottom-left and Team B harvest top-right.
+    final alignment = teamId == 'teamA' ? const Alignment(-0.85, 0.7) : const Alignment(0.85, -0.7);
+
+    return Align(
+      alignment: alignment,
+      child: HarvestStackWidget(captures: captures, teamName: teamId.replaceAll('team', 'Team ')),
+    );
+  }
+
+  String _getTeamOfPlayer(String playerId, List<String> playerIds) {
+    final index = playerIds.indexOf(playerId);
+    if (index == -1) return '';
+    return (index % 2 == 0) ? 'teamA' : 'teamB';
+  }
+
+  int _getAbsoluteIndex(MatchState state, String myUid, int offset) {
+    int myIdx = state.playerIds.indexOf(myUid);
+    if (myIdx == -1) return offset;
+    return (myIdx + offset) % 4;
   }
 
   @override
@@ -80,9 +103,19 @@ class GameBoardScreen extends ConsumerWidget {
       body: SafeArea(
         child: Stack(
           children: [
-            // Table Top Background
+            // Table Top Background (Premium Radial Gradient)
             Container(
-              decoration: BoxDecoration(color: Colors.green.shade800),
+              decoration: const BoxDecoration(
+                gradient: RadialGradient(
+                  colors: [
+                    Color(0xFF2E7D32), // Lighter green center
+                    Color(0xFF1B5E20), // Mid green
+                    Color(0xFF0D3310), // Dark borders
+                  ],
+                  radius: 1.2,
+                  center: Alignment.center,
+                ),
+              ),
             ),
             
             // Opponent (Top Center, Offset 2)
@@ -102,41 +135,65 @@ class GameBoardScreen extends ConsumerWidget {
 
             // Left Player (Offset 1)
             Align(
-              alignment: Alignment.centerLeft,
-              child: Padding(
-                padding: const EdgeInsets.only(left: 16.0),
-                child: PlayerAvatar(
-                   user: _getAvatarUser(ref, matchState, myUid, 1),
-                   isCurrentTurn: matchState.currentTurnIndex == _getAbsoluteIndex(matchState, myUid, 1),
-                   turnStartTime: matchState.turnStartTime,
-                   timerDurationSeconds: matchState.timerDurationSeconds,
-                   activeEmoji: matchState.playerIds.length > _getAbsoluteIndex(matchState, myUid, 1) ? matchState.playerEmojis[matchState.playerIds[_getAbsoluteIndex(matchState, myUid, 1)]] : null,
-                ),
+              alignment: const Alignment(-0.95, 0),
+              child: PlayerAvatar(
+                 user: _getAvatarUser(ref, matchState, myUid, 1),
+                 isCurrentTurn: matchState.currentTurnIndex == _getAbsoluteIndex(matchState, myUid, 1),
+                 turnStartTime: matchState.turnStartTime,
+                 timerDurationSeconds: matchState.timerDurationSeconds,
+                 activeEmoji: matchState.playerIds.length > _getAbsoluteIndex(matchState, myUid, 1) ? matchState.playerEmojis[matchState.playerIds[_getAbsoluteIndex(matchState, myUid, 1)]] : null,
               ),
             ),
 
             // Right Player (Offset 3)
             Align(
-              alignment: Alignment.centerRight,
-              child: Padding(
-                padding: const EdgeInsets.only(right: 16.0),
-                child: PlayerAvatar(
-                   user: _getAvatarUser(ref, matchState, myUid, 3),
-                   isCurrentTurn: matchState.currentTurnIndex == _getAbsoluteIndex(matchState, myUid, 3),
-                   turnStartTime: matchState.turnStartTime,
-                   timerDurationSeconds: matchState.timerDurationSeconds,
-                   activeEmoji: matchState.playerIds.length > _getAbsoluteIndex(matchState, myUid, 3) ? matchState.playerEmojis[matchState.playerIds[_getAbsoluteIndex(matchState, myUid, 3)]] : null,
-                ),
+              alignment: const Alignment(0.95, 0),
+              child: PlayerAvatar(
+                 user: _getAvatarUser(ref, matchState, myUid, 3),
+                 isCurrentTurn: matchState.currentTurnIndex == _getAbsoluteIndex(matchState, myUid, 3),
+                 turnStartTime: matchState.turnStartTime,
+                 timerDurationSeconds: matchState.timerDurationSeconds,
+                 activeEmoji: matchState.playerIds.length > _getAbsoluteIndex(matchState, myUid, 3) ? matchState.playerEmojis[matchState.playerIds[_getAbsoluteIndex(matchState, myUid, 3)]] : null,
               ),
             ),
 
-            // The Board (Fasha / Center Stack)
+            // Team A Harvest Stack (Adjacent to Player 0 - typically Bottom/Self if Host)
+            _buildTeamHarvestStack(matchState, 'teamA', isMyTeam: _getTeamOfPlayer(myUid, matchState.playerIds) == 'teamA'),
+
+            // Team B Harvest Stack (Adjacent to Player 1 - typically Left)
+            _buildTeamHarvestStack(matchState, 'teamB', isMyTeam: _getTeamOfPlayer(myUid, matchState.playerIds) == 'teamB'),
+
+            // The Board (Fasha / Center Stack - Physical Pile)
             Center(
-              child: Wrap(
-                spacing: 8.0,
-                runSpacing: 8.0,
-                alignment: WrapAlignment.center,
-                children: matchState.board.map((card) => CardWidget(card: card)).toList(),
+              child: SizedBox(
+                width: 200,
+                height: 200,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: matchState.board.asMap().entries.map((entry) {
+                    final index = entry.key;
+                    final card = entry.value;
+                    
+                    // Deterministic "randomness" based on card properties
+                    final seed = card.suit.index * 13 + card.rank.index + index;
+                    final random = Random(seed);
+                    
+                    final rotation = (random.nextDouble() - 0.5) * 0.4; // +/- 11 degrees
+                    final offsetX = (random.nextDouble() - 0.5) * 45;
+                    final offsetY = (random.nextDouble() - 0.5) * 45;
+                    
+                    return Transform.translate(
+                      offset: Offset(offsetX, offsetY),
+                      child: Transform.rotate(
+                        angle: rotation,
+                        child: Hero(
+                          tag: 'card_${card.suit.index}_${card.rank.index}',
+                          child: CardWidget(card: card),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
               ),
             ),
             
@@ -184,11 +241,14 @@ class GameBoardScreen extends ConsumerWidget {
                           separatorBuilder: (_, __) => const SizedBox(width: 8),
                           itemBuilder: (context, index) {
                             final card = matchState.handCards[myUid]![index];
-                            return CardWidget(
-                              card: card,
-                              onTap: () {
-                                 ref.read(matchStateProvider.notifier).playCard(myUid, card);
-                              },
+                            return Hero(
+                              tag: 'card_${card.suit.index}_${card.rank.index}',
+                              child: CardWidget(
+                                card: card,
+                                onTap: () {
+                                   ref.read(matchStateProvider.notifier).playCard(myUid, card);
+                                },
+                              ),
                             );
                           },
                         ),
@@ -383,5 +443,131 @@ class GameBoardScreen extends ConsumerWidget {
           ),
        ),
      );
+  }
+}
+
+class HarvestStackWidget extends StatefulWidget {
+  final List<Capture> captures;
+  final String teamName;
+
+  const HarvestStackWidget({super.key, required this.captures, required this.teamName});
+
+  @override
+  State<HarvestStackWidget> createState() => _HarvestStackWidgetState();
+}
+
+class _HarvestStackWidgetState extends State<HarvestStackWidget> {
+  bool isExpanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => setState(() => isExpanded = !isExpanded),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        padding: const EdgeInsets.all(8),
+        constraints: const BoxConstraints(maxWidth: 220),
+        decoration: BoxDecoration(
+          color: Colors.black.withOpacity(0.4),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.white24, width: 1),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 10, offset: const Offset(0, 4)),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.inventory_2_outlined, color: ThemeConfig.goldAccent, size: 14),
+                const SizedBox(width: 4),
+                Text(widget.teamName, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                const Spacer(),
+                Icon(isExpanded ? Icons.expand_less : Icons.expand_more, color: Colors.white70, size: 16),
+              ],
+            ),
+            const SizedBox(height: 8),
+            if (!isExpanded)
+              _buildCompactView()
+            else
+              _buildExpandedView(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCompactView() {
+    final lastCapture = widget.captures.last;
+    return SizedBox(
+      height: 90,
+      child: Stack(
+        children: [
+          // "Face-down" cards representing the bulk of the stack
+          ...List.generate(min(3, lastCapture.capturedCards.length + 2), (idx) => Positioned(
+            left: idx * 3.0,
+            top: idx * 2.0,
+            child: Container(
+              width: 55,
+              height: 75,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Colors.blue.shade900, Colors.blue.shade800],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: Colors.white38, width: 1),
+              ),
+              child: const Center(child: Icon(Icons.style, color: Colors.white24, size: 20)),
+            ),
+          )),
+          // Face-up leading card (The card that captured the stack)
+          Positioned(
+            left: 12,
+            top: 6,
+            child: Transform.rotate(
+              angle: 0.05,
+              child: SizedBox(
+                width: 55,
+                height: 75,
+                child: CardWidget(card: lastCapture.leadingCard),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildExpandedView() {
+    return SizedBox(
+      height: 110,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: widget.captures.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 12),
+        itemBuilder: (context, index) {
+          final cap = widget.captures[index];
+          return Column(
+            children: [
+              SizedBox(
+                width: 50,
+                height: 70,
+                child: CardWidget(card: cap.leadingCard),
+              ),
+              const SizedBox(height: 4),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(4)),
+                child: Text('+${cap.capturedCards.length}', style: const TextStyle(color: Colors.white, fontSize: 10)),
+              ),
+            ],
+          );
+        },
+      ),
+    );
   }
 }

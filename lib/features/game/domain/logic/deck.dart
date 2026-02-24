@@ -1,4 +1,5 @@
 import '../models/card.dart' as game_card;
+import '../models/capture.dart';
 
 class Deck {
   final List<game_card.Card> cards;
@@ -15,15 +16,21 @@ class Deck {
     return Deck(cards);
   }
 
-  factory Deck.restoreFromHarvest(Map<String, List<game_card.Card>> harvestStacks) {
-    // Simply stack Team B's harvest on top of Team A's harvest.
-    // Since draw() uses removeLast(), Team B's most recently captured cards will be dealt first.
+  factory Deck.restoreFromHarvest(Map<String, List<Capture>> harvestStacks) {
     final restoredCards = <game_card.Card>[];
+    
+    // Process Team A then Team B
     if (harvestStacks.containsKey('teamA')) {
-      restoredCards.addAll(harvestStacks['teamA']!);
+      for (var capture in harvestStacks['teamA']!) {
+        restoredCards.addAll(capture.capturedCards);
+        restoredCards.add(capture.leadingCard);
+      }
     }
     if (harvestStacks.containsKey('teamB')) {
-      restoredCards.addAll(harvestStacks['teamB']!);
+      for (var capture in harvestStacks['teamB']!) {
+        restoredCards.addAll(capture.capturedCards);
+        restoredCards.add(capture.leadingCard);
+      }
     }
     return Deck(restoredCards);
   }

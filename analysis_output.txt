@@ -1,0 +1,15 @@
+Analyzing Halabessa-Card-Game...                                
+
+   info - Use 'const' with the constructor to improve performance - lib\features\auth\presentation\pages\auth_screen.dart:76:9 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\features\auth\presentation\pages\auth_screen.dart:76:27 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\features\auth\presentation\pages\auth_screen.dart:90:9 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\features\auth\presentation\pages\auth_screen.dart:90:27 - prefer_const_constructors
+   info - Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check - lib\features\auth\presentation\pages\auth_screen.dart:122:40 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check - lib\features\auth\presentation\pages\auth_screen.dart:128:40 - use_build_context_synchronously
+   info - Use the null-aware operator '?.' rather than an explicit 'null' comparison - lib\features\game\domain\models\match_state.dart:151:24 - prefer_null_aware_operators
+  error - The name '_buildTeamHarvestStack' is already defined - lib\features\game\presentation\pages\game_board_screen.dart:446:10 - duplicate_definition
+  error - The name '_getAbsoluteIndex' is already defined - lib\features\game\presentation\pages\game_board_screen.dart:462:7 - duplicate_definition
+  error - The name 'Capture' isn't a type, so it can't be used as a type argument - lib\features\game\presentation\pages\game_board_screen.dart:470:14 - non_type_as_type_argument
+  error - Invalid constant value - lib\features\game\presentation\pages\game_board_screen.dart:504:63 - invalid_constant
+  error - The getter 'goldAccent' isn't defined for the type 'Colors' - lib\features\game\presentation\pages\game_board_screen.dart:504:70 - undefined_getter
+

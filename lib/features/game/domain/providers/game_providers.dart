@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'dart:math';
 import '../../domain/models/match_state.dart';
+import '../../domain/models/capture.dart';
 import '../../domain/models/card.dart' as game_card;
 import '../../domain/logic/deck.dart';
 import '../../domain/logic/game_engine_utils.dart';
@@ -281,14 +282,21 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
 
     final board = List<game_card.Card>.from(state!.board);
     final hands = Map<String, List<game_card.Card>>.from(state!.handCards);
-    final harvest = Map<String, List<game_card.Card>>.from(state!.harvestStacks);
+    final harvest = Map<String, List<Capture>>.from(state!.harvestStacks);
     
     // Remove card from hand
-    hands[playerId]?.remove(card);
+    final playerHand = hands[playerId];
+    if (playerHand == null) return;
+    playerHand.remove(card);
 
     // Calculate capture
     final capturedCards = GameEngineUtils.calculateCapture(card, board);
     final teamId = _getTeamOfPlayer(playerId);
+    
+    // Ensure harvest stacks are initialized for this team
+    if (!harvest.containsKey(teamId)) {
+      harvest[teamId] = [];
+    }
 
     int newConsecutive = state!.consecutiveTafweetCount;
 
@@ -302,11 +310,14 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
       bool isBasra = GameEngineUtils.isBasra(card, capturedCards, board);
       
       if (isTafweetMode && isBasra) {
-         newConsecutive += 1;
+          newConsecutive += 1;
       } else {
-         newConsecutive = 0;
+          newConsecutive = 0;
       }
       bool isConsecutiveTafweet = newConsecutive > 1;
+
+      // Extract only the ACTUAL captured cards FROM the board (not including the played card yet)
+      final harvestedBoardCards = List<game_card.Card>.from(capturedCards)..remove(card);
 
       int pointsEarned = GameEngineUtils.calculatePoints(
          playedCard: card,
@@ -318,12 +329,15 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
       );
 
       // Remove captured cards from board
-      for (var c in capturedCards) {
+      for (var c in harvestedBoardCards) {
         board.remove(c);
       }
       
-      // Add to harvest stack
-      harvest[teamId]?.addAll(capturedCards);
+      // Add to harvest stack as a grouped Capture event
+      harvest[teamId]?.add(Capture(
+        leadingCard: card,
+        capturedCards: harvestedBoardCards,
+      ));
       
       if (teamId == 'teamA') {
         state = state!.copyWith(teamAScore: state!.teamAScore + pointsEarned, consecutiveTafweetCount: newConsecutive);

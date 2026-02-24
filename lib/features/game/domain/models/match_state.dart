@@ -1,4 +1,5 @@
 import 'card.dart' as game_card;
+import 'capture.dart';
 
 enum GamePhase { waitingForPlayers, preRoundCut, dealingFasha, dealingCards, playing, roundScoring, shuffleVoting, rematchVoting, matchOver }
 enum GameMode { classic, tafweet }
@@ -20,9 +21,8 @@ class MatchState {
   // Player Hands: Map<PlayerId, List<game_card.Card>>
   final Map<String, List<game_card.Card>> handCards;
   
-  // Harvested cards per team: 'teamA' -> [...], 'teamB' -> [...]
-  // Maintained in sequences for Memory Mode (No-Shuffle)
-  final Map<String, List<game_card.Card>> harvestStacks;
+  // Harvested cards per team grouped by capture event
+  final Map<String, List<Capture>> harvestStacks;
   
   // Points tracked match-level
   final int teamAScore;
@@ -83,7 +83,7 @@ class MatchState {
     List<game_card.Card>? board,
     List<game_card.Card>? recentFasha,
     Map<String, List<game_card.Card>>? handCards,
-    Map<String, List<game_card.Card>>? harvestStacks,
+    Map<String, List<Capture>>? harvestStacks,
     int? teamAScore,
     int? teamBScore,
     int? dealerIndex,
@@ -162,6 +162,11 @@ class MatchState {
       if (list == null) return [];
       return (list as List).map((i) => game_card.Card.fromJson(Map<String, dynamic>.from(i as Map))).toList();
     }
+
+    List<Capture> parseCaptures(dynamic list) {
+      if (list == null) return [];
+      return (list as List).map((i) => Capture.fromJson(Map<String, dynamic>.from(i as Map))).toList();
+    }
     
     Map<String, List<game_card.Card>> parseCardMap(dynamic map) {
       if (map == null) return {};
@@ -169,6 +174,19 @@ class MatchState {
       (map as Map).forEach((key, value) {
         result[key.toString()] = parseCards(value);
       });
+      return result;
+    }
+
+    Map<String, List<Capture>> parseCaptureMap(dynamic map) {
+      final result = <String, List<Capture>>{
+        'teamA': [],
+        'teamB': [],
+      };
+      if (map != null) {
+        (map as Map).forEach((key, value) {
+          result[key.toString()] = parseCaptures(value);
+        });
+      }
       return result;
     }
 
@@ -181,7 +199,7 @@ class MatchState {
       board: parseCards(json['board']),
       recentFasha: parseCards(json['recentFasha']),
       handCards: parseCardMap(json['handCards']),
-      harvestStacks: parseCardMap(json['harvestStacks']),
+      harvestStacks: parseCaptureMap(json['harvestStacks']),
       teamAScore: json['teamAScore'] as int? ?? 0,
       teamBScore: json['teamBScore'] as int? ?? 0,
       dealerIndex: json['dealerIndex'] as int? ?? 0,
