@@ -7,7 +7,7 @@ import '../../domain/logic/deck.dart';
 import '../../domain/logic/game_engine_utils.dart';
 import '../../data/repositories/multiplayer_sync_service.dart';
 import 'package:firebase_core/firebase_core.dart';
-import '../../../firebase_options.dart';
+import '../../../../firebase_options.dart';
 
 final multiplayerSyncServiceProvider = Provider<MultiplayerSyncService>((ref) {
   // Explicitly initialize with the databaseURL to fix Flutter Web resolution bug
