@@ -43,7 +43,6 @@ dependencies:
   google_sign_in: ^6.2.2
   sign_in_with_apple: ^7.0.1
   flutter_facebook_auth: ^7.1.0
-  google_fonts: 6.1.0
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -69,6 +68,10 @@ flutter:
   assets:
     - assets/translations/
 
+  fonts:
+    - family: Cairo
+      fonts:
+        - asset: assets/fonts/Cairo.ttf
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/assets-and-images/#resolution-aware
 
