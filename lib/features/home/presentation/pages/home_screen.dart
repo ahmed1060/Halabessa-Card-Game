@@ -5,7 +5,7 @@ import 'package:easy_localization/easy_localization.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../game/domain/providers/game_providers.dart';
 import '../../../game/domain/models/match_state.dart';
-import '../widgets/social_overlay.dart';
+import '../widgets/public_rooms_list.dart';
 import '../../auth/presentation/widgets/social_overlay.dart' as social_ui;
 
 class HomeScreen extends ConsumerWidget {
@@ -85,7 +85,7 @@ class HomeScreen extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: 16),
-              const PublicRoomsList(),
+              PublicRoomsList(),
             ],
           ),
         ),

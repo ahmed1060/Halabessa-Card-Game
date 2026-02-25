@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'card.dart' as game_card;
 import 'capture.dart';
 

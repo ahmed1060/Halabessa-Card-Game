@@ -9,6 +9,7 @@ import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../auth/domain/models/app_user.dart';
 import '../widgets/card_widget.dart';
 import '../widgets/player_avatar.dart';
+import '../widgets/fanned_hand_widget.dart';
 import '../../domain/models/capture.dart';
 import '../../../../core/theme/theme_config.dart';
 
@@ -124,7 +125,43 @@ class GameBoardScreen extends ConsumerWidget {
       ),
       body: SafeArea(
         child: Stack(
-          children: [
+         children: [
+           // 0. Background Zones (Ref: Reference Image)
+           Column(
+             children: [
+               Expanded(
+                 flex: 5,
+                 child: Container(
+                   width: double.infinity,
+                   color: const Color(0xFFC4A484).withOpacity(0.15), // Tan tint
+                   child: Center(
+                     child: Opacity(
+                       opacity: 0.1,
+                       child: Text('PLAY CARD ZONE', style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 48, fontWeight: FontWeight.w900, letterSpacing: 4)),
+                     ),
+                   ),
+                 ),
+               ),
+               Expanded(
+                 flex: 5,
+                 child: Container(
+                   width: double.infinity,
+                   color: const Color(0xFF6B8E23).withOpacity(0.15), // Green tint
+                   child: Align(
+                     alignment: Alignment.topCenter,
+                     child: Padding(
+                       padding: const EdgeInsets.only(top: 20.0),
+                       child: Opacity(
+                         opacity: 0.1,
+                         child: Text('CARD ZONE', style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 48, fontWeight: FontWeight.w900, letterSpacing: 4)),
+                       ),
+                     ),
+                   ),
+                 ),
+               ),
+             ],
+           ),
+
             // Table Top Background (Premium Radial Gradient)
             Container(
               decoration: const BoxDecoration(
@@ -294,27 +331,14 @@ class GameBoardScreen extends ConsumerWidget {
                     const SizedBox(height: 16),
                     if ((matchState.handCards[myUid]?.length ?? 0) > 0) ...[
                       const SizedBox(height: 16),
-                      // Player Hand
-                      SizedBox(
-                        height: 120, // Enough height for the card
-                        child: ListView.separated(
-                          shrinkWrap: true,
-                          scrollDirection: Axis.horizontal,
-                          itemCount: matchState.handCards[myUid]!.length,
-                          separatorBuilder: (_, __) => const SizedBox(width: 8),
-                          itemBuilder: (context, index) {
-                            final card = matchState.handCards[myUid]![index];
-                            return Hero(
-                              tag: 'card_${card.suit.index}_${card.rank.index}',
-                              child: CardWidget(
-                                card: card,
-                                onTap: () {
-                                   ref.read(matchStateProvider.notifier).playCard(myUid, card);
-                                },
-                              ),
-                            );
-                          },
-                        ),
+                      // Fanned Player Hand
+                      FannedHandWidget(
+                        cards: matchState.handCards[myUid] ?? [],
+                        isMyTurn: matchState.playerIds.isNotEmpty && 
+                                 matchState.currentTurnIndex == _getAbsoluteIndex(matchState, myUid, 0),
+                        onCardTap: (card) {
+                           ref.read(gameProvider(matchState.id).notifier).playCard(myUid, card);
+                        },
                       ),
                     ],
                   ],
@@ -517,7 +541,48 @@ class GameBoardScreen extends ConsumerWidget {
              ],
           ),
        ),
-     );
+  void _showInviteFriendDialog(BuildContext context, WidgetRef ref, MatchState state, String currentUid) {
+    final currentUser = ref.read(currentUserProvider);
+    if (currentUser == null) return;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: Colors.grey[900],
+          title: Text('invite_friends'.tr(), style: const TextStyle(color: Colors.white)),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: currentUser.friends.isEmpty 
+              ? Text('no_friends_yet'.tr(), style: const TextStyle(color: Colors.white70))
+              : ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: currentUser.friends.length,
+                  itemBuilder: (context, index) {
+                    final friendId = currentUser.friends[index];
+                    return FutureBuilder<List<AppUser>>(
+                      future: ref.read(multiplayerSyncServiceProvider).searchUsers(friendId), // Inefficient but simple for now
+                      builder: (context, snap) {
+                        final friend = snap.data?.firstWhere((u) => u.uid == friendId, orElse: () => AppUser(uid: friendId, email: '', displayName: 'Friend'));
+                        return ListTile(
+                          title: Text(friend?.displayName ?? 'Friend', style: const TextStyle(color: Colors.white)),
+                          trailing: ElevatedButton(
+                            child: Text('send'.tr()),
+                            onPressed: () {
+                              ref.read(multiplayerSyncServiceProvider).sendInvite(friendId, state.id, currentUser.displayName);
+                              Navigator.pop(context);
+                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('invitation_sent'.tr())));
+                            },
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
+          ),
+        );
+      },
+    );
   }
 }
 

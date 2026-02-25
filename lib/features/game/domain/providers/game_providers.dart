@@ -354,6 +354,8 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
       cardOwnership: newOwnership,
     );
 
+    final board = List<game_card.Card>.from(newState.board);
+    final hands = Map<String, List<game_card.Card>>.from(newState.handCards);
     final harvest = Map<String, List<Capture>>.from(newState.harvestStacks);
     final skipped = Map<String, List<game_card.Card>>.from(newState.skippedMatches);
     final history = List<game_card.Card>.from(newState.playHistory);

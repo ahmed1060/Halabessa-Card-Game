@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easy_localization/easy_localization.dart';
 import '../../game/domain/models/match_state.dart';
 import '../../game/domain/providers/game_providers.dart';
+import '../../../auth/presentation/providers/auth_providers.dart';
+import '../../../auth/domain/models/app_user.dart';
 
 class PublicRoomsList extends ConsumerWidget {
   const PublicRoomsList({super.key});

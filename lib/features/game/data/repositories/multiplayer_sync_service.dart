@@ -1,6 +1,7 @@
 import 'package:firebase_database/firebase_database.dart';
-import '../../domain/models/match_state.dart';
 import 'package:flutter/foundation.dart';
+import '../../domain/models/match_state.dart';
+import '../../../auth/domain/models/app_user.dart';
 
 class MultiplayerSyncService {
   final FirebaseDatabase _db;
