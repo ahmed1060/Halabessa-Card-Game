@@ -161,7 +161,7 @@ class MatchState {
       'recentFasha': recentFasha.map((c) => c.toJson()).toList(),
       'handCards': handCards.map((k, v) => MapEntry(k, v.map((c) => c.toJson()).toList())),
       'harvestStacks': harvestStacks.map((k, v) => MapEntry(k, v.map((c) => c.toJson()).toList())),
-      'skippedMatches': skippedMatches.map((k, v) => MapEntry(k, v.map((c) => c.toJson()).toList())),
+      'skippedMatches': skippedMatches,
       'playHistory': playHistory.map((c) => c.toJson()).toList(),
       'teamAScore': teamAScore,
       'teamBScore': teamBScore,
@@ -261,6 +261,15 @@ class MatchState {
           // Backward compatibility if it was still Card objects
           result[key.toString()] = [];
         }
+      });
+      return result;
+    }
+
+    Map<String, List<game_card.Card>> parseCardMap(dynamic map) {
+      if (map == null || map is! Map) return {};
+      final result = <String, List<game_card.Card>>{};
+      map.forEach((key, value) {
+        result[key.toString()] = parseCards(value);
       });
       return result;
     }
