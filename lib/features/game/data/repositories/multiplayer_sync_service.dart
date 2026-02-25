@@ -38,10 +38,12 @@ class MultiplayerSyncService {
     return _matchRef.onValue.map((event) {
       if (event.snapshot.value == null) return [];
       try {
+        if (event.snapshot.value is! Map) return [];
         final Map<dynamic, dynamic> matches = event.snapshot.value as Map<dynamic, dynamic>;
         return matches.entries
             .map((entry) {
               try {
+                if (entry.value is! Map) return null;
                 return MatchState.fromJson(Map<String, dynamic>.from(entry.value as Map));
               } catch (e) {
                 return null;
@@ -88,12 +90,13 @@ class MultiplayerSyncService {
         .limitToFirst(20)
         .get();
     
-    if (snapshot.value == null) return [];
+    if (snapshot.value is! Map) return [];
     
     final Map<dynamic, dynamic> users = snapshot.value as Map<dynamic, dynamic>;
     return users.entries.map((entry) {
+      if (entry.value is! Map) return null;
       return AppUser.fromJson(Map<String, dynamic>.from(entry.value as Map), entry.key as String);
-    }).toList();
+    }).whereType<AppUser>().toList();
   }
 
   /// Accept a friend request / Add a friend

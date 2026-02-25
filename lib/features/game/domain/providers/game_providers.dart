@@ -13,10 +13,10 @@ import '../../../../firebase_options.dart';
 import '../../../../features/auth/presentation/providers/auth_providers.dart';
 
 final multiplayerSyncServiceProvider = Provider<MultiplayerSyncService>((ref) {
-  // Explicitly initialize with the databaseURL to fix Flutter Web resolution bug
-  final db = FirebaseDatabase.instanceFor(
-      app: Firebase.app(),
-      databaseURL: DefaultFirebaseOptions.web.databaseURL!);
+  // Use a singleton pattern or standard instance to avoid repeat initialization errors
+  final db = FirebaseDatabase.instance;
+  // If a custom URL is strictly needed, it should be set once in main.dart or here with a check.
+  // For Halabessa, we use the default RTDB from the google-services/FirebaseOptions.
   return MultiplayerSyncService(db);
 });
 

@@ -188,20 +188,55 @@ class MatchState {
     List<game_card.Card> parseCards(dynamic list) {
       if (list == null) return [];
       if (list is Map) {
-         // Firebase RTDB sometimes returns lists as maps with integer keys
-         final sortedKeys = list.keys.map((e) => int.tryParse(e.toString())).whereType<int>().toList()..sort();
-         return sortedKeys.map((k) => game_card.Card.fromJson(Map<String, dynamic>.from(list[k.toString()] as Map))).toList();
+         try {
+           final sortedKeys = list.keys.map((e) => int.tryParse(e.toString())).whereType<int>().toList()..sort();
+           return sortedKeys.map((k) {
+             final item = list[k.toString()];
+             if (item is Map) {
+               return game_card.Card.fromJson(Map<String, dynamic>.from(item));
+             }
+             return null;
+           }).whereType<game_card.Card>().toList();
+         } catch (e) {
+           return [];
+         }
       }
-      return (list as List).map((i) => game_card.Card.fromJson(Map<String, dynamic>.from(i as Map))).toList();
+      if (list is List) {
+        return list.map((i) {
+          if (i is Map) {
+            return game_card.Card.fromJson(Map<String, dynamic>.from(i));
+          }
+          return null;
+        }).whereType<game_card.Card>().toList();
+      }
+      return [];
     }
 
     List<Capture> parseCaptures(dynamic list) {
       if (list == null) return [];
       if (list is Map) {
-         final sortedKeys = list.keys.map((e) => int.tryParse(e.toString())).whereType<int>().toList()..sort();
-         return sortedKeys.map((k) => Capture.fromJson(Map<String, dynamic>.from(list[k.toString()] as Map))).toList();
+         try {
+           final sortedKeys = list.keys.map((e) => int.tryParse(e.toString())).whereType<int>().toList()..sort();
+           return sortedKeys.map((k) {
+             final item = list[k.toString()];
+             if (item is Map) {
+               return Capture.fromJson(Map<String, dynamic>.from(item));
+             }
+             return null;
+           }).whereType<Capture>().toList();
+         } catch (e) {
+           return [];
+         }
       }
-      return (list as List).map((i) => Capture.fromJson(Map<String, dynamic>.from(i as Map))).toList();
+      if (list is List) {
+        return list.map((i) {
+          if (i is Map) {
+            return Capture.fromJson(Map<String, dynamic>.from(i));
+          }
+          return null;
+        }).whereType<Capture>().toList();
+      }
+      return [];
     }
     
     Map<String, List<game_card.Card>> parseCardMap(dynamic map) {
@@ -232,33 +267,33 @@ class MatchState {
 
     try {
       return MatchState(
-        id: json['id'] as String? ?? '',
-        mode: GameMode.values.byName(json['mode'] as String? ?? 'classic'),
-        maxPoints: json['maxPoints'] as int? ?? 41,
-        playerIds: (json['playerIds'] as List?)?.map((e) => e.toString()).toList() ?? [],
+        id: json['id']?.toString() ?? '',
+        mode: GameMode.values.firstWhere((e) => e.name == json['mode'], orElse: () => GameMode.classic),
+        maxPoints: json['maxPoints'] is int ? json['maxPoints'] as int : 41,
+        playerIds: (json['playerIds'] is List) ? (json['playerIds'] as List).map((e) => e.toString()).toList() : [],
         board: parseCards(json['board']),
         recentFasha: parseCards(json['recentFasha']),
         handCards: parseCardMap(json['handCards']),
         harvestStacks: parseCaptureMap(json['harvestStacks']),
-        teamAScore: json['teamAScore'] as int? ?? 0,
-        teamBScore: json['teamBScore'] as int? ?? 0,
-        dealerIndex: json['dealerIndex'] as int? ?? 0,
-        currentTurnIndex: json['currentTurnIndex'] as int? ?? 0,
-        phase: GamePhase.values.byName(json['phase'] as String? ?? 'waitingForPlayers'),
-        lastCaptureTeam: json['lastCaptureTeam'] as String?,
-        roundCount: json['roundCount'] as int? ?? 1,
-        roundsSinceLastShuffle: json['roundsSinceLastShuffle'] as int? ?? 0,
-        consecutiveTafweetCount: json['consecutiveTafweetCount'] as int? ?? 0,
-        turnStartTime: json['turnStartTime'] != null ? DateTime.parse(json['turnStartTime'] as String) : null,
-        timerDurationSeconds: json['timerDurationSeconds'] as int? ?? 10,
-        playerEmojis: (json['playerEmojis'] as Map?)?.cast<String, String>() ?? const {},
-        shuffleVotes: (json['shuffleVotes'] as Map?)?.cast<String, bool>() ?? const {},
-        rematchVotes: (json['rematchVotes'] as Map?)?.cast<String, bool>() ?? const {},
-        botInjectionVotes: (json['botInjectionVotes'] as Map?)?.cast<String, bool>() ?? const {},
-        playerNames: (json['playerNames'] as Map?)?.cast<String, String>() ?? const {},
-        isPublic: json['isPublic'] as bool? ?? false,
-        cardOwnership: (json['cardOwnership'] as Map?)?.cast<String, String>() ?? const {},
-        deckCount: json['deckCount'] as int? ?? 0,
+        teamAScore: json['teamAScore'] is int ? json['teamAScore'] as int : 0,
+        teamBScore: json['teamBScore'] is int ? json['teamBScore'] as int : 0,
+        dealerIndex: json['dealerIndex'] is int ? json['dealerIndex'] as int : 0,
+        currentTurnIndex: json['currentTurnIndex'] is int ? json['currentTurnIndex'] as int : 0,
+        phase: GamePhase.values.firstWhere((e) => e.name == json['phase'], orElse: () => GamePhase.waitingForPlayers),
+        lastCaptureTeam: json['lastCaptureTeam']?.toString(),
+        roundCount: json['roundCount'] is int ? json['roundCount'] as int : 1,
+        roundsSinceLastShuffle: json['roundsSinceLastShuffle'] is int ? json['roundsSinceLastShuffle'] as int : 0,
+        consecutiveTafweetCount: json['consecutiveTafweetCount'] is int ? json['consecutiveTafweetCount'] as int : 0,
+        turnStartTime: json['turnStartTime'] != null ? DateTime.tryParse(json['turnStartTime'].toString()) : null,
+        timerDurationSeconds: json['timerDurationSeconds'] is int ? json['timerDurationSeconds'] as int : 10,
+        playerEmojis: (json['playerEmojis'] is Map) ? (json['playerEmojis'] as Map).cast<String, String>() : const {},
+        shuffleVotes: (json['shuffleVotes'] is Map) ? (json['shuffleVotes'] as Map).cast<String, bool>() : const {},
+        rematchVotes: (json['rematchVotes'] is Map) ? (json['rematchVotes'] as Map).cast<String, bool>() : const {},
+        botInjectionVotes: (json['botInjectionVotes'] is Map) ? (json['botInjectionVotes'] as Map).cast<String, bool>() : const {},
+        playerNames: (json['playerNames'] is Map) ? (json['playerNames'] as Map).cast<String, String>() : const {},
+        isPublic: json['isPublic'] is bool ? json['isPublic'] as bool : false,
+        cardOwnership: (json['cardOwnership'] is Map) ? (json['cardOwnership'] as Map).cast<String, String>() : const {},
+        deckCount: json['deckCount'] is int ? json['deckCount'] as int : 0,
         skippedMatches: parseCardMap(json['skippedMatches']),
         playHistory: parseCards(json['playHistory']),
       );
