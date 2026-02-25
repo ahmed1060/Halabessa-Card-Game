@@ -172,7 +172,7 @@ class MatchState {
       'roundCount': roundCount,
       'roundsSinceLastShuffle': roundsSinceLastShuffle,
       'consecutiveTafweetCount': consecutiveTafweetCount,
-      'turnStartTime': turnStartTime == null ? null : turnStartTime!.toIso8601String(),
+      'turnStartTime': turnStartTime?.toIso8601String(),
       'timerDurationSeconds': timerDurationSeconds,
       'playerEmojis': playerEmojis,
       'shuffleVotes': shuffleVotes,

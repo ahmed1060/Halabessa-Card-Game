@@ -85,7 +85,7 @@ class HomeScreen extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: 16),
-              PublicRoomsList(),
+              const PublicRoomsList(),
             ],
           ),
         ),

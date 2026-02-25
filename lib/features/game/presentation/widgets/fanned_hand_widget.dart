@@ -1,4 +1,3 @@
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:halabessa/features/game/domain/models/card.dart' as game_card;
 import 'package:halabessa/features/game/presentation/widgets/card_widget.dart';
@@ -28,7 +27,6 @@ class _FannedHandWidgetState extends State<FannedHandWidget> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final double maxWidth = constraints.maxWidth;
         final int cardCount = widget.cards.length;
         
         // Configuration for the fan effect
@@ -37,7 +35,7 @@ class _FannedHandWidgetState extends State<FannedHandWidget> {
         
         // Calculate dynamic spacing to ensure overlap
         // We want cards to overlap by about 60-70%
-        final double preferredSpacing = 30.0;
+        const double preferredSpacing = 30.0;
         final double fanWidth = (cardCount - 1) * preferredSpacing;
         
         // Arc configuration

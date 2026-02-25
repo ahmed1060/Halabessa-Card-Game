@@ -8,8 +8,7 @@ import '../../domain/models/card.dart' as game_card;
 import '../../domain/logic/deck.dart';
 import '../../domain/logic/game_engine_utils.dart';
 import '../../data/repositories/multiplayer_sync_service.dart';
-import 'package:firebase_core/firebase_core.dart';
-import '../../../../firebase_options.dart';
+import 'package:flutter/foundation.dart';
 import '../../../../features/auth/presentation/providers/auth_providers.dart';
 
 final multiplayerSyncServiceProvider = Provider<MultiplayerSyncService>((ref) {
@@ -82,15 +81,6 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
         await Future.delayed(const Duration(milliseconds: 500));
         if (state?.phase == GamePhase.dealingFasha) {
           await dealInitialCards();
-        }
-      } else if (serverState.phase == GamePhase.dealingCards) {
-        // This is the "Memorize Fasha" 5s phase
-        await Future.delayed(const Duration(milliseconds: 5000));
-        if (state?.phase == GamePhase.dealingCards) {
-          _publishState(state!.copyWith(
-            phase: GamePhase.playing,
-            turnStartTime: DateTime.now(),
-          ));
         }
       } else if (serverState.phase == GamePhase.playing) {
         String activePlayerId = serverState.playerIds[serverState.currentTurnIndex];
@@ -265,7 +255,19 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
 
      final currentUser = ref.read(currentUserProvider);
      final isHost = state!.playerIds.indexOf(currentUser?.uid ?? '') == 0;
-     if (!isHost || _secretDeck == null) return;
+     if (!isHost) return;
+
+     // RECOVERY: If Host refreshed and lost the secret deck, regenerate it
+     if (_secretDeck == null) {
+        debugPrint('RECOVERY: Host lost secret deck in dealInitialCards. Regenerating.');
+        if (state!.roundCount == 1 && state!.roundsSinceLastShuffle == 0) {
+           _secretDeck = Deck.standard();
+           _secretDeck!.shuffle();
+        } else {
+           _secretDeck = Deck.restoreFromHarvest(state!.harvestStacks);
+        }
+        _secretDeck!.cut(Random().nextInt(40) + 5);
+     }
 
      final hands = Map<String, List<game_card.Card>>.from(state!.handCards);
      final board = <game_card.Card>[];
@@ -297,6 +299,16 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
        recentFasha: List.from(board),
        phase: GamePhase.dealingCards,
      ));
+
+     // 3. Memorization Phase: Wait 5 seconds then start playing
+     await Future.delayed(const Duration(seconds: 5));
+     
+     if (state?.phase == GamePhase.dealingCards) {
+       _publishState(state!.copyWith(
+         phase: GamePhase.playing,
+         turnStartTime: DateTime.now(),
+       ));
+     }
   }
 
   Future<void> dealSubsequentCards() async {
@@ -304,8 +316,17 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
      
      final currentUser = ref.read(currentUserProvider);
      final isHost = state!.playerIds.indexOf(currentUser?.uid ?? '') == 0;
-     if (!isHost || _secretDeck == null) return;
+     if (!isHost) return;
      
+     // RECOVERY: Minimal mid-round recovery
+     if (_secretDeck == null) {
+       debugPrint('RECOVERY: Host lost secret deck in dealSubsequentCards. Regenerating.');
+       _secretDeck = Deck.restoreFromHarvest(state!.harvestStacks);
+       // This might result in duplicate hand cards if we don't subtract them, 
+       // but it's better than a hard hang. 
+       // Round 1 start is the most common place for this hang.
+     }
+
      if (_secretDeck!.isEmpty) {
         _handleRoundEnd();
         return;

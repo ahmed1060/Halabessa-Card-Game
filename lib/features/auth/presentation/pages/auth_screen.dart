@@ -118,17 +118,15 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
               
               try {
                 await ref.read(authRepositoryProvider).resetPassword(email);
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('verification_sent'.tr())),
-                  );
-                }
+                if (!dialogContext.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('verification_sent'.tr())),
+                );
               } catch (e) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('error_general'.tr(args: [e.toString()]))),
-                  );
-                }
+                if (!dialogContext.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('error_general'.tr(args: [e.toString()]))),
+                );
               }
             },
             child: Text('send_link'.tr()),
