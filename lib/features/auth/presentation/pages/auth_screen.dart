@@ -73,7 +73,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: \$e')),
+        const SnackBar(content: Text('Error: \$e')),
       );
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -87,7 +87,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: \$e')),
+        const SnackBar(content: Text('Error: \$e')),
       );
     } finally {
       if (mounted) setState(() => _isLoading = false);
