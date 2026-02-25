@@ -40,12 +40,23 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
 
   void bindToMatch(String matchId) {
     lastBoundMatchId = matchId;
-    ref.read(multiplayerSyncServiceProvider).watchMatch(matchId).listen((serverState) {
-      if (serverState != null) {
-        state = serverState;
-        _evaluateBotActions(serverState);
-      }
-    });
+    ref.read(multiplayerSyncServiceProvider).watchMatch(matchId).listen(
+      (serverState) {
+        if (serverState != null) {
+          try {
+            state = serverState;
+            _evaluateBotActions(serverState);
+          } catch (e, stack) {
+            debugPrint('ERROR in match listener callback: $e');
+            debugPrint('Stack: $stack');
+          }
+        }
+      },
+      onError: (error) {
+        debugPrint('MATCH LISTENER STREAM ERROR: $error');
+      },
+      cancelOnError: false,
+    );
   }
 
   void rebind(String matchId) {
@@ -71,9 +82,13 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
         int cutterIdx = (serverState.dealerIndex + 3) % 4;
         String cutterId = serverState.playerIds[cutterIdx];
         if (cutterId.startsWith('bot_')) {
-          await Future.delayed(const Duration(milliseconds: 1500));
+          // Dynamic reaction time: 1-2.5 seconds
+          await Future.delayed(Duration(milliseconds: 1000 + Random().nextInt(1500)));
           if (state?.phase == GamePhase.preRoundCut) {
-            performCut(Random().nextInt(serverState.deckCount > 10 ? serverState.deckCount - 10 : 1) + 5); 
+            // Cut at a more varied random depth
+            int deckSize = serverState.deckCount;
+            int cutPoint = deckSize > 6 ? (3 + Random().nextInt(deckSize - 6)) : 1;
+            performCut(cutPoint); 
           }
         }
       } else if (serverState.phase == GamePhase.dealingFasha) {
@@ -85,7 +100,8 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
       } else if (serverState.phase == GamePhase.playing) {
         String activePlayerId = serverState.playerIds[serverState.currentTurnIndex];
         if (activePlayerId.startsWith('bot_')) {
-          await Future.delayed(const Duration(milliseconds: 1500));
+          // Dynamic reaction time: 0.8-2.3 seconds
+          await Future.delayed(Duration(milliseconds: 800 + Random().nextInt(1500)));
           if (state?.phase == GamePhase.playing && state!.playerIds[state!.currentTurnIndex] == activePlayerId) {
             _executeBotPlayCard(activePlayerId);
           }
@@ -94,8 +110,12 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
         for (var playerId in serverState.playerIds) {
           if (playerId.startsWith('bot_')) {
             if (serverState.phase == GamePhase.shuffleVoting && !serverState.shuffleVotes.containsKey(playerId)) {
-              voteShuffle(playerId, false);
+              // Standard bot behavior for memory mode: usually prefers no shuffle (80% chance)
+              await Future.delayed(Duration(milliseconds: 1000 + Random().nextInt(2000)));
+              voteShuffle(playerId, Random().nextDouble() < 0.2); 
             } else if (serverState.phase == GamePhase.rematchVoting && !serverState.rematchVotes.containsKey(playerId)) {
+              // Bots always want another round!
+              await Future.delayed(Duration(milliseconds: 1000 + Random().nextInt(2000)));
               voteRematch(playerId, true);
             }
           }
@@ -111,8 +131,49 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     final hand = state!.handCards[botId];
     if (hand == null || hand.isEmpty) return;
 
-    // Really simple bot: just plays a random card for now.
-    // Future Enhancement: Implement Basra heuristics and pattern matching.
+    final board = state!.board;
+    
+    // HEURISTIC 1: Can I capture?
+    if (board.isNotEmpty) {
+      final topRank = board.last.rank;
+      final matchingCards = hand.where((c) => c.rank == topRank).toList();
+      
+      if (matchingCards.isNotEmpty) {
+        // TAFWEET STRATEGY: 
+        // If in Tafweet mode and I have TWO of this rank, intentionally ignore the capture 
+        // now if there's someone else to play after me (baiting a 10/20/30 bonus).
+        bool isTafweetMode = state!.mode == GameMode.tafweet;
+        if (isTafweetMode && matchingCards.length >= 2 && hand.length > 1) {
+           final nonMatching = hand.where((c) => c.rank != topRank).toList();
+           if (nonMatching.isNotEmpty) {
+             debugPrint('BOT STRATEGY: Baiting Tafweet for ${topRank.name}');
+             playCard(botId, nonMatching[Random().nextInt(nonMatching.length)]);
+             return;
+           }
+        }
+
+        // Otherwise, TAKE THE CAPTURE!
+        // 5% chance of "human error" (missing a capture)
+        if (Random().nextDouble() > 0.05) {
+          playCard(botId, matchingCards[Random().nextInt(matchingCards.length)]);
+          return;
+        }
+      }
+    }
+
+    // HEURISTIC 2: No capture available, setup for next turn.
+    // Try to play a card that I have a duplicate of in my hand.
+    final rankCounts = <game_card.Rank, int>{};
+    for (var c in hand) {
+      rankCounts[c.rank] = (rankCounts[c.rank] ?? 0) + 1;
+    }
+    final duplicates = hand.where((c) => rankCounts[c.rank]! > 1).toList();
+    if (duplicates.isNotEmpty && Random().nextDouble() < 0.7) {
+       playCard(botId, duplicates[Random().nextInt(duplicates.length)]);
+       return;
+    }
+
+    // FALLBACK: Play a random card.
     final cardToPlay = hand[Random().nextInt(hand.length)];
     playCard(botId, cardToPlay);
   }

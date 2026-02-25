@@ -14,6 +14,7 @@ class ThemeConfig {
         secondary: goldAccent,
       ),
       fontFamily: 'Cairo',
+      fontFamilyFallback: const ['sans-serif', 'Arial'],
       appBarTheme: const AppBarTheme(
         backgroundColor: darkGreen,
         foregroundColor: Colors.white,
@@ -34,6 +35,7 @@ class ThemeConfig {
         surface: darkGreen,
       ),
       fontFamily: 'Cairo',
+      fontFamilyFallback: const ['sans-serif', 'Arial'],
       appBarTheme: const AppBarTheme(
         backgroundColor: Color(0xFF000000),
         foregroundColor: Colors.white,

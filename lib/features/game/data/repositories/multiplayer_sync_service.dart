@@ -24,12 +24,16 @@ class MultiplayerSyncService {
     return _matchRef.child(matchId).onValue.map((event) {
       final value = event.snapshot.value;
       if (value == null || value is! Map) return null;
+      
       try {
-        return MatchState.fromJson(Map<String, dynamic>.from(value));
+        return MatchState.fromJson(value);
       } catch (e) {
-        debugPrint('Error parsing match state for $matchId: $e');
+        debugPrint('CRITICAL: Error parsing match state for $matchId: $e');
         return null;
       }
+    }).handleError((error) {
+      debugPrint('STREAM ERROR for match $matchId: $error');
+      return null;
     });
   }
 
