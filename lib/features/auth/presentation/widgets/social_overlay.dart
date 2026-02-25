@@ -39,9 +39,9 @@ class _SocialOverlayState extends ConsumerState<SocialOverlay> {
     if (currentUser == null) return const SizedBox.shrink();
 
     return Container(
-      decoration: const BoxDecoration(
-        color: Colors.black90,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.9),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       padding: const EdgeInsets.all(24),
       child: Column(
