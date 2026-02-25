@@ -32,6 +32,11 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
   
   // Prevents multiple concurrent bot logic evaluations for the same state change
   bool _isHandlingBotLogic = false;
+  bool _hasStaleBotState = false;
+  Timer? _heartbeatTimer;
+  
+  // Stream subscription for the match listener
+  StreamSubscription? _matchListener;
 
   Future<void> _publishState(MatchState newState) async {
     state = newState;
@@ -40,11 +45,27 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
 
   void bindToMatch(String matchId) {
     lastBoundMatchId = matchId;
-    ref.read(multiplayerSyncServiceProvider).watchMatch(matchId).listen(
+    _matchListener?.cancel(); // Cancel previous listener if any
+    _matchListener = ref.read(multiplayerSyncServiceProvider).watchMatch(matchId).listen(
       (serverState) {
         if (serverState != null) {
           try {
             state = serverState;
+            
+            // Manage Heartbeat: Start if Host, stop if not
+            final currentUser = ref.read(currentUserProvider);
+            if (currentUser != null && serverState.playerIds.indexOf(currentUser.uid) == 0) {
+              if (_heartbeatTimer == null || !_heartbeatTimer!.isActive) {
+                _heartbeatTimer?.cancel();
+                _heartbeatTimer = Timer.periodic(const Duration(seconds: 4), (timer) {
+                   if (state != null) _evaluateBotActions(state!);
+                });
+              }
+            } else {
+              _heartbeatTimer?.cancel();
+              _heartbeatTimer = null;
+            }
+
             _evaluateBotActions(serverState);
           } catch (e, stack) {
             debugPrint('ERROR in match listener callback: $e');
@@ -73,20 +94,32 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     final isHost = serverState.playerIds.indexOf(currentUser.uid) == 0;
     if (!isHost) return;
 
-    if (_isHandlingBotLogic) return;
+    if (_isHandlingBotLogic) {
+      _hasStaleBotState = true;
+      return;
+    }
+    
     _isHandlingBotLogic = true;
+    _hasStaleBotState = false;
+    
+    // Safety delay to allow state to settle
+    await Future.delayed(const Duration(milliseconds: 100));
     
     try {
+      while (true) {
+        // Re-read current state inside the loop
+        final currentState = state;
+        if (currentState == null) break;
       // Host specific global phase handling (Dealing Cards)
-      if (serverState.phase == GamePhase.dealingFasha) {
+      if (currentState.phase == GamePhase.dealingFasha) {
         // This is where Host deals Initial Board + Hands
         await Future.delayed(const Duration(milliseconds: 500));
         if (state?.phase == GamePhase.dealingFasha) {
           await dealInitialCards();
         }
-      } else if (serverState.phase == GamePhase.waitingForPlayers) {
+      } else if (currentState.phase == GamePhase.waitingForPlayers) {
         // LOBBY AUTO-START: If 4 players join, Host triggers start automatically.
-        if (serverState.playerIds.length == 4) {
+        if (currentState.playerIds.length == 4) {
           await Future.delayed(const Duration(milliseconds: 1000));
           if (state?.phase == GamePhase.waitingForPlayers && state!.playerIds.length == 4) {
             _setupNewRound(isFirstRound: true);
@@ -95,31 +128,34 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
       }
 
       // Determine active turning logic
-      if (serverState.phase == GamePhase.preRoundCut) {
-        int cutterIdx = (serverState.dealerIndex + 3) % 4;
-        String cutterId = serverState.playerIds[cutterIdx];
+      if (currentState.phase == GamePhase.preRoundCut) {
+        int cutterIdx = (currentState.dealerIndex + 3) % 4;
+        String cutterId = currentState.playerIds[cutterIdx];
         if (cutterId.startsWith('bot_')) {
           // Dynamic reaction time: 1-2.5 seconds
           await Future.delayed(Duration(milliseconds: 1000 + Random().nextInt(1500)));
           if (state?.phase == GamePhase.preRoundCut) {
             // Cut at a more varied random depth
-            int deckSize = serverState.deckCount;
+            int deckSize = currentState.deckCount;
             int cutPoint = deckSize > 6 ? (3 + Random().nextInt(deckSize - 6)) : 1;
             performCut(cutPoint); 
           }
         }
-      } else if (serverState.phase == GamePhase.playing) {
+      } else if (currentState.phase == GamePhase.playing) {
         // PROACTIVE DEAL CHECK: If all hands are empty during playing phase, Host must deal.
-        bool allHandsEmpty = serverState.handCards.values.every((hand) => hand.isEmpty);
+        bool allHandsEmpty = currentState.handCards.values.every((hand) => hand.isEmpty);
         if (allHandsEmpty) {
            await Future.delayed(const Duration(milliseconds: 1000));
            if (state?.phase == GamePhase.playing && state!.handCards.values.every((hand) => hand.isEmpty)) {
              await dealSubsequentCards();
            }
-           return;
+           // After dealing, the state will change, so we should re-evaluate.
+           // If dealSubsequentCards changes the phase, the loop will naturally re-evaluate.
+           // If it just deals cards, the next iteration will pick up the new hands.
+           continue; 
         }
 
-        String activePlayerId = serverState.playerIds[serverState.currentTurnIndex];
+        String activePlayerId = currentState.playerIds[currentState.currentTurnIndex];
         if (activePlayerId.startsWith('bot_')) {
           // Dynamic reaction time: 0.8-2.3 seconds
           await Future.delayed(Duration(milliseconds: 800 + Random().nextInt(1500)));
@@ -127,14 +163,14 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
             _executeBotPlayCard(activePlayerId);
           }
         }
-      } else if (serverState.phase == GamePhase.shuffleVoting || serverState.phase == GamePhase.rematchVoting) {
-        for (var playerId in serverState.playerIds) {
+      } else if (currentState.phase == GamePhase.shuffleVoting || currentState.phase == GamePhase.rematchVoting) {
+        for (var playerId in currentState.playerIds) {
           if (playerId.startsWith('bot_')) {
-            if (serverState.phase == GamePhase.shuffleVoting && !serverState.shuffleVotes.containsKey(playerId)) {
+            if (currentState.phase == GamePhase.shuffleVoting && !currentState.shuffleVotes.containsKey(playerId)) {
               // Standard bot behavior for memory mode: usually prefers no shuffle (80% chance)
               await Future.delayed(Duration(milliseconds: 1000 + Random().nextInt(2000)));
               voteShuffle(playerId, Random().nextDouble() < 0.2); 
-            } else if (serverState.phase == GamePhase.rematchVoting && !serverState.rematchVotes.containsKey(playerId)) {
+            } else if (currentState.phase == GamePhase.rematchVoting && !currentState.rematchVotes.containsKey(playerId)) {
               // Bots always want another round!
               await Future.delayed(Duration(milliseconds: 1000 + Random().nextInt(2000)));
               voteRematch(playerId, true);
@@ -142,11 +178,21 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
           }
         }
       }
+
+      // 4. Check if state changed while we were processing
+      if (_hasStaleBotState && state != null) {
+        _hasStaleBotState = false;
+        // Continue loop to process new state immediately
+        continue;
+      }
+      break; 
+     }
     } catch (e, stack) {
       debugPrint('CRITICAL ASYNC ERROR in _evaluateBotActions: $e');
       debugPrint('Stack: $stack');
     } finally {
       _isHandlingBotLogic = false;
+      _hasStaleBotState = false;
     }
   }
 
@@ -486,20 +532,30 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
       // Validate turn
       if (state!.playerIds[state!.currentTurnIndex] != playerId) return;
 
-      // 1. Prepare local state
+      // 1. Prepare local state with DEEP COPIES
       final prePlayBoard = List<game_card.Card>.from(state!.board);
-      final hands = Map<String, List<game_card.Card>>.from(state!.handCards);
-      final harvest = Map<String, List<Capture>>.from(state!.harvestStacks);
-      final skipped = Map<String, List<String>>.from(state!.skippedMatches);
+      // Deep copy handCards Map and its nested Lists
+      final hands = Map<String, List<game_card.Card>>.from(
+        state!.handCards.map((k, v) => MapEntry(k, List<game_card.Card>.from(v)))
+      );
+      // Deep copy harvestStacks Map and its nested Lists
+      final harvest = Map<String, List<Capture>>.from(
+        state!.harvestStacks.map((k, v) => MapEntry(k, List<Capture>.from(v)))
+      );
+      // Deep copy skippedMatches Map and its nested Lists
+      final skipped = Map<String, List<String>>.from(
+        state!.skippedMatches.map((k, v) => MapEntry(k, List<String>.from(v)))
+      );
+      
       final history = List<game_card.Card>.from(state!.playHistory);
       final ownership = Map<String, String>.from(state!.cardOwnership);
+      final emojis = Map<String, String>.from(state!.playerEmojis);
       
       // 0. Detect Skips (Deliberately not capturing)
       if (prePlayBoard.isNotEmpty) {
         final topCard = prePlayBoard.last;
         bool hasMatchInHand = hands[playerId]?.any((c) => c.rank == topCard.rank) ?? false;
         
-        // If they have a match but chosen card rank DOES NOT match the top card
         if (hasMatchInHand && card.rank != topCard.rank) {
           final sourceId = ownership['${topCard.suit}_${topCard.rank}'] ?? 'fasha';
           final skipKey = '${topCard.rank.name}:$sourceId';
@@ -515,11 +571,10 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
       // 1. Remove card from player hand
       hands[playerId]?.remove(card);
 
-      // 2. Calculate capture (using refined Top-Match rules in calculateCapture)
+      // 2. Calculate capture
       final capturedCards = GameEngineUtils.calculateCapture(card, prePlayBoard);
       final teamId = _getTeamOfPlayer(playerId);
       
-      // Ensure harvest stacks are initialized
       if (!harvest.containsKey(teamId)) {
         harvest[teamId] = [];
       }
@@ -529,11 +584,9 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
       List<game_card.Card> finalBoard = List.from(prePlayBoard);
 
       if (capturedCards.isEmpty) {
-        // No capture: Add card to board and track ownership
         finalBoard.add(card);
         ownership['${card.suit}_${card.rank}'] = playerId;
       } else {
-        // Capture: Calculate points and Tafweets
         pointsEarned = 1; 
         
         bool isTafweetMode = state!.mode == GameMode.tafweet;
@@ -554,22 +607,25 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
 
           if (isFashaTafweet) {
             pointsEarned += 20;
-            // No await needed for emoji as it's fire-and-forget UI
-            sendEmoji(playerId, '😎');
+            emojis[playerId] = '😎';
             playerSkips.remove('${card.rank.name}:fasha');
           } else if (isDoubleTafweet) {
             pointsEarned += 30;
-            sendEmoji(playerId, '🔥');
+            emojis[playerId] = '🔥';
             playerSkips.removeWhere((s) => s.startsWith('${card.rank.name}:'));
           } else if (isStandardTafweet) {
             pointsEarned += 10;
-            sendEmoji(playerId, '😂');
+            emojis[playerId] = '😂';
             playerSkips.removeWhere((s) => s.startsWith('${card.rank.name}:'));
           }
           skipped[playerId] = playerSkips;
+          
+          // Auto-clear emoji after duration
+          if (emojis.containsKey(playerId)) {
+            Future.delayed(const Duration(seconds: 3), () => clearEmoji(playerId));
+          }
         }
 
-        // Process harvested cards
         final harvestedBoardCards = List<game_card.Card>.from(capturedCards)..remove(card);
         for (var c in harvestedBoardCards) {
           finalBoard.remove(c);
@@ -595,6 +651,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
         skippedMatches: skipped,
         playHistory: history,
         cardOwnership: ownership,
+        playerEmojis: emojis, // Unified emoji update
         currentTurnIndex: nextTurn,
         teamAScore: state!.teamAScore + (teamId == 'teamA' ? pointsEarned : 0),
         teamBScore: state!.teamBScore + (teamId == 'teamB' ? pointsEarned : 0),

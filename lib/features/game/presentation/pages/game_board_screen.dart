@@ -17,6 +17,8 @@ class GameBoardScreen extends ConsumerWidget {
   const GameBoardScreen({super.key});
 
   AppUser _getAvatarUser(WidgetRef ref, MatchState matchState, String currentUserUid, int relativeOffset) {
+     if (matchState.playerIds.isEmpty) return AppUser(uid: 'empty', email: '', displayName: 'Waiting...');
+     
      int myIdx = matchState.playerIds.indexOf(currentUserUid);
      
      // spectator logic: if I'm not in the playerIds, I see from Host's perspective (bottom = T1P1)
@@ -24,12 +26,16 @@ class GameBoardScreen extends ConsumerWidget {
      
      // 0 = Bottom (Local Player), 1 = Left, 2 = Top (Opponent), 3 = Right
      if (myIdx != -1 && relativeOffset == 0) {
-        final realUser = ref.watch(currentUserProvider)!;
-        return realUser.copyWith(displayName: 'You (${realUser.displayName})');
+        final realUser = ref.watch(currentUserProvider);
+        if (realUser != null) {
+          return realUser.copyWith(displayName: 'You (${realUser.displayName})');
+        }
      }
      
      int targetIdx = (baseIdx + relativeOffset) % 4;
-     if (targetIdx >= matchState.playerIds.length) return AppUser(uid: 'empty', email: '', displayName: 'Waiting...');
+     if (targetIdx < 0 || targetIdx >= matchState.playerIds.length) {
+       return AppUser(uid: 'empty', email: '', displayName: 'Waiting...');
+     }
      
      String targetUid = matchState.playerIds[targetIdx];
      String targetName = matchState.playerNames[targetUid] ?? (targetUid.startsWith('bot_') ? '🤖 Bot' : 'Player');
@@ -373,10 +379,12 @@ class GameBoardScreen extends ConsumerWidget {
                _buildPhaseOverlay('memorize_fasha'.tr(args: ['5'])),
              if (matchState.phase == GamePhase.shuffleVoting)
                _buildShuffleVoteOverlay(context, ref, matchState, myUid),
+             if (matchState.phase == GamePhase.roundScoring)
+               _buildPhaseOverlay('round_scoring'.tr(args: [matchState.teamAScore.toString(), matchState.teamBScore.toString()])),
              if (matchState.phase == GamePhase.rematchVoting)
                _buildRematchVoteOverlay(context, ref, matchState, myUid),
              if (matchState.phase == GamePhase.matchOver)
-               _buildPhaseOverlay('match_over'.tr()),
+               _buildPhaseOverlay('match_over'.tr(args: [matchState.teamAScore.toString(), matchState.teamBScore.toString()])),
           ],
         ),
       ),
@@ -661,6 +669,7 @@ class _HarvestStackWidgetState extends State<HarvestStackWidget> {
   }
 
   Widget _buildCompactView() {
+    if (widget.captures.isEmpty) return const SizedBox.shrink();
     final lastCapture = widget.captures.last;
     return SizedBox(
       height: 90,
