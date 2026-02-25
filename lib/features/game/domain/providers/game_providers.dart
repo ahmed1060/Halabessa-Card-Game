@@ -84,6 +84,14 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
         if (state?.phase == GamePhase.dealingFasha) {
           await dealInitialCards();
         }
+      } else if (serverState.phase == GamePhase.waitingForPlayers) {
+        // LOBBY AUTO-START: If 4 players join, Host triggers start automatically.
+        if (serverState.playerIds.length == 4) {
+          await Future.delayed(const Duration(milliseconds: 1000));
+          if (state?.phase == GamePhase.waitingForPlayers && state!.playerIds.length == 4) {
+            _setupNewRound(isFirstRound: true);
+          }
+        }
       }
 
       // Determine active turning logic
