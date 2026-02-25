@@ -15,11 +15,20 @@ class Capture {
       };
 
   factory Capture.fromJson(Map<String, dynamic> json) {
+    // Ultra-defensive parsing to avoid TypeError: null: type '...' is not a subtype of type 'Map'
+    final leadingCardData = json['leadingCard'];
+    final capturedCardsData = json['capturedCards'];
+
     return Capture(
-      leadingCard: game_card.Card.fromJson(Map<String, dynamic>.from(json['leadingCard'] as Map)),
-      capturedCards: (json['capturedCards'] as List)
-          .map((c) => game_card.Card.fromJson(Map<String, dynamic>.from(c as Map)))
-          .toList(),
+      leadingCard: (leadingCardData is Map)
+          ? game_card.Card.fromJson(Map<String, dynamic>.from(leadingCardData))
+          : const game_card.Card(game_card.Suit.hearts, game_card.Rank.ace), // Safe fallback
+      capturedCards: (capturedCardsData is List)
+          ? capturedCardsData
+              .map((c) => c is Map ? game_card.Card.fromJson(Map<String, dynamic>.from(c)) : null)
+              .whereType<game_card.Card>()
+              .toList()
+          : [],
     );
   }
 }

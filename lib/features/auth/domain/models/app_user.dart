@@ -22,6 +22,20 @@ class AppUser {
   });
 
   factory AppUser.fromJson(Map<String, dynamic> json, String uid) {
+    List<String> parseFriends(dynamic data) {
+      if (data == null) return const [];
+      if (data is List) return data.map((e) => e.toString()).toList();
+      if (data is Map) {
+        return data.values.map((e) => e.toString()).toList();
+      }
+      return const [];
+    }
+
+    Map<String, String> parseInvites(dynamic data) {
+      if (data == null || data is! Map) return const {};
+      return Map<String, String>.from(data);
+    }
+
     return AppUser(
       uid: uid,
       email: json['email'] ?? '',
@@ -30,8 +44,8 @@ class AppUser {
       avatarUrl: json['avatarUrl'],
       points: json['points'] ?? 0,
       rank: json['rank'] ?? 0,
-      friends: (json['friends'] as List?)?.cast<String>() ?? const [],
-      friendInvites: (json['friendInvites'] as Map?)?.cast<String, String>() ?? const {},
+      friends: parseFriends(json['friends']),
+      friendInvites: parseInvites(json['friendInvites']),
     );
   }
 

@@ -81,36 +81,56 @@ class FirebaseAuthRepository implements AuthRepository {
   @override
   Future<AppUser?> signInWithGoogle() async {
     try {
-       final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
-       if (googleUser == null) return null;
+      if (kIsWeb) {
+        final googleProvider = firebase_auth.GoogleAuthProvider();
+        final userCredential = await _firebaseAuth.signInWithPopup(googleProvider);
+        final user = _userFromFirebase(userCredential.user);
+        if (user != null) await _syncUserToDatabase(user);
+        return user;
+      }
 
-       final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
-       final credential = firebase_auth.GoogleAuthProvider.credential(
-          accessToken: googleAuth.accessToken,
-          idToken: googleAuth.idToken,
-       );
+      final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
+      if (googleUser == null) return null;
 
-       final userCredential = await _firebaseAuth.signInWithCredential(credential);
-       return _userFromFirebase(userCredential.user);
+      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      final credential = firebase_auth.GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      final userCredential = await _firebaseAuth.signInWithCredential(credential);
+      final user = _userFromFirebase(userCredential.user);
+      if (user != null) await _syncUserToDatabase(user);
+      return user;
     } catch (e) {
-       debugPrint("Google Sign In failed: $e");
-       rethrow;
+      debugPrint("Google Sign In failed: $e");
+      rethrow;
     }
   }
 
   @override
   Future<AppUser?> signInWithFacebook() async {
     try {
-       final LoginResult result = await FacebookAuth.instance.login();
-       if (result.status == LoginStatus.success) {
-          final credential = firebase_auth.FacebookAuthProvider.credential(result.accessToken!.tokenString);
-          final userCredential = await _firebaseAuth.signInWithCredential(credential);
-          return _userFromFirebase(userCredential.user);
-       }
-       return null;
+      if (kIsWeb) {
+        final facebookProvider = firebase_auth.FacebookAuthProvider();
+        final userCredential = await _firebaseAuth.signInWithPopup(facebookProvider);
+        final user = _userFromFirebase(userCredential.user);
+        if (user != null) await _syncUserToDatabase(user);
+        return user;
+      }
+
+      final LoginResult result = await FacebookAuth.instance.login();
+      if (result.status == LoginStatus.success) {
+        final credential = firebase_auth.FacebookAuthProvider.credential(result.accessToken!.tokenString);
+        final userCredential = await _firebaseAuth.signInWithCredential(credential);
+        final user = _userFromFirebase(userCredential.user);
+        if (user != null) await _syncUserToDatabase(user);
+        return user;
+      }
+      return null;
     } catch (e) {
-       debugPrint("Facebook Sign In failed: $e");
-       rethrow;
+      debugPrint("Facebook Sign In failed: $e");
+      rethrow;
     }
   }
 

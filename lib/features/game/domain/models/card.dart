@@ -56,9 +56,13 @@ class Card {
       };
 
   factory Card.fromJson(Map<String, dynamic> json) {
-    return Card(
-      Suit.values.byName(json['suit'] as String),
-      Rank.values.byName(json['rank'] as String),
-    );
+    try {
+      return Card(
+        Suit.values.byName(json['suit']?.toString() ?? 'hearts'),
+        Rank.values.byName(json['rank']?.toString() ?? 'ace'),
+      );
+    } catch (e) {
+      return const Card(Suit.hearts, Rank.ace); // Fallback for corrupt data
+    }
   }
 }

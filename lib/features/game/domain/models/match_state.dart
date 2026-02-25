@@ -185,21 +185,33 @@ class MatchState {
   }
 
   factory MatchState.fromJson(Map<dynamic, dynamic> json) {
+    // Helper for robust String -> String map parsing (Firebase minification safety)
+    Map<String, String> parseStringMap(dynamic map) {
+      if (map == null || map is! Map) return {};
+      return map.map((k, v) => MapEntry(k.toString(), v?.toString() ?? ''));
+    }
+
+    // Helper for robust String -> Bool map parsing
+    Map<String, bool> parseBoolMap(dynamic map) {
+      if (map == null || map is! Map) return {};
+      return map.map((k, v) => MapEntry(k.toString(), v == true));
+    }
+
     List<game_card.Card> parseCards(dynamic list) {
       if (list == null) return [];
       if (list is Map) {
-         try {
-           final sortedKeys = list.keys.map((e) => int.tryParse(e.toString())).whereType<int>().toList()..sort();
-           return sortedKeys.map((k) {
-             final item = list[k.toString()];
-             if (item is Map) {
-               return game_card.Card.fromJson(Map<String, dynamic>.from(item));
-             }
-             return null;
-           }).whereType<game_card.Card>().toList();
-         } catch (e) {
-           return [];
-         }
+        try {
+          final sortedKeys = list.keys.map((e) => int.tryParse(e.toString())).whereType<int>().toList()..sort();
+          return sortedKeys.map((k) {
+            final item = list[k.toString()];
+            if (item is Map) {
+              return game_card.Card.fromJson(Map<String, dynamic>.from(item));
+            }
+            return null;
+          }).whereType<game_card.Card>().toList();
+        } catch (e) {
+          return [];
+        }
       }
       if (list is List) {
         return list.map((i) {
@@ -215,18 +227,18 @@ class MatchState {
     List<Capture> parseCaptures(dynamic list) {
       if (list == null) return [];
       if (list is Map) {
-         try {
-           final sortedKeys = list.keys.map((e) => int.tryParse(e.toString())).whereType<int>().toList()..sort();
-           return sortedKeys.map((k) {
-             final item = list[k.toString()];
-             if (item is Map) {
-               return Capture.fromJson(Map<String, dynamic>.from(item));
-             }
-             return null;
-           }).whereType<Capture>().toList();
-         } catch (e) {
-           return [];
-         }
+        try {
+          final sortedKeys = list.keys.map((e) => int.tryParse(e.toString())).whereType<int>().toList()..sort();
+          return sortedKeys.map((k) {
+            final item = list[k.toString()];
+            if (item is Map) {
+              return Capture.fromJson(Map<String, dynamic>.from(item));
+            }
+            return null;
+          }).whereType<Capture>().toList();
+        } catch (e) {
+          return [];
+        }
       }
       if (list is List) {
         return list.map((i) {
@@ -238,7 +250,7 @@ class MatchState {
       }
       return [];
     }
-    
+
     Map<String, List<game_card.Card>> parseCardMap(dynamic map) {
       if (map == null || map is! Map) return {};
       final result = <String, List<game_card.Card>>{};
@@ -254,11 +266,12 @@ class MatchState {
         'teamB': [],
       };
       if (map == null) return result;
-      
+
       if (map is Map) {
         map.forEach((key, value) {
-          if (key.toString() == 'teamA' || key.toString() == 'teamB') {
-            result[key.toString()] = parseCaptures(value);
+          final kStr = key.toString();
+          if (kStr == 'teamA' || kStr == 'teamB') {
+            result[kStr] = parseCaptures(value);
           }
         });
       }
@@ -266,35 +279,26 @@ class MatchState {
     }
 
     try {
-      String? id;
-      try { id = json['id']?.toString() ?? ''; } catch (e) { id = ''; }
+      final id = json['id']?.toString() ?? '';
       
-      GameMode mode;
-      try { mode = GameMode.values.firstWhere((e) => e.name == json['mode'], orElse: () => GameMode.classic); } catch (e) { mode = GameMode.classic; }
+      final GameMode mode = GameMode.values.firstWhere(
+        (e) => e.name == json['mode']?.toString(), 
+        orElse: () => GameMode.classic
+      );
       
-      int maxPoints;
-      try { maxPoints = json['maxPoints'] is int ? json['maxPoints'] as int : 41; } catch (e) { maxPoints = 41; }
+      final maxPoints = json['maxPoints'] is int ? json['maxPoints'] as int : 41;
       
-      List<String> playerIds;
-      try { playerIds = (json['playerIds'] is List) ? (json['playerIds'] as List).map((e) => e.toString()).toList() : []; } catch (e) { playerIds = []; }
+      final playerIds = (json['playerIds'] is List) 
+          ? (json['playerIds'] as List).map((e) => e.toString()).toList() 
+          : <String>[];
       
-      Map<String, String> playerEmojis;
-      try { playerEmojis = (json['playerEmojis'] is Map) ? Map<String, String>.from(json['playerEmojis'] as Map) : const {}; } catch (e) { playerEmojis = const {}; }
-      
-      Map<String, bool> shuffleVotes;
-      try { shuffleVotes = (json['shuffleVotes'] is Map) ? Map<String, bool>.from(json['shuffleVotes'] as Map) : const {}; } catch (e) { shuffleVotes = const {}; }
-      
-      Map<String, bool> rematchVotes;
-      try { rematchVotes = (json['rematchVotes'] is Map) ? Map<String, bool>.from(json['rematchVotes'] as Map) : const {}; } catch (e) { rematchVotes = const {}; }
-      
-      Map<String, bool> botInjectionVotes;
-      try { botInjectionVotes = (json['botInjectionVotes'] is Map) ? Map<String, bool>.from(json['botInjectionVotes'] as Map) : const {}; } catch (e) { botInjectionVotes = const {}; }
-      
-      Map<String, String> playerNames;
-      try { playerNames = (json['playerNames'] is Map) ? Map<String, String>.from(json['playerNames'] as Map) : const {}; } catch (e) { playerNames = const {}; }
-      
-      Map<String, String> cardOwnership;
-      try { cardOwnership = (json['cardOwnership'] is Map) ? Map<String, String>.from(json['cardOwnership'] as Map) : const {}; } catch (e) { cardOwnership = const {}; }
+      // Use ultra-safe map parsing helpers
+      final playerEmojis = parseStringMap(json['playerEmojis']);
+      final shuffleVotes = parseBoolMap(json['shuffleVotes']);
+      final rematchVotes = parseBoolMap(json['rematchVotes']);
+      final botInjectionVotes = parseBoolMap(json['botInjectionVotes']);
+      final playerNames = parseStringMap(json['playerNames']);
+      final cardOwnership = parseStringMap(json['cardOwnership']);
 
       return MatchState(
         id: id,
@@ -309,7 +313,10 @@ class MatchState {
         teamBScore: json['teamBScore'] is int ? json['teamBScore'] as int : 0,
         dealerIndex: json['dealerIndex'] is int ? json['dealerIndex'] as int : 0,
         currentTurnIndex: json['currentTurnIndex'] is int ? json['currentTurnIndex'] as int : 0,
-        phase: GamePhase.values.firstWhere((e) => e.name == json['phase'], orElse: () => GamePhase.waitingForPlayers),
+        phase: GamePhase.values.firstWhere(
+          (e) => e.name == json['phase']?.toString(), 
+          orElse: () => GamePhase.waitingForPlayers
+        ),
         lastCaptureTeam: json['lastCaptureTeam']?.toString(),
         roundCount: json['roundCount'] is int ? json['roundCount'] as int : 1,
         roundsSinceLastShuffle: json['roundsSinceLastShuffle'] is int ? json['roundsSinceLastShuffle'] as int : 0,
@@ -321,16 +328,24 @@ class MatchState {
         rematchVotes: rematchVotes,
         botInjectionVotes: botInjectionVotes,
         playerNames: playerNames,
-        isPublic: json['isPublic'] is bool ? json['isPublic'] as bool : false,
+        isPublic: json['isPublic'] == true,
         cardOwnership: cardOwnership,
         deckCount: json['deckCount'] is int ? json['deckCount'] as int : 0,
         skippedMatches: parseCardMap(json['skippedMatches']),
         playHistory: parseCards(json['playHistory']),
       );
     } catch (e, stack) {
-      debugPrint('CRITICAL MatchState.fromJson failure: $e');
+      debugPrint('RECOVERED MatchState.fromJson failure: $e');
       debugPrint('Stack: $stack');
-      rethrow; // Rethrow to let the repository catch it and log/return null
+      // Return a dummy state instead of crashing the whole app
+      return MatchState(
+        id: 'error_recovery',
+        mode: GameMode.classic,
+        playerIds: [],
+        dealerIndex: 0,
+        currentTurnIndex: 0,
+        phase: GamePhase.waitingForPlayers,
+      );
     }
   }
 }
