@@ -1,7 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import '../../domain/models/card.dart' as game_card;
-import 'card_widget.dart';
+import 'package:halabessa/features/game/domain/models/card.dart' as game_card;
+import 'package:halabessa/features/game/presentation/widgets/card_widget.dart';
 
 class FannedHandWidget extends StatefulWidget {
   final List<game_card.Card> cards;

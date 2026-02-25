@@ -3,15 +3,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easy_localization/easy_localization.dart';
 
-import '../../domain/providers/game_providers.dart';
-import '../../domain/models/match_state.dart';
-import '../../../auth/presentation/providers/auth_providers.dart';
-import '../../../auth/domain/models/app_user.dart';
-import '../widgets/card_widget.dart';
-import '../widgets/player_avatar.dart';
-import '../widgets/fanned_hand_widget.dart';
-import '../../domain/models/capture.dart';
-import '../../../../core/theme/theme_config.dart';
+import 'package:halabessa/features/game/domain/providers/game_providers.dart';
+import 'package:halabessa/features/game/domain/models/match_state.dart';
+import 'package:halabessa/features/auth/presentation/providers/auth_providers.dart';
+import 'package:halabessa/features/auth/domain/models/app_user.dart';
+import 'package:halabessa/features/game/presentation/widgets/card_widget.dart';
+import 'package:halabessa/features/game/presentation/widgets/player_avatar.dart';
+import 'package:halabessa/features/game/presentation/widgets/fanned_hand_widget.dart';
+import 'package:halabessa/features/game/domain/models/capture.dart';
+import 'package:halabessa/core/theme/theme_config.dart';
 
 class GameBoardScreen extends ConsumerWidget {
   const GameBoardScreen({super.key});
@@ -337,7 +337,7 @@ class GameBoardScreen extends ConsumerWidget {
                         isMyTurn: matchState.playerIds.isNotEmpty && 
                                  matchState.currentTurnIndex == _getAbsoluteIndex(matchState, myUid, 0),
                         onCardTap: (card) {
-                           ref.read(gameProvider(matchState.id).notifier).playCard(myUid, card);
+                           ref.read(matchStateProvider.notifier).playCard(myUid, card);
                         },
                       ),
                     ],
@@ -470,9 +470,9 @@ class GameBoardScreen extends ConsumerWidget {
                    Text('room_full_starting'.tr(), style: const TextStyle(color: Colors.green)),
               ],
            ),
-        ),
-      );
-   }
+        ), // Container
+      ); // Center
+  }
 
   Widget _buildShuffleVoteOverlay(BuildContext context, WidgetRef ref, MatchState state, String currentUid) {
      final hasVoted = state.shuffleVotes.containsKey(currentUid);
@@ -539,8 +539,11 @@ class GameBoardScreen extends ConsumerWidget {
                  ],
                ) else Text('waiting_for_other_players'.tr(), style: const TextStyle(color: Colors.white)),
              ],
-          ),
-       ),
+           ),
+         ),
+       );
+   }
+
   void _showInviteFriendDialog(BuildContext context, WidgetRef ref, MatchState state, String currentUid) {
     final currentUser = ref.read(currentUserProvider);
     if (currentUser == null) return;
