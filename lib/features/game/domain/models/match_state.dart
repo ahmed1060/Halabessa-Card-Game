@@ -240,9 +240,9 @@ class MatchState {
     }
     
     Map<String, List<game_card.Card>> parseCardMap(dynamic map) {
-      if (map == null) return {};
+      if (map == null || map is! Map) return {};
       final result = <String, List<game_card.Card>>{};
-      (map as Map).forEach((key, value) {
+      map.forEach((key, value) {
         result[key.toString()] = parseCards(value);
       });
       return result;
@@ -266,11 +266,41 @@ class MatchState {
     }
 
     try {
+      String? id;
+      try { id = json['id']?.toString() ?? ''; } catch (e) { id = ''; }
+      
+      GameMode mode;
+      try { mode = GameMode.values.firstWhere((e) => e.name == json['mode'], orElse: () => GameMode.classic); } catch (e) { mode = GameMode.classic; }
+      
+      int maxPoints;
+      try { maxPoints = json['maxPoints'] is int ? json['maxPoints'] as int : 41; } catch (e) { maxPoints = 41; }
+      
+      List<String> playerIds;
+      try { playerIds = (json['playerIds'] is List) ? (json['playerIds'] as List).map((e) => e.toString()).toList() : []; } catch (e) { playerIds = []; }
+      
+      Map<String, String> playerEmojis;
+      try { playerEmojis = (json['playerEmojis'] is Map) ? Map<String, String>.from(json['playerEmojis'] as Map) : const {}; } catch (e) { playerEmojis = const {}; }
+      
+      Map<String, bool> shuffleVotes;
+      try { shuffleVotes = (json['shuffleVotes'] is Map) ? Map<String, bool>.from(json['shuffleVotes'] as Map) : const {}; } catch (e) { shuffleVotes = const {}; }
+      
+      Map<String, bool> rematchVotes;
+      try { rematchVotes = (json['rematchVotes'] is Map) ? Map<String, bool>.from(json['rematchVotes'] as Map) : const {}; } catch (e) { rematchVotes = const {}; }
+      
+      Map<String, bool> botInjectionVotes;
+      try { botInjectionVotes = (json['botInjectionVotes'] is Map) ? Map<String, bool>.from(json['botInjectionVotes'] as Map) : const {}; } catch (e) { botInjectionVotes = const {}; }
+      
+      Map<String, String> playerNames;
+      try { playerNames = (json['playerNames'] is Map) ? Map<String, String>.from(json['playerNames'] as Map) : const {}; } catch (e) { playerNames = const {}; }
+      
+      Map<String, String> cardOwnership;
+      try { cardOwnership = (json['cardOwnership'] is Map) ? Map<String, String>.from(json['cardOwnership'] as Map) : const {}; } catch (e) { cardOwnership = const {}; }
+
       return MatchState(
-        id: json['id']?.toString() ?? '',
-        mode: GameMode.values.firstWhere((e) => e.name == json['mode'], orElse: () => GameMode.classic),
-        maxPoints: json['maxPoints'] is int ? json['maxPoints'] as int : 41,
-        playerIds: (json['playerIds'] is List) ? (json['playerIds'] as List).map((e) => e.toString()).toList() : [],
+        id: id,
+        mode: mode,
+        maxPoints: maxPoints,
+        playerIds: playerIds,
         board: parseCards(json['board']),
         recentFasha: parseCards(json['recentFasha']),
         handCards: parseCardMap(json['handCards']),
@@ -286,13 +316,13 @@ class MatchState {
         consecutiveTafweetCount: json['consecutiveTafweetCount'] is int ? json['consecutiveTafweetCount'] as int : 0,
         turnStartTime: json['turnStartTime'] != null ? DateTime.tryParse(json['turnStartTime'].toString()) : null,
         timerDurationSeconds: json['timerDurationSeconds'] is int ? json['timerDurationSeconds'] as int : 10,
-        playerEmojis: (json['playerEmojis'] is Map) ? (json['playerEmojis'] as Map).cast<String, String>() : const {},
-        shuffleVotes: (json['shuffleVotes'] is Map) ? (json['shuffleVotes'] as Map).cast<String, bool>() : const {},
-        rematchVotes: (json['rematchVotes'] is Map) ? (json['rematchVotes'] as Map).cast<String, bool>() : const {},
-        botInjectionVotes: (json['botInjectionVotes'] is Map) ? (json['botInjectionVotes'] as Map).cast<String, bool>() : const {},
-        playerNames: (json['playerNames'] is Map) ? (json['playerNames'] as Map).cast<String, String>() : const {},
+        playerEmojis: playerEmojis,
+        shuffleVotes: shuffleVotes,
+        rematchVotes: rematchVotes,
+        botInjectionVotes: botInjectionVotes,
+        playerNames: playerNames,
         isPublic: json['isPublic'] is bool ? json['isPublic'] as bool : false,
-        cardOwnership: (json['cardOwnership'] is Map) ? (json['cardOwnership'] as Map).cast<String, String>() : const {},
+        cardOwnership: cardOwnership,
         deckCount: json['deckCount'] is int ? json['deckCount'] as int : 0,
         skippedMatches: parseCardMap(json['skippedMatches']),
         playHistory: parseCards(json['playHistory']),

@@ -22,12 +22,12 @@ class MultiplayerSyncService {
 
   Stream<MatchState?> watchMatch(String matchId) {
     return _matchRef.child(matchId).onValue.map((event) {
-      if (event.snapshot.value == null) return null;
+      final value = event.snapshot.value;
+      if (value == null || value is! Map) return null;
       try {
-        final data = event.snapshot.value as Map<dynamic, dynamic>;
-        return MatchState.fromJson(Map<String, dynamic>.from(data));
+        return MatchState.fromJson(Map<String, dynamic>.from(value));
       } catch (e) {
-        debugPrint('Error parsing match state: $e');
+        debugPrint('Error parsing match state for $matchId: $e');
         return null;
       }
     });

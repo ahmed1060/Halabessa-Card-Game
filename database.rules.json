@@ -7,6 +7,10 @@
         "matchmaking_queue": {
             ".read": "true",
             ".write": "true"
+        },
+        "users": {
+            ".read": "true",
+            ".write": "true"
         }
     }
 }
