@@ -77,6 +77,15 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     _isHandlingBotLogic = true;
     
     try {
+      // Host specific global phase handling (Dealing Cards)
+      if (serverState.phase == GamePhase.dealingFasha) {
+        // This is where Host deals Initial Board + Hands
+        await Future.delayed(const Duration(milliseconds: 500));
+        if (state?.phase == GamePhase.dealingFasha) {
+          await dealInitialCards();
+        }
+      }
+
       // Determine active turning logic
       if (serverState.phase == GamePhase.preRoundCut) {
         int cutterIdx = (serverState.dealerIndex + 3) % 4;
@@ -91,13 +100,17 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
             performCut(cutPoint); 
           }
         }
-      } else if (serverState.phase == GamePhase.dealingFasha) {
-        // This is where Host deals Initial Board + Hands
-        await Future.delayed(const Duration(milliseconds: 500));
-        if (state?.phase == GamePhase.dealingFasha) {
-          await dealInitialCards();
-        }
       } else if (serverState.phase == GamePhase.playing) {
+        // PROACTIVE DEAL CHECK: If all hands are empty during playing phase, Host must deal.
+        bool allHandsEmpty = serverState.handCards.values.every((hand) => hand.isEmpty);
+        if (allHandsEmpty) {
+           await Future.delayed(const Duration(milliseconds: 1000));
+           if (state?.phase == GamePhase.playing && state!.handCards.values.every((hand) => hand.isEmpty)) {
+             await dealSubsequentCards();
+           }
+           return;
+        }
+
         String activePlayerId = serverState.playerIds[serverState.currentTurnIndex];
         if (activePlayerId.startsWith('bot_')) {
           // Dynamic reaction time: 0.8-2.3 seconds
@@ -215,19 +228,24 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     StreamSubscription? sub;
     sub = ref.read(multiplayerSyncServiceProvider).watchMatch(matchId).listen((serverState) {
       if (serverState != null) {
-        sub?.cancel();
-        
-        // Atomic Add check
-        if (serverState.phase == GamePhase.waitingForPlayers && serverState.playerIds.length < 4) {
-          if (!serverState.playerIds.contains(playerId)) {
-             final newPlayers = List<String>.from(serverState.playerIds)..add(playerId);
-             final newNames = Map<String, String>.from(serverState.playerNames)..[playerId] = displayName;
-             
-             _publishState(serverState.copyWith(
-               playerIds: newPlayers,
-               playerNames: newNames,
-             ));
+        try {
+          sub?.cancel();
+          
+          // Atomic Add check
+          if (serverState.phase == GamePhase.waitingForPlayers && serverState.playerIds.length < 4) {
+            if (!serverState.playerIds.contains(playerId)) {
+               final newPlayers = List<String>.from(serverState.playerIds)..add(playerId);
+               final newNames = Map<String, String>.from(serverState.playerNames)..[playerId] = displayName;
+               
+               _publishState(serverState.copyWith(
+                 playerIds: newPlayers,
+                 playerNames: newNames,
+               ));
+            }
           }
+        } catch (e, stack) {
+          debugPrint('ERROR in joinMatch listener callback: $e');
+          debugPrint('Stack: $stack');
         }
       }
     });
@@ -375,6 +393,12 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
    await Future.delayed(const Duration(seconds: 5));
    
    if (state?.phase == GamePhase.dealingCards) {
+     await _publishState(state!.copyWith(
+       phase: GamePhase.playing,
+       turnStartTime: DateTime.now(),
+     ));
+   } else if (state?.phase == GamePhase.dealingFasha) {
+     // FAILSAFE: If state stuck in fasha but dealing finished
      await _publishState(state!.copyWith(
        phase: GamePhase.playing,
        turnStartTime: DateTime.now(),
