@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 class ThemeConfig {
   static const Color primaryGreen = Color(0xFF1B5E20);
@@ -14,8 +13,7 @@ class ThemeConfig {
         primary: primaryGreen,
         secondary: goldAccent,
       ),
-      textTheme: GoogleFonts.cairoTextTheme(),
-      fontFamily: GoogleFonts.cairo().fontFamily,
+      fontFamily: 'Cairo',
       fontFamilyFallback: const ['sans-serif', 'Arial'],
       appBarTheme: const AppBarTheme(
         backgroundColor: darkGreen,
@@ -36,8 +34,7 @@ class ThemeConfig {
         secondary: goldAccent,
         surface: darkGreen,
       ),
-      textTheme: GoogleFonts.cairoTextTheme(ThemeData.dark().textTheme),
-      fontFamily: GoogleFonts.cairo().fontFamily,
+      fontFamily: 'Cairo',
       fontFamilyFallback: const ['sans-serif', 'Arial'],
       appBarTheme: const AppBarTheme(
         backgroundColor: Color(0xFF000000),
