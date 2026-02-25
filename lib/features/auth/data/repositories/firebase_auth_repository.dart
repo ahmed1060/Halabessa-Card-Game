@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
+import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
@@ -10,6 +11,16 @@ class FirebaseAuthRepository implements AuthRepository {
   final firebase_auth.FirebaseAuth _firebaseAuth;
 
   FirebaseAuthRepository(this._firebaseAuth);
+
+  Future<void> _syncUserToDatabase(AppUser user) async {
+    final ref = FirebaseDatabase.instance.ref('users').child(user.uid);
+    // Use update to avoid overwriting friends/invites if they exist
+    await ref.update({
+      'displayName': user.displayName,
+      'email': user.email,
+      'avatarUrl': user.avatarUrl,
+    });
+  }
 
   AppUser? _userFromFirebase(firebase_auth.User? user) {
     if (user == null) {
@@ -40,7 +51,9 @@ class FirebaseAuthRepository implements AuthRepository {
         email: email,
         password: password,
       );
-      return _userFromFirebase(credential.user);
+      final user = _userFromFirebase(credential.user);
+      if (user != null) await _syncUserToDatabase(user);
+      return user;
     } catch (e) {
       debugPrint("Email Login failed: \$e");
       rethrow;
@@ -56,7 +69,9 @@ class FirebaseAuthRepository implements AuthRepository {
         password: password,
       );
       await credential.user?.updateDisplayName(displayName);
-      return _userFromFirebase(credential.user);
+      final user = _userFromFirebase(credential.user);
+      if (user != null) await _syncUserToDatabase(user);
+      return user;
     } catch (e) {
       debugPrint("Email Sign Up failed: \$e");
       rethrow;
@@ -135,7 +150,9 @@ class FirebaseAuthRepository implements AuthRepository {
       }
       // Re-fetch the current user instance from Firebase after reload to ensure we have the latest payload
       final updatedUser = _firebaseAuth.currentUser;
-      return _userFromFirebase(updatedUser);
+      final user = _userFromFirebase(updatedUser);
+      if (user != null) await _syncUserToDatabase(user);
+      return user;
     } catch (e) {
       debugPrint("Anonymous Sign In failed: \$e");
       rethrow;

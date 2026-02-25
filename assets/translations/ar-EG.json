@@ -88,6 +88,19 @@
     "match_over": "الماتش خلص!",
     "team_wins": "فريق {} كسب!",
     "rematch_votes": "تصويت الإعادة: {} / 4",
-    "best_of_3_yes": "اللي يكسب ٢ (أيوة)",
-    "leave_match_no": "اخرج من الماتش (لأ)"
+    "best_of_3_yes": "أفضل من 3 (نعم)",
+    "leave_match_no": "مغادرة المباراة (لا)",
+    "loading_match_environment": "جاري تحميل بيئة المباراة...",
+    "retry_or_exit": "إعادة المحاولة أو الخروج",
+    "public_room": "غرفة عامة",
+    "public_room_desc": "إظهار هذه الغرفة في قائمة الغرف المتاحة",
+    "available_matches": "المباريات العامة المتاحة",
+    "no_public_matches": "مفيش غرف عامة دلوقتي. اعمل واحدة!",
+    "join_matching_mode": "دخول مباراة {}",
+    "invite_friends": "دعوة أصدقاء",
+    "friends_list": "قائمة الأصدقاء",
+    "add_friend": "إضافة صديق",
+    "search_users": "البحث عن لاعبين",
+    "send_invite": "إرسال دعوة",
+    "invitation_sent": "تم إرسال الدعوة!"
 }

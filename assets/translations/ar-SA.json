@@ -89,5 +89,7 @@
     "team_wins": "الفريق {} الفائز!",
     "rematch_votes": "أصوات الإعادة: {} / 4",
     "best_of_3_yes": "الأفضل من 3 (نعم)",
-    "leave_match_no": "مغادرة المباراة (لا)"
+    "leave_match_no": "مغادرة المباراة (لا)",
+    "loading_match_environment": "جاري تحميل بيئة المباراة...",
+    "retry_or_exit": "إعادة المحاولة أو الخروج"
 }

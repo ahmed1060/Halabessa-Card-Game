@@ -12,6 +12,9 @@ class MatchState {
   // Players Array: [T1_P1, T2_P1, T1_P2, T2_P2] -> [0, 1, 2, 3]
   // Teams: A is indices [0, 2], B is indices [1, 3]
   final List<String> playerIds;
+  final Map<String, String> playerNames; // Synced ID -> DisplayName
+  final bool isPublic;
+  final Map<String, String> cardOwnership; // cardId -> playerWhoPlayedIt
 
   // Deck & Board State
   // Removed shared deck list for security (Anti-Cheat)
@@ -74,6 +77,9 @@ class MatchState {
     this.shuffleVotes = const {},
     this.rematchVotes = const {},
     this.botInjectionVotes = const {},
+    this.playerNames = const {},
+    this.isPublic = false,
+    this.cardOwnership = const {},
     this.deckCount = 0,
     this.skippedMatches = const {},
     this.playHistory = const [],
@@ -103,6 +109,9 @@ class MatchState {
     Map<String, bool>? shuffleVotes,
     Map<String, bool>? rematchVotes,
     Map<String, bool>? botInjectionVotes,
+    Map<String, String>? playerNames,
+    bool? isPublic,
+    Map<String, String>? cardOwnership,
     int? deckCount,
     Map<String, List<game_card.Card>>? skippedMatches,
     List<game_card.Card>? playHistory,
@@ -131,6 +140,9 @@ class MatchState {
       shuffleVotes: shuffleVotes ?? this.shuffleVotes,
       rematchVotes: rematchVotes ?? this.rematchVotes,
       botInjectionVotes: botInjectionVotes ?? this.botInjectionVotes,
+      playerNames: playerNames ?? this.playerNames,
+      isPublic: isPublic ?? this.isPublic,
+      cardOwnership: cardOwnership ?? this.cardOwnership,
       deckCount: deckCount ?? this.deckCount,
       skippedMatches: skippedMatches ?? this.skippedMatches,
       playHistory: playHistory ?? this.playHistory,
@@ -165,6 +177,9 @@ class MatchState {
       'shuffleVotes': shuffleVotes,
       'rematchVotes': rematchVotes,
       'botInjectionVotes': botInjectionVotes,
+      'playerNames': playerNames,
+      'isPublic': isPublic,
+      'cardOwnership': cardOwnership,
     };
   }
 
@@ -202,41 +217,54 @@ class MatchState {
         'teamA': [],
         'teamB': [],
       };
-      if (map != null) {
-        (map as Map).forEach((key, value) {
-          result[key.toString()] = parseCaptures(value);
+      if (map == null) return result;
+      
+      if (map is Map) {
+        map.forEach((key, value) {
+          if (key.toString() == 'teamA' || key.toString() == 'teamB') {
+            result[key.toString()] = parseCaptures(value);
+          }
         });
       }
       return result;
     }
 
-    return MatchState(
-      id: json['id'] as String? ?? '',
-      mode: GameMode.values.byName(json['mode'] as String? ?? 'classic'),
-      maxPoints: json['maxPoints'] as int? ?? 41,
-      playerIds: (json['playerIds'] as List?)?.map((e) => e.toString()).toList() ?? [],
-      board: parseCards(json['board']),
-      recentFasha: parseCards(json['recentFasha']),
-      handCards: parseCardMap(json['handCards']),
-      harvestStacks: parseCaptureMap(json['harvestStacks']),
-      teamAScore: json['teamAScore'] as int? ?? 0,
-      teamBScore: json['teamBScore'] as int? ?? 0,
-      dealerIndex: json['dealerIndex'] as int? ?? 0,
-      currentTurnIndex: json['currentTurnIndex'] as int? ?? 0,
-      phase: GamePhase.values.byName(json['phase'] as String? ?? 'preRoundCut'),
-      lastCaptureTeam: json['lastCaptureTeam'] as String?,
-      roundCount: json['roundCount'] as int? ?? 1,
-      roundsSinceLastShuffle: json['roundsSinceLastShuffle'] as int? ?? 0,
-      consecutiveTafweetCount: json['consecutiveTafweetCount'] as int? ?? 0,
-      turnStartTime: json['turnStartTime'] != null ? DateTime.parse(json['turnStartTime'] as String) : null,
-      timerDurationSeconds: json['timerDurationSeconds'] as int? ?? 10,
-      playerEmojis: (json['playerEmojis'] as Map?)?.cast<String, String>() ?? const {},
-      shuffleVotes: (json['shuffleVotes'] as Map?)?.cast<String, bool>() ?? const {},
-      rematchVotes: (json['rematchVotes'] as Map?)?.cast<String, bool>() ?? const {},
-      botInjectionVotes: (json['botInjectionVotes'] as Map?)?.cast<String, bool>() ?? const {},
-      deckCount: json['deckCount'] as int? ?? 0,
-      skippedMatches: parseCardMap(json['skippedMatches']),
-      playHistory: parseCards(json['playHistory']),
-    );
+    try {
+      return MatchState(
+        id: json['id'] as String? ?? '',
+        mode: GameMode.values.byName(json['mode'] as String? ?? 'classic'),
+        maxPoints: json['maxPoints'] as int? ?? 41,
+        playerIds: (json['playerIds'] as List?)?.map((e) => e.toString()).toList() ?? [],
+        board: parseCards(json['board']),
+        recentFasha: parseCards(json['recentFasha']),
+        handCards: parseCardMap(json['handCards']),
+        harvestStacks: parseCaptureMap(json['harvestStacks']),
+        teamAScore: json['teamAScore'] as int? ?? 0,
+        teamBScore: json['teamBScore'] as int? ?? 0,
+        dealerIndex: json['dealerIndex'] as int? ?? 0,
+        currentTurnIndex: json['currentTurnIndex'] as int? ?? 0,
+        phase: GamePhase.values.byName(json['phase'] as String? ?? 'waitingForPlayers'),
+        lastCaptureTeam: json['lastCaptureTeam'] as String?,
+        roundCount: json['roundCount'] as int? ?? 1,
+        roundsSinceLastShuffle: json['roundsSinceLastShuffle'] as int? ?? 0,
+        consecutiveTafweetCount: json['consecutiveTafweetCount'] as int? ?? 0,
+        turnStartTime: json['turnStartTime'] != null ? DateTime.parse(json['turnStartTime'] as String) : null,
+        timerDurationSeconds: json['timerDurationSeconds'] as int? ?? 10,
+        playerEmojis: (json['playerEmojis'] as Map?)?.cast<String, String>() ?? const {},
+        shuffleVotes: (json['shuffleVotes'] as Map?)?.cast<String, bool>() ?? const {},
+        rematchVotes: (json['rematchVotes'] as Map?)?.cast<String, bool>() ?? const {},
+        botInjectionVotes: (json['botInjectionVotes'] as Map?)?.cast<String, bool>() ?? const {},
+        playerNames: (json['playerNames'] as Map?)?.cast<String, String>() ?? const {},
+        isPublic: json['isPublic'] as bool? ?? false,
+        cardOwnership: (json['cardOwnership'] as Map?)?.cast<String, String>() ?? const {},
+        deckCount: json['deckCount'] as int? ?? 0,
+        skippedMatches: parseCardMap(json['skippedMatches']),
+        playHistory: parseCards(json['playHistory']),
+      );
+    } catch (e, stack) {
+      debugPrint('CRITICAL MatchState.fromJson failure: $e');
+      debugPrint('Stack: $stack');
+      rethrow; // Rethrow to let the repository catch it and log/return null
+    }
   }
 }

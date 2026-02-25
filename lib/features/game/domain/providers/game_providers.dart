@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'dart:math';
+import 'dart:async';
 import '../../domain/models/match_state.dart';
 import '../../domain/models/capture.dart';
 import '../../domain/models/card.dart' as game_card;
@@ -27,18 +28,27 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
   // Local secret deck ONLY known by the Host (Anti-Cheat)
   Deck? _secretDeck;
   
+  // Track last bound match for refresh recovery
+  String? lastBoundMatchId;
+  
   void _publishState(MatchState newState) {
     state = newState;
     ref.read(multiplayerSyncServiceProvider).updateMatchState(newState);
   }
 
   void bindToMatch(String matchId) {
+    lastBoundMatchId = matchId;
     ref.read(multiplayerSyncServiceProvider).watchMatch(matchId).listen((serverState) {
       if (serverState != null) {
         state = serverState;
         _evaluateBotActions(serverState);
       }
     });
+  }
+
+  void rebind(String matchId) {
+    if (lastBoundMatchId == matchId && state != null) return;
+    bindToMatch(matchId);
   }
 
   Future<void> _evaluateBotActions(MatchState serverState) async {
@@ -117,12 +127,14 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     return c + d;
   }
 
-  void initializeMatch(List<String> playerIds, GameMode mode, {int timerDurationSeconds = 10}) {
+  void initializeMatch(String playerId, String displayName, GameMode mode, {int timerDurationSeconds = 10, bool isPublic = false}) {
     final newId = _generateRoomId();
     final initial = MatchState(
       id: newId,
       mode: mode,
-      playerIds: playerIds,
+      isPublic: isPublic,
+      playerIds: [playerId],
+      playerNames: {playerId: displayName},
       dealerIndex: 0,
       currentTurnIndex: 1, // Player after dealer starts
       phase: GamePhase.waitingForPlayers, // Start in Lobby phase
@@ -133,17 +145,32 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     bindToMatch(newId);
   }
 
-  void joinMatch(String matchId, String playerId) async {
+  void joinMatch(String matchId, String playerId, String displayName) async {
     bindToMatch(matchId);
-    // Add an artificial delay to allow bindToMatch to seed the local state
-    await Future.delayed(const Duration(milliseconds: 1000));
     
-    if (state != null && state!.phase == GamePhase.waitingForPlayers && state!.playerIds.length < 4) {
-      if (!state!.playerIds.contains(playerId)) {
-         final newPlayers = List<String>.from(state!.playerIds)..add(playerId);
-         _publishState(state!.copyWith(playerIds: newPlayers));
+    // Listen for the first non-null state specifically for this join event
+    StreamSubscription? sub;
+    sub = ref.read(multiplayerSyncServiceProvider).watchMatch(matchId).listen((serverState) {
+      if (serverState != null) {
+        sub?.cancel();
+        
+        // Atomic Add check
+        if (serverState.phase == GamePhase.waitingForPlayers && serverState.playerIds.length < 4) {
+          if (!serverState.playerIds.contains(playerId)) {
+             final newPlayers = List<String>.from(serverState.playerIds)..add(playerId);
+             final newNames = Map<String, String>.from(serverState.playerNames)..[playerId] = displayName;
+             
+             _publishState(serverState.copyWith(
+               playerIds: newPlayers,
+               playerNames: newNames,
+             ));
+          }
+        }
       }
-    }
+    });
+    
+    // Safety timeout to cancel listener if room doesn't exist
+    Future.delayed(const Duration(seconds: 5), () => sub?.cancel());
   }
 
   void voteForBots(String playerId) {
@@ -158,12 +185,19 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     if (votes.length == newState.playerIds.length) {
        // Unanimous Human Consent reached! Generate bots for empty seats.
        final finalPlayers = List<String>.from(newState.playerIds);
+       final finalNames = Map<String, String>.from(newState.playerNames);
        int botCount = 1;
        while (finalPlayers.length < 4) {
-          finalPlayers.add('bot_$botCount');
+          String botId = 'bot_$botCount';
+          finalPlayers.add(botId);
+          finalNames[botId] = '🤖 Bot $botCount';
           botCount++;
        }
-       state = newState.copyWith(playerIds: finalPlayers, botInjectionVotes: {});
+       state = newState.copyWith(
+         playerIds: finalPlayers, 
+         playerNames: finalNames,
+         botInjectionVotes: {}
+       );
        _setupNewRound(isFirstRound: true);
     } else {
        _publishState(newState);
@@ -306,11 +340,23 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     // Validate turn
     if (state!.playerIds[state!.currentTurnIndex] != playerId) return;
 
-    final board = List<game_card.Card>.from(state!.board);
-    final hands = Map<String, List<game_card.Card>>.from(state!.handCards);
-    final harvest = Map<String, List<Capture>>.from(state!.harvestStacks);
-    final skipped = Map<String, List<game_card.Card>>.from(state!.skippedMatches);
-    final history = List<game_card.Card>.from(state!.playHistory);
+    // 1. Move card from player hand to board
+    final newHand = List<game_card.Card>.from(state!.handCards[playerId]!)..remove(card);
+    final newBoard = List<game_card.Card>.from(state!.board)..add(card);
+    
+    // Track card ownership for positional animation
+    final newOwnership = Map<String, String>.from(state!.cardOwnership);
+    newOwnership['${card.suit}_${card.rank}'] = playerId;
+
+    MatchState newState = state!.copyWith(
+      handCards: Map<String, List<game_card.Card>>.from(state!.handCards)..[playerId] = newHand,
+      board: newBoard,
+      cardOwnership: newOwnership,
+    );
+
+    final harvest = Map<String, List<Capture>>.from(newState.harvestStacks);
+    final skipped = Map<String, List<game_card.Card>>.from(newState.skippedMatches);
+    final history = List<game_card.Card>.from(newState.playHistory);
     
     // 0. Behavioral Check: Did this player "skip" a capture?
     // If board has cards that match the hands OTHER than the one being played
@@ -424,8 +470,6 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     history.add(card);
     if (history.length > 10) history.removeAt(0);
 
-    // Determine next turn
-    int nextTurn = (state!.currentTurnIndex + 1) % 4;
     
     // Check if hands empty
     bool allHandsEmpty = hands.values.every((hand) => hand.isEmpty);

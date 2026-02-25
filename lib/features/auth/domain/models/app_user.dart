@@ -6,6 +6,8 @@ class AppUser {
   final String? avatarUrl;
   final int points;
   final int rank;
+  final List<String> friends;
+  final Map<String, String> friendInvites; // matchId -> senderName
 
   AppUser({
     required this.uid,
@@ -15,6 +17,8 @@ class AppUser {
     this.avatarUrl,
     this.points = 0,
     this.rank = 0,
+    this.friends = const [],
+    this.friendInvites = const {},
   });
 
   factory AppUser.fromJson(Map<String, dynamic> json, String uid) {
@@ -26,6 +30,8 @@ class AppUser {
       avatarUrl: json['avatarUrl'],
       points: json['points'] ?? 0,
       rank: json['rank'] ?? 0,
+      friends: (json['friends'] as List?)?.cast<String>() ?? const [],
+      friendInvites: (json['friendInvites'] as Map?)?.cast<String, String>() ?? const {},
     );
   }
 
@@ -37,6 +43,8 @@ class AppUser {
       'avatarUrl': avatarUrl,
       'points': points,
       'rank': rank,
+      'friends': friends,
+      'friendInvites': friendInvites,
     };
   }
 
@@ -48,6 +56,8 @@ class AppUser {
     String? avatarUrl,
     int? points,
     int? rank,
+    List<String>? friends,
+    Map<String, String>? friendInvites,
   }) {
     return AppUser(
       uid: uid ?? this.uid,
@@ -57,6 +67,8 @@ class AppUser {
       avatarUrl: avatarUrl ?? this.avatarUrl,
       points: points ?? this.points,
       rank: rank ?? this.rank,
+      friends: friends ?? this.friends,
+      friendInvites: friendInvites ?? this.friendInvites,
     );
   }
 }

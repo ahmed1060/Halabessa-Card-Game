@@ -5,6 +5,8 @@ import 'package:easy_localization/easy_localization.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../game/domain/providers/game_providers.dart';
 import '../../../game/domain/models/match_state.dart';
+import '../widgets/social_overlay.dart';
+import '../../auth/presentation/widgets/social_overlay.dart' as social_ui;
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -15,66 +17,85 @@ class HomeScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('7alabessa'),
+        title: Text('app_title'.tr()),
         actions: [
           IconButton(
-            icon: const Icon(Icons.person),
+            icon: const Icon(Icons.people_alt_outlined),
             onPressed: () {
-              Navigator.pushNamed(context, '/profile');
+              showModalBottomSheet(
+                context: context,
+                isScrollControlled: true,
+                backgroundColor: Colors.transparent,
+                builder: (context) => const social_ui.SocialOverlay(),
+              );
             },
           ),
           IconButton(
             icon: const Icon(Icons.logout),
-            onPressed: () {
-              ref.read(authRepositoryProvider).signOut();
-            },
+            onPressed: () => ref.read(authRepositoryProvider).signOut(),
           ),
         ],
       ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.casino, size: 100, color: Colors.teal),
-            const SizedBox(height: 24),
-            Text(
-              'welcome_player'.tr(args: [user?.displayName ?? "Player"]),
-              style: Theme.of(context).textTheme.headlineSmall,
-            ),
-            const SizedBox(height: 8),
-            Text('points_and_rank'.tr(args: [user?.points.toString() ?? '0', user?.rank.toString() ?? '0'])),
-            const SizedBox(height: 32),
-            ElevatedButton.icon(
-              onPressed: () {
-                _showCreateRoomDialog(context, ref, user?.uid ?? 'unknown');
-              },
-              icon: const Icon(Icons.add),
-              label: Text('create_game_room'.tr()),
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 16),
-                textStyle: const TextStyle(fontSize: 18),
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 40.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.casino, size: 100, color: Colors.teal),
+              const SizedBox(height: 24),
+              Text(
+                'welcome_player'.tr(args: [user?.displayName ?? "Player"]),
+                style: Theme.of(context).textTheme.headlineSmall,
               ),
-            ),
-            const SizedBox(height: 16),
-            OutlinedButton.icon(
-              onPressed: () {
-                 _showJoinRoomDialog(context, ref, user?.uid ?? 'unknown');
-              },
-              icon: const Icon(Icons.group_add),
-              label: Text('join_game_room'.tr()),
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 16),
-                textStyle: const TextStyle(fontSize: 18),
+              const SizedBox(height: 8),
+              Text('points_and_rank'.tr(args: [user?.points.toString() ?? '0', user?.rank.toString() ?? '0'])),
+              const SizedBox(height: 32),
+              ElevatedButton.icon(
+                onPressed: () {
+                  _showCreateRoomDialog(context, ref, user?.uid ?? 'unknown', user?.displayName ?? 'Player');
+                },
+                icon: const Icon(Icons.add),
+                label: Text('create_game_room'.tr()),
+                style: ElevatedButton.styleFrom(
+                  minimumSize: const Size(double.infinity, 56),
+                  textStyle: const TextStyle(fontSize: 18),
+                ),
               ),
-            ),
-          ],
+              const SizedBox(height: 16),
+              OutlinedButton.icon(
+                onPressed: () {
+                   _showJoinRoomDialog(context, ref, user?.uid ?? 'unknown', user?.displayName ?? 'Player');
+                },
+                icon: const Icon(Icons.group_add),
+                label: Text('join_game_room'.tr()),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(double.infinity, 56),
+                  textStyle: const TextStyle(fontSize: 18),
+                ),
+              ),
+              const SizedBox(height: 48),
+              const Divider(color: Colors.white24),
+              const SizedBox(height: 24),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'available_matches'.tr(),
+                  style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const PublicRoomsList(),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  void _showCreateRoomDialog(BuildContext context, WidgetRef ref, String playerId) {
+  void _showCreateRoomDialog(BuildContext context, WidgetRef ref, String playerId, String displayName) {
     int selectedTimerSeconds = 10; // Default is now 10. 0 represents Infinity
+    bool isPublic = false;
 
     showDialog(
       context: context,
@@ -106,6 +127,15 @@ class HomeScreen extends ConsumerWidget {
                    ),
                    const SizedBox(height: 16),
                    Text('select_game_mode'.tr()),
+                   const SizedBox(height: 8),
+                   SwitchListTile(
+                     title: Text('public_room'.tr()),
+                     subtitle: Text('public_room_desc'.tr()),
+                     value: isPublic,
+                     onChanged: (val) {
+                       setState(() { isPublic = val; });
+                     },
+                   ),
                 ],
               ),
               actions: [
@@ -118,9 +148,11 @@ class HomeScreen extends ConsumerWidget {
                     Navigator.pop(dialogContext);
                     try {
                       ref.read(matchStateProvider.notifier).initializeMatch(
-                         [playerId], // Only instantiate the creator
+                         playerId,
+                         displayName,
                          GameMode.classic,
                          timerDurationSeconds: selectedTimerSeconds,
+                         isPublic: isPublic,
                       );
                       Navigator.pushNamed(context, '/game');
                     } catch (e) {
@@ -138,9 +170,11 @@ class HomeScreen extends ConsumerWidget {
                     Navigator.pop(dialogContext);
                     try {
                       ref.read(matchStateProvider.notifier).initializeMatch(
-                         [playerId], // Only instantiate the creator
+                         playerId,
+                         displayName,
                          GameMode.tafweet,
                          timerDurationSeconds: selectedTimerSeconds,
+                         isPublic: isPublic,
                       );
                       Navigator.pushNamed(context, '/game');
                     } catch (e) {
@@ -161,7 +195,7 @@ class HomeScreen extends ConsumerWidget {
     );
   }
 
-  void _showJoinRoomDialog(BuildContext context, WidgetRef ref, String playerId) {
+  void _showJoinRoomDialog(BuildContext context, WidgetRef ref, String playerId, String displayName) {
     final TextEditingController roomController = TextEditingController();
     
     showDialog(
@@ -183,7 +217,7 @@ class HomeScreen extends ConsumerWidget {
                  final roomId = roomController.text.trim().toUpperCase();
                  if (roomId.isNotEmpty) {
                     Navigator.pop(dialogContext);
-                    ref.read(matchStateProvider.notifier).joinMatch(roomId, playerId);
+                    ref.read(matchStateProvider.notifier).joinMatch(roomId, playerId, displayName);
                     Navigator.pushNamed(context, '/game');
                  }
                },

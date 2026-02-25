@@ -17,25 +17,23 @@ class GameBoardScreen extends ConsumerWidget {
 
   AppUser _getAvatarUser(WidgetRef ref, MatchState matchState, String currentUserUid, int relativeOffset) {
      int myIdx = matchState.playerIds.indexOf(currentUserUid);
-     if (myIdx == -1) return AppUser(uid: 'spectator', email: '', displayName: 'Spectator');
+     
+     // spectator logic: if I'm not in the playerIds, I see from Host's perspective (bottom = T1P1)
+     int baseIdx = myIdx == -1 ? 0 : myIdx;
      
      // 0 = Bottom (Local Player), 1 = Left, 2 = Top (Opponent), 3 = Right
-     if (relativeOffset == 0) {
+     if (myIdx != -1 && relativeOffset == 0) {
         final realUser = ref.watch(currentUserProvider)!;
         return realUser.copyWith(displayName: 'You (${realUser.displayName})');
      }
      
-     int targetIdx = (myIdx + relativeOffset) % 4;
+     int targetIdx = (baseIdx + relativeOffset) % 4;
      if (targetIdx >= matchState.playerIds.length) return AppUser(uid: 'empty', email: '', displayName: 'Waiting...');
      
      String targetUid = matchState.playerIds[targetIdx];
+     String targetName = matchState.playerNames[targetUid] ?? (targetUid.startsWith('bot_') ? '🤖 Bot' : 'Player');
      
-     if (targetUid.startsWith('bot_')) {
-        return AppUser(uid: targetUid, email: '', displayName: '🤖 Bot ${targetUid.split('_')[1]}');
-     }
-     
-     String positionName = relativeOffset == 1 ? "Left Player" : relativeOffset == 2 ? "Opponent" : "Right Player";
-     return AppUser(uid: targetUid, email: '', displayName: positionName);
+     return AppUser(uid: targetUid, email: '', displayName: targetName);
   }
 
   Widget _buildTeamHarvestStack(MatchState matchState, String teamId, {required bool isMyTeam}) {
@@ -70,8 +68,29 @@ class GameBoardScreen extends ConsumerWidget {
     final currentUser = ref.watch(currentUserProvider);
 
     if (matchState == null || currentUser == null) {
-      return const Scaffold(
-        body: Center(child: Text("Loading Match Environment...")),
+      return Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const CircularProgressIndicator(),
+              const SizedBox(height: 24),
+              Text('loading_match_environment'.tr()),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () {
+                   final lastId = ref.read(matchStateProvider.notifier).lastBoundMatchId;
+                   if (lastId != null) {
+                      ref.read(matchStateProvider.notifier).rebind(lastId);
+                   } else {
+                      Navigator.pop(context);
+                   }
+                },
+                child: Text('retry_or_exit'.tr()),
+              ),
+            ],
+          ),
+        ),
       );
     }
 
@@ -178,30 +197,43 @@ class GameBoardScreen extends ConsumerWidget {
                     final card = entry.value;
                     
                     // Deterministic "randomness" based on card properties
-                    final seed = card.suit.index * 13 + card.rank.index + index;
-                    final random = Random(seed);
-                    
-                    final rotation = (random.nextDouble() - 0.5) * 0.4; // +/- 11 degrees
-                    final offsetX = (random.nextDouble() - 0.5) * 45;
-                    final offsetY = (random.nextDouble() - 0.5) * 45;
-                    
+                     final seed = card.suit.index * 13 + card.rank.index + index;
+                     final random = Random(seed);
+                     
+                     final rotation = (random.nextDouble() - 0.5) * 0.4; // +/- 11 degrees
+                     final offsetX = (random.nextDouble() - 0.5) * 45;
+                     final offsetY = (random.nextDouble() - 0.5) * 45;
+                     
+                     // 1. Determine who played this card to set start position
+                     String? ownerId = matchState.cardOwnership['${card.suit}_${card.rank}'];
+                     double startX = 0;
+                     double startY = 400; // Default: Bottom
+                     
+                     if (ownerId != null) {
+                       int myIdx = matchState.playerIds.indexOf(myUid);
+                       int ownerIdx = matchState.playerIds.indexOf(ownerId);
+                       if (myIdx != -1 && ownerIdx != -1) {
+                         int relativeIdx = (ownerIdx - myIdx + 4) % 4;
+                         if (relativeIdx == 1) { startX = -400; startY = 0; } // Left
+                         else if (relativeIdx == 2) { startX = 0; startY = -400; } // Top
+                         else if (relativeIdx == 3) { startX = 400; startY = 0; } // Right
+                       }
+                     }
+
                      return TweenAnimationBuilder<double>(
-                       duration: const Duration(milliseconds: 500),
-                       curve: Curves.easeOutBack,
+                       duration: const Duration(milliseconds: 600),
+                       curve: Curves.easeOutCubic,
                        tween: Tween(begin: 0.0, end: 1.0),
                        builder: (context, value, child) {
-                         // Animate from bottom (y=500) to current offset
-                         final targetX = offsetX;
-                         final targetY = offsetY;
-                         final currentX = targetX; 
-                         final currentY = 500.0 * (1 - value) + targetY * value;
+                         final currentX = startX * (1 - value) + offsetX * value;
+                         final currentY = startY * (1 - value) + offsetY * value;
                          
                          return Transform.translate(
                            offset: Offset(currentX, currentY),
                            child: Transform.rotate(
                              angle: rotation * value,
                              child: Transform.scale(
-                               scale: 0.5 + 0.5 * value,
+                               scale: 0.4 + 0.6 * value,
                                child: child,
                              ),
                            ),
@@ -367,7 +399,19 @@ class GameBoardScreen extends ConsumerWidget {
               children: [
                 Text('waiting_for_players'.tr(), style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 16),
-                Text('Room ID: ${state.id}', style: const TextStyle(color: Colors.orangeAccent, fontSize: 16, fontWeight: FontWeight.w500)),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('Room ID: ${state.id}', style: const TextStyle(color: Colors.orangeAccent, fontSize: 16, fontWeight: FontWeight.w500)),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      icon: const Icon(Icons.person_add_alt_1, color: Colors.teal, size: 20),
+                      onPressed: () => _showInviteFriendDialog(context, ref, state, currentUid),
+                      tooltip: 'invite_friends'.tr(),
+                    ),
+                  ],
+                ),
                 const SizedBox(height: 24),
                 Text('connected_players'.tr(), style: const TextStyle(color: Colors.white70, fontSize: 14)),
                 const SizedBox(height: 8),
@@ -378,7 +422,7 @@ class GameBoardScreen extends ConsumerWidget {
                       children: [
                          Icon(Icons.person, color: id == currentUid ? Colors.green : Colors.white54, size: 20),
                          const SizedBox(width: 8),
-                         Text(id == currentUid ? "you".tr() : "player_uuid".tr(args: [id.substring(0, 5)]), style: TextStyle(color: id == currentUid ? Colors.green : Colors.white)),
+                         Text(id == currentUid ? "you".tr() : (state.playerNames[id] ?? "player_uuid".tr(args: [id.substring(0, 5)])), style: TextStyle(color: id == currentUid ? Colors.green : Colors.white)),
                          if (state.botInjectionVotes.containsKey(id))
                             const Padding(
                               padding: EdgeInsets.only(left: 8.0),

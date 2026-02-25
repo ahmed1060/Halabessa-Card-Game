@@ -88,5 +88,21 @@
     "team_wins": "Team {} Wins!",
     "rematch_votes": "Rematch votes: {} / 4",
     "best_of_3_yes": "Best of 3 (Yes)",
-    "leave_match_no": "Leave Match (No)"
+    "leave_match_no": "Leave Match (No)",
+    "app_title": "7alabessa",
+    "loading_match_environment": "Loading Match Environment...",
+    "retry_or_exit": "Retry or Exit",
+    "public_room": "Public Room",
+    "public_room_desc": "List this room in the lobby browser",
+    "available_matches": "Available Public Matches",
+    "no_public_matches": "No public rooms available right now. Create one!",
+    "join_matching_mode": "Join {} Mode",
+    "invite_friends": "Invite Friends",
+    "friends_list": "Friends List",
+    "add_friend": "Add Friend",
+    "search_users": "Search Users",
+    "send_invite": "Send Invite",
+    "invitation_sent": "Invitation sent!",
+    "no_friends_yet": "You haven't added any friends yet. Use the search above!",
+    "send": "Send"
 }
