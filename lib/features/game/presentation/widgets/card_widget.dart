@@ -32,11 +32,20 @@ class CardWidget extends StatelessWidget {
              _mapRank(card.rank),
           ),
           showBack: !isFaceUp,
-          shape: RoundedRectangleBorder(
-             borderRadius: BorderRadius.circular(8),
-             side: const BorderSide(color: Colors.black26, width: 1),
+          style: PlayingCardViewStyle(
+            cardBack: (context) => ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: Image.asset(
+                'assets/images/card_back_premium.png',
+                fit: BoxFit.cover,
+              ),
+            ),
           ),
-          elevation: 4.0,
+          shape: RoundedRectangleBorder(
+             borderRadius: BorderRadius.circular(10),
+             side: BorderSide(color: Colors.white.withOpacity(0.1), width: 0.5),
+          ),
+          elevation: 8.0,
         ),
       ),
     );

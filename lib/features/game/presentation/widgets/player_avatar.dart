@@ -64,38 +64,68 @@ class PlayerAvatar extends StatelessWidget {
                 ),
               ),
             Container(
-              padding: EdgeInsets.all(isCurrentTurn ? 4 : 0),
+              padding: const EdgeInsets.all(2),
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                border: isCurrentTurn
-                    ? Border.all(color: Colors.transparent, width: 3) // Border is now handled by the indicator
-                    : null,
+                boxShadow: isCurrentTurn ? [
+                  BoxShadow(
+                    color: Colors.amber.withOpacity(0.5),
+                    blurRadius: 12,
+                    spreadRadius: 2,
+                  )
+                ] : null,
               ),
-              child: CircleAvatar(
-                radius: size / 2,
-                backgroundColor: Colors.teal.shade200,
-                backgroundImage: user.avatarUrl != null ? NetworkImage(user.avatarUrl!) : null,
-                child: user.avatarUrl == null
-                    ? Text(
-                        user.displayName.isNotEmpty ? user.displayName[0].toUpperCase() : '?',
-                        style: TextStyle(fontSize: size * 0.4, color: Colors.white),
-                      )
-                    : null,
+              child: Container(
+                padding: EdgeInsets.all(isCurrentTurn ? 2 : 0),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: isCurrentTurn
+                      ? Border.all(color: Colors.amber, width: 2)
+                      : Border.all(color: Colors.white24, width: 1),
+                ),
+                child: CircleAvatar(
+                  radius: size / 2,
+                  backgroundColor: isCurrentTurn ? Colors.amber.shade100 : Colors.teal.shade200,
+                  backgroundImage: user.avatarUrl != null ? NetworkImage(user.avatarUrl!) : null,
+                  child: user.avatarUrl == null
+                      ? Text(
+                          user.displayName.isNotEmpty ? user.displayName[0].toUpperCase() : '?',
+                          style: TextStyle(
+                            fontSize: size * 0.4, 
+                            color: isCurrentTurn ? Colors.black87 : Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        )
+                      : null,
+                ),
               ),
             ),
           ],
         ),
         
-        const SizedBox(height: 4),
+        const SizedBox(height: 8),
         
-        // Player Name & Points
-        Text(
-          user.displayName,
-          style: TextStyle(
-            fontWeight: isCurrentTurn ? FontWeight.bold : FontWeight.normal,
-            fontSize: 12,
+        // Player Name & Points - Glassmorphism Style
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          decoration: BoxDecoration(
+            color: Colors.black26,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: isCurrentTurn ? Colors.amber.withOpacity(0.5) : Colors.white12, width: 0.5),
+            boxShadow: isCurrentTurn ? [
+              BoxShadow(color: Colors.amber.withOpacity(0.2), blurRadius: 4, spreadRadius: 1)
+            ] : null,
           ),
-          overflow: TextOverflow.ellipsis,
+          child: Text(
+            user.displayName,
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: isCurrentTurn ? FontWeight.bold : FontWeight.normal,
+              fontSize: 11,
+              letterSpacing: 0.5,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
         ),
       ],
     );

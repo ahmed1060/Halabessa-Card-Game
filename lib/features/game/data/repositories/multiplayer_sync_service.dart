@@ -37,6 +37,24 @@ class MultiplayerSyncService {
     });
   }
 
+  /// Sync presence for a player: sets online status and removes it on disconnect
+  Future<void> syncPresence(String matchId, String playerId) async {
+    final presenceRef = _matchRef.child(matchId).child('presence').child(playerId);
+    // Set online status to true
+    await presenceRef.set(true);
+    // Set onDisconnect behavior
+    await presenceRef.onDisconnect().remove();
+  }
+
+  /// Watch presence changes for all players in a match
+  Stream<Map<String, bool>> watchPresence(String matchId) {
+    return _matchRef.child(matchId).child('presence').onValue.map((event) {
+      final value = event.snapshot.value;
+      if (value == null || value is! Map) return <String, bool>{};
+      return Map<String, bool>.from(value.map((k, v) => MapEntry(k.toString(), v == true)));
+    });
+  }
+
   /// Listen to all public matches
   Stream<List<MatchState>> watchPublicMatches() {
     return _matchRef.onValue.map((event) {

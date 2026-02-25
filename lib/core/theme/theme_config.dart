@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 
 class ThemeConfig {
-  static const Color primaryGreen = Color(0xFF1B5E20);
-  static const Color darkGreen = Color(0xFF0D3310);
-  static const Color goldAccent = Color(0xFFFFD700);
+  static const Color primaryGreen = Color(0xFF1B4332); // Deep Cinematic Forest Green
+  static const Color darkGreen = Color(0xFF081C15);    // Opulent Dark Green (near black)
+  static const Color accentGreen = Color(0xFF40916C);  // Vibrant Felt Green
+  static const Color goldAccent = Color(0xFFD4AF37);  // Classic Gold
+  static const Color surfaceGlass = Color(0x33000000); // Semi-transparent black for glassmorphism
 
   static ThemeData get lightTheme {
     return ThemeData(

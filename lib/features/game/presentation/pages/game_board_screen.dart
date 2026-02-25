@@ -48,12 +48,11 @@ class GameBoardScreen extends ConsumerWidget {
     if (captures.isEmpty) return const SizedBox.shrink();
 
     // Alignment logic: Team A typically bottom/left-ish, Team B top/right-ish or vice versa.
-    // For now, let's put Team A harvest bottom-left and Team B harvest top-right.
-    final alignment = teamId == 'teamA' ? const Alignment(-0.85, 0.7) : const Alignment(0.85, -0.7);
+    final alignment = teamId == 'teamA' ? const Alignment(-0.85, 0.45) : const Alignment(0.85, -0.45);
 
     return Align(
       alignment: alignment,
-      child: HarvestStackWidget(captures: captures, teamName: teamId.replaceAll('team', 'Team ')),
+      child: HarvestStackWidget(captures: captures, teamName: teamId == 'teamA' ? 'team_a'.tr() : 'team_b'.tr()),
     );
   }
 
@@ -75,26 +74,31 @@ class GameBoardScreen extends ConsumerWidget {
     final currentUser = ref.watch(currentUserProvider);
 
     if (matchState == null || currentUser == null) {
+      if (currentUser != null && matchState == null) {
+        Future.microtask(() => ref.read(matchStateProvider.notifier).tryRecoverLastMatch());
+      }
+
       return Scaffold(
+        backgroundColor: ThemeConfig.darkGreen,
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const CircularProgressIndicator(),
-              const SizedBox(height: 24),
-              Text('loading_match_environment'.tr()),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: () {
-                   final lastId = ref.read(matchStateProvider.notifier).lastBoundMatchId;
-                   if (lastId != null) {
-                      ref.read(matchStateProvider.notifier).rebind(lastId);
-                   } else {
-                      Navigator.pop(context);
-                   }
-                },
-                child: Text('retry_or_exit'.tr()),
+              const CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(ThemeConfig.accentGreen),
               ),
+              const SizedBox(height: 32),
+              Text(
+                'loading_match_environment'.tr(),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w500,
+                  letterSpacing: 0.5,
+                ),
+              ),
+              const SizedBox(height: 48),
+              _buildRetryButton(context, ref),
             ],
           ),
         ),
@@ -104,471 +108,546 @@ class GameBoardScreen extends ConsumerWidget {
     final myUid = currentUser.uid;
 
     return Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        centerTitle: false,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('7alabessa Match'),
+            const Text('7alabessa', 
+              style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2, color: Colors.white)
+            ),
             Text(
-              'Room ID: ${matchState.id}',
-              style: const TextStyle(fontSize: 12, color: Colors.white70),
+              '${'room_id'.tr()}: ${matchState.id}',
+              style: TextStyle(fontSize: 10, color: Colors.white.withOpacity(0.5)),
             ),
           ],
         ),
         actions: [
-          Center(
-             child: Padding(
-               padding: const EdgeInsets.symmetric(horizontal: 16.0),
-               child: Text(
-                 'score'.tr(args: [matchState.teamAScore.toString(), matchState.teamBScore.toString()]), 
-                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)
-               ),
-             ),
+          _buildScoreBadge(matchState),
+          const SizedBox(width: 8),
+          IconButton(
+            icon: const Icon(Icons.settings, color: Colors.white70), 
+            onPressed: () {}
           ),
-          IconButton(icon: const Icon(Icons.settings), onPressed: () {}),
         ],
       ),
-      body: SafeArea(
-        child: Stack(
-         children: [
-           // 0. Background Zones (Ref: Reference Image)
-           Column(
-             children: [
-               Expanded(
-                 flex: 5,
-                 child: Container(
-                   width: double.infinity,
-                   color: const Color(0xFFC4A484).withOpacity(0.15), // Tan tint
-                   child: Center(
-                     child: Opacity(
-                       opacity: 0.1,
-                       child: Text('PLAY CARD ZONE', style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 48, fontWeight: FontWeight.w900, letterSpacing: 4)),
-                     ),
-                   ),
-                 ),
-               ),
-               Expanded(
-                 flex: 5,
-                 child: Container(
-                   width: double.infinity,
-                   color: const Color(0xFF6B8E23).withOpacity(0.15), // Green tint
-                   child: Align(
-                     alignment: Alignment.topCenter,
-                     child: Padding(
-                       padding: const EdgeInsets.only(top: 20.0),
-                       child: Opacity(
-                         opacity: 0.1,
-                         child: Text('CARD ZONE', style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 48, fontWeight: FontWeight.w900, letterSpacing: 4)),
-                       ),
-                     ),
-                   ),
-                 ),
-               ),
-             ],
-           ),
-
-            // Table Top Background (Premium Radial Gradient)
-            Container(
-              decoration: const BoxDecoration(
-                gradient: RadialGradient(
-                  colors: [
-                    Color(0xFF2E7D32), // Lighter green center
-                    Color(0xFF1B5E20), // Mid green
-                    Color(0xFF0D3310), // Dark borders
-                  ],
-                  radius: 1.2,
-                  center: Alignment.center,
-                ),
+      body: Stack(
+        children: [
+          // Table Top Background (Premium Radial Gradient)
+          Container(
+            decoration: BoxDecoration(
+              gradient: RadialGradient(
+                colors: [
+                  ThemeConfig.primaryGreen.withOpacity(0.8),
+                  ThemeConfig.primaryGreen,
+                  ThemeConfig.darkGreen,
+                ],
+                radius: 1.4,
+                center: Alignment.center,
               ),
             ),
-            
-            // Opponent (Top Center, Offset 2)
-            Align(
-              alignment: Alignment.topCenter,
-              child: Padding(
-                padding: const EdgeInsets.only(top: 16.0),
-                child: PlayerAvatar(
-                   user: _getAvatarUser(ref, matchState, myUid, 2),
-                   isCurrentTurn: matchState.currentTurnIndex == _getAbsoluteIndex(matchState, myUid, 2),
-                   turnStartTime: matchState.turnStartTime,
-                   timerDurationSeconds: matchState.timerDurationSeconds,
-                   activeEmoji: matchState.playerIds.length > _getAbsoluteIndex(matchState, myUid, 2) ? matchState.playerEmojis[matchState.playerIds[_getAbsoluteIndex(matchState, myUid, 2)]] : null,
-                ),
-              ),
-            ),
-
-            // Left Player (Offset 1)
-            Align(
-              alignment: const Alignment(-0.95, 0),
-              child: PlayerAvatar(
-                 user: _getAvatarUser(ref, matchState, myUid, 1),
-                 isCurrentTurn: matchState.currentTurnIndex == _getAbsoluteIndex(matchState, myUid, 1),
-                 turnStartTime: matchState.turnStartTime,
-                 timerDurationSeconds: matchState.timerDurationSeconds,
-                 activeEmoji: matchState.playerIds.length > _getAbsoluteIndex(matchState, myUid, 1) ? matchState.playerEmojis[matchState.playerIds[_getAbsoluteIndex(matchState, myUid, 1)]] : null,
-              ),
-            ),
-
-            // Right Player (Offset 3)
-            Align(
-              alignment: const Alignment(0.95, 0),
-              child: PlayerAvatar(
-                 user: _getAvatarUser(ref, matchState, myUid, 3),
-                 isCurrentTurn: matchState.currentTurnIndex == _getAbsoluteIndex(matchState, myUid, 3),
-                 turnStartTime: matchState.turnStartTime,
-                 timerDurationSeconds: matchState.timerDurationSeconds,
-                 activeEmoji: matchState.playerIds.length > _getAbsoluteIndex(matchState, myUid, 3) ? matchState.playerEmojis[matchState.playerIds[_getAbsoluteIndex(matchState, myUid, 3)]] : null,
-              ),
-            ),
-
-            // Team A Harvest Stack (Adjacent to Player 0 - typically Bottom/Self if Host)
-            _buildTeamHarvestStack(matchState, 'teamA', isMyTeam: _getTeamOfPlayer(myUid, matchState.playerIds) == 'teamA'),
-
-            // Team B Harvest Stack (Adjacent to Player 1 - typically Left)
-            _buildTeamHarvestStack(matchState, 'teamB', isMyTeam: _getTeamOfPlayer(myUid, matchState.playerIds) == 'teamB'),
-
-            // The Board (Fasha / Center Stack - Physical Pile)
-            Center(
-              child: SizedBox(
-                width: 200,
-                height: 200,
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: matchState.board.asMap().entries.map((entry) {
-                    final index = entry.key;
-                    final card = entry.value;
-                    
-                    // Deterministic "randomness" based on card properties
-                    final seed = card.suit.index * 13 + card.rank.index + index;
-                    final random = Random(seed);
-                    
-                    // 1. Calculate Target Position & Rotation
-                    double targetX = (random.nextDouble() - 0.5) * 45; // Pile jitter
-                    double targetY = (random.nextDouble() - 0.5) * 45;
-                    double rotation = (random.nextDouble() - 0.5) * 0.4; // Pile rotation
-
-                    // Phase override: Spread out during Memorize phase
-                    if (matchState.phase == GamePhase.dealingCards) {
-                      // Simple horizontal spread for 4 cards
-                      // -1.5, -0.5, 0.5, 1.5 multiplier for spacing
-                      targetX = (index - 1.5) * 70; 
-                      targetY = 0;
-                      rotation = 0;
-                    }
-                    
-                    // 2. Determine who played/dealt this card to set start position
-                    String? ownerId = matchState.cardOwnership['${card.suit}_${card.rank}'];
-                    double startX = 0;
-                    double startY = 400; // Default: Bottom
-                    
-                    // If no owner, it's a dealt card from the Dealer
-                    final effectiveOwnerId = ownerId ?? (matchState.phase == GamePhase.dealingFasha || matchState.phase == GamePhase.dealingCards 
-                        ? matchState.playerIds[matchState.dealerIndex] 
-                        : null);
-
-                    if (effectiveOwnerId != null) {
-                      int myIdx = matchState.playerIds.indexOf(myUid);
-                      int ownerIdx = matchState.playerIds.indexOf(effectiveOwnerId);
-                      if (myIdx != -1 && ownerIdx != -1) {
-                        int relativeIdx = (ownerIdx - myIdx + 4) % 4;
-                        if (relativeIdx == 1) { startX = -400; startY = 0; } // Left
-                        else if (relativeIdx == 2) { startX = 0; startY = -400; } // Top
-                        else if (relativeIdx == 3) { startX = 400; startY = 0; } // Right
-                        else if (relativeIdx == 0) { startX = 0; startY = 400; } // Bottom (Self)
-                      }
-                    }
-
-                    return TweenAnimationBuilder<double>(
-                      duration: const Duration(milliseconds: 600),
-                      curve: Curves.easeOutCubic,
-                      tween: Tween(begin: 0.0, end: 1.0),
-                      builder: (context, value, child) {
-                        final currentX = startX * (1 - value) + targetX * value;
-                        final currentY = startY * (1 - value) + targetY * value;
-                        
-                        return Transform.translate(
-                          offset: Offset(currentX, currentY),
-                          child: Transform.rotate(
-                            angle: rotation * value,
-                            child: Transform.scale(
-                              scale: 0.8 + 0.2 * value,
-                              child: child,
-                            ),
-                          ),
-                        );
-                      },
-                      child: CardWidget(card: card),
-                    );
-                  }).toList(),
-                ),
-              ),
-            ),
-            
-            // Local Player (Bottom Left to clear center)
-            Align(
-              alignment: Alignment.bottomLeft,
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    PlayerAvatar(
-                       user: _getAvatarUser(ref, matchState, myUid, 0),
-                       isCurrentTurn: matchState.playerIds.isNotEmpty && matchState.currentTurnIndex == _getAbsoluteIndex(matchState, myUid, 0),
-                       turnStartTime: matchState.turnStartTime,
-                       timerDurationSeconds: matchState.timerDurationSeconds,
-                       activeEmoji: matchState.playerEmojis[myUid],
+          ),
+          
+          SafeArea(
+            child: Stack(
+              children: [
+                // Opponent (Top Center, Offset 2)
+                Align(
+                  alignment: Alignment.topCenter,
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 16.0),
+                    child: PlayerAvatar(
+                      user: _getAvatarUser(ref, matchState, myUid, 2),
+                      isCurrentTurn: matchState.currentTurnIndex == _getAbsoluteIndex(matchState, myUid, 2),
+                      turnStartTime: matchState.turnStartTime,
+                      timerDurationSeconds: matchState.timerDurationSeconds,
+                      activeEmoji: _getPlayerEmoji(matchState, myUid, 2),
                     ),
-                    const SizedBox(height: 8),
-                    // Reaction Bar (Small)
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: ['😂', '😡', '🤔', '😎'].map((e) => GestureDetector(
-                        onTap: () {
-                           ref.read(matchStateProvider.notifier).sendEmoji(myUid, e);
-                           Future.delayed(const Duration(seconds: 3), () {
-                              ref.read(matchStateProvider.notifier).clearEmoji(myUid);
-                           });
-                        },
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                          child: Text(e, style: const TextStyle(fontSize: 18)),
-                        ),
-                      )).toList(),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
-            ),
-            
-            // Local Player's Hand (Bottom Center)
-            Align(
-              alignment: Alignment.bottomCenter,
-              child: Container(
-                padding: const EdgeInsets.only(bottom: 16.0),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const SizedBox(height: 16),
-                    if ((matchState.handCards[myUid]?.length ?? 0) > 0) ...[
-                      const SizedBox(height: 16),
-                      // Fanned Player Hand
-                      FannedHandWidget(
-                        cards: matchState.handCards[myUid] ?? [],
-                        isMyTurn: matchState.playerIds.isNotEmpty && 
-                                 matchState.currentTurnIndex == _getAbsoluteIndex(matchState, myUid, 0),
-                        onCardTap: (card) {
-                           ref.read(matchStateProvider.notifier).playCard(myUid, card);
-                        },
-                      ),
-                    ],
-                  ],
+
+                // Left Player (Offset 1)
+                Align(
+                  alignment: const Alignment(-0.95, -0.1),
+                  child: PlayerAvatar(
+                    user: _getAvatarUser(ref, matchState, myUid, 1),
+                    isCurrentTurn: matchState.currentTurnIndex == _getAbsoluteIndex(matchState, myUid, 1),
+                    turnStartTime: matchState.turnStartTime,
+                    timerDurationSeconds: matchState.timerDurationSeconds,
+                    activeEmoji: _getPlayerEmoji(matchState, myUid, 1),
+                  ),
                 ),
-              ),
+
+                // Right Player (Offset 3)
+                Align(
+                  alignment: const Alignment(0.95, -0.1),
+                  child: PlayerAvatar(
+                    user: _getAvatarUser(ref, matchState, myUid, 3),
+                    isCurrentTurn: matchState.currentTurnIndex == _getAbsoluteIndex(matchState, myUid, 3),
+                    turnStartTime: matchState.turnStartTime,
+                    timerDurationSeconds: matchState.timerDurationSeconds,
+                    activeEmoji: _getPlayerEmoji(matchState, myUid, 3),
+                  ),
+                ),
+
+                // Harvest Stacks
+                _buildTeamHarvestStack(matchState, 'teamA', isMyTeam: _getTeamOfPlayer(myUid, matchState.playerIds) == 'teamA'),
+                _buildTeamHarvestStack(matchState, 'teamB', isMyTeam: _getTeamOfPlayer(myUid, matchState.playerIds) == 'teamB'),
+
+                // Center Area (Harvest Stacks & Played Cards)
+                Center(
+                  child: _buildBoardCenter(context, ref, matchState, myUid),
+                ),
+
+                // Local Player (Bottom Center, Offset 0)
+                Align(
+                  alignment: Alignment.bottomCenter,
+                  child: _buildLocalPlayerArea(context, ref, matchState, myUid),
+                ),
+
+                // Phase indicator overlay
+                if (matchState.phase == GamePhase.waitingForPlayers)
+                  _buildLobbyOverlay(context, ref, matchState, myUid),
+                if (matchState.phase == GamePhase.preRoundCut)
+                  _buildCutOverlay(context, ref, matchState, myUid),
+                 if (matchState.phase == GamePhase.dealingFasha)
+                   _buildPhaseOverlay('dealing_cards'.tr()),
+                  if (matchState.phase == GamePhase.dealingCards)
+                    _buildPhaseOverlay('memorize_fasha'.tr(args: ['5']), alignment: const Alignment(0, -0.4)),
+                 if (matchState.phase == GamePhase.shuffleVoting)
+                   _buildShuffleVoteOverlay(context, ref, matchState, myUid),
+                 if (matchState.phase == GamePhase.roundScoring)
+                   _buildPhaseOverlay('round_scoring'.tr(args: [matchState.teamAScore.toString(), matchState.teamBScore.toString()])),
+                 if (matchState.phase == GamePhase.rematchVoting)
+                   _buildRematchVoteOverlay(context, ref, matchState, myUid),
+                 if (matchState.phase == GamePhase.matchOver)
+                   _buildPhaseOverlay('match_over'.tr(args: [matchState.teamAScore.toString(), matchState.teamBScore.toString()])),
+              ],
             ),
-            
-            // Phase indicator overlay
-             if (matchState.phase == GamePhase.waitingForPlayers)
-               _buildLobbyOverlay(context, ref, matchState, myUid),
-             if (matchState.phase == GamePhase.preRoundCut)
-               _buildCutOverlay(context, ref, matchState, myUid),
-             if (matchState.phase == GamePhase.dealingFasha)
-               _buildPhaseOverlay('dealing_cards'.tr()),
-             if (matchState.phase == GamePhase.dealingCards)
-               _buildPhaseOverlay('memorize_fasha'.tr(args: ['5'])),
-             if (matchState.phase == GamePhase.shuffleVoting)
-               _buildShuffleVoteOverlay(context, ref, matchState, myUid),
-             if (matchState.phase == GamePhase.roundScoring)
-               _buildPhaseOverlay('round_scoring'.tr(args: [matchState.teamAScore.toString(), matchState.teamBScore.toString()])),
-             if (matchState.phase == GamePhase.rematchVoting)
-               _buildRematchVoteOverlay(context, ref, matchState, myUid),
-             if (matchState.phase == GamePhase.matchOver)
-               _buildPhaseOverlay('match_over'.tr(args: [matchState.teamAScore.toString(), matchState.teamBScore.toString()])),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildScoreBadge(MatchState matchState) {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.black45,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white12),
+      ),
+      child: Center(
+        child: Text(
+          'score'.tr(args: [matchState.teamAScore.toString(), matchState.teamBScore.toString()]), 
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.amber)
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRetryButton(BuildContext context, WidgetRef ref) {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(30),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: ElevatedButton(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.black26,
+          foregroundColor: Colors.white70,
+          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(30),
+            side: const BorderSide(color: Colors.white10),
+          ),
+          elevation: 0,
+        ),
+        onPressed: () {
+           final lastId = ref.read(matchStateProvider.notifier).lastBoundMatchId;
+           if (lastId != null) {
+              ref.read(matchStateProvider.notifier).rebind(lastId);
+           } else {
+              ref.read(matchStateProvider.notifier).leaveMatch();
+              Navigator.pop(context);
+           }
+        },
+        child: Text('retry_or_exit'.tr()),
+      ),
+    );
+  }
+
+  String? _getPlayerEmoji(MatchState matchState, String myUid, int offset) {
+    final idx = _getAbsoluteIndex(matchState, myUid, offset);
+    if (matchState.playerIds.length > idx) {
+      return matchState.playerEmojis[matchState.playerIds[idx]];
+    }
+    return null;
+  }
+
+  Widget _buildBoardCenter(BuildContext context, WidgetRef ref, MatchState matchState, String myUid) {
+    return SizedBox(
+      width: 200,
+      height: 200,
+      child: Stack(
+        alignment: Alignment.center,
+        children: matchState.board.asMap().entries.map((entry) {
+          final index = entry.key;
+          final card = entry.value;
+          
+          final seed = card.suit.index * 13 + card.rank.index + index;
+          final random = Random(seed);
+          
+          double targetX = (random.nextDouble() - 0.5) * 45;
+          double targetY = (random.nextDouble() - 0.5) * 45;
+          double rotation = (random.nextDouble() - 0.5) * 0.4;
+
+          if (matchState.phase == GamePhase.dealingCards) {
+            targetX = (index - 1.5) * 70; 
+            targetY = 0;
+            rotation = 0;
+          }
+          
+          String? ownerId = matchState.cardOwnership['${card.suit}_${card.rank}'];
+          double startX = 0;
+          double startY = 400;
+          
+          final effectiveOwnerId = ownerId ?? (matchState.phase == GamePhase.dealingFasha || matchState.phase == GamePhase.dealingCards 
+              ? matchState.playerIds[matchState.dealerIndex] 
+              : null);
+
+          if (effectiveOwnerId != null) {
+            int myIdx = matchState.playerIds.indexOf(myUid);
+            int ownerIdx = matchState.playerIds.indexOf(effectiveOwnerId);
+            if (myIdx != -1 && ownerIdx != -1) {
+              int relativeIdx = (ownerIdx - myIdx + 4) % 4;
+              if (relativeIdx == 1) { startX = -400; startY = 0; }
+              else if (relativeIdx == 2) { startX = 0; startY = -400; }
+              else if (relativeIdx == 3) { startX = 400; startY = 0; }
+              else if (relativeIdx == 0) { startX = 0; startY = 400; }
+            }
+          }
+
+          return TweenAnimationBuilder<double>(
+            duration: const Duration(milliseconds: 600),
+            curve: Curves.easeOutCubic,
+            tween: Tween(begin: 0.0, end: 1.0),
+            builder: (context, value, child) {
+              final currentX = startX * (1 - value) + targetX * value;
+              final currentY = startY * (1 - value) + targetY * value;
+              
+              return Transform.translate(
+                offset: Offset(currentX, currentY),
+                child: Transform.rotate(
+                  angle: rotation * value,
+                  child: Transform.scale(
+                    scale: 0.8 + 0.2 * value,
+                    child: child,
+                  ),
+                ),
+              );
+            },
+            child: CardWidget(card: card),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildLocalPlayerArea(BuildContext context, WidgetRef ref, MatchState matchState, String myUid) {
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              // Avatar & Reactions
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  PlayerAvatar(
+                    user: _getAvatarUser(ref, matchState, myUid, 0),
+                    isCurrentTurn: matchState.playerIds.isNotEmpty && matchState.currentTurnIndex == _getAbsoluteIndex(matchState, myUid, 0),
+                    turnStartTime: matchState.turnStartTime,
+                    timerDurationSeconds: matchState.timerDurationSeconds,
+                    activeEmoji: matchState.playerEmojis[myUid],
+                  ),
+                  const SizedBox(height: 8),
+                  _buildReactionBar(ref, myUid),
+                ],
+              ),
+              const SizedBox(width: 24),
+              // Hand
+              if ((matchState.handCards[myUid]?.length ?? 0) > 0)
+                FannedHandWidget(
+                  cards: matchState.handCards[myUid] ?? [],
+                  isMyTurn: matchState.playerIds.isNotEmpty && 
+                           matchState.currentTurnIndex == _getAbsoluteIndex(matchState, myUid, 0),
+                  onCardTap: (card) {
+                    ref.read(matchStateProvider.notifier).playCard(myUid, card);
+                  },
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReactionBar(WidgetRef ref, String myUid) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: ['😂', '😡', '🤔', '😎'].map((e) => GestureDetector(
+        onTap: () {
+          ref.read(matchStateProvider.notifier).sendEmoji(myUid, e);
+          Future.delayed(const Duration(seconds: 3), () {
+            ref.read(matchStateProvider.notifier).clearEmoji(myUid);
+          });
+        },
+        child: Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: Colors.black26,
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.white10),
+          ),
+          child: Text(e, style: const TextStyle(fontSize: 16)),
+        ),
+      )).toList(),
+    );
+  }
+
+  Widget _buildPhaseOverlay(String text, {Alignment alignment = Alignment.center}) {
+    return Align(
+      alignment: alignment,
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.black87,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.white24, width: 1),
+          boxShadow: const [
+            BoxShadow(color: Colors.black54, blurRadius: 20, spreadRadius: 4)
+          ],
+        ),
+        child: Text(
+          text, 
+          style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold, letterSpacing: 1.2)
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCutOverlay(BuildContext context, WidgetRef ref, MatchState state, String currentUid) {
+    int myIdx = state.playerIds.indexOf(currentUid);
+    int cutterIdx = (state.dealerIndex + 3) % 4;
+    bool isMyCut = myIdx == cutterIdx;
+    
+    return Center(
+      child: Container(
+        padding: const EdgeInsets.all(32),
+        decoration: BoxDecoration(
+          color: Colors.black.withOpacity(0.9), 
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: Colors.white10),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('pre_round_cut'.tr(), style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 16),
+            Text(isMyCut ? 'your_turn_cut_deck'.tr() : 'waiting_deck_cut'.tr(), 
+              style: const TextStyle(color: Colors.white70, fontSize: 16)
+            ),
+            const SizedBox(height: 32),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: isMyCut ? Colors.teal : Colors.blueGrey,
+                padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 16),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              onPressed: () => ref.read(matchStateProvider.notifier).performCut(20),
+              child: Text(isMyCut ? 'Cut the Deck' : 'Wait for Cut', style: const TextStyle(fontWeight: FontWeight.bold)),
+            )
           ],
         ),
       ),
     );
   }
 
-  Widget _buildPhaseOverlay(String text) {
-     return Center(
-       child: Container(
-          padding: const EdgeInsets.all(16),
-          color: Colors.black87,
-          child: Text(
-            text, 
-            style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)
-          ),
-       ),
-     );
-  }
-
-  Widget _buildCutOverlay(BuildContext context, WidgetRef ref, MatchState state, String currentUid) {
-     int myIdx = state.playerIds.indexOf(currentUid);
-     int cutterIdx = (state.dealerIndex + 3) % 4; // Right of dealer
-     bool isMyCut = myIdx == cutterIdx;
-     
-     // Note: we'll show the cut button to everyone for testing/debug, but highlight whose turn it really is
-     return Center(
-       child: Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(16)),
-          child: Column(
-             mainAxisSize: MainAxisSize.min,
-             children: [
-               const Text('pre_round_cut', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)).tr(),
-               const SizedBox(height: 16),
-               if (isMyCut) ...[
-                  const Text('your_turn_cut_deck', style: TextStyle(color: Colors.white70)).tr(),
-               ] else ...[
-                  const Text('waiting_deck_cut', style: TextStyle(color: Colors.white70)).tr(),
-               ],
-               const SizedBox(height: 24),
-               ElevatedButton(
-                  onPressed: () => ref.read(matchStateProvider.notifier).performCut(20), // Placeholder random cut index
-                  child: Text(isMyCut ? 'Cut Deck' : 'Cut Deck (Force)'),
-               )
-             ],
-          ),
-       ),
-     );
-  }
-
-   Widget _buildLobbyOverlay(BuildContext context, WidgetRef ref, MatchState state, String currentUid) {
-      final isReady = state.botInjectionVotes.containsKey(currentUid);
-      final readyCount = state.botInjectionVotes.length;
-      final totalPlayers = state.playerIds.length;
-      
-      return Center(
-        child: Container(
-           padding: const EdgeInsets.all(24),
-           decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(16)),
-           child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text('waiting_for_players'.tr(), style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 16),
-                const SizedBox(height: 16),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text('Room ID: ${state.id}', style: const TextStyle(color: Colors.orangeAccent, fontSize: 16, fontWeight: FontWeight.w500)),
-                    const SizedBox(width: 8),
-                    IconButton(
-                      icon: const Icon(Icons.person_add_alt_1, color: Colors.teal, size: 20),
-                      onPressed: () => _showInviteFriendDialog(context, ref, state, currentUid),
-                      tooltip: 'invite_friends'.tr(),
-                    ),
-                  ],
+  Widget _buildLobbyOverlay(BuildContext context, WidgetRef ref, MatchState state, String currentUid) {
+    final isReady = state.botInjectionVotes.containsKey(currentUid);
+    final readyCount = state.botInjectionVotes.length;
+    final totalPlayers = state.playerIds.length;
+    
+    return Center(
+      child: Container(
+        padding: const EdgeInsets.all(32),
+        width: 340,
+        decoration: BoxDecoration(
+          color: Colors.black.withOpacity(0.9), 
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: Colors.white10),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('waiting_for_players'.tr(), 
+              style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)
+            ),
+            const SizedBox(height: 24),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.black26,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.hub, color: Colors.orangeAccent, size: 20),
+                  const SizedBox(width: 12),
+                  Text('Room ID: ${state.id}', 
+                    style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w500)
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    icon: const Icon(Icons.share, color: Colors.tealAccent, size: 20),
+                    onPressed: () => _showInviteFriendDialog(context, ref, state, currentUid),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 32),
+            ...state.playerIds.map((id) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6.0),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 12,
+                    backgroundColor: id == currentUid ? Colors.green : Colors.white10,
+                    child: Icon(Icons.person, size: 14, color: id == currentUid ? Colors.white : Colors.white38),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(id == currentUid ? "you".tr() : (state.playerNames[id] ?? "player".tr()), 
+                    style: TextStyle(color: id == currentUid ? Colors.green : Colors.white)
+                  ),
+                  const Spacer(),
+                  if (state.botInjectionVotes.containsKey(id))
+                    const Icon(Icons.check_circle, color: Colors.green, size: 18),
+                ],
+              ),
+            )),
+            const SizedBox(height: 32),
+            if (totalPlayers < 4) ...[
+              if (!isReady)
+                ElevatedButton.icon(
+                  onPressed: () => ref.read(matchStateProvider.notifier).voteForBots(currentUid),
+                  icon: const Icon(Icons.smart_toy),
+                  label: Text('ready_fill_bots'.tr()),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.teal,
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size(double.infinity, 50),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                )
+              else
+                Text('waiting_human_consent'.tr(args: [readyCount.toString(), totalPlayers.toString()]), 
+                  style: const TextStyle(color: Colors.orangeAccent, fontStyle: FontStyle.italic, fontSize: 13),
+                  textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 24),
-                Text('connected_players'.tr(), style: const TextStyle(color: Colors.white70, fontSize: 14)),
-                const SizedBox(height: 8),
-                ...state.playerIds.map((id) => Padding(
-                   padding: const EdgeInsets.symmetric(vertical: 4.0),
-                   child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                         Icon(Icons.person, color: id == currentUid ? Colors.green : Colors.white54, size: 20),
-                         const SizedBox(width: 8),
-                         Text(id == currentUid ? "you".tr() : (state.playerNames[id] ?? "player_uuid".tr(args: [id.substring(0, 5)])), style: TextStyle(color: id == currentUid ? Colors.green : Colors.white)),
-                         if (state.botInjectionVotes.containsKey(id))
-                            const Padding(
-                              padding: EdgeInsets.only(left: 8.0),
-                              child: Icon(Icons.check_circle, color: Colors.green, size: 16),
-                            ),
-                      ],
-                   ),
-                )),
-                const SizedBox(height: 24),
-                if (totalPlayers < 4) ...[
-                   if (!isReady)
-                      ElevatedButton.icon(
-                        onPressed: () => ref.read(matchStateProvider.notifier).voteForBots(currentUid),
-                        icon: const Icon(Icons.smart_toy),
-                        label: Text('ready_fill_bots'.tr()),
-                        style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
-                      )
-                   else
-                      Text('waiting_human_consent'.tr(args: [readyCount.toString(), totalPlayers.toString()]), style: const TextStyle(color: Colors.orangeAccent, fontStyle: FontStyle.italic)),
-                ] else
-                   Text('room_full_starting'.tr(), style: const TextStyle(color: Colors.green)),
-              ],
-           ),
-        ), // Container
-      ); // Center
+            ] else
+              Text('room_full_starting'.tr(), style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildShuffleVoteOverlay(BuildContext context, WidgetRef ref, MatchState state, String currentUid) {
-     final hasVoted = state.shuffleVotes.containsKey(currentUid);
-     return Center(
-       child: Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(16)),
-          child: Column(
-             mainAxisSize: MainAxisSize.min,
-             children: [
-               Text('deck_finished'.tr(), style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
-               const SizedBox(height: 16),
-               Text('shuffle_votes'.tr(args: [state.shuffleVotes.length.toString()]), style: const TextStyle(color: Colors.white70)),
-               const SizedBox(height: 24),
-               if (!hasVoted) Row(
-                 mainAxisSize: MainAxisSize.min,
-                 children: [
-                   ElevatedButton(
-                     onPressed: () => ref.read(matchStateProvider.notifier).voteShuffle(currentUid, true),
-                     child: Text('shuffle_yes'.tr()),
-                   ),
-                   const SizedBox(width: 16),
-                   ElevatedButton(
-                     style: ElevatedButton.styleFrom(backgroundColor: Colors.blueGrey),
-                     onPressed: () => ref.read(matchStateProvider.notifier).voteShuffle(currentUid, false),
-                     child: Text('keep_sequence_no'.tr(), style: const TextStyle(color: Colors.white)),
-                   ),
-                 ],
-               ) else Text('waiting_for_other_players'.tr(), style: const TextStyle(color: Colors.white)),
-             ],
-          ),
-       ),
-     );
+    final hasVoted = state.shuffleVotes.containsKey(currentUid);
+    return Center(
+      child: Container(
+        padding: const EdgeInsets.all(32),
+        decoration: BoxDecoration(color: Colors.black90, borderRadius: BorderRadius.circular(24)),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('deck_finished'.tr(), style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 16),
+            Text('shuffle_votes'.tr(args: [state.shuffleVotes.length.toString()]), style: const TextStyle(color: Colors.white70)),
+            const SizedBox(height: 32),
+            if (!hasVoted) Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white),
+                  onPressed: () => ref.read(matchStateProvider.notifier).voteShuffle(currentUid, true),
+                  child: Text('shuffle_yes'.tr()),
+                ),
+                const SizedBox(width: 16),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.blueGrey, foregroundColor: Colors.white),
+                  onPressed: () => ref.read(matchStateProvider.notifier).voteShuffle(currentUid, false),
+                  child: Text('keep_sequence_no'.tr()),
+                ),
+              ],
+            ) else Text('waiting_for_other_players'.tr(), style: const TextStyle(color: Colors.white70)),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildRematchVoteOverlay(BuildContext context, WidgetRef ref, MatchState state, String currentUid) {
-     final hasVoted = state.rematchVotes.containsKey(currentUid);
-     final bool aWins = state.teamAScore >= state.teamBScore;
-     return Center(
-       child: Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(16)),
-          child: Column(
-             mainAxisSize: MainAxisSize.min,
-             children: [
-               Text('match_over'.tr(), style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold)),
-               Text('team_wins'.tr(args: [aWins ? "A" : "B"]), style: const TextStyle(color: Colors.greenAccent, fontSize: 20)),
-               const SizedBox(height: 16),
-               Text('rematch_votes'.tr(args: [state.rematchVotes.length.toString()]), style: const TextStyle(color: Colors.white70)),
-               const SizedBox(height: 24),
-               if (!hasVoted) Row(
-                 mainAxisSize: MainAxisSize.min,
-                 children: [
-                   ElevatedButton(
-                     onPressed: () => ref.read(matchStateProvider.notifier).voteRematch(currentUid, true),
-                     child: Text('best_of_3_yes'.tr()),
-                   ),
-                   const SizedBox(width: 16),
-                   ElevatedButton(
-                     style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                     onPressed: () => ref.read(matchStateProvider.notifier).voteRematch(currentUid, false),
-                     child: Text('leave_match_no'.tr(), style: const TextStyle(color: Colors.white)),
-                   ),
-                 ],
-               ) else Text('waiting_for_other_players'.tr(), style: const TextStyle(color: Colors.white)),
-             ],
-           ),
-         ),
-       );
-   }
+    final hasVoted = state.rematchVotes.containsKey(currentUid);
+    final bool aWins = state.teamAScore >= state.teamBScore;
+    return Center(
+      child: Container(
+        padding: const EdgeInsets.all(32),
+        decoration: BoxDecoration(color: Colors.black90, borderRadius: BorderRadius.circular(24)),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('match_over'.tr(), style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold)),
+            Text('team_wins'.tr(args: [aWins ? "A" : "B"]), style: const TextStyle(color: Colors.amberAccent, fontSize: 20)),
+            const SizedBox(height: 32),
+            if (!hasVoted) Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white),
+                  onPressed: () => ref.read(matchStateProvider.notifier).voteRematch(currentUid, true),
+                  child: Text('best_of_3_yes'.tr()),
+                ),
+                const SizedBox(width: 16),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
+                  onPressed: () => ref.read(matchStateProvider.notifier).voteRematch(currentUid, false),
+                  child: Text('leave_match_no'.tr()),
+                ),
+              ],
+            ) else Text('waiting_for_other_players'.tr(), style: const TextStyle(color: Colors.white70)),
+          ],
+        ),
+      ),
+    );
+  }
 
   void _showInviteFriendDialog(BuildContext context, WidgetRef ref, MatchState state, String currentUid) {
     final currentUser = ref.read(currentUserProvider);
@@ -579,6 +658,7 @@ class GameBoardScreen extends ConsumerWidget {
       builder: (context) {
         return AlertDialog(
           backgroundColor: Colors.grey[900],
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           title: Text('invite_friends'.tr(), style: const TextStyle(color: Colors.white)),
           content: SizedBox(
             width: double.maxFinite,
@@ -590,12 +670,13 @@ class GameBoardScreen extends ConsumerWidget {
                   itemBuilder: (context, index) {
                     final friendId = currentUser.friends[index];
                     return FutureBuilder<List<AppUser>>(
-                      future: ref.read(multiplayerSyncServiceProvider).searchUsers(friendId), // Inefficient but simple for now
+                      future: ref.read(multiplayerSyncServiceProvider).searchUsers(friendId),
                       builder: (context, snap) {
                         final friend = snap.data?.firstWhere((u) => u.uid == friendId, orElse: () => AppUser(uid: friendId, email: '', displayName: 'Friend'));
                         return ListTile(
                           title: Text(friend?.displayName ?? 'Friend', style: const TextStyle(color: Colors.white)),
                           trailing: ElevatedButton(
+                            style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white),
                             child: Text('send'.tr()),
                             onPressed: () {
                               ref.read(multiplayerSyncServiceProvider).sendInvite(friendId, state.id, currentUser.displayName);
@@ -634,12 +715,12 @@ class _HarvestStackWidgetState extends State<HarvestStackWidget> {
       onTap: () => setState(() => isExpanded = !isExpanded),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 300),
-        padding: const EdgeInsets.all(8),
+        padding: const EdgeInsets.all(10),
         constraints: const BoxConstraints(maxWidth: 220),
         decoration: BoxDecoration(
-          color: Colors.black.withOpacity(0.4),
+          color: Colors.black45,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.white24, width: 1),
+          border: Border.all(color: Colors.white12, width: 1),
           boxShadow: [
             BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 10, offset: const Offset(0, 4)),
           ],
@@ -652,9 +733,9 @@ class _HarvestStackWidgetState extends State<HarvestStackWidget> {
               children: [
                 const Icon(Icons.inventory_2_outlined, color: ThemeConfig.goldAccent, size: 14),
                 const SizedBox(width: 4),
-                Text(widget.teamName, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                Text(widget.teamName, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
                 const Spacer(),
-                Icon(isExpanded ? Icons.expand_less : Icons.expand_more, color: Colors.white70, size: 16),
+                Icon(isExpanded ? Icons.expand_less : Icons.expand_more, color: Colors.white38, size: 16),
               ],
             ),
             const SizedBox(height: 8),
@@ -675,26 +756,21 @@ class _HarvestStackWidgetState extends State<HarvestStackWidget> {
       height: 90,
       child: Stack(
         children: [
-          // "Face-down" cards representing the bulk of the stack
           ...List.generate(min(3, lastCapture.capturedCards.length + 2), (idx) => Positioned(
-            left: idx * 3.0,
+            left: idx * 4.0,
             top: idx * 2.0,
             child: Container(
               width: 55,
               height: 75,
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Colors.blue.shade900, Colors.blue.shade800],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
+                color: const Color(0xFF1B4332),
                 borderRadius: BorderRadius.circular(6),
-                border: Border.all(color: Colors.white38, width: 1),
+                border: Border.all(color: Colors.white10, width: 1),
+                boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 2)],
               ),
-              child: const Center(child: Icon(Icons.style, color: Colors.white24, size: 20)),
+              child: const Center(child: Icon(Icons.style, color: Colors.white10, size: 20)),
             ),
           )),
-          // Face-up leading card (The card that captured the stack)
           Positioned(
             left: 12,
             top: 6,

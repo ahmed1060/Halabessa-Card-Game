@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:math';
 import 'dart:async';
 import '../../domain/models/match_state.dart';
@@ -37,14 +38,46 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
   
   // Stream subscription for the match listener
   StreamSubscription? _matchListener;
+  StreamSubscription? _presenceListener;
 
   Future<void> _publishState(MatchState newState) async {
     state = newState;
     await ref.read(multiplayerSyncServiceProvider).updateMatchState(newState);
   }
 
+  static const String _matchIdKey = 'last_match_id';
+
+  Future<void> _saveMatchId(String id) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_matchIdKey, id);
+  }
+
+  Future<void> _clearMatchId() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_matchIdKey);
+  }
+
+  Future<void> tryRecoverLastMatch() async {
+    final prefs = await SharedPreferences.getInstance();
+    final lastId = prefs.getString(_matchIdKey);
+    if (lastId != null && state == null) {
+       debugPrint('RECOVERY: Attempting to recover match $lastId');
+       bindToMatch(lastId);
+    }
+  }
+
+  void leaveMatch() {
+    _matchListener?.cancel();
+    _presenceListener?.cancel();
+    _heartbeatTimer?.cancel();
+    _heartbeatTimer = null;
+    state = null;
+    _clearMatchId();
+  }
+
   void bindToMatch(String matchId) {
     lastBoundMatchId = matchId;
+    _saveMatchId(matchId);
     _matchListener?.cancel(); // Cancel previous listener if any
     _matchListener = ref.read(multiplayerSyncServiceProvider).watchMatch(matchId).listen(
       (serverState) {
@@ -78,6 +111,39 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
       },
       cancelOnError: false,
     );
+
+    // Sync Presence
+    final currentUser = ref.read(currentUserProvider);
+    if (currentUser != null) {
+      ref.read(multiplayerSyncServiceProvider).syncPresence(matchId, currentUser.uid);
+    }
+
+    // Host Presence Watcher
+    _presenceListener?.cancel();
+    _presenceListener = ref.read(multiplayerSyncServiceProvider).watchPresence(matchId).listen((presence) {
+       final serverState = state;
+       if (serverState == null) return;
+       
+       final isHost = currentUser != null && serverState.playerIds.indexOf(currentUser.uid) == 0;
+       if (!isHost) return;
+
+       final newOnlineStatus = Map<String, bool>.from(serverState.playerOnlineStatus);
+       bool changed = false;
+
+       for (var playerId in serverState.playerIds) {
+         final isOnline = presence[playerId] == true;
+         // Special case: if prefix is bot_, always online
+         final actualOnline = playerId.startsWith('bot_') ? true : isOnline;
+         if (newOnlineStatus[playerId] != actualOnline) {
+           newOnlineStatus[playerId] = actualOnline;
+           changed = true;
+         }
+       }
+
+       if (changed) {
+         _publishState(serverState.copyWith(playerOnlineStatus: newOnlineStatus));
+       }
+    });
   }
 
   void rebind(String matchId) {
@@ -155,12 +221,57 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
            continue; 
         }
 
-        String activePlayerId = currentState.playerIds[currentState.currentTurnIndex];
+        final activePlayerId = currentState.playerIds[currentState.currentTurnIndex];
+        
         if (activePlayerId.startsWith('bot_')) {
           // Dynamic reaction time: 0.8-2.3 seconds
           await Future.delayed(Duration(milliseconds: 800 + Random().nextInt(1500)));
           if (state?.phase == GamePhase.playing && state!.playerIds[state!.currentTurnIndex] == activePlayerId) {
             _executeBotPlayCard(activePlayerId);
+          }
+        } else {
+          // HUMAN Turner: Handle Auto-Play logic
+          
+          // 1. Single-Card Auto-Play
+          final hand = currentState.handCards[activePlayerId] ?? [];
+          if (hand.length == 1) {
+             await Future.delayed(const Duration(milliseconds: 1500));
+             if (state?.phase == GamePhase.playing && 
+                 state!.playerIds[state!.currentTurnIndex] == activePlayerId &&
+                 state!.handCards[activePlayerId]?.length == 1) {
+                // If it's MY turn and MY client, I play it.
+                if (currentUser.uid == activePlayerId) {
+                  playCard(activePlayerId, hand.first);
+                  return; 
+                }
+             }
+          }
+
+          // 2. Bot Takeover (for offline humans) - ONLY Host does this
+          final isOnline = currentState.playerOnlineStatus[activePlayerId] ?? true;
+          if (!isOnline) {
+             // Host takes over for disconnected player
+             await Future.delayed(const Duration(milliseconds: 2000));
+             if (state?.phase == GamePhase.playing && 
+                 state!.playerIds[state!.currentTurnIndex] == activePlayerId &&
+                 state!.playerOnlineStatus[activePlayerId] == false) {
+                _executeBotPlayCard(activePlayerId);
+                return;
+             }
+          }
+
+          // 3. Timeout Failsafe (Proactive client-side)
+          if (currentState.turnStartTime != null) {
+            final elapsed = DateTime.now().difference(currentState.turnStartTime!).inSeconds;
+            if (elapsed >= currentState.timerDurationSeconds) {
+               // If it's ME, I auto-play because timer expired
+               if (currentUser.uid == activePlayerId) {
+                 final possibleCards = currentState.handCards[activePlayerId] ?? [];
+                 if (possibleCards.isNotEmpty) {
+                    playCard(activePlayerId, possibleCards[Random().nextInt(possibleCards.length)]);
+                 }
+               }
+            }
           }
         }
       } else if (currentState.phase == GamePhase.shuffleVoting || currentState.phase == GamePhase.rematchVoting) {

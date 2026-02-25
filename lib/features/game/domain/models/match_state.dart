@@ -53,6 +53,7 @@ class MatchState {
   final int deckCount;
   final Map<String, List<String>> skippedMatches;
   final List<game_card.Card> playHistory;
+  final Map<String, bool> playerOnlineStatus;
 
   MatchState({
     required this.id,
@@ -84,6 +85,7 @@ class MatchState {
     this.deckCount = 0,
     this.skippedMatches = const {},
     this.playHistory = const [],
+    this.playerOnlineStatus = const {},
   });
 
   MatchState copyWith({
@@ -116,6 +118,7 @@ class MatchState {
     int? deckCount,
     Map<String, List<String>>? skippedMatches,
     List<game_card.Card>? playHistory,
+    Map<String, bool>? playerOnlineStatus,
   }) {
     return MatchState(
       id: id ?? this.id,
@@ -147,6 +150,7 @@ class MatchState {
       deckCount: deckCount ?? this.deckCount,
       skippedMatches: skippedMatches ?? this.skippedMatches,
       playHistory: playHistory ?? this.playHistory,
+      playerOnlineStatus: playerOnlineStatus ?? this.playerOnlineStatus,
     );
   }
 
@@ -181,6 +185,7 @@ class MatchState {
       'playerNames': playerNames,
       'isPublic': isPublic,
       'cardOwnership': cardOwnership,
+      'playerOnlineStatus': playerOnlineStatus,
     };
   }
 
@@ -313,6 +318,7 @@ class MatchState {
       final botInjectionVotes = parseBoolMap(json['botInjectionVotes']);
       final playerNames = parseStringMap(json['playerNames']);
       final cardOwnership = parseStringMap(json['cardOwnership']);
+      final playerOnlineStatus = parseBoolMap(json['playerOnlineStatus']);
 
       return MatchState(
         id: id,
@@ -347,6 +353,7 @@ class MatchState {
         deckCount: json['deckCount'] is int ? json['deckCount'] as int : 0,
         skippedMatches: parseSkipMap(json['skippedMatches']),
         playHistory: parseCards(json['playHistory']),
+        playerOnlineStatus: playerOnlineStatus,
       );
     } catch (e, stack) {
       debugPrint('RECOVERED MatchState.fromJson failure: $e');
