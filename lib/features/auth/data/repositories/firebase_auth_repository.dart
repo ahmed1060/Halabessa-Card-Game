@@ -13,13 +13,18 @@ class FirebaseAuthRepository implements AuthRepository {
   FirebaseAuthRepository(this._firebaseAuth);
 
   Future<void> _syncUserToDatabase(AppUser user) async {
-    final ref = FirebaseDatabase.instance.ref('users').child(user.uid);
-    // Use update to avoid overwriting friends/invites if they exist
-    await ref.update({
-      'displayName': user.displayName,
-      'email': user.email,
-      'avatarUrl': user.avatarUrl,
-    });
+    try {
+      final ref = FirebaseDatabase.instance.ref('users').child(user.uid);
+      // Use update to avoid overwriting friends/invites if they exist
+      await ref.update({
+        'displayName': user.displayName,
+        'email': user.email,
+        'avatarUrl': user.avatarUrl,
+      });
+    } catch (e) {
+      debugPrint("User Sync failed (likely due to rules): $e");
+      // Don't rethrow, let the user login even if profile sync fails
+    }
   }
 
   AppUser? _userFromFirebase(firebase_auth.User? user) {
@@ -55,7 +60,7 @@ class FirebaseAuthRepository implements AuthRepository {
       if (user != null) await _syncUserToDatabase(user);
       return user;
     } catch (e) {
-      debugPrint("Email Login failed: \$e");
+      debugPrint("Email Login failed: $e");
       rethrow;
     }
   }
@@ -73,7 +78,7 @@ class FirebaseAuthRepository implements AuthRepository {
       if (user != null) await _syncUserToDatabase(user);
       return user;
     } catch (e) {
-      debugPrint("Email Sign Up failed: \$e");
+      debugPrint("Email Sign Up failed: $e");
       rethrow;
     }
   }
@@ -174,7 +179,7 @@ class FirebaseAuthRepository implements AuthRepository {
       if (user != null) await _syncUserToDatabase(user);
       return user;
     } catch (e) {
-      debugPrint("Anonymous Sign In failed: \$e");
+      debugPrint("Anonymous Sign In failed: $e");
       rethrow;
     }
   }
