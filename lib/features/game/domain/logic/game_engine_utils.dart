@@ -8,80 +8,20 @@ class GameEngineUtils {
   static List<game_card.Card> calculateCapture(game_card.Card playedCard, List<game_card.Card> board) {
     if (board.isEmpty) return [];
 
-    final captured = <game_card.Card>[];
+    // Halabessa Core Rule: Capture only occurs if played card matches the CURRENT TOP card of the board.
+    final topCard = board.last;
     
-    // 1. Check for exact Rank matches (Standard Capture & Basra)
-    final exactMatches = board.where((card) => card.rank == playedCard.rank).toList();
-    if (exactMatches.isNotEmpty) {
-      // Typically, capturing one exact match (or all if applying standard Egyptian rules)
-      // For 7alabessa, generally we capture ALL matching ranks if multiple exist on board.
-      captured.addAll(exactMatches);
-    }
-    
-    // 2. Check for Boy (Jack) sweep rule
-    if (playedCard.isJack) {
-       // Jack captures everything on the board
-       captured.addAll(board);
-       // Remove exact matches to avoid duplicates
-       captured.removeWhere((c) => exactMatches.contains(c));
-    }
-    
-    // 3. Check for 7 of Diamonds (Al Koomi) sweep rule
-    if (playedCard.isDiamondSeven) {
-       // Koomi captures everything on the board
-       captured.addAll(board);
-       captured.removeWhere((c) => exactMatches.contains(c));
-    }
-
-    // 4. Sum Captures (only if the card is numerical: Ace to 10)
-    if (!playedCard.isJack && !playedCard.isDiamondSeven && playedCard.basraValue > 0) {
-      final targetSum = playedCard.basraValue;
-      
-      // Basic recursive or combinatorial sum finder for cards on board
-      List<List<game_card.Card>> validSums = _findSubsetsWithSum(board, targetSum);
-      
-      for (var subset in validSums) {
-        for (var card in subset) {
-          if (!captured.contains(card)) {
-            captured.add(card);
-          }
-        }
-      }
-    }
-
-    if (captured.isNotEmpty) {
+    if (playedCard.rank == topCard.rank) {
+      // In Halabessa, a top-match sweeps the ENTIRE board.
+      final captured = List<game_card.Card>.from(board);
       captured.add(playedCard);
+      return captured;
     }
 
-    return captured;
+    return [];
   }
   
-  /// Helper to find combinations of cards that equal a sum target
-  static List<List<game_card.Card>> _findSubsetsWithSum(List<game_card.Card> board, int target) {
-    List<List<game_card.Card>> results = [];
-    int n = board.length;
-    // Iterate through all possible subsets (2^n)
-    for (int i = 1; i < (1 << n); i++) {
-      List<game_card.Card> currentSubset = [];
-      int currentSum = 0;
-      for (int j = 0; j < n; j++) {
-        if ((i & (1 << j)) != 0) {
-          // only add numerical cards to sum calculations
-          int val = board[j].basraValue;
-          if (val > 0) {
-             currentSum += val;
-             currentSubset.add(board[j]);
-          } else {
-             currentSum = -999; // Invalidate if containing non-numerical cards
-          }
-        }
-      }
-      if (currentSum == target && currentSubset.length > 1) {
-        results.add(currentSubset);
-      }
-    }
-    return results;
-  }
+  // Internal sum finder removed as it is not part of Halabessa rules
 
   /// Check if the capture constitutes a "Basra" (Clear board)
   static bool isBasra(game_card.Card playedCard, List<game_card.Card> capturedCards, List<game_card.Card> boardBeforeCapture) {

@@ -31,6 +31,9 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
   // Track last bound match for refresh recovery
   String? lastBoundMatchId;
   
+  // Prevents multiple concurrent bot logic evaluations for the same state change
+  bool _isHandlingBotLogic = false;
+
   void _publishState(MatchState newState) {
     state = newState;
     ref.read(multiplayerSyncServiceProvider).updateMatchState(newState);
@@ -60,50 +63,56 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     final isHost = serverState.playerIds.indexOf(currentUser.uid) == 0;
     if (!isHost) return;
 
-    // Determine active turning logic
-    if (serverState.phase == GamePhase.preRoundCut) {
-       int cutterIdx = (serverState.dealerIndex + 3) % 4;
-       String cutterId = serverState.playerIds[cutterIdx];
-       if (cutterId.startsWith('bot_')) {
+    if (_isHandlingBotLogic) return;
+    _isHandlingBotLogic = true;
+    
+    try {
+      // Determine active turning logic
+      if (serverState.phase == GamePhase.preRoundCut) {
+        int cutterIdx = (serverState.dealerIndex + 3) % 4;
+        String cutterId = serverState.playerIds[cutterIdx];
+        if (cutterId.startsWith('bot_')) {
           await Future.delayed(const Duration(milliseconds: 1500));
-          // Make sure state didn't change while waiting
           if (state?.phase == GamePhase.preRoundCut) {
-             performCut(Random().nextInt(serverState.deckCount > 10 ? serverState.deckCount - 10 : 1) + 5); 
+            performCut(Random().nextInt(serverState.deckCount > 10 ? serverState.deckCount - 10 : 1) + 5); 
           }
-       }
-    } else if (serverState.phase == GamePhase.dealingFasha) {
-       await Future.delayed(const Duration(milliseconds: 1000));
-       if (state?.phase == GamePhase.dealingFasha) {
-          dealInitialCards();
-       }
-    } else if (serverState.phase == GamePhase.dealingCards) {
-       await Future.delayed(const Duration(milliseconds: 5000)); // 5s memorize phase
-       if (state?.phase == GamePhase.dealingCards) {
+        }
+      } else if (serverState.phase == GamePhase.dealingFasha) {
+        // This is where Host deals Initial Board + Hands
+        await Future.delayed(const Duration(milliseconds: 500));
+        if (state?.phase == GamePhase.dealingFasha) {
+          await dealInitialCards();
+        }
+      } else if (serverState.phase == GamePhase.dealingCards) {
+        // This is the "Memorize Fasha" 5s phase
+        await Future.delayed(const Duration(milliseconds: 5000));
+        if (state?.phase == GamePhase.dealingCards) {
           _publishState(state!.copyWith(
-             phase: GamePhase.playing,
-             turnStartTime: DateTime.now(),
+            phase: GamePhase.playing,
+            turnStartTime: DateTime.now(),
           ));
-       }
-    } else if (serverState.phase == GamePhase.playing) {
-       String activePlayerId = serverState.playerIds[serverState.currentTurnIndex];
-       if (activePlayerId.startsWith('bot_')) {
-          await Future.delayed(const Duration(milliseconds: 2000));
-          // Validate state is still playing and it's still their turn
+        }
+      } else if (serverState.phase == GamePhase.playing) {
+        String activePlayerId = serverState.playerIds[serverState.currentTurnIndex];
+        if (activePlayerId.startsWith('bot_')) {
+          await Future.delayed(const Duration(milliseconds: 1500));
           if (state?.phase == GamePhase.playing && state!.playerIds[state!.currentTurnIndex] == activePlayerId) {
-             _executeBotPlayCard(activePlayerId);
+            _executeBotPlayCard(activePlayerId);
           }
-       }
-    } else if (serverState.phase == GamePhase.shuffleVoting || serverState.phase == GamePhase.rematchVoting) {
-       // Bots auto-vote immediately
-       for (var playerId in serverState.playerIds) {
+        }
+      } else if (serverState.phase == GamePhase.shuffleVoting || serverState.phase == GamePhase.rematchVoting) {
+        for (var playerId in serverState.playerIds) {
           if (playerId.startsWith('bot_')) {
-              if (serverState.phase == GamePhase.shuffleVoting && !serverState.shuffleVotes.containsKey(playerId)) {
-                 voteShuffle(playerId, false); // Bots prefer memory mode
-              } else if (serverState.phase == GamePhase.rematchVoting && !serverState.rematchVotes.containsKey(playerId)) {
-                 voteRematch(playerId, true); // Bots always want to play again
-              }
+            if (serverState.phase == GamePhase.shuffleVoting && !serverState.shuffleVotes.containsKey(playerId)) {
+              voteShuffle(playerId, false);
+            } else if (serverState.phase == GamePhase.rematchVoting && !serverState.rematchVotes.containsKey(playerId)) {
+              voteRematch(playerId, true);
+            }
           }
-       }
+        }
+      }
+    } finally {
+      _isHandlingBotLogic = false;
     }
   }
 
@@ -251,7 +260,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     ));
   }
 
-  void dealInitialCards() async {
+  Future<void> dealInitialCards() async {
      if (state == null || state!.phase != GamePhase.dealingFasha) return;
 
      final currentUser = ref.read(currentUserProvider);
@@ -264,21 +273,23 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
      // Sequential Dealing: Stagger delivery
      // 1. Board (Fasha) - 4 cards
      for (int i = 0; i < 4; i++) {
-        final c = _secretDeck!.draw()!;
+        final c = _secretDeck?.draw();
+        if (c == null) break;
         board.add(c);
-        _publishState(state!.copyWith(board: List.from(board), deckCount: _secretDeck!.cards.length));
-        await Future.delayed(const Duration(milliseconds: 200));
+        _publishState(state!.copyWith(board: List.from(board), deckCount: _secretDeck?.cards.length ?? 0));
+        await Future.delayed(const Duration(milliseconds: 250));
      }
 
      // 2. Players - 4 each
      for (var playerId in state!.playerIds) {
        final playerHand = <game_card.Card>[];
        for (int i = 0; i < 4; i++) {
-          final c = _secretDeck!.draw()!;
+          final c = _secretDeck?.draw();
+          if (c == null) break;
           playerHand.add(c);
           hands[playerId] = List.from(playerHand);
-          _publishState(state!.copyWith(handCards: Map.from(hands), deckCount: _secretDeck!.cards.length));
-          await Future.delayed(const Duration(milliseconds: 200));
+          _publishState(state!.copyWith(handCards: Map.from(hands), deckCount: _secretDeck?.cards.length ?? 0));
+          await Future.delayed(const Duration(milliseconds: 250));
        }
      }
 
@@ -288,7 +299,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
      ));
   }
 
-  void dealSubsequentCards() async {
+  Future<void> dealSubsequentCards() async {
      if (state == null) return;
      
      final currentUser = ref.read(currentUserProvider);
@@ -306,11 +317,12 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
      for (var playerId in state!.playerIds) {
        final playerHand = <game_card.Card>[];
        for (int i = 0; i < 4; i++) {
-          final c = _secretDeck!.draw()!;
+          final c = _secretDeck?.draw();
+          if (c == null) break;
           playerHand.add(c);
           hands[playerId] = List.from(playerHand);
-          _publishState(state!.copyWith(handCards: Map.from(hands), deckCount: _secretDeck!.cards.length));
-          await Future.delayed(const Duration(milliseconds: 200));
+          _publishState(state!.copyWith(handCards: Map.from(hands), deckCount: _secretDeck?.cards.length ?? 0));
+          await Future.delayed(const Duration(milliseconds: 250));
        }
      }
 
@@ -340,149 +352,118 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     // Validate turn
     if (state!.playerIds[state!.currentTurnIndex] != playerId) return;
 
-    // 1. Move card from player hand to board
-    final newHand = List<game_card.Card>.from(state!.handCards[playerId]!)..remove(card);
-    final newBoard = List<game_card.Card>.from(state!.board)..add(card);
+    // 1. Prepare local state
+    final prePlayBoard = List<game_card.Card>.from(state!.board);
+    final hands = Map<String, List<game_card.Card>>.from(state!.handCards);
+    final harvest = Map<String, List<Capture>>.from(state!.harvestStacks);
+    final skipped = Map<String, List<String>>.from(state!.skippedMatches);
+    final history = List<game_card.Card>.from(state!.playHistory);
+    final ownership = Map<String, String>.from(state!.cardOwnership);
     
-    // Track card ownership for positional animation
-    final newOwnership = Map<String, String>.from(state!.cardOwnership);
-    newOwnership['${card.suit}_${card.rank}'] = playerId;
-
-    MatchState newState = state!.copyWith(
-      handCards: Map<String, List<game_card.Card>>.from(state!.handCards)..[playerId] = newHand,
-      board: newBoard,
-      cardOwnership: newOwnership,
-    );
-
-    final board = List<game_card.Card>.from(newState.board);
-    final hands = Map<String, List<game_card.Card>>.from(newState.handCards);
-    final harvest = Map<String, List<Capture>>.from(newState.harvestStacks);
-    final skipped = Map<String, List<game_card.Card>>.from(newState.skippedMatches);
-    final history = List<game_card.Card>.from(newState.playHistory);
-    
-    // 0. Behavioral Check: Did this player "skip" a capture?
-    // If board has cards that match the hands OTHER than the one being played
-    // We'll check if they COULD have captured with the card they just played first.
-    final potentialMatchesBefore = GameEngineUtils.calculateCapture(card, board);
-    if (potentialMatchesBefore.isNotEmpty) {
-      // They ARE capturing. Let's check if this is a Tafweet trap from a previous skip.
-      // A trap is when they capture a card that matches their 'skipped' values.
-    } else {
-      // They didn't capture. Did they have another card in hand that COULD have captured?
-      final currentHand = hands[playerId] ?? [];
-      for (var hCard in currentHand) {
-        if (hCard != card) {
-           final canCapture = GameEngineUtils.calculateCapture(hCard, board);
-           if (canCapture.isNotEmpty) {
-              // Mark these cards as "skipped" for this player
-              final playerSkips = List<game_card.Card>.from(skipped[playerId] ?? [])..addAll(canCapture);
-              skipped[playerId] = playerSkips;
-           }
+    // 0. Detect Skips (Deliberately not capturing)
+    if (prePlayBoard.isNotEmpty) {
+      final topCard = prePlayBoard.last;
+      bool hasMatchInHand = hands[playerId]?.any((c) => c.rank == topCard.rank) ?? false;
+      
+      // If they have a match but chosen card rank DOES NOT match the top card
+      if (hasMatchInHand && card.rank != topCard.rank) {
+        final sourceId = ownership['${topCard.suit}_${topCard.rank}'] ?? 'fasha';
+        final skipKey = '${topCard.rank.name}:$sourceId';
+        
+        final playerSkips = List<String>.from(skipped[playerId] ?? []);
+        if (!playerSkips.contains(skipKey)) {
+          playerSkips.add(skipKey);
+          skipped[playerId] = playerSkips;
         }
       }
     }
 
-    // Remove card from hand
-    final playerHand = hands[playerId];
-    if (playerHand == null) return;
-    playerHand.remove(card);
+    // 1. Remove card from player hand
+    hands[playerId]?.remove(card);
 
-    // Calculate capture
-    final capturedCards = GameEngineUtils.calculateCapture(card, board);
+    // 2. Calculate capture (using refined Top-Match rules in calculateCapture)
+    final capturedCards = GameEngineUtils.calculateCapture(card, prePlayBoard);
     final teamId = _getTeamOfPlayer(playerId);
     
-    // Ensure harvest stacks are initialized for this team
+    // Ensure harvest stacks are initialized
     if (!harvest.containsKey(teamId)) {
       harvest[teamId] = [];
     }
 
+    int pointsEarned = 0;
     int nextTurn = (state!.currentTurnIndex + 1) % 4;
+    List<game_card.Card> finalBoard = List.from(prePlayBoard);
 
     if (capturedCards.isEmpty) {
-      board.add(card);
-      _publishState(state!.copyWith(
-        board: board,
-        handCards: hands,
-        skippedMatches: skipped,
-        playHistory: history,
-        currentTurnIndex: nextTurn,
-        turnStartTime: DateTime.now(),
-      ));
+      // No capture: Add card to board and track ownership
+      finalBoard.add(card);
+      ownership['${card.suit}_${card.rank}'] = playerId;
     } else {
-      // 1 Point per Capture Rule (Standard Spec)
-      int pointsEarned = 1; 
+      // Capture: Calculate points and Tafweets
+      pointsEarned = 1; 
       
       bool isTafweetMode = state!.mode == GameMode.tafweet;
-      bool isFirstMoveOfRound = state!.roundCount == 1 && state!.harvestStacks.values.every((v) => v.isEmpty);
-      bool basra = GameEngineUtils.isBasra(card, capturedCards, board);
+      bool basra = GameEngineUtils.isBasra(card, capturedCards, prePlayBoard);
       
       if (basra) {
-        pointsEarned += 1; // Bonus point for Basra
+        pointsEarned += 1; 
       }
 
       if (isTafweetMode) {
-        // Check if this capture resolves a "skipped" trap
-        final playerSkips = skipped[playerId] ?? [];
-        bool isTrapMatch = playerSkips.any((s) => s.rank == card.rank);
+        final playerSkips = List<String>.from(skipped[playerId] ?? []);
+        final previousPlayerId = state!.playerIds[(state!.currentTurnIndex + 3) % 4];
         
-        if (isTrapMatch) {
-           if (isFirstMoveOfRound) {
-             pointsEarned += 20; // Fasha Tafweet
-             sendEmoji(playerId, '😎');
-           } else {
-             // Check Double Tafweet (Sequence of same rank in history)
-             int sameRankCount = history.where((c) => c.rank == card.rank).length;
-             if (sameRankCount >= 2) {
-                pointsEarned += 30; // Double Tafweet
-                sendEmoji(playerId, '🔥');
-             } else {
-                pointsEarned += 10; // Standard Tafweet
-                sendEmoji(playerId, '😂');
-             }
-           }
-           // Clear used trap
-           skipped[playerId]?.removeWhere((s) => s.rank == card.rank);
+        bool isFashaTafweet = playerSkips.contains('${card.rank.name}:fasha');
+        int rankSkipCount = playerSkips.where((s) => s.startsWith('${card.rank.name}:')).length;
+        bool isDoubleTafweet = rankSkipCount >= 2 && playerSkips.contains('${card.rank.name}:$previousPlayerId');
+        bool isStandardTafweet = playerSkips.contains('${card.rank.name}:$previousPlayerId');
+
+        if (isFashaTafweet) {
+          pointsEarned += 20;
+          sendEmoji(playerId, '😎');
+          playerSkips.remove('${card.rank.name}:fasha');
+        } else if (isDoubleTafweet) {
+          pointsEarned += 30;
+          sendEmoji(playerId, '🔥');
+          playerSkips.removeWhere((s) => s.startsWith('${card.rank.name}:'));
+        } else if (isStandardTafweet) {
+          pointsEarned += 10;
+          sendEmoji(playerId, '😂');
+          playerSkips.removeWhere((s) => s.startsWith('${card.rank.name}:'));
         }
+        skipped[playerId] = playerSkips;
       }
 
-      // Extract only the ACTUAL captured cards FROM the board (not including the played card yet)
+      // Process harvested cards
       final harvestedBoardCards = List<game_card.Card>.from(capturedCards)..remove(card);
-
-      // Remove captured cards from board
       for (var c in harvestedBoardCards) {
-        board.remove(c);
+        finalBoard.remove(c);
       }
       
-      // Add to harvest stack
       harvest[teamId]?.add(Capture(
         leadingCard: card,
         capturedCards: harvestedBoardCards,
       ));
-      
-      if (teamId == 'teamA') {
-        state = state!.copyWith(teamAScore: state!.teamAScore + pointsEarned);
-      } else {
-        state = state!.copyWith(teamBScore: state!.teamBScore + pointsEarned);
-      }
-      
-      state = state!.copyWith(lastCaptureTeam: teamId);
     }
     
-    // Update Play History (Value only for sequence tracking)
+    // 3. Update Play History
     history.add(card);
     if (history.length > 10) history.removeAt(0);
 
-    
-    // Check if hands empty
-    bool allHandsEmpty = hands.values.every((hand) => hand.isEmpty);
+    // 4. Update state atomically
+    final allHandsEmpty = hands.values.every((hand) => hand.isEmpty);
 
     _publishState(state!.copyWith(
-      board: board,
+      board: finalBoard,
       handCards: hands,
       harvestStacks: harvest,
       skippedMatches: skipped,
       playHistory: history,
+      cardOwnership: ownership,
       currentTurnIndex: nextTurn,
+      teamAScore: state!.teamAScore + (teamId == 'teamA' ? pointsEarned : 0),
+      teamBScore: state!.teamBScore + (teamId == 'teamB' ? pointsEarned : 0),
+      lastCaptureTeam: pointsEarned > 0 ? teamId : state!.lastCaptureTeam,
       turnStartTime: DateTime.now(),
     ));
 
@@ -521,12 +502,18 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     
     // Check Match Win Condition
     if (pointsA >= endPhase.maxPoints || pointsB >= endPhase.maxPoints) {
-       _publishState(endPhase.copyWith(phase: GamePhase.rematchVoting));
+       _publishState(endPhase.copyWith(
+          phase: GamePhase.rematchVoting,
+          skippedMatches: {},
+          playHistory: [],
+       ));
     } else {
        // Rotate dealer, trigger UI prompt for Shuffle/No-Shuffle
        _publishState(endPhase.copyWith(
           dealerIndex: (endPhase.dealerIndex + 1) % 4,
           phase: GamePhase.shuffleVoting,
+          skippedMatches: {},
+          playHistory: [],
        ));
     }
   }

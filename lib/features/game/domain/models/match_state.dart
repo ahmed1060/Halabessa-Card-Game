@@ -51,7 +51,7 @@ class MatchState {
   final Map<String, bool> rematchVotes;
   final Map<String, bool> botInjectionVotes;
   final int deckCount;
-  final Map<String, List<game_card.Card>> skippedMatches;
+  final Map<String, List<String>> skippedMatches;
   final List<game_card.Card> playHistory;
 
   MatchState({
@@ -114,7 +114,7 @@ class MatchState {
     bool? isPublic,
     Map<String, String>? cardOwnership,
     int? deckCount,
-    Map<String, List<game_card.Card>>? skippedMatches,
+    Map<String, List<String>>? skippedMatches,
     List<game_card.Card>? playHistory,
   }) {
     return MatchState(
@@ -251,11 +251,16 @@ class MatchState {
       return [];
     }
 
-    Map<String, List<game_card.Card>> parseCardMap(dynamic map) {
+    Map<String, List<String>> parseSkipMap(dynamic map) {
       if (map == null || map is! Map) return {};
-      final result = <String, List<game_card.Card>>{};
+      final result = <String, List<String>>{};
       map.forEach((key, value) {
-        result[key.toString()] = parseCards(value);
+        if (value is List) {
+          result[key.toString()] = value.map((e) => e.toString()).toList();
+        } else if (value is Map) {
+          // Backward compatibility if it was still Card objects
+          result[key.toString()] = [];
+        }
       });
       return result;
     }
@@ -331,7 +336,7 @@ class MatchState {
         isPublic: json['isPublic'] == true,
         cardOwnership: cardOwnership,
         deckCount: json['deckCount'] is int ? json['deckCount'] as int : 0,
-        skippedMatches: parseCardMap(json['skippedMatches']),
+        skippedMatches: parseSkipMap(json['skippedMatches']),
         playHistory: parseCards(json['playHistory']),
       );
     } catch (e, stack) {

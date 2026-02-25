@@ -104,5 +104,7 @@
     "send_invite": "Send Invite",
     "invitation_sent": "Invitation sent!",
     "no_friends_yet": "You haven't added any friends yet. Use the search above!",
-    "send": "Send"
+    "send": "Send",
+    "dealing_cards": "Dealing Cards...",
+    "memorize_fasha": "Memorize the Fasha! {}s"
 }

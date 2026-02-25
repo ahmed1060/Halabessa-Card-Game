@@ -102,5 +102,7 @@
     "add_friend": "إضافة صديق",
     "search_users": "البحث عن لاعبين",
     "send_invite": "إرسال دعوة",
-    "invitation_sent": "تم إرسال الدعوة!"
+    "invitation_sent": "تم إرسال الدعوة!",
+    "dealing_cards": "بوزع الورق...",
+    "memorize_fasha": "احفظ الفرشة! {} ثواني"
 }

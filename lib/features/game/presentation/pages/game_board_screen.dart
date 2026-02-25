@@ -234,50 +234,66 @@ class GameBoardScreen extends ConsumerWidget {
                     final card = entry.value;
                     
                     // Deterministic "randomness" based on card properties
-                     final seed = card.suit.index * 13 + card.rank.index + index;
-                     final random = Random(seed);
-                     
-                     final rotation = (random.nextDouble() - 0.5) * 0.4; // +/- 11 degrees
-                     final offsetX = (random.nextDouble() - 0.5) * 45;
-                     final offsetY = (random.nextDouble() - 0.5) * 45;
-                     
-                     // 1. Determine who played this card to set start position
-                     String? ownerId = matchState.cardOwnership['${card.suit}_${card.rank}'];
-                     double startX = 0;
-                     double startY = 400; // Default: Bottom
-                     
-                     if (ownerId != null) {
-                       int myIdx = matchState.playerIds.indexOf(myUid);
-                       int ownerIdx = matchState.playerIds.indexOf(ownerId);
-                       if (myIdx != -1 && ownerIdx != -1) {
-                         int relativeIdx = (ownerIdx - myIdx + 4) % 4;
-                         if (relativeIdx == 1) { startX = -400; startY = 0; } // Left
-                         else if (relativeIdx == 2) { startX = 0; startY = -400; } // Top
-                         else if (relativeIdx == 3) { startX = 400; startY = 0; } // Right
-                       }
-                     }
+                    final seed = card.suit.index * 13 + card.rank.index + index;
+                    final random = Random(seed);
+                    
+                    // 1. Calculate Target Position & Rotation
+                    double targetX = (random.nextDouble() - 0.5) * 45; // Pile jitter
+                    double targetY = (random.nextDouble() - 0.5) * 45;
+                    double rotation = (random.nextDouble() - 0.5) * 0.4; // Pile rotation
 
-                     return TweenAnimationBuilder<double>(
-                       duration: const Duration(milliseconds: 600),
-                       curve: Curves.easeOutCubic,
-                       tween: Tween(begin: 0.0, end: 1.0),
-                       builder: (context, value, child) {
-                         final currentX = startX * (1 - value) + offsetX * value;
-                         final currentY = startY * (1 - value) + offsetY * value;
-                         
-                         return Transform.translate(
-                           offset: Offset(currentX, currentY),
-                           child: Transform.rotate(
-                             angle: rotation * value,
-                             child: Transform.scale(
-                               scale: 0.4 + 0.6 * value,
-                               child: child,
-                             ),
-                           ),
-                         );
-                       },
-                       child: CardWidget(card: card),
-                     );
+                    // Phase override: Spread out during Memorize phase
+                    if (matchState.phase == GamePhase.dealingCards) {
+                      // Simple horizontal spread for 4 cards
+                      // -1.5, -0.5, 0.5, 1.5 multiplier for spacing
+                      targetX = (index - 1.5) * 70; 
+                      targetY = 0;
+                      rotation = 0;
+                    }
+                    
+                    // 2. Determine who played/dealt this card to set start position
+                    String? ownerId = matchState.cardOwnership['${card.suit}_${card.rank}'];
+                    double startX = 0;
+                    double startY = 400; // Default: Bottom
+                    
+                    // If no owner, it's a dealt card from the Dealer
+                    final effectiveOwnerId = ownerId ?? (matchState.phase == GamePhase.dealingFasha || matchState.phase == GamePhase.dealingCards 
+                        ? matchState.playerIds[matchState.dealerIndex] 
+                        : null);
+
+                    if (effectiveOwnerId != null) {
+                      int myIdx = matchState.playerIds.indexOf(myUid);
+                      int ownerIdx = matchState.playerIds.indexOf(effectiveOwnerId);
+                      if (myIdx != -1 && ownerIdx != -1) {
+                        int relativeIdx = (ownerIdx - myIdx + 4) % 4;
+                        if (relativeIdx == 1) { startX = -400; startY = 0; } // Left
+                        else if (relativeIdx == 2) { startX = 0; startY = -400; } // Top
+                        else if (relativeIdx == 3) { startX = 400; startY = 0; } // Right
+                        else if (relativeIdx == 0) { startX = 0; startY = 400; } // Bottom (Self)
+                      }
+                    }
+
+                    return TweenAnimationBuilder<double>(
+                      duration: const Duration(milliseconds: 600),
+                      curve: Curves.easeOutCubic,
+                      tween: Tween(begin: 0.0, end: 1.0),
+                      builder: (context, value, child) {
+                        final currentX = startX * (1 - value) + targetX * value;
+                        final currentY = startY * (1 - value) + targetY * value;
+                        
+                        return Transform.translate(
+                          offset: Offset(currentX, currentY),
+                          child: Transform.rotate(
+                            angle: rotation * value,
+                            child: Transform.scale(
+                              scale: 0.8 + 0.2 * value,
+                              child: child,
+                            ),
+                          ),
+                        );
+                      },
+                      child: CardWidget(card: card),
+                    );
                   }).toList(),
                 ),
               ),
@@ -352,13 +368,15 @@ class GameBoardScreen extends ConsumerWidget {
              if (matchState.phase == GamePhase.preRoundCut)
                _buildCutOverlay(context, ref, matchState, myUid),
              if (matchState.phase == GamePhase.dealingFasha)
-               _buildPhaseOverlay('Memorize the Fasha! 5s...'),
+               _buildPhaseOverlay('dealing_cards'.tr()),
+             if (matchState.phase == GamePhase.dealingCards)
+               _buildPhaseOverlay('memorize_fasha'.tr(args: ['5'])),
              if (matchState.phase == GamePhase.shuffleVoting)
                _buildShuffleVoteOverlay(context, ref, matchState, myUid),
              if (matchState.phase == GamePhase.rematchVoting)
                _buildRematchVoteOverlay(context, ref, matchState, myUid),
              if (matchState.phase == GamePhase.matchOver)
-               _buildPhaseOverlay('Match Finalized.'),
+               _buildPhaseOverlay('match_over'.tr()),
           ],
         ),
       ),
