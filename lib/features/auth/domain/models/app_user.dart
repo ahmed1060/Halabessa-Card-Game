@@ -8,6 +8,11 @@ class AppUser {
   final int rank;
   final List<String> friends;
   final Map<String, String> friendInvites; // matchId -> senderName
+  final int wins;
+  final int losses;
+  final int gamesPlayed;
+  final int bestScore;
+  final List<String> achievements;
 
   AppUser({
     required this.uid,
@@ -19,6 +24,11 @@ class AppUser {
     this.rank = 0,
     this.friends = const [],
     this.friendInvites = const {},
+    this.wins = 0,
+    this.losses = 0,
+    this.gamesPlayed = 0,
+    this.bestScore = 0,
+    this.achievements = const [],
   });
 
   factory AppUser.fromJson(Map<String, dynamic> json, String uid) {
@@ -46,6 +56,11 @@ class AppUser {
       rank: json['rank'] ?? 0,
       friends: parseFriends(json['friends']),
       friendInvites: parseInvites(json['friendInvites']),
+      wins: json['wins'] ?? 0,
+      losses: json['losses'] ?? 0,
+      gamesPlayed: json['gamesPlayed'] ?? 0,
+      bestScore: json['bestScore'] ?? 0,
+      achievements: parseFriends(json['achievements']),
     );
   }
 
@@ -59,6 +74,11 @@ class AppUser {
       'rank': rank,
       'friends': friends,
       'friendInvites': friendInvites,
+      'wins': wins,
+      'losses': losses,
+      'gamesPlayed': gamesPlayed,
+      'bestScore': bestScore,
+      'achievements': achievements,
     };
   }
 
@@ -72,6 +92,11 @@ class AppUser {
     int? rank,
     List<String>? friends,
     Map<String, String>? friendInvites,
+    int? wins,
+    int? losses,
+    int? gamesPlayed,
+    int? bestScore,
+    List<String>? achievements,
   }) {
     return AppUser(
       uid: uid ?? this.uid,
@@ -83,6 +108,11 @@ class AppUser {
       rank: rank ?? this.rank,
       friends: friends ?? this.friends,
       friendInvites: friendInvites ?? this.friendInvites,
+      wins: wins ?? this.wins,
+      losses: losses ?? this.losses,
+      gamesPlayed: gamesPlayed ?? this.gamesPlayed,
+      bestScore: bestScore ?? this.bestScore,
+      achievements: achievements ?? this.achievements,
     );
   }
 }

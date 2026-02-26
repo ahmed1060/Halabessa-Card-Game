@@ -12,6 +12,7 @@ import 'package:halabessa/features/game/presentation/widgets/player_avatar.dart'
 import 'package:halabessa/features/game/presentation/widgets/fanned_hand_widget.dart';
 import 'package:halabessa/features/game/domain/models/capture.dart';
 import 'package:halabessa/core/theme/theme_config.dart';
+import 'package:halabessa/core/widgets/settings_overlay.dart';
 
 class GameBoardScreen extends ConsumerWidget {
   const GameBoardScreen({super.key});
@@ -131,7 +132,14 @@ class GameBoardScreen extends ConsumerWidget {
           const SizedBox(width: 8),
           IconButton(
             icon: const Icon(Icons.settings, color: Colors.white70), 
-            onPressed: () {}
+            onPressed: () {
+              showModalBottomSheet(
+                context: context,
+                isScrollControlled: true,
+                backgroundColor: Colors.transparent,
+                builder: (context) => const SettingsOverlay(),
+              );
+            },
           ),
         ],
       ),

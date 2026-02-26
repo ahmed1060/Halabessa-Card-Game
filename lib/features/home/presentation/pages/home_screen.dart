@@ -7,6 +7,8 @@ import 'package:halabessa/features/game/domain/providers/game_providers.dart';
 import 'package:halabessa/features/game/domain/models/match_state.dart';
 import 'package:halabessa/features/home/presentation/widgets/public_rooms_list.dart';
 import 'package:halabessa/features/auth/presentation/widgets/social_overlay.dart' as social_ui;
+import 'package:halabessa/core/widgets/settings_overlay.dart';
+import 'package:halabessa/core/widgets/user_avatar.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -31,9 +33,24 @@ class HomeScreen extends ConsumerWidget {
             },
           ),
           IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () => ref.read(authRepositoryProvider).signOut(),
+            icon: const Icon(Icons.settings),
+            onPressed: () {
+              showModalBottomSheet(
+                context: context,
+                isScrollControlled: true,
+                backgroundColor: Colors.transparent,
+                builder: (context) => const SettingsOverlay(),
+              );
+            },
           ),
+          if (user != null)
+            Padding(
+              padding: const EdgeInsets.only(right: 16.0, left: 8.0),
+              child: UserAvatar(
+                user: user,
+                onTap: () => Navigator.pushNamed(context, '/profile'),
+              ),
+            ),
         ],
       ),
       body: SingleChildScrollView(

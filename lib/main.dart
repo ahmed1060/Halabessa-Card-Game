@@ -6,10 +6,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'firebase_options.dart';
 import 'core/routes/app_routes.dart';
 import 'core/theme/theme_config.dart';
+import 'core/providers/settings_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await EasyLocalization.ensureInitialized();
+
+  final sharedPrefs = await SharedPreferences.getInstance();
   
   // Try to initialize Firebase, but catch errors if it's not configured yet
   // We will configure Firebase properly later.
@@ -23,6 +27,9 @@ void main() async {
 
   runApp(
     ProviderScope(
+      overrides: [
+        sharedPreferencesProvider.overrideWithValue(sharedPrefs),
+      ],
       child: EasyLocalization(
         supportedLocales: const [Locale('ar', 'EG'), Locale('ar', 'SA'), Locale('en', 'US')],
         path: 'assets/translations', 
