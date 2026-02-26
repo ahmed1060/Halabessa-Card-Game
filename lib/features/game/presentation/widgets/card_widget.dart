@@ -9,6 +9,9 @@ class CardWidget extends StatelessWidget {
   final double width;
   final double height;
   final VoidCallback? onTap;
+  final String? customBackPath;
+  final String? customFrontPath;
+  final Map<String, String>? faceIllustrations;
 
   const CardWidget({
     super.key,
@@ -17,6 +20,9 @@ class CardWidget extends StatelessWidget {
     this.width = 70,
     this.height = 100,
     this.onTap,
+    this.customBackPath,
+    this.customFrontPath,
+    this.faceIllustrations,
   });
 
   @override
@@ -36,9 +42,35 @@ class CardWidget extends StatelessWidget {
             cardBackContentBuilder: (context) => ClipRRect(
               borderRadius: BorderRadius.circular(10),
               child: Image.asset(
-                'assets/images/card_back_premium.png',
+                customBackPath ?? 'assets/images/cards/premium/card_back_premium.png',
                 fit: BoxFit.cover,
               ),
+            ),
+            cardFrontContentBuilder: (context) => Stack(
+              children: [
+                // Themed Background
+                Positioned.fill(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: Image.asset(
+                      customFrontPath ?? 'assets/images/cards/premium/card_front_premium_bg.png',
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                ),
+                // Face Card Illustration
+                if (_getIllustrationPath() != null)
+                  Center(
+                    child: Opacity(
+                      opacity: 0.8,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 18.0),
+                        child: Image.asset(_getIllustrationPath()!, fit: BoxFit.contain),
+                      ),
+                    ),
+                  ),
+                _buildFrontOverlay(context, isFaceItem: _getIllustrationPath() != null),
+              ],
             ),
           ),
           shape: RoundedRectangleBorder(
@@ -49,6 +81,43 @@ class CardWidget extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String? _getIllustrationPath() {
+    if (faceIllustrations == null) return null;
+    if (card.rank == game_card.Rank.king) return faceIllustrations!['king'];
+    if (card.rank == game_card.Rank.queen) return faceIllustrations!['queen'] ?? faceIllustrations!['king'];
+    if (card.rank == game_card.Rank.jack) return faceIllustrations!['jack'] ?? faceIllustrations!['king'];
+    return null;
+  }
+
+  Color _getCardColor() {
+    // If it's Neon theme, maybe use Cyan/Pink? 
+    // For now, let's stick to standard Red/Black but brightened for the theme.
+    if (card.suit == game_card.Suit.hearts || card.suit == game_card.Suit.diamonds) {
+      return customFrontPath?.contains('neon') == true ? const Color(0xFFFF4081) : Colors.redAccent;
+    } else {
+      return customFrontPath?.contains('neon') == true ? const Color(0xFF00E5FF) : Colors.black87;
+    }
+  }
+
+  String _getRankText() {
+    switch (card.rank) {
+      case game_card.Rank.ace: return 'A';
+      case game_card.Rank.jack: return 'J';
+      case game_card.Rank.queen: return 'Q';
+      case game_card.Rank.king: return 'K';
+      default: return (card.rank.index + 2).toString();
+    }
+  }
+
+  IconData _getSuitIcon() {
+    switch (card.suit) {
+      case game_card.Suit.hearts: return Icons.favorite;
+      case game_card.Suit.diamonds: return Icons.diamond;
+      case game_card.Suit.clubs: return Icons.spa;
+      case game_card.Suit.spades: return Icons.bolt; // Funky choice for Spades in Neon
+    }
   }
 
   Suit _mapSuit(game_card.Suit suit) {

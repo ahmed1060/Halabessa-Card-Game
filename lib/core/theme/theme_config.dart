@@ -1,30 +1,25 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class ThemeConfig {
-  static const Color primaryGreen = Color(0xFF1B4332); // Deep Cinematic Forest Green
-  static const Color darkGreen = Color(0xFF081C15);    // Opulent Dark Green (near black)
-  static const Color accentGreen = Color(0xFF40916C);  // Vibrant Felt Green
-  static const Color goldAccent = Color(0xFFD4AF37);  // Classic Gold
-  static const Color surfaceGlass = Color(0x33000000); // Semi-transparent black for glassmorphism
+  static const Color primaryTeal = Color(0xFF00E5FF); // Electric Neon Teal
+  static const Color accentPink = Color(0xFFFF4081);  // Vibrant Pink 
+  static const Color goldAccent = Color(0xFFFFD600);  // Electric Gold
+  static const Color darkBg = Color(0xFF0D1B2A);      // Deep Midnight
+  static const Color surfaceGlass = Color(0x661B263B); 
 
   static ThemeData get lightTheme {
     return ThemeData(
       useMaterial3: true,
       colorScheme: ColorScheme.fromSeed(
-        seedColor: primaryGreen,
-        primary: primaryGreen,
+        seedColor: primaryTeal,
+        primary: primaryTeal,
         secondary: goldAccent,
+        error: crimsonAccent,
       ),
-      fontFamily: 'Cairo',
-      fontFamilyFallback: const [
-        'Noto Sans Arabic',
-        'sans-serif',
-      ],
-      appBarTheme: const AppBarTheme(
-        backgroundColor: darkGreen,
-        foregroundColor: Colors.white,
-        centerTitle: false,
-        elevation: 0,
+      textTheme: GoogleFonts.outfitTextTheme().copyWith(
+        headlineMedium: GoogleFonts.righteous(fontWeight: FontWeight.bold),
+        headlineSmall: GoogleFonts.righteous(),
       ),
     );
   }
@@ -33,21 +28,20 @@ class ThemeConfig {
     return ThemeData(
       useMaterial3: true,
       colorScheme: ColorScheme.fromSeed(
-        seedColor: primaryGreen,
+        seedColor: primaryTeal,
         brightness: Brightness.dark,
-        primary: primaryGreen,
+        primary: primaryTeal,
         secondary: goldAccent,
-        surface: darkGreen,
+        surface: darkTeal,
+        error: crimsonAccent,
       ),
-      fontFamily: 'Cairo',
-      fontFamilyFallback: const [
-        'Noto Sans Arabic',
-        'sans-serif',
-      ],
+      textTheme: GoogleFonts.outfitTextTheme(ThemeData.dark().textTheme).copyWith(
+        headlineMedium: GoogleFonts.righteous(fontWeight: FontWeight.bold, color: Colors.white),
+        headlineSmall: GoogleFonts.righteous(color: Colors.white),
+      ),
       appBarTheme: const AppBarTheme(
-        backgroundColor: Color(0xFF000000),
+        backgroundColor: Colors.black,
         foregroundColor: Colors.white,
-        centerTitle: false,
         elevation: 0,
       ),
     );

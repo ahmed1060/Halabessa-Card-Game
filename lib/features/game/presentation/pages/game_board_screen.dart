@@ -13,6 +13,8 @@ import 'package:halabessa/features/game/presentation/widgets/fanned_hand_widget.
 import 'package:halabessa/features/game/domain/models/capture.dart';
 import 'package:halabessa/core/theme/theme_config.dart';
 import 'package:halabessa/core/widgets/settings_overlay.dart';
+import 'package:halabessa/features/home/presentation/providers/store_provider.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class GameBoardScreen extends ConsumerWidget {
   const GameBoardScreen({super.key});
@@ -119,7 +121,7 @@ class GameBoardScreen extends ConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text('app_title'.tr(), 
-              style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2, color: Colors.white)
+              style: GoogleFonts.righteous(fontWeight: FontWeight.bold, letterSpacing: 1.2, color: Colors.white)
             ),
             Text(
               'room_id_label'.tr(args: [matchState.id]),
@@ -145,17 +147,28 @@ class GameBoardScreen extends ConsumerWidget {
       ),
       body: Stack(
         children: [
-          // Table Top Background (Premium Radial Gradient)
+          // Table Top Background (Premium Skin)
+          Positioned.fill(
+            child: Consumer(
+              builder: (context, ref, child) {
+                final activeTable = ref.watch(storeProvider.notifier).activeTableSkin;
+                return Image.asset(
+                  activeTable.assetPath,
+                  fit: BoxFit.cover,
+                );
+              },
+            ),
+          ),
+          // Additional Radial Overlay for Depth
           Container(
             decoration: BoxDecoration(
               gradient: RadialGradient(
                 colors: [
-                  ThemeConfig.primaryGreen.withOpacity(0.8),
-                  ThemeConfig.primaryGreen,
-                  ThemeConfig.darkGreen,
+                  Colors.transparent,
+                  Colors.black.withOpacity(0.3),
+                  Colors.black.withOpacity(0.7),
                 ],
-                radius: 1.4,
-                center: Alignment.center,
+                radius: 1.2,
               ),
             ),
           ),
@@ -367,7 +380,17 @@ class GameBoardScreen extends ConsumerWidget {
                 ),
               );
             },
-            child: CardWidget(card: card),
+            child: Consumer(
+              builder: (context, ref, child) {
+                final activeCard = ref.watch(storeProvider.notifier).activeCardBack;
+                return CardWidget(
+                  card: card, 
+                  customBackPath: activeCard.assetPath,
+                  customFrontPath: activeCard.frontSkinPath,
+                  faceIllustrations: activeCard.faceIllustrations,
+                );
+              },
+            ),
           );
         }).toList(),
       ),
@@ -786,12 +809,19 @@ class _HarvestStackWidgetState extends State<HarvestStackWidget> {
               width: 55,
               height: 75,
               decoration: BoxDecoration(
-                color: const Color(0xFF1B4332),
                 borderRadius: BorderRadius.circular(6),
                 border: Border.all(color: Colors.white10, width: 1),
                 boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 2)],
               ),
-              child: const Center(child: Icon(Icons.style, color: Colors.white10, size: 20)),
+              child: Consumer(
+                builder: (context, ref, _) {
+                  final activeCard = ref.watch(storeProvider.notifier).activeCardBack;
+                  return ClipRRect(
+                    borderRadius: BorderRadius.circular(6),
+                    child: Image.asset(activeCard.assetPath, fit: BoxFit.cover),
+                  );
+                },
+              ),
             ),
           )),
           Positioned(
