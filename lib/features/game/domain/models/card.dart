@@ -14,6 +14,8 @@ class Card {
 
   const Card(this.suit, this.rank);
 
+  String get firebaseKey => '${suit.name}_${rank.name}';
+
   bool get isJack => rank == Rank.jack;
   bool get isDiamondSeven => suit == Suit.diamonds && rank == Rank.seven; // "Al Koomi" or special cards
   

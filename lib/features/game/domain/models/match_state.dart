@@ -193,7 +193,20 @@ class MatchState {
     // Helper for robust String -> String map parsing (Firebase minification safety)
     Map<String, String> parseStringMap(dynamic map) {
       if (map == null || map is! Map) return {};
-      return map.map((k, v) => MapEntry(k.toString(), v?.toString() ?? ''));
+      final result = <String, String>{};
+      map.forEach((k, v) {
+        final key = k.toString();
+        // Firebase illegal keys: contains '.', '#', '$', '/', '[', or ']'
+        if (!key.contains('.') && 
+            !key.contains('#') && 
+            !key.contains(r'$') && 
+            !key.contains('/') && 
+            !key.contains('[') && 
+            !key.contains(']')) {
+          result[key] = v?.toString() ?? '';
+        }
+      });
+      return result;
     }
 
     // Helper for robust String -> Bool map parsing

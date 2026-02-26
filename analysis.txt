@@ -1,2 +1,2 @@
 Analyzing Halabessa-Card-Game...                                
-No issues found! (ran in 2.4s)
+No issues found! (ran in 3.3s)
