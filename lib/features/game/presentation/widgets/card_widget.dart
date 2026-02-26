@@ -27,57 +27,77 @@ class CardWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: SizedBox(
-        width: width,
-        height: height,
-        child: PlayingCardView(
-          card: PlayingCard(
-             _mapSuit(card.suit),
-             _mapRank(card.rank),
-          ),
-          showBack: !isFaceUp,
-          style: PlayingCardViewStyle(
-            backContentBuilder: (context) => ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: Image.asset(
-                customBackPath ?? 'assets/images/cards/premium/card_back_premium.png',
-                fit: BoxFit.cover,
+    if (!isFaceUp) {
+      return GestureDetector(
+        onTap: onTap,
+        child: SizedBox(
+          width: width,
+          height: height,
+          child: PlayingCardView(
+            card: PlayingCard(
+              _mapSuit(card.suit),
+              _mapRank(card.rank),
+            ),
+            showBack: true,
+            style: PlayingCardViewStyle(
+              cardBackContentBuilder: (context) => ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: Image.asset(
+                  customBackPath ?? 'assets/images/cards/premium/card_back_premium.png',
+                  fit: BoxFit.cover,
+                ),
               ),
             ),
-            frontContentBuilder: (context) => Stack(
-              children: [
-                // Themed Background
-                Positioned.fill(
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: Image.asset(
-                      customFrontPath ?? 'assets/images/cards/premium/card_front_premium_bg.png',
-                      fit: BoxFit.cover,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+              side: BorderSide(color: Colors.white.withOpacity(0.1), width: 0.5),
+            ),
+            elevation: 8.0,
+          ),
+        ),
+      );
+    }
+
+    // Custom Front Rendering
+    return GestureDetector(
+      onTap: onTap,
+      child: Material(
+        elevation: 8.0,
+        borderRadius: BorderRadius.circular(10),
+        color: Colors.white,
+        child: Container(
+          width: width,
+          height: height,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: Colors.white.withOpacity(0.1), width: 0.5),
+          ),
+          child: Stack(
+            children: [
+              // Themed Background
+              Positioned.fill(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: Image.asset(
+                    customFrontPath ?? 'assets/images/cards/premium/card_front_premium_bg.png',
+                    fit: BoxFit.cover,
+                  ),
+                ),
+              ),
+              // Face Card Illustration
+              if (_getIllustrationPath() != null)
+                Center(
+                  child: Opacity(
+                    opacity: 0.8,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 18.0),
+                      child: Image.asset(_getIllustrationPath()!, fit: BoxFit.contain),
                     ),
                   ),
                 ),
-                // Face Card Illustration
-                if (_getIllustrationPath() != null)
-                  Center(
-                    child: Opacity(
-                      opacity: 0.8,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 18.0),
-                        child: Image.asset(_getIllustrationPath()!, fit: BoxFit.contain),
-                      ),
-                    ),
-                  ),
-                _buildFrontOverlay(context, isFaceItem: _getIllustrationPath() != null),
-              ],
-            ),
+              _buildFrontOverlay(context, isFaceItem: _getIllustrationPath() != null),
+            ],
           ),
-          shape: RoundedRectangleBorder(
-             borderRadius: BorderRadius.circular(10),
-             side: BorderSide(color: Colors.white.withOpacity(0.1), width: 0.5),
-          ),
-          elevation: 8.0,
         ),
       ),
     );
