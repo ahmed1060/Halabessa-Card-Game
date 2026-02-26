@@ -4,18 +4,21 @@ import '../../features/auth/presentation/pages/auth_wrapper.dart';
 import '../../features/home/presentation/pages/home_screen.dart';
 import '../../features/game/presentation/pages/game_board_screen.dart';
 import '../../features/auth/presentation/pages/profile_screen.dart';
+import '../../features/home/presentation/pages/store_screen.dart';
 
 class AppRoutes {
   static const String initial = '/';
   static const String home = '/home';
   static const String game = '/game';
   static const String profile = '/profile';
+  static const String store = '/store';
 
   static Map<String, WidgetBuilder> get routes => {
         initial: (context) => const AuthWrapper(),
         home: (context) => const HomeScreen(),
         game: (context) => const GameBoardScreen(),
         profile: (context) => const ProfileScreen(),
+        store: (context) => const StoreScreen(),
       };
 }
 

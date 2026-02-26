@@ -84,7 +84,7 @@ class StoreNotifier extends StateNotifier<StoreState> {
   }
 
   ShopItem get activeTableSkin {
-    return allItems.firstWhere((i) => i.id == state.activeTableSkinId, orElse: () => allItems[2]);
+    return allItems.firstWhere((i) => i.id == state.activeTableSkinId, orElse: () => allItems[3]);
   }
 
   static final allItems = [
