@@ -511,6 +511,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
         rematchVotes: {},
         phase: GamePhase.preRoundCut,
         roundCount: state!.roundCount + (isFirstRound ? 0 : 1),
+        cardOwnership: {},
       ));
     } catch (e, stack) {
       debugPrint('ERROR in _setupNewRound: $e');

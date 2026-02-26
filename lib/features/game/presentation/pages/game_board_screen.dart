@@ -340,7 +340,7 @@ class GameBoardScreen extends ConsumerWidget {
             rotation = 0;
           }
           
-          String? ownerId = matchState.cardOwnership['${card.suit}_${card.rank}'];
+          String? ownerId = matchState.cardOwnership[card.firebaseKey];
           double startX = 0;
           double startY = 400;
           
@@ -361,6 +361,7 @@ class GameBoardScreen extends ConsumerWidget {
           }
 
           return TweenAnimationBuilder<double>(
+            key: ValueKey(card.firebaseKey),
             duration: const Duration(milliseconds: 600),
             curve: Curves.easeOutCubic,
             tween: Tween(begin: 0.0, end: 1.0),
