@@ -112,10 +112,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 scrollDirection: Axis.horizontal,
                 child: Row(
                   children: [
-                    _buildAchievementBadge(context, "Welcome", Icons.handshake, Colors.blue),
-                    _buildAchievementBadge(context, "Winner", Icons.workspace_premium, Colors.amber),
-                    _buildAchievementBadge(context, "Tafweet King", Icons.auto_awesome, Colors.purple),
-                    if (user.points > 1000) _buildAchievementBadge(context, "Pro", Icons.star, Colors.red),
+                    _buildAchievementBadge(context, "achievement_welcome".tr(), Icons.handshake, Colors.blue),
+                    _buildAchievementBadge(context, "achievement_winner".tr(), Icons.workspace_premium, Colors.amber),
+                    _buildAchievementBadge(context, "tafweet_king".tr(), Icons.auto_awesome, Colors.purple),
+                    if (user.points > 1000) _buildAchievementBadge(context, "achievement_pro".tr(), Icons.star, Colors.red),
                   ],
                 ),
               ),

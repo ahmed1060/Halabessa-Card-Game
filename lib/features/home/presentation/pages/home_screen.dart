@@ -62,7 +62,7 @@ class HomeScreen extends ConsumerWidget {
               const Icon(Icons.casino, size: 100, color: Colors.teal),
               const SizedBox(height: 24),
               Text(
-                'welcome_player'.tr(args: [user?.displayName ?? "Player"]),
+                'welcome_player'.tr(args: [user?.displayName ?? 'player_default_name'.tr()]),
                 style: Theme.of(context).textTheme.headlineSmall,
               ),
               const SizedBox(height: 8),
@@ -70,7 +70,7 @@ class HomeScreen extends ConsumerWidget {
               const SizedBox(height: 32),
               ElevatedButton.icon(
                 onPressed: () {
-                  _showCreateRoomDialog(context, ref, user?.uid ?? 'unknown', user?.displayName ?? 'Player');
+                  _showCreateRoomDialog(context, ref, user?.uid ?? 'unknown', user?.displayName ?? 'player_default_name'.tr());
                 },
                 icon: const Icon(Icons.add),
                 label: Text('create_game_room'.tr()),
@@ -82,7 +82,7 @@ class HomeScreen extends ConsumerWidget {
               const SizedBox(height: 16),
               OutlinedButton.icon(
                 onPressed: () {
-                   _showJoinRoomDialog(context, ref, user?.uid ?? 'unknown', user?.displayName ?? 'Player');
+                   _showJoinRoomDialog(context, ref, user?.uid ?? 'unknown', user?.displayName ?? 'player_default_name'.tr());
                 },
                 icon: const Icon(Icons.group_add),
                 label: Text('join_game_room'.tr()),

@@ -464,7 +464,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
        while (finalPlayers.length < 4) {
           String botId = 'bot_$botCount';
           finalPlayers.add(botId);
-          finalNames[botId] = '🤖 Bot $botCount';
+          finalNames[botId] = '${'bot_name'.tr()} $botCount';
           botCount++;
        }
        state = newState.copyWith(

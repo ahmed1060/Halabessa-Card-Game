@@ -90,6 +90,7 @@
     "rematch_votes": "اللي هيكمل البيست: {} / 4",
     "best_of_3_yes": "تلعبوا بيست (ايوه)",
     "leave_match_no": "تقفلوا (لأ)",
+    "app_title": "حلبسه",
     "loading_match_environment": "جاري تحميل بيئة المباراة...",
     "retry_or_exit": "حاول تاني أو اطلع بره",
     "public_room": "غرفة عامة",
@@ -102,6 +103,8 @@
     "add_friend": "إضافة صديق",
     "search_users": "البحث عن لاعبين",
     "send_invite": "إرسال دعوة",
+    "no_friends_yet": "لسه مضافتش أصحاب. استخدم البحث اللي فوق!",
+    "send": "إرسال",
     "invitation_sent": "تم إرسال الدعوة!",
     "dealing_cards": "الورق بيتوزع ...",
     "memorize_fasha": "احفظ الفاشة! {} ثواني",
@@ -144,5 +147,9 @@
     "my_team": "فريقي",
     "opponent_team": "فريق المنافس",
     "your_team_wins": "فريقك كسب!",
-    "opponent_wins": "المنافس كسب!"
+    "opponent_wins": "المنافس كسب!",
+    "achievement_welcome": "نورتنا",
+    "achievement_winner": "كسبان",
+    "tafweet_king": "ملك التفويت",
+    "achievement_pro": "محترف"
 }

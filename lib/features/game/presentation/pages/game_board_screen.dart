@@ -695,9 +695,9 @@ class GameBoardScreen extends ConsumerWidget {
                     return FutureBuilder<List<AppUser>>(
                       future: ref.read(multiplayerSyncServiceProvider).searchUsers(friendId),
                       builder: (context, snap) {
-                        final friend = snap.data?.firstWhere((u) => u.uid == friendId, orElse: () => AppUser(uid: friendId, email: '', displayName: 'Friend'));
+                        final friend = snap.data?.firstWhere((u) => u.uid == friendId, orElse: () => AppUser(uid: friendId, email: '', displayName: 'player_default_name'.tr()));
                         return ListTile(
-                          title: Text(friend?.displayName ?? 'Friend', style: const TextStyle(color: Colors.white)),
+                          title: Text(friend?.displayName ?? 'player_default_name'.tr(), style: const TextStyle(color: Colors.white)),
                           trailing: ElevatedButton(
                             style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white),
                             child: Text('send'.tr()),

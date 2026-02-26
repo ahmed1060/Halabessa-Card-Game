@@ -90,6 +90,7 @@
     "rematch_votes": "أصوات الإعادة: {} / 4",
     "best_of_3_yes": "الأفضل من 3 (نعم)",
     "leave_match_no": "مغادرة المباراة (لا)",
+    "app_title": "حلبسه",
     "loading_match_environment": "جاري تحميل بيئة المباراة...",
     "retry_or_exit": "إعادة المحاولة أو الخروج",
     "public_room": "غرفة عامة",
@@ -102,6 +103,8 @@
     "add_friend": "إضافة صديق",
     "search_users": "البحث عن لاعبين",
     "send_invite": "إرسال دعوة",
+    "no_friends_yet": "لم تقم بإضافة أصدقاء بعد. استخدم البحث أعلاه!",
+    "send": "إرسال",
     "invitation_sent": "تم إرسال الدعوة!",
     "dealing_cards": "جاري توزيع الأوراق...",
     "memorize_fasha": "احفظ الفاشة! {} ثانية",
@@ -144,5 +147,9 @@
     "my_team": "فريقي",
     "opponent_team": "فريق المنافس",
     "your_team_wins": "فريقك فاز!",
-    "opponent_wins": "المنافس فاز!"
+    "opponent_wins": "المنافس فاز!",
+    "achievement_welcome": "مرحباً بك",
+    "achievement_winner": "فائز",
+    "tafweet_king": "ملك التفويت",
+    "achievement_pro": "محترف"
 }

@@ -147,5 +147,9 @@
     "my_team": "My Team",
     "opponent_team": "Opponent Team",
     "your_team_wins": "Your Team Wins!",
-    "opponent_wins": "Opponent Wins!"
+    "opponent_wins": "Opponent Wins!",
+    "achievement_welcome": "Welcome",
+    "achievement_winner": "Winner",
+    "tafweet_king": "Tafweet King",
+    "achievement_pro": "Pro"
 }
