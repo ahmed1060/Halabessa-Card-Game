@@ -37,7 +37,7 @@ class ThemeConfig {
         surface: darkGreen,
       ),
       fontFamily: 'Cairo',
-      fontFamilyFallback: const ['sans-serif', 'Arial'],
+      fontFamilyFallback: const ['Noto Sans Arabic', 'sans-serif', 'Arial'],
       appBarTheme: const AppBarTheme(
         backgroundColor: Color(0xFF000000),
         foregroundColor: Colors.white,

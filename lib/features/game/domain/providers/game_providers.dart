@@ -668,7 +668,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
         bool hasMatchInHand = hands[playerId]?.any((c) => c.rank == topCard.rank) ?? false;
         
         if (hasMatchInHand && card.rank != topCard.rank) {
-          final sourceId = ownership['${topCard.suit}_${topCard.rank}'] ?? 'fasha';
+          final sourceId = ownership['${topCard.suit.name}_${topCard.rank.name}'] ?? 'fasha';
           final skipKey = '${topCard.rank.name}:$sourceId';
           
           final playerSkips = List<String>.from(skipped[playerId] ?? []);
@@ -696,7 +696,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
 
       if (capturedCards.isEmpty) {
         finalBoard.add(card);
-        ownership['${card.suit}_${card.rank}'] = playerId;
+        ownership['${card.suit.name}_${card.rank.name}'] = playerId;
       } else {
         pointsEarned = 1; 
         
