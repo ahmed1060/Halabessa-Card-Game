@@ -18,7 +18,7 @@ class GameBoardScreen extends ConsumerWidget {
   const GameBoardScreen({super.key});
 
   AppUser _getAvatarUser(WidgetRef ref, MatchState matchState, String currentUserUid, int relativeOffset) {
-     if (matchState.playerIds.isEmpty) return AppUser(uid: 'empty', email: '', displayName: 'Waiting...');
+     if (matchState.playerIds.isEmpty) return AppUser(uid: 'empty', email: '', displayName: 'waiting_label'.tr());
      
      int myIdx = matchState.playerIds.indexOf(currentUserUid);
      
@@ -29,17 +29,17 @@ class GameBoardScreen extends ConsumerWidget {
      if (myIdx != -1 && relativeOffset == 0) {
         final realUser = ref.watch(currentUserProvider);
         if (realUser != null) {
-          return realUser.copyWith(displayName: 'You (${realUser.displayName})');
+          return realUser.copyWith(displayName: 'you_label'.tr(args: [realUser.displayName]));
         }
      }
      
      int targetIdx = (baseIdx + relativeOffset) % 4;
      if (targetIdx < 0 || targetIdx >= matchState.playerIds.length) {
-       return AppUser(uid: 'empty', email: '', displayName: 'Waiting...');
+       return AppUser(uid: 'empty', email: '', displayName: 'waiting_label'.tr());
      }
      
      String targetUid = matchState.playerIds[targetIdx];
-     String targetName = matchState.playerNames[targetUid] ?? (targetUid.startsWith('bot_') ? '🤖 Bot' : 'Player');
+     String targetName = matchState.playerNames[targetUid] ?? (targetUid.startsWith('bot_') ? 'bot_name'.tr() : 'player_default_name'.tr());
      
      return AppUser(uid: targetUid, email: '', displayName: targetName);
   }
@@ -53,7 +53,7 @@ class GameBoardScreen extends ConsumerWidget {
 
     return Align(
       alignment: alignment,
-      child: HarvestStackWidget(captures: captures, teamName: teamId == 'teamA' ? 'team_a'.tr() : 'team_b'.tr()),
+      child: HarvestStackWidget(captures: captures, teamName: isMyTeam ? 'my_team'.tr() : 'opponent_team'.tr()),
     );
   }
 
@@ -118,11 +118,11 @@ class GameBoardScreen extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('7alabessa', 
-              style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2, color: Colors.white)
+            Text('app_title'.tr(), 
+              style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2, color: Colors.white)
             ),
             Text(
-              '${'room_code'.tr()}: ${matchState.id}',
+              'room_id_label'.tr(args: [matchState.id]),
               style: TextStyle(fontSize: 10, color: Colors.white.withOpacity(0.5)),
             ),
           ],
@@ -228,12 +228,12 @@ class GameBoardScreen extends ConsumerWidget {
                     _buildPhaseOverlay('memorize_fasha'.tr(args: ['5']), alignment: const Alignment(0, -0.4)),
                  if (matchState.phase == GamePhase.shuffleVoting)
                    _buildShuffleVoteOverlay(context, ref, matchState, myUid),
-                 if (matchState.phase == GamePhase.roundScoring)
-                   _buildPhaseOverlay('round_scoring'.tr(args: [matchState.teamAScore.toString(), matchState.teamBScore.toString()])),
+                if (matchState.phase == GamePhase.roundScoring)
+                   _buildContextualScoringOverlay(matchState, myUid),
                  if (matchState.phase == GamePhase.rematchVoting)
                    _buildRematchVoteOverlay(context, ref, matchState, myUid),
                  if (matchState.phase == GamePhase.matchOver)
-                   _buildPhaseOverlay('match_over'.tr(args: [matchState.teamAScore.toString(), matchState.teamBScore.toString()])),
+                   _buildContextualGameOverOverlay(matchState, myUid),
               ],
             ),
           ),
@@ -332,8 +332,8 @@ class GameBoardScreen extends ConsumerWidget {
           double startX = 0;
           double startY = 400;
           
-          final effectiveOwnerId = ownerId ?? (matchState.phase == GamePhase.dealingFasha || matchState.phase == GamePhase.dealingCards 
-              ? matchState.playerIds[matchState.dealerIndex] 
+          final effectiveOwnerId = ownerId ?? ((matchState.phase == GamePhase.dealingFasha || matchState.phase == GamePhase.dealingCards) && matchState.playerIds.isNotEmpty
+              ? matchState.playerIds[matchState.dealerIndex % matchState.playerIds.length] 
               : null);
 
           if (effectiveOwnerId != null) {
@@ -461,6 +461,20 @@ class GameBoardScreen extends ConsumerWidget {
     );
   }
 
+  Widget _buildContextualScoringOverlay(MatchState matchState, String myUid) {
+    final myTeamId = _getTeamOfPlayer(myUid, matchState.playerIds);
+    final myScore = myTeamId == 'teamA' ? matchState.teamAScore : matchState.teamBScore;
+    final oppScore = myTeamId == 'teamA' ? matchState.teamBScore : matchState.teamAScore;
+    return _buildPhaseOverlay('round_scoring'.tr(args: [myScore.toString(), oppScore.toString()]), alignment: Alignment.center);
+  }
+
+  Widget _buildContextualGameOverOverlay(MatchState matchState, String myUid) {
+    final myTeamId = _getTeamOfPlayer(myUid, matchState.playerIds);
+    final myScore = myTeamId == 'teamA' ? matchState.teamAScore : matchState.teamBScore;
+    final oppScore = myTeamId == 'teamA' ? matchState.teamBScore : matchState.teamAScore;
+    return _buildPhaseOverlay('match_over'.tr(args: [myScore.toString(), oppScore.toString()]));
+  }
+
   Widget _buildCutOverlay(BuildContext context, WidgetRef ref, MatchState state, String currentUid) {
     int myIdx = state.playerIds.indexOf(currentUid);
     int cutterIdx = (state.dealerIndex + 3) % 4;
@@ -490,7 +504,7 @@ class GameBoardScreen extends ConsumerWidget {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
               onPressed: () => ref.read(matchStateProvider.notifier).performCut(20),
-              child: Text(isMyCut ? 'Cut the Deck' : 'Wait for Cut', style: const TextStyle(fontWeight: FontWeight.bold)),
+              child: Text(isMyCut ? 'cut_the_deck'.tr() : 'wait_for_cut'.tr(), style: const TextStyle(fontWeight: FontWeight.bold)),
             )
           ],
         ),
@@ -529,7 +543,7 @@ class GameBoardScreen extends ConsumerWidget {
                 children: [
                   const Icon(Icons.hub, color: Colors.orangeAccent, size: 20),
                   const SizedBox(width: 12),
-                  Text('Room ID: ${state.id}', 
+                  Text('room_id_label'.tr(args: [state.id]), 
                     style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w500)
                   ),
                   const Spacer(),
@@ -551,7 +565,7 @@ class GameBoardScreen extends ConsumerWidget {
                     child: Icon(Icons.person, size: 14, color: id == currentUid ? Colors.white : Colors.white38),
                   ),
                   const SizedBox(width: 12),
-                  Text(id == currentUid ? "you".tr() : (state.playerNames[id] ?? "player".tr()), 
+                  Text(id == currentUid ? "you".tr() : (state.playerNames[id] ?? "player_default_name".tr()), 
                     style: TextStyle(color: id == currentUid ? Colors.green : Colors.white)
                   ),
                   const Spacer(),
@@ -625,6 +639,7 @@ class GameBoardScreen extends ConsumerWidget {
   Widget _buildRematchVoteOverlay(BuildContext context, WidgetRef ref, MatchState state, String currentUid) {
     final hasVoted = state.rematchVotes.containsKey(currentUid);
     final bool aWins = state.teamAScore >= state.teamBScore;
+    final myTeamId = _getTeamOfPlayer(currentUid, state.playerIds);
     return Center(
       child: Container(
         padding: const EdgeInsets.all(32),
@@ -633,7 +648,7 @@ class GameBoardScreen extends ConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text('match_over'.tr(), style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold)),
-            Text('team_wins'.tr(args: [aWins ? "A" : "B"]), style: const TextStyle(color: Colors.amberAccent, fontSize: 20)),
+            Text(aWins == (myTeamId == 'teamA') ? 'your_team_wins'.tr() : 'opponent_wins'.tr(), style: const TextStyle(color: Colors.amberAccent, fontSize: 20)),
             const SizedBox(height: 32),
             if (!hasVoted) Row(
               mainAxisSize: MainAxisSize.min,

@@ -43,13 +43,13 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
         await authRepo.signUpWithEmail(
           _emailController.text.trim(),
           _passwordController.text.trim(),
-          _nameController.text.trim().isEmpty ? 'New Player' : _nameController.text.trim(),
+          _nameController.text.trim().isEmpty ? 'new_player_default'.tr() : _nameController.text.trim(),
         );
       }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Error: \$e')),
+        SnackBar(content: Text('error_general'.tr(args: [e.toString()]))),
       );
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -60,7 +60,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     final guestName = _guestNameController.text.trim();
     if (guestName.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a nickname first.')),
+        SnackBar(content: Text('enter_nickname_error'.tr())),
       );
       return;
     }
@@ -73,7 +73,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Error: \$e')),
+        SnackBar(content: Text('error_general'.tr(args: [e.toString()]))),
       );
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -87,7 +87,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Error: \$e')),
+        SnackBar(content: Text('error_general'.tr(args: [e.toString()]))),
       );
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -144,22 +144,22 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
         actions: [
           PopupMenuButton<Locale>(
             icon: const Icon(Icons.language),
-            tooltip: 'Select Language',
+            tooltip: 'language'.tr(),
             onSelected: (Locale newLocale) {
               context.setLocale(newLocale);
             },
             itemBuilder: (BuildContext context) => <PopupMenuEntry<Locale>>[
               const PopupMenuItem<Locale>(
                 value: Locale('en', 'US'),
-                child: Text('English (US)'),
+                child: Text('english'.tr()),
               ),
               const PopupMenuItem<Locale>(
                 value: Locale('ar', 'EG'),
-                child: Text('العربية (مصر)'),
+                child: Text('arabic_eg'.tr()),
               ),
               const PopupMenuItem<Locale>(
                 value: Locale('ar', 'SA'),
-                child: Text('العربية (السعودية)'),
+                child: Text('arabic_sa'.tr()),
               ),
             ],
           ),
@@ -247,7 +247,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                     icon: const Icon(Icons.apple, size: 40),
                     onPressed: () {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Apple Sign-In is coming soon!')),
+                        SnackBar(content: Text('apple_signin_soon'.tr())),
                       );
                     },
                   ),

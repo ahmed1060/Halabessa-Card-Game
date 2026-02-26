@@ -36,8 +36,8 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
   
   // Prevents multiple concurrent bot logic evaluations for the same state change
   bool _isHandlingBotLogic = false;
-  bool _hasStaleBotState = false;
   Timer? _heartbeatTimer;
+  Timer? _autoplayTimer;
   
   // Stream subscription for the match listener
   StreamSubscription? _matchListener;
@@ -74,6 +74,8 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     _presenceListener?.cancel();
     _heartbeatTimer?.cancel();
     _heartbeatTimer = null;
+    _autoplayTimer?.cancel();
+    _autoplayTimer = null;
     state = null;
     _clearMatchId();
   }
@@ -103,6 +105,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
             }
 
             _evaluateBotActions(serverState);
+            _manageAutoplayTimer(serverState);
           } catch (e, stack) {
             debugPrint('ERROR in match listener callback: $e');
             debugPrint('Stack: $stack');
@@ -163,22 +166,15 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     final isHost = serverState.playerIds.indexOf(currentUser.uid) == 0;
     if (!isHost) return;
 
-    if (_isHandlingBotLogic) {
-      _hasStaleBotState = true;
-      return;
-    }
-    
+    if (_isHandlingBotLogic) return;
     _isHandlingBotLogic = true;
-    _hasStaleBotState = false;
     
     // Safety delay to allow state to settle
     await Future.delayed(const Duration(milliseconds: 100));
     
     try {
-      while (true) {
-        // Re-read current state inside the loop
-        final currentState = state;
-        if (currentState == null) break;
+      final currentState = serverState;
+      if (currentState.playerIds.isEmpty) return;
       // Host specific global phase handling (Dealing Cards)
       if (currentState.phase == GamePhase.dealingFasha) {
         // This is where Host deals Initial Board + Hands
@@ -293,20 +289,49 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
         }
       }
 
-      // 4. Check if state changed while we were processing
-      if (_hasStaleBotState && state != null) {
-        _hasStaleBotState = false;
-        // Continue loop to process new state immediately
-        continue;
-      }
-      break; 
-     }
     } catch (e, stack) {
       debugPrint('CRITICAL ASYNC ERROR in _evaluateBotActions: $e');
       debugPrint('Stack: $stack');
     } finally {
       _isHandlingBotLogic = false;
-      _hasStaleBotState = false;
+    }
+  }
+
+  void _manageAutoplayTimer(MatchState matchState) {
+    _autoplayTimer?.cancel();
+    
+    if (matchState.phase != GamePhase.playing) return;
+    
+    final currentUser = ref.read(currentUserProvider);
+    if (currentUser == null) return;
+    
+    final activePlayerId = matchState.playerIds[matchState.currentTurnIndex];
+    if (activePlayerId != currentUser.uid) return;
+    
+    // Calculate remaining time
+    if (matchState.turnStartTime != null) {
+      final elapsed = DateTime.now().difference(matchState.turnStartTime!).inSeconds;
+      final remaining = matchState.timerDurationSeconds - elapsed;
+      
+      if (remaining <= 0) {
+        _triggerAutoplay(matchState, currentUser.uid);
+      } else {
+        _autoplayTimer = Timer(Duration(seconds: remaining), () {
+          if (state?.id == matchState.id) {
+            _triggerAutoplay(state!, currentUser.uid);
+          }
+        });
+      }
+    }
+  }
+
+  void _triggerAutoplay(MatchState matchState, String myUid) {
+    if (matchState.phase != GamePhase.playing) return;
+    if (matchState.playerIds[matchState.currentTurnIndex] != myUid) return;
+    
+    final hand = matchState.handCards[myUid] ?? [];
+    if (hand.isNotEmpty) {
+      playCard(myUid, hand[Random().nextInt(hand.length)]);
     }
   }
 

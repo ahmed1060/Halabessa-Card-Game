@@ -49,7 +49,7 @@ class SettingsOverlay extends ConsumerWidget {
             const SizedBox(height: 32),
 
             // Audio Section
-            _buildSectionHeader(context, 'Audio'),
+            _buildSectionHeader(context, 'audio'.tr()),
             _buildToggleTile(
               context,
               'sound_effects'.tr(),

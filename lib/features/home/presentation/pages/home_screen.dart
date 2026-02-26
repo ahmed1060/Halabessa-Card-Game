@@ -175,7 +175,7 @@ class HomeScreen extends ConsumerWidget {
                     } catch (e) {
                       debugPrint('Match init error: $e');
                       if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Firebase Warning: $e (Continuing locally...)')));
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('firebase_warning'.tr(args: [e.toString()]))));
                         Navigator.pushNamed(context, '/game');
                       }
                     }
@@ -197,7 +197,7 @@ class HomeScreen extends ConsumerWidget {
                     } catch (e) {
                       debugPrint('Match init error: $e');
                       if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Firebase Warning: $e (Continuing locally...)')));
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('firebase_warning'.tr(args: [e.toString()]))));
                         Navigator.pushNamed(context, '/game');
                       }
                     }

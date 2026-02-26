@@ -106,7 +106,7 @@ class _SocialOverlayState extends ConsumerState<SocialOverlay> {
                           icon: const Icon(Icons.person_add, color: Colors.teal),
                           onPressed: () {
                             ref.read(multiplayerSyncServiceProvider).addFriend(currentUser.uid, user.uid);
-                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Friend added!')));
+                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('friend_added'.tr())));
                           },
                         ),
                   );
@@ -118,11 +118,11 @@ class _SocialOverlayState extends ConsumerState<SocialOverlay> {
           if (currentUser.friendInvites.isNotEmpty) ...[
             const Align(
               alignment: Alignment.centerLeft,
-              child: Text('Invitations', style: TextStyle(color: Colors.orangeAccent, fontSize: 14)),
+              child: Text('invitations'.tr(), style: const TextStyle(color: Colors.orangeAccent, fontSize: 14)),
             ),
             const SizedBox(height: 8),
             ...currentUser.friendInvites.entries.map((invite) => ListTile(
-              title: Text('Invite from ${invite.value}', style: const TextStyle(color: Colors.white)),
+              title: Text('invite_from'.tr(args: [invite.value]), style: const TextStyle(color: Colors.white)),
               trailing: ElevatedButton(
                 child: Text('join'.tr()),
                 onPressed: () {
