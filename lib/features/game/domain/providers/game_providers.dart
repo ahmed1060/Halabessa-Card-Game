@@ -701,12 +701,6 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
         pointsEarned = 1; 
         
         bool isTafweetMode = state!.mode == GameMode.tafweet;
-        bool basra = GameEngineUtils.isBasra(card, capturedCards, prePlayBoard);
-        
-        if (basra) {
-          pointsEarned += 1; 
-        }
-
         if (isTafweetMode) {
           final playerSkips = List<String>.from(skipped[playerId] ?? []);
           final previousPlayerId = state!.playerIds[(state!.currentTurnIndex + 3) % 4];
@@ -717,15 +711,15 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
           bool isStandardTafweet = playerSkips.contains('${card.rank.name}:$previousPlayerId');
 
           if (isFashaTafweet) {
-            pointsEarned += 20;
+            pointsEarned += 5;
             emojis[playerId] = '😎';
             playerSkips.remove('${card.rank.name}:fasha');
           } else if (isDoubleTafweet) {
-            pointsEarned += 30;
+            pointsEarned += 10;
             emojis[playerId] = '🔥';
             playerSkips.removeWhere((s) => s.startsWith('${card.rank.name}:'));
           } else if (isStandardTafweet) {
-            pointsEarned += 10;
+            pointsEarned += 5;
             emojis[playerId] = '😂';
             playerSkips.removeWhere((s) => s.startsWith('${card.rank.name}:'));
           }
