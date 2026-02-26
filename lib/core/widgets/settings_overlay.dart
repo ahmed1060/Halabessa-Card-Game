@@ -136,20 +136,19 @@ class SettingsOverlay extends ConsumerWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
-        _buildLangButton(context, 'English', const Locale('en', 'US'), currentLocale),
-        _buildLangButton(context, 'عربي (مصر)', const Locale('ar', 'EG'), currentLocale),
-        _buildLangButton(context, 'عربي (سعودي)', const Locale('ar', 'SA'), currentLocale),
+        _buildLangButton(context, ref, 'English', const Locale('en', 'US'), currentLocale),
+        _buildLangButton(context, ref, 'عربي (مصر)', const Locale('ar', 'EG'), currentLocale),
+        _buildLangButton(context, ref, 'عربي (سعودي)', const Locale('ar', 'SA'), currentLocale),
       ],
     );
   }
 
-  Widget _buildLangButton(BuildContext context, String label, Locale locale, Locale current) {
+  Widget _buildLangButton(BuildContext context, WidgetRef ref, String label, Locale locale, Locale current) {
     final isSelected = current == locale;
     return GestureDetector(
       onTap: () {
         context.setLocale(locale);
-        // Also update our internal settings state for persistence across fresh boots
-        // though easy_localization handles its own persistence too.
+        ref.read(settingsProvider.notifier).setLanguage(locale.languageCode);
       },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),

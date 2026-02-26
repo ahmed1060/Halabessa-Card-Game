@@ -1,4 +1,4 @@
-import 'package:easy_localization/easy_localization.dart';
+﻿import 'package:easy_localization/easy_localization.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -15,14 +15,12 @@ void main() async {
 
   final sharedPrefs = await SharedPreferences.getInstance();
   
-  // Try to initialize Firebase, but catch errors if it's not configured yet
-  // We will configure Firebase properly later.
   try {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
   } catch (e) {
-    debugPrint("Firebase init failed (likely missing config): \$e");
+    debugPrint("Firebase init failed (likely missing config): $e");
   }
 
   runApp(
@@ -40,11 +38,13 @@ void main() async {
   );
 }
 
-class HalabessaApp extends StatelessWidget {
+class HalabessaApp extends ConsumerWidget {
   const HalabessaApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final settings = ref.watch(settingsProvider);
+
     return MaterialApp(
       title: '7alabessa',
       localizationsDelegates: context.localizationDelegates,
@@ -52,9 +52,10 @@ class HalabessaApp extends StatelessWidget {
       locale: context.locale,
       theme: ThemeConfig.lightTheme,
       darkTheme: ThemeConfig.darkTheme,
-      themeMode: ThemeMode.system,
+      themeMode: settings.themeMode,
       initialRoute: AppRoutes.initial,
       routes: AppRoutes.routes,
+      debugShowCheckedModeBanner: false,
     );
   }
 }

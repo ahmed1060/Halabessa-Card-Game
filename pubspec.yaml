@@ -44,6 +44,7 @@ dependencies:
   sign_in_with_apple: ^7.0.1
   flutter_facebook_auth: ^7.1.0
   shared_preferences: ^2.2.3
+  audioplayers: ^6.1.0
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -55,10 +56,7 @@ dev_dependencies:
   # rules and activating additional ones.
   flutter_lints: ^3.0.0
 
-# For information on the generic Dart part of this file, see the
-# following page: https://dart.dev/tools/pub/pubspec
-
-# The following section is specific to Flutter packages.
+  # The following section is specific to Flutter packages.
 flutter:
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
@@ -69,16 +67,6 @@ flutter:
   assets:
     - assets/translations/
     - assets/images/card_back_premium.png
-
-  fonts:
-    - family: Cairo
-      fonts:
-        - asset: assets/fonts/Cairo.ttf
-    - family: Noto Sans Arabic
-      fonts:
-        - asset: assets/fonts/NotoSansArabic-Regular.ttf
-        - asset: assets/fonts/NotoSansArabic-Bold.ttf
-          weight: 700
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/assets-and-images/#resolution-aware
 

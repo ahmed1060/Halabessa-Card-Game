@@ -11,6 +11,7 @@ import '../../domain/logic/game_engine_utils.dart';
 import '../../data/repositories/multiplayer_sync_service.dart';
 import 'package:flutter/foundation.dart';
 import '../../../../features/auth/presentation/providers/auth_providers.dart';
+import 'package:halabessa/core/services/multimedia_service.dart';
 
 final multiplayerSyncServiceProvider = Provider<MultiplayerSyncService>((ref) {
   // Use a singleton pattern or standard instance to avoid repeat initialization errors
@@ -24,6 +25,8 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
   final Ref ref;
 
   MatchStateNotifier(this.ref) : super(null);
+
+  MultimediaService get _multimedia => ref.read(multimediaServiceProvider);
   
   // Local secret deck ONLY known by the Host (Anti-Cheat)
   Deck? _secretDeck;
@@ -495,6 +498,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     // Only Host manages the secret deck
     if (_secretDeck != null) {
       _secretDeck!.cut(index);
+      _multimedia.vibrate();
     }
 
     await _publishState(state!.copyWith(
@@ -626,6 +630,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     if (state == null) return;
     final emojis = Map<String, String>.from(state!.playerEmojis);
     emojis[playerId] = emoji;
+    _multimedia.vibrate();
     await _publishState(state!.copyWith(playerEmojis: emojis));
   }
 
@@ -740,7 +745,9 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
           leadingCard: card,
           capturedCards: harvestedBoardCards,
         ));
+        _multimedia.playSfx('sfx/capture.mp3');
       }
+      _multimedia.vibrate();
       
       // 3. Update Play History
       history.add(card);
@@ -887,5 +894,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
 }
 
 final matchStateProvider = StateNotifierProvider<MatchStateNotifier, MatchState?>((ref) {
+  // Watch multimedia service to ensure it's available for triggers
+  ref.watch(multimediaServiceProvider); 
   return MatchStateNotifier(ref);
 });
