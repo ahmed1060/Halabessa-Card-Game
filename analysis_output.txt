@@ -1,10 +1,2 @@
 Analyzing Halabessa-Card-Game...                                
-
-  error - The getter 'black90' isn't defined for the type 'Colors' - lib\features\game\presentation\pages\game_board_screen.dart:465:25 - undefined_getter
-  error - The getter 'black90' isn't defined for the type 'Colors' - lib\features\game\presentation\pages\game_board_screen.dart:503:25 - undefined_getter
-  error - The getter 'black90' isn't defined for the type 'Colors' - lib\features\game\presentation\pages\game_board_screen.dart:587:49 - undefined_getter
-  error - The getter 'black90' isn't defined for the type 'Colors' - lib\features\game\presentation\pages\game_board_screen.dart:623:49 - undefined_getter
-  error - The named parameter 'cardBackContent' isn't defined - lib\features\game\presentation\widgets\card_widget.dart:36:13 - undefined_named_parameter
-  error - The named parameter 'rotateBlurSigma' isn't defined - lib\features\game\presentation\widgets\player_avatar.dart:73:21 - undefined_named_parameter
-
-6 issues found. (ran in 1.6s)
+No issues found! (ran in 2.6s)

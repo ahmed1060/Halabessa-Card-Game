@@ -33,7 +33,7 @@ class CardWidget extends StatelessWidget {
           ),
           showBack: !isFaceUp,
           style: PlayingCardViewStyle(
-            cardBack: (context) => ClipRRect(
+            cardBackContentBuilder: (context) => ClipRRect(
               borderRadius: BorderRadius.circular(10),
               child: Image.asset(
                 'assets/images/card_back_premium.png',

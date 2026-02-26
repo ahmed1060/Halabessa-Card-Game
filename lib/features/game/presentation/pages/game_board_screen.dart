@@ -121,7 +121,7 @@ class GameBoardScreen extends ConsumerWidget {
               style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2, color: Colors.white)
             ),
             Text(
-              '${'room_id'.tr()}: ${matchState.id}',
+              '${'room_code'.tr()}: ${matchState.id}',
               style: TextStyle(fontSize: 10, color: Colors.white.withOpacity(0.5)),
             ),
           ],
@@ -584,7 +584,7 @@ class GameBoardScreen extends ConsumerWidget {
     return Center(
       child: Container(
         padding: const EdgeInsets.all(32),
-        decoration: BoxDecoration(color: Colors.black90, borderRadius: BorderRadius.circular(24)),
+        decoration: BoxDecoration(color: Colors.black.withOpacity(0.9), borderRadius: BorderRadius.circular(24)),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -620,7 +620,7 @@ class GameBoardScreen extends ConsumerWidget {
     return Center(
       child: Container(
         padding: const EdgeInsets.all(32),
-        decoration: BoxDecoration(color: Colors.black90, borderRadius: BorderRadius.circular(24)),
+        decoration: BoxDecoration(color: Colors.black.withOpacity(0.9), borderRadius: BorderRadius.circular(24)),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
