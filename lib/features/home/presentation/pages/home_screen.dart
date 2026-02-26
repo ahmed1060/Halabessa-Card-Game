@@ -9,7 +9,6 @@ import 'package:halabessa/features/home/presentation/widgets/public_rooms_list.d
 import 'package:halabessa/features/auth/presentation/widgets/social_overlay.dart' as social_ui;
 import 'package:halabessa/core/widgets/settings_overlay.dart';
 import 'package:halabessa/core/widgets/user_avatar.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:halabessa/core/theme/theme_config.dart';
 
 class HomeScreen extends ConsumerWidget {
@@ -24,7 +23,7 @@ class HomeScreen extends ConsumerWidget {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        title: Text('app_title'.tr(), style: GoogleFonts.righteous(letterSpacing: 2)),
+        title: Text('app_title'.tr(), style: const TextStyle(fontFamily: ThemeConfig.fontHeading, letterSpacing: 2)),
         actions: [
           IconButton(
             icon: const Icon(Icons.people_alt_outlined, color: Colors.white70),
@@ -86,13 +85,13 @@ class HomeScreen extends ConsumerWidget {
                   const SizedBox(height: 32),
                   Text(
                     'welcome_player'.tr(args: [user?.displayName ?? 'player_default_name'.tr()]),
-                    style: GoogleFonts.righteous(fontSize: 28, color: Colors.white),
+                    style: const TextStyle(fontFamily: ThemeConfig.fontHeading, fontSize: 28, color: Colors.white),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 8),
                   Text(
                     'points_and_rank'.tr(args: [user?.points.toString() ?? '0', user?.rank.toString() ?? '0']),
-                    style: GoogleFonts.outfit(color: ThemeConfig.goldAccent, fontWeight: FontWeight.bold),
+                    style: const TextStyle(fontFamily: ThemeConfig.fontBody, color: ThemeConfig.goldAccent, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 40),
                   _buildMenuButton(
@@ -126,7 +125,7 @@ class HomeScreen extends ConsumerWidget {
                     alignment: Alignment.centerLeft,
                     child: Text(
                       'available_matches'.tr(),
-                      style: GoogleFonts.righteous(color: Colors.white, fontSize: 22),
+                      style: const TextStyle(fontFamily: ThemeConfig.fontHeading, color: Colors.white, fontSize: 22),
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -178,7 +177,8 @@ class HomeScreen extends ConsumerWidget {
                 const SizedBox(width: 16),
                 Text(
                   label,
-                  style: GoogleFonts.righteous(
+                  style: TextStyle(
+                    fontFamily: ThemeConfig.fontHeading,
                     fontSize: 18,
                     color: isPrimary ? Colors.white : Colors.white70,
                     letterSpacing: 1,

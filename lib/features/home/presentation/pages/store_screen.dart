@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:easy_localization/easy_localization.dart';
 import '../../../../core/theme/theme_config.dart';
 import '../providers/store_provider.dart';
@@ -18,7 +17,7 @@ class StoreScreen extends ConsumerWidget {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        title: Text('Halabessa Store', style: GoogleFonts.righteous(letterSpacing: 1.5)),
+        title: const Text('Halabessa Store', style: TextStyle(fontFamily: ThemeConfig.fontHeading, letterSpacing: 1.5)),
       ),
       body: CustomScrollView(
         slivers: [
@@ -38,7 +37,7 @@ class StoreScreen extends ConsumerWidget {
         padding: const EdgeInsets.fromLTRB(24, 32, 24, 16),
         child: Text(
           title,
-          style: GoogleFonts.righteous(fontSize: 22, color: ThemeConfig.goldAccent),
+          style: const TextStyle(fontFamily: ThemeConfig.fontHeading, fontSize: 22, color: ThemeConfig.goldAccent),
         ),
       ),
     );
@@ -119,7 +118,7 @@ class StoreScreen extends ConsumerWidget {
                 children: [
                   Text(
                     item.name,
-                    style: GoogleFonts.righteous(fontSize: 16, color: Colors.white),
+                    style: const TextStyle(fontFamily: ThemeConfig.fontHeading, fontSize: 16, color: Colors.white),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -132,7 +131,8 @@ class StoreScreen extends ConsumerWidget {
                     ),
                     child: Text(
                       isActive ? 'ACTIVE' : (isOwned ? 'OWNED' : 'FREE'),
-                      style: GoogleFonts.outfit(
+                      style: TextStyle(
+                        fontFamily: ThemeConfig.fontBody,
                         fontSize: 10, 
                         fontWeight: FontWeight.bold,
                         color: isActive ? Colors.black : (isOwned ? Colors.teal : Colors.white38),

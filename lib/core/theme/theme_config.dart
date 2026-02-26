@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 class ThemeConfig {
   static const Color primaryTeal = Color(0xFF00E5FF); // Electric Neon Teal
@@ -14,18 +13,22 @@ class ThemeConfig {
   static const Color darkTeal = Color(0xFF004D40);
   static const Color crimsonAccent = Color(0xFFB71C1C);
 
+  static const String fontHeading = 'Righteous';
+  static const String fontBody = 'Outfit';
+
   static ThemeData get lightTheme {
     return ThemeData(
       useMaterial3: true,
+      fontFamily: fontBody,
       colorScheme: ColorScheme.fromSeed(
         seedColor: primaryTeal,
         primary: primaryTeal,
         secondary: goldAccent,
         error: crimsonAccent,
       ),
-      textTheme: GoogleFonts.outfitTextTheme().copyWith(
-        headlineMedium: GoogleFonts.righteous(fontWeight: FontWeight.bold),
-        headlineSmall: GoogleFonts.righteous(),
+      textTheme: const TextTheme(
+        headlineMedium: TextStyle(fontFamily: fontHeading, fontWeight: FontWeight.bold),
+        headlineSmall: TextStyle(fontFamily: fontHeading),
       ),
     );
   }
@@ -33,6 +36,7 @@ class ThemeConfig {
   static ThemeData get darkTheme {
     return ThemeData(
       useMaterial3: true,
+      fontFamily: fontBody,
       colorScheme: ColorScheme.fromSeed(
         seedColor: primaryTeal,
         brightness: Brightness.dark,
@@ -41,9 +45,9 @@ class ThemeConfig {
         surface: darkTeal,
         error: crimsonAccent,
       ),
-      textTheme: GoogleFonts.outfitTextTheme(ThemeData.dark().textTheme).copyWith(
-        headlineMedium: GoogleFonts.righteous(fontWeight: FontWeight.bold, color: Colors.white),
-        headlineSmall: GoogleFonts.righteous(color: Colors.white),
+      textTheme: const TextTheme(
+        headlineMedium: TextStyle(fontFamily: fontHeading, fontWeight: FontWeight.bold, color: Colors.white),
+        headlineSmall: TextStyle(fontFamily: fontHeading, color: Colors.white),
       ),
       appBarTheme: const AppBarTheme(
         backgroundColor: Colors.black,

@@ -14,7 +14,6 @@ import 'package:halabessa/features/game/domain/models/capture.dart';
 import 'package:halabessa/core/theme/theme_config.dart';
 import 'package:halabessa/core/widgets/settings_overlay.dart';
 import 'package:halabessa/features/home/presentation/providers/store_provider.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 class GameBoardScreen extends ConsumerWidget {
   const GameBoardScreen({super.key});
@@ -121,7 +120,7 @@ class GameBoardScreen extends ConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text('app_title'.tr(), 
-              style: GoogleFonts.righteous(fontWeight: FontWeight.bold, letterSpacing: 1.2, color: Colors.white)
+              style: const TextStyle(fontFamily: ThemeConfig.fontHeading, fontWeight: FontWeight.bold, letterSpacing: 1.2, color: Colors.white)
             ),
             Text(
               'room_id_label'.tr(args: [matchState.id]),
