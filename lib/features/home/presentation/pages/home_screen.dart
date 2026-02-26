@@ -9,6 +9,8 @@ import 'package:halabessa/features/home/presentation/widgets/public_rooms_list.d
 import 'package:halabessa/features/auth/presentation/widgets/social_overlay.dart' as social_ui;
 import 'package:halabessa/core/widgets/settings_overlay.dart';
 import 'package:halabessa/core/widgets/user_avatar.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:halabessa/core/theme/theme_config.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -63,7 +65,7 @@ class HomeScreen extends ConsumerWidget {
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [Color(0xFF0D1B2A), Color(0xFF1B263B), Color(0xFF00E5FF).withOpacity(0.2)],
+                colors: [Color(0xFF0D1B2A), Color(0xFF1B263B), Color(0x3300E5FF)],
               ),
             ),
           ),
@@ -190,7 +192,6 @@ class HomeScreen extends ConsumerWidget {
         ),
       ),
     );
-  }
   }
 
   void _showCreateRoomDialog(BuildContext context, WidgetRef ref, String playerId, String displayName) {

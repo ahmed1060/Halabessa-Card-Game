@@ -19,7 +19,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
     if (user == null) {
       return Scaffold(
-        backgroundColor: ThemeConfig.darkGreen,
+        backgroundColor: ThemeConfig.darkBg,
         body: Center(child: Text('not_logged_in'.tr(), style: const TextStyle(color: Colors.white))),
       );
     }
@@ -30,7 +30,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final level = (user.points / 100).floor() + 1;
 
     return Scaffold(
-      backgroundColor: ThemeConfig.darkGreen,
+      backgroundColor: ThemeConfig.darkBg,
       appBar: AppBar(
         title: Text('player_profile'.tr()),
         backgroundColor: Colors.transparent,
@@ -42,7 +42,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              ThemeConfig.darkGreen,
+              ThemeConfig.darkBg,
               Colors.black.withOpacity(0.8),
             ],
           ),

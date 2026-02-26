@@ -39,14 +39,14 @@ class CardWidget extends StatelessWidget {
           ),
           showBack: !isFaceUp,
           style: PlayingCardViewStyle(
-            cardBackContentBuilder: (context) => ClipRRect(
+            backContentBuilder: (context) => ClipRRect(
               borderRadius: BorderRadius.circular(10),
               child: Image.asset(
                 customBackPath ?? 'assets/images/cards/premium/card_back_premium.png',
                 fit: BoxFit.cover,
               ),
             ),
-            cardFrontContentBuilder: (context) => Stack(
+            frontContentBuilder: (context) => Stack(
               children: [
                 // Themed Background
                 Positioned.fill(
@@ -89,6 +89,50 @@ class CardWidget extends StatelessWidget {
     if (card.rank == game_card.Rank.queen) return faceIllustrations!['queen'] ?? faceIllustrations!['king'];
     if (card.rank == game_card.Rank.jack) return faceIllustrations!['jack'] ?? faceIllustrations!['king'];
     return null;
+  }
+
+  Widget _buildFrontOverlay(BuildContext context, {bool isFaceItem = false}) {
+    final color = _getCardColor();
+    final rankText = _getRankText();
+    final suitIcon = _getSuitIcon();
+
+    return Padding(
+      padding: const EdgeInsets.all(6.0),
+      child: Stack(
+        children: [
+          // Top Left Rank
+          Positioned(
+            top: 0,
+            left: 0,
+            child: Column(
+              children: [
+                Text(rankText, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 14)),
+                Icon(suitIcon, color: color, size: 12),
+              ],
+            ),
+          ),
+          // Center Large Suit (Only if not a face item with illustration)
+          if (!isFaceItem)
+            Center(
+              child: Icon(suitIcon, color: color.withOpacity(0.4), size: 40),
+            ),
+          // Bottom Right Rank (inverted)
+          Positioned(
+            bottom: 0,
+            right: 0,
+            child: RotatedBox(
+              quarterTurns: 2,
+              child: Column(
+                children: [
+                  Text(rankText, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 14)),
+                  Icon(suitIcon, color: color, size: 12),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Color _getCardColor() {

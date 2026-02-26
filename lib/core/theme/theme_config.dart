@@ -6,7 +6,13 @@ class ThemeConfig {
   static const Color accentPink = Color(0xFFFF4081);  // Vibrant Pink 
   static const Color goldAccent = Color(0xFFFFD600);  // Electric Gold
   static const Color darkBg = Color(0xFF0D1B2A);      // Deep Midnight
-  static const Color surfaceGlass = Color(0x661B263B); 
+  static const Color surfaceGlass = Color(0x661B263B);
+  
+  // Legacy colors for compatibility
+  static const Color darkGreen = Color(0xFF1B3022);
+  static const Color accentGreen = Color(0xFF4CAF50);
+  static const Color darkTeal = Color(0xFF004D40);
+  static const Color crimsonAccent = Color(0xFFB71C1C);
 
   static ThemeData get lightTheme {
     return ThemeData(

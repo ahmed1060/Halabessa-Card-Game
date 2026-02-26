@@ -82,13 +82,13 @@ class GameBoardScreen extends ConsumerWidget {
       }
 
       return Scaffold(
-        backgroundColor: ThemeConfig.darkGreen,
+        backgroundColor: ThemeConfig.darkBg,
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               const CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(ThemeConfig.accentGreen),
+                valueColor: AlwaysStoppedAnimation<Color>(ThemeConfig.goldAccent),
               ),
               const SizedBox(height: 32),
               Text(
