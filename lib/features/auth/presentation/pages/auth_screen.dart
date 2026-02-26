@@ -149,16 +149,16 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
               context.setLocale(newLocale);
             },
             itemBuilder: (BuildContext context) => <PopupMenuEntry<Locale>>[
-              const PopupMenuItem<Locale>(
-                value: Locale('en', 'US'),
+              PopupMenuItem<Locale>(
+                value: const Locale('en', 'US'),
                 child: Text('english'.tr()),
               ),
-              const PopupMenuItem<Locale>(
-                value: Locale('ar', 'EG'),
+              PopupMenuItem<Locale>(
+                value: const Locale('ar', 'EG'),
                 child: Text('arabic_eg'.tr()),
               ),
-              const PopupMenuItem<Locale>(
-                value: Locale('ar', 'SA'),
+              PopupMenuItem<Locale>(
+                value: const Locale('ar', 'SA'),
                 child: Text('arabic_sa'.tr()),
               ),
             ],

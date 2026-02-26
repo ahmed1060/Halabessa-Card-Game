@@ -217,7 +217,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
            // After dealing, the state will change, so we should re-evaluate.
            // If dealSubsequentCards changes the phase, the loop will naturally re-evaluate.
            // If it just deals cards, the next iteration will pick up the new hands.
-           continue; 
+           return; 
         }
 
         final activePlayerId = currentState.playerIds[currentState.currentTurnIndex];

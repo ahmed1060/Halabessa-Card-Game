@@ -116,7 +116,7 @@ class _SocialOverlayState extends ConsumerState<SocialOverlay> {
           const Divider(color: Colors.white24, height: 32),
           // Placeholder for Friends list / Invites
           if (currentUser.friendInvites.isNotEmpty) ...[
-            const Align(
+            Align(
               alignment: Alignment.centerLeft,
               child: Text('invitations'.tr(), style: const TextStyle(color: Colors.orangeAccent, fontSize: 14)),
             ),
