@@ -100,27 +100,74 @@ class GameBoardScreen extends ConsumerWidget {
       }
 
       return Scaffold(
-        backgroundColor: ThemeConfig.darkBg,
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(ThemeConfig.goldAccent),
-              ),
-              const SizedBox(height: 32),
-              Text(
-                'loading_match_environment'.tr(),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w500,
-                  letterSpacing: 0.5,
+        body: Container(
+          decoration: const BoxDecoration(
+            gradient: RadialGradient(
+              center: Alignment.center,
+              radius: 1.2,
+              colors: [
+                Color(0xFF1B263B),
+                ThemeConfig.darkBg,
+              ],
+            ),
+          ),
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // Logo with subtle scale
+                Image.asset(
+                  'assets/images/logo.png',
+                  height: 140,
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, error, stackTrace) => const Icon(Icons.casino, size: 80, color: ThemeConfig.goldAccent),
                 ),
-              ),
-              const SizedBox(height: 48),
-              _buildRetryButton(context, ref),
-            ],
+                const SizedBox(height: 60),
+                // Glowing Loader
+                Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Container(
+                      width: 60,
+                      height: 60,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: ThemeConfig.goldAccent.withOpacity(0.3),
+                            blurRadius: 25,
+                            spreadRadius: 2,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(
+                      width: 45,
+                      height: 45,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 3,
+                        valueColor: AlwaysStoppedAnimation<Color>(ThemeConfig.goldAccent),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 40),
+                Text(
+                  'loading_match_environment'.tr(),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 24,
+                    fontFamily: ThemeConfig.fontHeading,
+                    letterSpacing: 1.2,
+                    shadows: [
+                      Shadow(color: Colors.black87, offset: Offset(0, 2), blurRadius: 4),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 64),
+                _buildRetryButton(context, ref),
+              ],
+            ),
           ),
         ),
       );
@@ -324,33 +371,40 @@ class GameBoardScreen extends ConsumerWidget {
         borderRadius: BorderRadius.circular(30),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.2),
+            color: Colors.black.withOpacity(0.3),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
         ],
       ),
-      child: ElevatedButton(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.black26,
-          foregroundColor: Colors.white70,
-          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+      child: OutlinedButton(
+        style: OutlinedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
+          backgroundColor: Colors.white.withOpacity(0.05),
+          foregroundColor: Colors.white,
+          side: BorderSide(color: Colors.white.withOpacity(0.2), width: 1.5),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(30),
-            side: const BorderSide(color: Colors.white10),
           ),
           elevation: 0,
         ),
         onPressed: () {
-           final lastId = ref.read(matchStateProvider.notifier).lastBoundMatchId;
-           if (lastId != null) {
-              ref.read(matchStateProvider.notifier).rebind(lastId);
-           } else {
-              ref.read(matchStateProvider.notifier).leaveMatch();
-              Navigator.pop(context);
-           }
+            final lastId = ref.read(matchStateProvider.notifier).lastBoundMatchId;
+            if (lastId != null) {
+               ref.read(matchStateProvider.notifier).rebind(lastId);
+            } else {
+               ref.read(matchStateProvider.notifier).leaveMatch();
+               Navigator.pop(context);
+            }
         },
-        child: Text('retry_or_exit'.tr()),
+        child: Text(
+          'retry_or_exit'.tr().toUpperCase(),
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 1.5,
+          ),
+        ),
       ),
     );
   }
@@ -451,18 +505,7 @@ class GameBoardScreen extends ConsumerWidget {
                 ),
               );
             },
-            child: Consumer(
-              builder: (context, ref, child) {
-                final store = ref.watch(storeProvider);
-                final activeCard = StoreNotifier.allItems.firstWhere((i) => i.id == store.activeCardBackId, orElse: () => StoreNotifier.allItems[0]);
-                return CardWidget(
-                  card: card, 
-                  customBackPath: activeCard.assetPath,
-                  customFrontPath: activeCard.frontSkinPath,
-                  faceIllustrations: activeCard.faceIllustrations,
-                );
-              },
-            ),
+            child: CardWidget(card: card),
           );
         }).toList(),
       ),

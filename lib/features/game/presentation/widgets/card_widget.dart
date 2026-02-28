@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:playing_cards/playing_cards.dart';
 
 import '../../domain/models/card.dart' as game_card;
+import '../../../home/presentation/providers/store_provider.dart';
 
-class CardWidget extends StatelessWidget {
+class CardWidget extends ConsumerWidget {
   final game_card.Card card;
   final bool isFaceUp;
   final double width;
@@ -26,7 +28,17 @@ class CardWidget extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final store = ref.watch(storeProvider);
+    final activeCard = StoreNotifier.allItems.firstWhere(
+      (i) => i.id == store.activeCardBackId, 
+      orElse: () => StoreNotifier.allItems[0]
+    );
+
+    final effectiveBackPath = customBackPath ?? activeCard.assetPath;
+    final effectiveFrontPath = customFrontPath ?? activeCard.frontSkinPath ?? 'assets/images/cards/premium/card_front_premium_bg.png';
+    final effectiveIllustrations = faceIllustrations ?? activeCard.faceIllustrations;
+
     if (!isFaceUp) {
       return GestureDetector(
         onTap: onTap,
@@ -43,7 +55,7 @@ class CardWidget extends StatelessWidget {
               cardBackContentBuilder: (context) => ClipRRect(
                 borderRadius: BorderRadius.circular(10),
                 child: Image.asset(
-                  customBackPath ?? 'assets/images/cards/premium/card_back_premium.png',
+                  effectiveBackPath,
                   fit: BoxFit.cover,
                 ),
               ),
@@ -79,7 +91,7 @@ class CardWidget extends StatelessWidget {
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(10),
                   child: Image.asset(
-                    customFrontPath ?? 'assets/images/cards/premium/card_front_premium_bg.png',
+                    effectiveFrontPath,
                     fit: BoxFit.cover,
                   ),
                 ),
@@ -87,7 +99,7 @@ class CardWidget extends StatelessWidget {
               // Face Card Illustration
                 Builder(
                   builder: (context) {
-                    final illustrationPath = _getIllustrationPath();
+                    final illustrationPath = _getIllustrationPath(effectiveIllustrations);
                     if (illustrationPath == null) return const SizedBox.shrink();
                     return Center(
                       child: Opacity(
@@ -100,7 +112,7 @@ class CardWidget extends StatelessWidget {
                     );
                   },
                 ),
-              _buildFrontOverlay(context, isFaceItem: _getIllustrationPath() != null),
+              _buildFrontOverlay(context, isFaceItem: _getIllustrationPath(effectiveIllustrations) != null, customFrontPath: effectiveFrontPath),
             ],
           ),
         ),
@@ -108,8 +120,7 @@ class CardWidget extends StatelessWidget {
     );
   }
 
-  String? _getIllustrationPath() {
-    final illustrations = faceIllustrations;
+  String? _getIllustrationPath(Map<String, String>? illustrations) {
     if (illustrations == null) return null;
     if (card.rank == game_card.Rank.king) return illustrations['king'];
     if (card.rank == game_card.Rank.queen) return illustrations['queen'] ?? illustrations['king'];
@@ -117,8 +128,8 @@ class CardWidget extends StatelessWidget {
     return null;
   }
 
-  Widget _buildFrontOverlay(BuildContext context, {bool isFaceItem = false}) {
-    final color = _getCardColor();
+  Widget _buildFrontOverlay(BuildContext context, {required bool isFaceItem, required String customFrontPath}) {
+    final color = _getCardColor(customFrontPath);
     final rankText = _getRankText();
     final suitIcon = _getSuitIcon();
 
@@ -161,13 +172,13 @@ class CardWidget extends StatelessWidget {
     );
   }
 
-  Color _getCardColor() {
+  Color _getCardColor(String customFrontPath) {
     // If it's Neon theme, maybe use Cyan/Pink? 
     // For now, let's stick to standard Red/Black but brightened for the theme.
     if (card.suit == game_card.Suit.hearts || card.suit == game_card.Suit.diamonds) {
-      return customFrontPath?.contains('neon') == true ? const Color(0xFFFF4081) : Colors.redAccent;
+      return customFrontPath.contains('neon') == true ? const Color(0xFFFF4081) : Colors.redAccent;
     } else {
-      return customFrontPath?.contains('neon') == true ? const Color(0xFF00E5FF) : Colors.black87;
+      return customFrontPath.contains('neon') == true ? const Color(0xFF00E5FF) : Colors.black87;
     }
   }
 
