@@ -9,6 +9,7 @@ class PlayerAvatar extends StatelessWidget {
   final DateTime? turnStartTime;
   final int timerDurationSeconds;
   final Color? teamColor;
+  final String? activeMessage;
 
   const PlayerAvatar({
     super.key,
@@ -19,6 +20,7 @@ class PlayerAvatar extends StatelessWidget {
     this.turnStartTime,
     this.timerDurationSeconds = 10,
     this.teamColor,
+    this.activeMessage,
   });
 
   @override
@@ -26,15 +28,56 @@ class PlayerAvatar extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        // Emoji Reaction Bubble
+        // Message/Emoji Bubble Container
         SizedBox(
-          height: 30,
-          child: AnimatedOpacity(
-            opacity: activeEmoji != null ? 1.0 : 0.0,
-            duration: const Duration(milliseconds: 300),
-            child: activeEmoji != null
-                ? Text(activeEmoji!, style: const TextStyle(fontSize: 24))
-                : const SizedBox.shrink(),
+          height: 40,
+          child: Stack(
+            alignment: Alignment.bottomCenter,
+            children: [
+              // Emoji Reaction
+              AnimatedOpacity(
+                opacity: activeEmoji != null && activeMessage == null ? 1.0 : 0.0,
+                duration: const Duration(milliseconds: 300),
+                child: activeEmoji != null
+                    ? Text(activeEmoji!, style: const TextStyle(fontSize: 24))
+                    : const SizedBox.shrink(),
+              ),
+              // Chat Message Bubble
+              AnimatedOpacity(
+                opacity: activeMessage != null ? 1.0 : 0.0,
+                duration: const Duration(milliseconds: 300),
+                child: activeMessage != null
+                    ? Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(color: Colors.black24, blurRadius: 4, offset: const Offset(0, 2))
+                          ],
+                        ),
+                        child: Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            Text(
+                              activeMessage!,
+                              style: const TextStyle(color: Colors.black87, fontSize: 13, fontWeight: FontWeight.bold),
+                            ),
+                            // Triangle pointer
+                            Positioned(
+                              bottom: -8,
+                              left: 10,
+                              child: CustomPaint(
+                                painter: TrianglePainter(color: Colors.white),
+                                size: const Size(12, 8),
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    : const SizedBox.shrink(),
+              ),
+            ],
           ),
         ),
         
@@ -132,4 +175,23 @@ class PlayerAvatar extends StatelessWidget {
       ],
     );
   }
+}
+
+class TrianglePainter extends CustomPainter {
+  final Color color;
+  TrianglePainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..color = color;
+    final path = Path();
+    path.moveTo(0, 0);
+    path.lineTo(size.width, 0);
+    path.lineTo(size.width / 2, size.height);
+    path.close();
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(CustomPainter oldDelegate) => false;
 }

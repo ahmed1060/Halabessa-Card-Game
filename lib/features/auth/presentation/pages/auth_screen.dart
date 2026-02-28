@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easy_localization/easy_localization.dart';
 
 import '../providers/auth_providers.dart';
+import '../../../../core/utils/error_handler.dart';
 
 class AuthScreen extends ConsumerStatefulWidget {
   const AuthScreen({super.key});
@@ -49,7 +50,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('error_general'.tr(args: [e.toString()]))),
+        SnackBar(content: Text(ErrorHandler.getAuthErrorMessage(e))),
       );
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -73,7 +74,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('error_general'.tr(args: [e.toString()]))),
+        SnackBar(content: Text(ErrorHandler.getAuthErrorMessage(e))),
       );
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -87,7 +88,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('error_general'.tr(args: [e.toString()]))),
+        SnackBar(content: Text(ErrorHandler.getAuthErrorMessage(e))),
       );
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -125,7 +126,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
               } catch (e) {
                 if (!dialogContext.mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('error_general'.tr(args: [e.toString()]))),
+                  SnackBar(content: Text(ErrorHandler.getAuthErrorMessage(e))),
                 );
               }
             },

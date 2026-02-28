@@ -1,6 +1,7 @@
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/foundation.dart';
 import '../../domain/models/match_state.dart';
+import '../../domain/models/chat_message.dart';
 import '../../../auth/domain/models/app_user.dart';
 
 class MultiplayerSyncService {
@@ -135,5 +136,30 @@ class MultiplayerSyncService {
     final friendSnap = await friendFriendsRef.get();
     final friendFriends = List<String>.from((friendSnap.value as List?) ?? [])..add(myUid);
     await friendFriendsRef.set(friendFriends);
+  }
+
+  /// CHAT: Send a message to the match chat
+  Future<void> sendChatMessage(String matchId, ChatMessage message) async {
+    final chatRef = _matchRef.child(matchId).child('chat').push();
+    await chatRef.set(message.toJson());
+  }
+
+  /// CHAT: Watch for new messages in a match
+  Stream<List<ChatMessage>> watchChatMessages(String matchId) {
+    return _matchRef.child(matchId).child('chat')
+      .orderByChild('timestamp')
+      .limitToLast(50)
+      .onValue.map((event) {
+        final value = event.snapshot.value;
+        if (value == null || value is! Map) return [];
+        
+        final Map<dynamic, dynamic> messages = value as Map<dynamic, dynamic>;
+        final sortedList = messages.entries.map((entry) {
+          return ChatMessage.fromJson(Map<String, dynamic>.from(entry.value), entry.key.toString());
+        }).toList();
+        
+        sortedList.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+        return sortedList;
+    });
   }
 }

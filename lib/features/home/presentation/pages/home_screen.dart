@@ -11,6 +11,8 @@ import 'package:halabessa/core/widgets/settings_overlay.dart';
 import 'package:halabessa/core/widgets/user_avatar.dart';
 import 'package:halabessa/core/theme/theme_config.dart';
 
+import 'package:halabessa/core/utils/error_handler.dart';
+
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
@@ -280,7 +282,7 @@ class HomeScreen extends ConsumerWidget {
                     } catch (e) {
                       debugPrint('Match init error: $e');
                       if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('firebase_warning'.tr(args: [e.toString()]))));
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(ErrorHandler.getAuthErrorMessage(e))));
                         Navigator.pushNamed(context, '/game');
                       }
                     }
@@ -303,7 +305,7 @@ class HomeScreen extends ConsumerWidget {
                     } catch (e) {
                       debugPrint('Match init error: $e');
                       if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('firebase_warning'.tr(args: [e.toString()]))));
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(ErrorHandler.getAuthErrorMessage(e))));
                         Navigator.pushNamed(context, '/game');
                       }
                     }

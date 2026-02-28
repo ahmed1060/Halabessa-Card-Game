@@ -11,9 +11,11 @@ import 'package:halabessa/features/game/presentation/widgets/card_widget.dart';
 import 'package:halabessa/features/game/presentation/widgets/player_avatar.dart';
 import 'package:halabessa/features/game/presentation/widgets/fanned_hand_widget.dart';
 import 'package:halabessa/features/game/domain/models/capture.dart';
+import 'package:halabessa/features/home/presentation/providers/store_provider.dart';
 import 'package:halabessa/core/theme/theme_config.dart';
 import 'package:halabessa/core/widgets/settings_overlay.dart';
-import 'package:halabessa/features/home/presentation/providers/store_provider.dart';
+import 'package:halabessa/features/game/presentation/providers/chat_providers.dart';
+import 'package:halabessa/features/game/presentation/widgets/chat_overlay.dart';
 
 class GameBoardScreen extends ConsumerWidget {
   const GameBoardScreen({super.key});
@@ -199,14 +201,7 @@ class GameBoardScreen extends ConsumerWidget {
           const SizedBox(width: 8),
           IconButton(
             icon: const Icon(Icons.settings, color: Colors.white70), 
-            onPressed: () {
-              showModalBottomSheet(
-                context: context,
-                isScrollControlled: true,
-                backgroundColor: Colors.transparent,
-                builder: (context) => const SettingsOverlay(),
-              );
-            },
+            onPressed: () => _showSettings(context),
           ),
         ],
       ),
@@ -253,6 +248,7 @@ class GameBoardScreen extends ConsumerWidget {
                       turnStartTime: matchState.turnStartTime,
                       timerDurationSeconds: matchState.timerDurationSeconds,
                       activeEmoji: _getPlayerEmoji(matchState, myUid, 2),
+                      activeMessage: ref.watch(lastMessageForUserProvider(matchState.playerIds.isEmpty ? '' : matchState.playerIds[(_getAbsoluteIndex(matchState, myUid, 2)) % matchState.playerIds.length]))?.text,
                       teamColor: _getTeamColorForOffset(matchState, myUid, 2),
                     ),
                   ),
@@ -267,6 +263,7 @@ class GameBoardScreen extends ConsumerWidget {
                     turnStartTime: matchState.turnStartTime,
                     timerDurationSeconds: matchState.timerDurationSeconds,
                     activeEmoji: _getPlayerEmoji(matchState, myUid, 1),
+                    activeMessage: ref.watch(lastMessageForUserProvider(matchState.playerIds.isEmpty ? '' : matchState.playerIds[(_getAbsoluteIndex(matchState, myUid, 1)) % matchState.playerIds.length]))?.text,
                     teamColor: _getTeamColorForOffset(matchState, myUid, 1),
                   ),
                 ),
@@ -280,47 +277,110 @@ class GameBoardScreen extends ConsumerWidget {
                     turnStartTime: matchState.turnStartTime,
                     timerDurationSeconds: matchState.timerDurationSeconds,
                     activeEmoji: _getPlayerEmoji(matchState, myUid, 3),
+                    activeMessage: ref.watch(lastMessageForUserProvider(matchState.playerIds.isEmpty ? '' : matchState.playerIds[(_getAbsoluteIndex(matchState, myUid, 3)) % matchState.playerIds.length]))?.text,
                     teamColor: _getTeamColorForOffset(matchState, myUid, 3),
                   ),
                 ),
 
-                // Harvest Stacks
+                // Harvest Stacks & Board Center
                 _buildTeamHarvestStack(matchState, 'teamA', isMyTeam: _getTeamOfPlayer(myUid, matchState.playerIds) == 'teamA'),
                 _buildTeamHarvestStack(matchState, 'teamB', isMyTeam: _getTeamOfPlayer(myUid, matchState.playerIds) == 'teamB'),
+                Center(child: _buildBoardCenter(context, ref, matchState, myUid)),
 
-                // Center Area (Harvest Stacks & Played Cards)
-                Center(
-                  child: _buildBoardCenter(context, ref, matchState, myUid),
-                ),
-
-                // Local Player (Bottom Center, Offset 0)
+                // Local Player (Bottom Center)
                 Align(
                   alignment: Alignment.bottomCenter,
                   child: _buildLocalPlayerArea(context, ref, matchState, myUid),
                 ),
 
-                // Phase indicator overlay
-                if (matchState.phase == GamePhase.waitingForPlayers)
-                  _buildLobbyOverlay(context, ref, matchState, myUid),
-                if (matchState.phase == GamePhase.preRoundCut)
-                  _buildCutOverlay(context, ref, matchState, myUid),
-                 if (matchState.phase == GamePhase.dealingFasha)
-                   _buildPhaseOverlay('dealing_cards'.tr()),
-                  if (matchState.phase == GamePhase.dealingCards)
-                    _buildPhaseOverlay('memorize_fasha'.tr(args: ['5']), alignment: const Alignment(0, -0.4)),
-                 if (matchState.phase == GamePhase.shuffleVoting)
-                   _buildShuffleVoteOverlay(context, ref, matchState, myUid),
-                if (matchState.phase == GamePhase.roundScoring)
-                   _buildContextualScoringOverlay(matchState, myUid),
-                 if (matchState.phase == GamePhase.rematchVoting)
-                   _buildRematchVoteOverlay(context, ref, matchState, myUid),
-                 if (matchState.phase == GamePhase.matchOver)
-                   _buildContextualGameOverOverlay(matchState, myUid),
+                // Phase Overlays
+                if (matchState.phase == GamePhase.waitingForPlayers) _buildLobbyOverlay(context, ref, matchState, myUid),
+                if (matchState.phase == GamePhase.preRoundCut) _buildCutOverlay(context, ref, matchState, myUid),
+                if (matchState.phase == GamePhase.dealingFasha) _buildPhaseOverlay('dealing_cards'.tr()),
+                if (matchState.phase == GamePhase.dealingCards) _buildPhaseOverlay('memorize_fasha'.tr(args: ['5']), alignment: const Alignment(0, -0.4)),
+                if (matchState.phase == GamePhase.shuffleVoting) _buildShuffleVoteOverlay(context, ref, matchState, myUid),
+                if (matchState.phase == GamePhase.roundScoring) _buildContextualScoringOverlay(matchState, myUid),
+                if (matchState.phase == GamePhase.rematchVoting) _buildRematchVoteOverlay(context, ref, matchState, myUid),
+                if (matchState.phase == GamePhase.matchOver) _buildContextualGameOverOverlay(matchState, myUid),
+                  
+                // Chat Toggle (Left Edge)
+                Positioned(
+                  left: 12,
+                  top: 0,
+                  bottom: 0,
+                  child: Center(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 20),
+                      decoration: BoxDecoration(
+                        color: Colors.black26,
+                        borderRadius: BorderRadius.circular(30),
+                        border: Border.all(color: Colors.white10),
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _buildSideButton(
+                            ref: ref,
+                            icon: Icons.chat_bubble_outline,
+                            onTap: () => ref.read(chatStateProvider.notifier).toggleOverlay(),
+                            showBadge: true,
+                          ),
+                          const SizedBox(height: 16),
+                          _buildSideButton(
+                            ref: ref,
+                            icon: Icons.settings_outlined,
+                            onTap: () => _showSettings(context),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
+          
+          // Chat Panel
+          const ChatOverlay(),
         ],
       ),
+    );
+  }
+
+  void _showSettings(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => const SettingsOverlay(),
+    );
+  }
+
+  Widget _buildSideButton({required WidgetRef ref, required IconData icon, required VoidCallback onTap, bool showBadge = false}) {
+    final unreadCount = ref.watch(unreadMessagesCountProvider);
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        IconButton(
+          icon: Icon(icon, color: Colors.white, size: 28),
+          onPressed: onTap,
+        ),
+        if (showBadge && unreadCount > 0)
+          Positioned(
+            right: 0,
+            top: 0,
+            child: Container(
+              padding: const EdgeInsets.all(4),
+              decoration: const BoxDecoration(color: ThemeConfig.accentPink, shape: BoxShape.circle),
+              constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+              child: Text(
+                unreadCount > 9 ? '9+' : '$unreadCount',
+                style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+      ],
     );
   }
 
@@ -532,6 +592,7 @@ class GameBoardScreen extends ConsumerWidget {
                     turnStartTime: matchState.turnStartTime,
                     timerDurationSeconds: matchState.timerDurationSeconds,
                     activeEmoji: matchState.playerEmojis[myUid],
+                    activeMessage: ref.watch(lastMessageForUserProvider(myUid))?.text,
                     teamColor: _getTeamColorForOffset(matchState, myUid, 0),
                   ),
                   const SizedBox(height: 8),

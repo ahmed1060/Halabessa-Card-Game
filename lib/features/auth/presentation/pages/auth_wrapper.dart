@@ -6,6 +6,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'auth_screen.dart';
 import '../providers/auth_providers.dart';
 import '../../../home/presentation/pages/home_screen.dart';
+import '../../../../core/utils/error_handler.dart';
 
 class AuthWrapper extends ConsumerWidget {
   const AuthWrapper({super.key});
@@ -28,7 +29,7 @@ class AuthWrapper extends ConsumerWidget {
       ),
       error: (error, stackTrace) => Scaffold(
         body: Center(
-          child: Text('error_general'.tr(args: [error.toString()])),
+          child: Text(ErrorHandler.getAuthErrorMessage(error)),
         ),
       ),
     );
