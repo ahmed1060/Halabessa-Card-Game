@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'card.dart' as game_card;
 import 'capture.dart';
 
-enum GamePhase { waitingForPlayers, preRoundCut, dealingFasha, dealingCards, playing, roundScoring, shuffleVoting, rematchVoting, matchOver }
+enum GamePhase { waitingForPlayers, preRoundCut, dealingFasha, dealingCards, playing, capturing, roundScoring, shuffleVoting, rematchVoting, matchOver }
 enum GameMode { classic, tafweet }
 
 class MatchState {
@@ -54,6 +54,11 @@ class MatchState {
   final Map<String, List<String>> skippedMatches;
   final List<game_card.Card> playHistory;
   final Map<String, bool> playerOnlineStatus;
+  
+  // Capturing Animation Meta
+  final List<game_card.Card> capturingCards;
+  final String? capturingTeam;
+  final int capturingStage; // 0: merge, 1: fly
 
   MatchState({
     required this.id,
@@ -86,6 +91,9 @@ class MatchState {
     this.skippedMatches = const {},
     this.playHistory = const [],
     this.playerOnlineStatus = const {},
+    this.capturingCards = const [],
+    this.capturingTeam,
+    this.capturingStage = 0,
   });
 
   MatchState copyWith({
@@ -119,6 +127,9 @@ class MatchState {
     Map<String, List<String>>? skippedMatches,
     List<game_card.Card>? playHistory,
     Map<String, bool>? playerOnlineStatus,
+    List<game_card.Card>? capturingCards,
+    String? capturingTeam,
+    int? capturingStage,
   }) {
     return MatchState(
       id: id ?? this.id,
@@ -151,6 +162,9 @@ class MatchState {
       skippedMatches: skippedMatches ?? this.skippedMatches,
       playHistory: playHistory ?? this.playHistory,
       playerOnlineStatus: playerOnlineStatus ?? this.playerOnlineStatus,
+      capturingCards: capturingCards ?? this.capturingCards,
+      capturingTeam: capturingTeam ?? this.capturingTeam,
+      capturingStage: capturingStage ?? this.capturingStage,
     );
   }
 
@@ -186,6 +200,9 @@ class MatchState {
       'isPublic': isPublic,
       'cardOwnership': cardOwnership,
       'playerOnlineStatus': playerOnlineStatus,
+      'capturingCards': capturingCards.map((c) => c.toJson()).toList(),
+      'capturingTeam': capturingTeam,
+      'capturingStage': capturingStage,
     };
   }
 
@@ -367,6 +384,9 @@ class MatchState {
         skippedMatches: parseSkipMap(json['skippedMatches']),
         playHistory: parseCards(json['playHistory']),
         playerOnlineStatus: playerOnlineStatus,
+        capturingCards: parseCards(json['capturingCards']),
+        capturingTeam: json['capturingTeam']?.toString(),
+        capturingStage: json['capturingStage'] is int ? json['capturingStage'] as int : 0,
       );
     } catch (e, stack) {
       debugPrint('RECOVERED MatchState.fromJson failure: $e');

@@ -1,0 +1,127 @@
+
+Compiling lib\main.dart for the Web...                          
+Target dart2js failed: ProcessException: Process exited abnormally with exit code 1:
+lib/features/game/domain/providers/game_providers.dart:882:7:
+Error: Expected a class member, but got 'catch'.
+    } catch (e, stack) {
+      ^^^^^
+lib/features/game/domain/providers/game_providers.dart:882:13:
+Error: Expected an identifier, but got '('.
+    } catch (e, stack) {
+            ^
+lib/features/game/domain/providers/game_providers.dart:946:1:
+Error: Expected a declaration, but got '}'.
+}
+^
+lib/features/game/presentation/pages/game_board_screen.dart:648:74:
+Error: The method 'voteShuffle' isn't defined for the class 'MatchStateNotifier'.
+ - 'MatchStateNotifier' is from 'package:halabessa/features/game/domain/providers/game_providers.dart' ('lib/features/game/domain/providers/game_providers.dart').
+                  onPressed: () => ref.read(matchStateProvider.notifier).voteShuffle(currentUid, true),
+                                                                         ^^^^^^^^^^^
+lib/features/game/presentation/pages/game_board_screen.dart:654:74:
+Error: The method 'voteShuffle' isn't defined for the class 'MatchStateNotifier'.
+ - 'MatchStateNotifier' is from 'package:halabessa/features/game/domain/providers/game_providers.dart' ('lib/features/game/domain/providers/game_providers.dart').
+                  onPressed: () => ref.read(matchStateProvider.notifier).voteShuffle(currentUid, false),
+                                                                         ^^^^^^^^^^^
+lib/features/game/presentation/pages/game_board_screen.dart:684:74:
+Error: The method 'voteRematch' isn't defined for the class 'MatchStateNotifier'.
+ - 'MatchStateNotifier' is from 'package:halabessa/features/game/domain/providers/game_providers.dart' ('lib/features/game/domain/providers/game_providers.dart').
+                  onPressed: () => ref.read(matchStateProvider.notifier).voteRematch(currentUid, true),
+                                                                         ^^^^^^^^^^^
+lib/features/game/presentation/pages/game_board_screen.dart:690:74:
+Error: The method 'voteRematch' isn't defined for the class 'MatchStateNotifier'.
+ - 'MatchStateNotifier' is from 'package:halabessa/features/game/domain/providers/game_providers.dart' ('lib/features/game/domain/providers/game_providers.dart').
+                  onPressed: () => ref.read(matchStateProvider.notifier).voteRematch(currentUid, false),
+                                                                         ^^^^^^^^^^^
+lib/features/game/domain/providers/game_providers.dart:889:27:
+Error: Undefined name 'state'.
+     final currentState = state;
+                          ^^^^^
+lib/features/game/domain/providers/game_providers.dart:901:9:
+Error: Setter not found: 'state'.
+        state = newState; 
+        ^^^^^
+lib/features/game/domain/providers/game_providers.dart:902:15:
+Error: Method not found: '_setupNewRound'.
+        await _setupNewRound(forceShuffle: forceShuffle);
+              ^^^^^^^^^^^^^^
+lib/features/game/domain/providers/game_providers.dart:904:15:
+Error: Method not found: '_publishState'.
+        await _publishState(newState);
+              ^^^^^^^^^^^^^
+lib/features/game/domain/providers/game_providers.dart:909:27:
+Error: Undefined name 'state'.
+     final currentState = state;
+                          ^^^^^
+lib/features/game/domain/providers/game_providers.dart:921:18:
+Error: Method not found: '_publishState'.
+           await _publishState(newState.copyWith(
+                 ^^^^^^^^^^^^^
+lib/features/game/domain/providers/game_providers.dart:930:18:
+Error: Method not found: '_setupNewRound'.
+           await _setupNewRound(isFirstRound: true);
+                 ^^^^^^^^^^^^^^
+lib/features/game/domain/providers/game_providers.dart:933:18:
+Error: Method not found: '_publishState'.
+           await _publishState(newState.copyWith(phase: GamePhase.matchOver));
+                 ^^^^^^^^^^^^^
+lib/features/game/domain/providers/game_providers.dart:936:15:
+Error: Method not found: '_publishState'.
+        await _publishState(newState);
+              ^^^^^^^^^^^^^
+lib/features/game/domain/providers/game_providers.dart:941:26:
+Error: Undefined name 'state'.
+    final currentState = state;
+                         ^^^^^
+/C:/Users/ahmed/AppData/Local/Pub/Cache/hosted/pub.dev/firebase_auth_platform_interface-7.4.4/lib/src/user_metadata.dart:22:45:
+Warning: Operand of null-aware operation '!' has type 'int' which excludes null.
+      : DateTime.fromMillisecondsSinceEpoch(_creationTimestamp!, isUtc: true);
+                                            ^
+/C:/Users/ahmed/AppData/Local/Pub/Cache/hosted/pub.dev/firebase_auth_platform_interface-7.4.4/lib/src/user_metadata.dart:32:45:
+Warning: Operand of null-aware operation '!' has type 'int' which excludes null.
+      : DateTime.fromMillisecondsSinceEpoch(_lastSignInTime!, isUtc: true);
+                                            ^
+Error: Compilation failed.
+  Command: C:\Users\ahmed\dev\flutter\bin\cache\dart-sdk\bin\dart.exe --disable-dart-dev C:\Users\ahmed\dev\flutter\bin\cache\dart-sdk\bin\snapshots\dart2js.dart.snapshot --platform-binaries=C:\Users\ahmed\dev\flutter\bin\cache\flutter_web_sdk\kernel --invoker=flutter_tool -Ddart.vm.product=true -DFLUTTER_WEB_AUTO_DETECT=true -DFLUTTER_WEB_CANVASKIT_URL=https://www.gstatic.com/flutter-canvaskit/e76c956498841e1ab458577d3892003e553e4f3c/ --native-null-assertions --no-source-maps -o D:\SHSD\Projects (Github)\Halabessa\Halabessa-Card-Game\.dart_tool\flutter_build\55f523216df6848392d4600006e0710a\app.dill --packages=.dart_tool/package_config.json --cfe-only D:\SHSD\Projects (Github)\Halabessa\Halabessa-Card-Game\.dart_tool\flutter_build\55f523216df6848392d4600006e0710a\main.dart
+#0      RunResult.throwException (package:flutter_tools/src/base/process.dart:127:5)
+#1      _DefaultProcessUtils.run (package:flutter_tools/src/base/process.dart:326:19)
+<asynchronous suspension>
+#2      Dart2JSTarget.build (package:flutter_tools/src/build_system/targets/web.dart:188:5)
+<asynchronous suspension>
+#3      _BuildInstance._invokeInternal (package:flutter_tools/src/build_system/build_system.dart:861:9)
+<asynchronous suspension>
+#4      Future.wait.<anonymous closure> (dart:async/future.dart:518:21)
+<asynchronous suspension>
+#5      _BuildInstance.invokeTarget (package:flutter_tools/src/build_system/build_system.dart:799:32)
+<asynchronous suspension>
+#6      Future.wait.<anonymous closure> (dart:async/future.dart:518:21)
+<asynchronous suspension>
+#7      _BuildInstance.invokeTarget (package:flutter_tools/src/build_system/build_system.dart:799:32)
+<asynchronous suspension>
+#8      FlutterBuildSystem.build (package:flutter_tools/src/build_system/build_system.dart:628:16)
+<asynchronous suspension>
+#9      WebBuilder.buildWeb (package:flutter_tools/src/web/compile.dart:93:34)
+<asynchronous suspension>
+#10     BuildWebCommand.runCommand (package:flutter_tools/src/commands/build_web.dart:200:5)
+<asynchronous suspension>
+#11     FlutterCommand.run.<anonymous closure> (package:flutter_tools/src/runner/flutter_command.dart:1389:27)
+<asynchronous suspension>
+#12     AppContext.run.<anonymous closure> (package:flutter_tools/src/base/context.dart:153:19)
+<asynchronous suspension>
+#13     CommandRunner.runCommand (package:args/command_runner.dart:212:13)
+<asynchronous suspension>
+#14     FlutterCommandRunner.runCommand.<anonymous closure> (package:flutter_tools/src/runner/flutter_command_runner.dart:355:9)
+<asynchronous suspension>
+#15     AppContext.run.<anonymous closure> (package:flutter_tools/src/base/context.dart:153:19)
+<asynchronous suspension>
+#16     FlutterCommandRunner.runCommand (package:flutter_tools/src/runner/flutter_command_runner.dart:295:5)
+<asynchronous suspension>
+#17     run.<anonymous closure>.<anonymous closure> (package:flutter_tools/runner.dart:119:9)
+<asynchronous suspension>
+#18     AppContext.run.<anonymous closure> (package:flutter_tools/src/base/context.dart:153:19)
+<asynchronous suspension>
+#19     main (package:flutter_tools/executable.dart:90:3)
+<asynchronous suspension>
+
+Compiling lib\main.dart for the Web...                             13.5s
+Error: Failed to compile application for the Web.

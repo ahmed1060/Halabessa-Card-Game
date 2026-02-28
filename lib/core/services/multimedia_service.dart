@@ -22,24 +22,33 @@ class MultimediaService {
 
   // Audio - Background Music
   Future<void> playMusic(String assetPath) async {
-    final settings = _ref.read(settingsProvider);
-    if (settings.isMusicEnabled) {
-      await _musicPlayer.play(AssetSource(assetPath));
+    try {
+      final settings = _ref.read(settingsProvider);
+      if (settings.isMusicEnabled) {
+        await _musicPlayer.play(AssetSource(assetPath));
+      }
+    } catch (e) {
+      debugPrint('MultimediaService: Failed to play music $assetPath: $e');
     }
   }
 
   Future<void> stopMusic() async {
-    await _musicPlayer.stop();
+    try {
+      await _musicPlayer.stop();
+    } catch (e) {
+      debugPrint('MultimediaService: Failed to stop music: $e');
+    }
   }
 
   // Audio - Sound Effects
   Future<void> playSfx(String assetPath) async {
-    final settings = _ref.read(settingsProvider);
-    if (settings.isSoundEnabled) {
-      // Create new player for overlapping sounds if needed, 
-      // but for simple card game, one SFX player is usually enough 
-      // or we can use dedicated players for specific events.
-      await _sfxPlayer.play(AssetSource(assetPath));
+    try {
+      final settings = _ref.read(settingsProvider);
+      if (settings.isSoundEnabled) {
+        await _sfxPlayer.play(AssetSource(assetPath));
+      }
+    } catch (e) {
+      debugPrint('MultimediaService: Failed to play SFX $assetPath: $e');
     }
   }
 

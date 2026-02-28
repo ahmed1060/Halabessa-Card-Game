@@ -151,5 +151,12 @@
     "achievement_welcome": "Welcome",
     "achievement_winner": "Winner",
     "tafweet_king": "Tafweet King",
-    "achievement_pro": "Pro"
+    "achievement_pro": "Pro",
+    "total_cards_count": "Total cards: {0}",
+    "harvest_details": "{0}'s Captures",
+    "no_captures_yet": "No captures yet.",
+    "select_target_score": "Select winning score:",
+    "target_score_21": "21 Points (Quick)",
+    "target_score_41": "41 Points (Standard)",
+    "target_score_61": "61 Points (Long)"
 }

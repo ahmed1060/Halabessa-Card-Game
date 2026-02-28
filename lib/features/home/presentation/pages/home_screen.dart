@@ -112,7 +112,7 @@ class HomeScreen extends ConsumerWidget {
                   const SizedBox(height: 16),
                   _buildMenuButton(
                     context, 
-                    label: 'Store', 
+                    label: 'store_label'.tr(), 
                     icon: Icons.shopping_bag_outlined,
                     onTap: () => Navigator.pushNamed(context, '/store'),
                     isPrimary: false,
@@ -196,6 +196,7 @@ class HomeScreen extends ConsumerWidget {
 
   void _showCreateRoomDialog(BuildContext context, WidgetRef ref, String playerId, String displayName) {
     int selectedTimerSeconds = 10; // Default is now 10. 0 represents Infinity
+    int selectedTargetScore = 41;
     bool isPublic = false;
 
     showDialog(
@@ -205,39 +206,58 @@ class HomeScreen extends ConsumerWidget {
           builder: (builderContext, setState) {
             return AlertDialog(
               title: Text('create_room'.tr()),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                   Text('select_timer'.tr()),
-                   const SizedBox(height: 8),
-                   DropdownButton<int>(
-                     value: selectedTimerSeconds,
-                     isExpanded: true,
-                     items: [
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('select_target_score'.tr()),
+                    const SizedBox(height: 8),
+                    DropdownButton<int>(
+                      value: selectedTargetScore,
+                      isExpanded: true,
+                      items: [
+                        DropdownMenuItem(value: 21, child: Text('target_score_21'.tr())),
+                        DropdownMenuItem(value: 41, child: Text('target_score_41'.tr())),
+                        DropdownMenuItem(value: 61, child: Text('target_score_61'.tr())),
+                      ],
+                      onChanged: (val) {
+                        if (val != null) {
+                          setState(() { selectedTargetScore = val; });
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    Text('select_timer'.tr()),
+                    const SizedBox(height: 8),
+                    DropdownButton<int>(
+                      value: selectedTimerSeconds,
+                      isExpanded: true,
+                      items: [
                         DropdownMenuItem(value: 5, child: Text('5_seconds'.tr())),
                         DropdownMenuItem(value: 10, child: Text('10_seconds_default'.tr())),
                         DropdownMenuItem(value: 15, child: Text('15_seconds'.tr())),
                         DropdownMenuItem(value: 0, child: Text('no_timer'.tr())),
-                     ],
-                     onChanged: (val) {
-                       if (val != null) {
-                         setState(() { selectedTimerSeconds = val; });
-                       }
-                     },
-                   ),
-                   const SizedBox(height: 16),
-                   Text('select_game_mode'.tr()),
-                   const SizedBox(height: 8),
-                   SwitchListTile(
-                     title: Text('public_room'.tr()),
-                     subtitle: Text('public_room_desc'.tr()),
-                     value: isPublic,
-                     onChanged: (val) {
-                       setState(() { isPublic = val; });
-                     },
-                   ),
-                ],
+                      ],
+                      onChanged: (val) {
+                        if (val != null) {
+                          setState(() { selectedTimerSeconds = val; });
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    Text('select_game_mode'.tr()),
+                    const SizedBox(height: 8),
+                    SwitchListTile(
+                      title: Text('public_room'.tr()),
+                      subtitle: Text('public_room_desc'.tr()),
+                      value: isPublic,
+                      onChanged: (val) {
+                        setState(() { isPublic = val; });
+                      },
+                    ),
+                  ],
+                ),
               ),
               actions: [
                 TextButton(
@@ -252,6 +272,7 @@ class HomeScreen extends ConsumerWidget {
                          playerId,
                          displayName,
                          GameMode.classic,
+                         maxPoints: selectedTargetScore,
                          timerDurationSeconds: selectedTimerSeconds,
                          isPublic: isPublic,
                       );
@@ -274,6 +295,7 @@ class HomeScreen extends ConsumerWidget {
                          playerId,
                          displayName,
                          GameMode.tafweet,
+                         maxPoints: selectedTargetScore,
                          timerDurationSeconds: selectedTimerSeconds,
                          isPublic: isPublic,
                       );

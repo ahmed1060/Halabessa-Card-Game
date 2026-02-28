@@ -40,7 +40,17 @@ class GameBoardScreen extends ConsumerWidget {
      }
      
      String targetUid = matchState.playerIds[targetIdx];
-     String targetName = matchState.playerNames[targetUid] ?? (targetUid.startsWith('bot_') ? 'bot_name'.tr() : 'player_default_name'.tr());
+     String rawName = matchState.playerNames[targetUid] ?? 
+         (targetUid.startsWith('bot_') ? 'bot_name_template' : 'player_default_name');
+     
+     String targetName;
+     if (rawName == 'bot_name_template') {
+       final bits = targetUid.split('_');
+       final num = bits.length > 1 ? bits[1] : '';
+       targetName = '${'bot_name'.tr()} $num';
+     } else {
+       targetName = rawName.tr();
+     }
      
      return AppUser(uid: targetUid, email: '', displayName: targetName);
   }
@@ -66,8 +76,17 @@ class GameBoardScreen extends ConsumerWidget {
 
   int _getAbsoluteIndex(MatchState state, String myUid, int offset) {
     int myIdx = state.playerIds.indexOf(myUid);
-    if (myIdx == -1) return offset;
+    if (myIdx == -1) return offset % 4;
     return (myIdx + offset) % 4;
+  }
+
+  Color? _getTeamColorForOffset(MatchState state, String myUid, int offset) {
+    if (state.playerIds.isEmpty) return null;
+    final absIdx = _getAbsoluteIndex(state, myUid, offset);
+    if (absIdx >= state.playerIds.length) return null;
+    
+    final team = _getTeamOfPlayer(state.playerIds[absIdx], state.playerIds);
+    return team == 'teamA' ? ThemeConfig.primaryTeal : ThemeConfig.goldAccent;
   }
 
   @override
@@ -150,7 +169,8 @@ class GameBoardScreen extends ConsumerWidget {
           Positioned.fill(
             child: Consumer(
               builder: (context, ref, child) {
-                final activeTable = ref.watch(storeProvider.notifier).activeTableSkin;
+                final store = ref.watch(storeProvider);
+                final activeTable = StoreNotifier.allItems.firstWhere((i) => i.id == store.activeTableSkinId, orElse: () => StoreNotifier.allItems[3]);
                 return Image.asset(
                   activeTable.assetPath,
                   fit: BoxFit.cover,
@@ -186,6 +206,7 @@ class GameBoardScreen extends ConsumerWidget {
                       turnStartTime: matchState.turnStartTime,
                       timerDurationSeconds: matchState.timerDurationSeconds,
                       activeEmoji: _getPlayerEmoji(matchState, myUid, 2),
+                      teamColor: _getTeamColorForOffset(matchState, myUid, 2),
                     ),
                   ),
                 ),
@@ -199,6 +220,7 @@ class GameBoardScreen extends ConsumerWidget {
                     turnStartTime: matchState.turnStartTime,
                     timerDurationSeconds: matchState.timerDurationSeconds,
                     activeEmoji: _getPlayerEmoji(matchState, myUid, 1),
+                    teamColor: _getTeamColorForOffset(matchState, myUid, 1),
                   ),
                 ),
 
@@ -211,6 +233,7 @@ class GameBoardScreen extends ConsumerWidget {
                     turnStartTime: matchState.turnStartTime,
                     timerDurationSeconds: matchState.timerDurationSeconds,
                     activeEmoji: _getPlayerEmoji(matchState, myUid, 3),
+                    teamColor: _getTeamColorForOffset(matchState, myUid, 3),
                   ),
                 ),
 
@@ -264,9 +287,32 @@ class GameBoardScreen extends ConsumerWidget {
         border: Border.all(color: Colors.white12),
       ),
       child: Center(
-        child: Text(
-          'score'.tr(args: [matchState.teamAScore.toString(), matchState.teamBScore.toString()]), 
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.amber)
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              matchState.teamAScore.toString(),
+              style: const TextStyle(
+                fontWeight: FontWeight.bold, 
+                fontSize: 16, 
+                color: ThemeConfig.primaryTeal,
+                shadows: [Shadow(color: ThemeConfig.primaryTeal, blurRadius: 8)],
+              ),
+            ),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 8.0),
+              child: Text(':', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.bold)),
+            ),
+            Text(
+              matchState.teamBScore.toString(),
+              style: const TextStyle(
+                fontWeight: FontWeight.bold, 
+                fontSize: 16, 
+                color: ThemeConfig.goldAccent,
+                shadows: [Shadow(color: ThemeConfig.goldAccent, blurRadius: 8)],
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -318,6 +364,9 @@ class GameBoardScreen extends ConsumerWidget {
   }
 
   Widget _buildBoardCenter(BuildContext context, WidgetRef ref, MatchState matchState, String myUid) {
+    final size = MediaQuery.sizeOf(context);
+    final isCapturing = matchState.phase == GamePhase.capturing;
+
     return SizedBox(
       width: 200,
       height: 200,
@@ -333,8 +382,30 @@ class GameBoardScreen extends ConsumerWidget {
           double targetX = (random.nextDouble() - 0.5) * 45;
           double targetY = (random.nextDouble() - 0.5) * 45;
           double rotation = (random.nextDouble() - 0.5) * 0.4;
+          double scale = 1.0;
 
-          if (matchState.phase == GamePhase.dealingCards) {
+          // Animation Logic for Capturing
+          if (isCapturing && matchState.capturingCards.any((c) => c.firebaseKey == card.firebaseKey)) {
+            if (matchState.capturingStage == 0) {
+              // stage 0: Symmetric Merge
+              targetX = 0;
+              targetY = 0;
+              rotation = 0;
+              scale = 1.25;
+            } else {
+              // stage 1: Fly to Harvest Box
+              final teamId = matchState.capturingTeam;
+              if (teamId == 'teamA') {
+                targetX = -size.width * 0.35;
+                targetY = size.height * 0.35;
+              } else {
+                targetX = size.width * 0.35;
+                targetY = -size.height * 0.35;
+              }
+              rotation = 1.5; // Tumble while flying
+              scale = 0.5; // Shrink as it goes to the box
+            }
+          } else if (matchState.phase == GamePhase.dealingCards) {
             targetX = (index - 1.5) * 70; 
             targetY = 0;
             rotation = 0;
@@ -362,8 +433,8 @@ class GameBoardScreen extends ConsumerWidget {
 
           return TweenAnimationBuilder<double>(
             key: ValueKey(card.firebaseKey),
-            duration: const Duration(milliseconds: 600),
-            curve: Curves.easeOutCubic,
+            duration: Duration(milliseconds: isCapturing ? 800 : 600),
+            curve: isCapturing ? Curves.easeInOutBack : Curves.easeOutCubic,
             tween: Tween(begin: 0.0, end: 1.0),
             builder: (context, value, child) {
               final currentX = startX * (1 - value) + targetX * value;
@@ -374,7 +445,7 @@ class GameBoardScreen extends ConsumerWidget {
                 child: Transform.rotate(
                   angle: rotation * value,
                   child: Transform.scale(
-                    scale: 0.8 + 0.2 * value,
+                    scale: (0.8 + 0.2 * value) * (isCapturing ? scale : 1.0),
                     child: child,
                   ),
                 ),
@@ -382,7 +453,8 @@ class GameBoardScreen extends ConsumerWidget {
             },
             child: Consumer(
               builder: (context, ref, child) {
-                final activeCard = ref.watch(storeProvider.notifier).activeCardBack;
+                final store = ref.watch(storeProvider);
+                final activeCard = StoreNotifier.allItems.firstWhere((i) => i.id == store.activeCardBackId, orElse: () => StoreNotifier.allItems[0]);
                 return CardWidget(
                   card: card, 
                   customBackPath: activeCard.assetPath,
@@ -417,6 +489,7 @@ class GameBoardScreen extends ConsumerWidget {
                     turnStartTime: matchState.turnStartTime,
                     timerDurationSeconds: matchState.timerDurationSeconds,
                     activeEmoji: matchState.playerEmojis[myUid],
+                    teamColor: _getTeamColorForOffset(matchState, myUid, 0),
                   ),
                   const SizedBox(height: 8),
                   _buildReactionBar(ref, myUid),
@@ -742,130 +815,137 @@ class GameBoardScreen extends ConsumerWidget {
   }
 }
 
-class HarvestStackWidget extends StatefulWidget {
+class HarvestStackWidget extends StatelessWidget {
   final List<Capture> captures;
   final String teamName;
 
   const HarvestStackWidget({super.key, required this.captures, required this.teamName});
 
   @override
-  State<HarvestStackWidget> createState() => _HarvestStackWidgetState();
+  Widget build(BuildContext context) {
+    int totalCards = captures.fold(0, (sum, cap) => sum + cap.capturedCards.length + 1);
+    
+    return GestureDetector(
+      onTap: () => _showHarvestDetails(context),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.black54,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.white12, width: 1),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 2)),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.inventory_2_outlined, color: ThemeConfig.goldAccent, size: 16),
+            const SizedBox(width: 8),
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(teamName, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                Text('total_cards_count'.tr(args: [totalCards.toString()]), 
+                  style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 9)),
+              ],
+            ),
+            const SizedBox(width: 8),
+            const Icon(Icons.open_in_full, color: Colors.white24, size: 12),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showHarvestDetails(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => HarvestDetailsOverlay(captures: captures, teamName: teamName),
+    );
+  }
 }
 
-class _HarvestStackWidgetState extends State<HarvestStackWidget> {
-  bool isExpanded = false;
+class HarvestDetailsOverlay extends StatelessWidget {
+  final List<Capture> captures;
+  final String teamName;
+
+  const HarvestDetailsOverlay({super.key, required this.captures, required this.teamName});
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () => setState(() => isExpanded = !isExpanded),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        padding: const EdgeInsets.all(10),
-        constraints: const BoxConstraints(maxWidth: 220),
-        decoration: BoxDecoration(
-          color: Colors.black45,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.white12, width: 1),
-          boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 10, offset: const Offset(0, 4)),
-          ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.inventory_2_outlined, color: ThemeConfig.goldAccent, size: 14),
-                const SizedBox(width: 4),
-                Text(widget.teamName, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
-                const Spacer(),
-                Icon(isExpanded ? Icons.expand_less : Icons.expand_more, color: Colors.white38, size: 16),
-              ],
-            ),
-            const SizedBox(height: 8),
-            if (!isExpanded)
-              _buildCompactView()
-            else
-              _buildExpandedView(),
-          ],
-        ),
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.75,
+      decoration: const BoxDecoration(
+        color: Color(0xFF0D1B2A),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-    );
-  }
-
-  Widget _buildCompactView() {
-    if (widget.captures.isEmpty) return const SizedBox.shrink();
-    final lastCapture = widget.captures.last;
-    return SizedBox(
-      height: 90,
-      child: Stack(
+      child: Column(
         children: [
-          ...List.generate(min(3, lastCapture.capturedCards.length + 2), (idx) => Positioned(
-            left: idx * 4.0,
-            top: idx * 2.0,
+          // Handle
+          Center(
             child: Container(
-              width: 55,
-              height: 75,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(6),
-                border: Border.all(color: Colors.white10, width: 1),
-                boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 2)],
-              ),
-              child: Consumer(
-                builder: (context, ref, _) {
-                  final activeCard = ref.watch(storeProvider.notifier).activeCardBack;
-                  return ClipRRect(
-                    borderRadius: BorderRadius.circular(6),
-                    child: Image.asset(activeCard.assetPath, fit: BoxFit.cover),
-                  );
-                },
-              ),
-            ),
-          )),
-          Positioned(
-            left: 12,
-            top: 6,
-            child: Transform.rotate(
-              angle: 0.05,
-              child: SizedBox(
-                width: 55,
-                height: 75,
-                child: CardWidget(card: lastCapture.leadingCard),
-              ),
+              margin: const EdgeInsets.symmetric(vertical: 12),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)),
             ),
           ),
+          
+          Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Row(
+              children: [
+                const Icon(Icons.inventory_2_outlined, color: ThemeConfig.goldAccent),
+                const SizedBox(width: 12),
+                Text(
+                  'harvest_details'.tr(args: [teamName]),
+                  style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold, fontFamily: ThemeConfig.fontHeading),
+                ),
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.close, color: Colors.white54),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+          ),
+          
+          Expanded(
+            child: captures.isEmpty
+                ? Center(child: Text('no_captures_yet'.tr(), style: const TextStyle(color: Colors.white38)))
+                : GridView.builder(
+                    padding: const EdgeInsets.all(16),
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 3,
+                      childAspectRatio: 0.7,
+                      crossAxisSpacing: 16,
+                      mainAxisSpacing: 16,
+                    ),
+                    itemCount: captures.length,
+                    itemBuilder: (context, index) {
+                      final cap = captures[index];
+                      return Column(
+                        children: [
+                          Expanded(child: CardWidget(card: cap.leadingCard)),
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(6)),
+                            child: Text(
+                              '+${cap.capturedCards.length}',
+                              style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+          ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildExpandedView() {
-    return SizedBox(
-      height: 110,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: widget.captures.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 12),
-        itemBuilder: (context, index) {
-          final cap = widget.captures[index];
-          return Column(
-            children: [
-              SizedBox(
-                width: 50,
-                height: 70,
-                child: CardWidget(card: cap.leadingCard),
-              ),
-              const SizedBox(height: 4),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(4)),
-                child: Text('+${cap.capturedCards.length}', style: const TextStyle(color: Colors.white, fontSize: 10)),
-              ),
-            ],
-          );
-        },
       ),
     );
   }

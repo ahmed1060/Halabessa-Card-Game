@@ -17,8 +17,8 @@ class CardWidget extends StatelessWidget {
     super.key,
     required this.card,
     this.isFaceUp = true,
-    this.width = 70,
-    this.height = 100,
+    this.width = 84,
+    this.height = 120,
     this.onTap,
     this.customBackPath,
     this.customFrontPath,
@@ -85,15 +85,20 @@ class CardWidget extends StatelessWidget {
                 ),
               ),
               // Face Card Illustration
-              if (_getIllustrationPath() != null)
-                Center(
-                  child: Opacity(
-                    opacity: 0.8,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 18.0),
-                      child: Image.asset(_getIllustrationPath()!, fit: BoxFit.contain),
-                    ),
-                  ),
+                Builder(
+                  builder: (context) {
+                    final illustrationPath = _getIllustrationPath();
+                    if (illustrationPath == null) return const SizedBox.shrink();
+                    return Center(
+                      child: Opacity(
+                        opacity: 0.8,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 18.0),
+                          child: Image.asset(illustrationPath, fit: BoxFit.contain),
+                        ),
+                      ),
+                    );
+                  },
                 ),
               _buildFrontOverlay(context, isFaceItem: _getIllustrationPath() != null),
             ],
@@ -104,10 +109,11 @@ class CardWidget extends StatelessWidget {
   }
 
   String? _getIllustrationPath() {
-    if (faceIllustrations == null) return null;
-    if (card.rank == game_card.Rank.king) return faceIllustrations!['king'];
-    if (card.rank == game_card.Rank.queen) return faceIllustrations!['queen'] ?? faceIllustrations!['king'];
-    if (card.rank == game_card.Rank.jack) return faceIllustrations!['jack'] ?? faceIllustrations!['king'];
+    final illustrations = faceIllustrations;
+    if (illustrations == null) return null;
+    if (card.rank == game_card.Rank.king) return illustrations['king'];
+    if (card.rank == game_card.Rank.queen) return illustrations['queen'] ?? illustrations['king'];
+    if (card.rank == game_card.Rank.jack) return illustrations['jack'] ?? illustrations['king'];
     return null;
   }
 

@@ -45,6 +45,8 @@ dependencies:
   flutter_facebook_auth: ^7.1.0
   shared_preferences: ^2.2.3
   audioplayers: ^6.1.0
+  cloud_firestore: ^5.4.0
+  quiver: ^3.2.1
 
 dev_dependencies:
   flutter_test:
@@ -73,15 +75,4 @@ flutter:
     - assets/images/cards/royal/
     - assets/images/tables/
 
-  fonts:
-    - family: Righteous
-      fonts:
-        - asset: assets/fonts/Righteous-Regular.ttf
-    - family: Outfit
-      fonts:
-        - asset: assets/fonts/Outfit-Regular.ttf
-        - asset: assets/fonts/Outfit-Bold.ttf
-          weight: 700
-    - family: Cairo
-      fonts:
-        - asset: assets/fonts/Cairo.ttf
+  # Fonts are provided via Google Fonts CDN in web/index.html to ensure Safari compatibility and avoid duplication errors.

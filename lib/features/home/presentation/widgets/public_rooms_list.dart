@@ -51,7 +51,7 @@ class PublicRoomsList extends ConsumerWidget {
                   style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                 ),
                 subtitle: Text(
-                  'Players: ${match.playerIds.length}/4 | Room: ${match.id}',
+                  'room_players_info'.tr(args: [match.playerIds.length.toString(), match.id]),
                   style: const TextStyle(color: Colors.white70),
                 ),
                 trailing: ElevatedButton(

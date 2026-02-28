@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -14,16 +15,31 @@ class FirebaseAuthRepository implements AuthRepository {
 
   Future<void> _syncUserToDatabase(AppUser user) async {
     try {
-      final ref = FirebaseDatabase.instance.ref('users').child(user.uid);
-      // Use update to avoid overwriting friends/invites if they exist
-      await ref.update({
+      final docRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
+      
+      // Check if user exists to preserve stats, or initialize if new
+      final doc = await docRef.get();
+      if (!doc.exists) {
+        await docRef.set(user.toJson());
+      } else {
+        // Only update basic profile info, preserving scores/stats
+        await docRef.update({
+          'displayName': user.displayName,
+          'email': user.email,
+          'avatarUrl': user.avatarUrl,
+        });
+      }
+
+      // Legacy Sync: Keep RTDB for presence/lobby lookups if needed, 
+      // but only the bare minimum.
+      final rtdbRef = FirebaseDatabase.instance.ref('users').child(user.uid);
+      await rtdbRef.update({
         'displayName': user.displayName,
         'email': user.email,
         'avatarUrl': user.avatarUrl,
       });
     } catch (e) {
-      debugPrint("User Sync failed (likely due to rules): $e");
-      // Don't rethrow, let the user login even if profile sync fails
+      debugPrint("User Sync failed: $e");
     }
   }
 
@@ -41,7 +57,24 @@ class FirebaseAuthRepository implements AuthRepository {
 
   @override
   Stream<AppUser?> get authStateChanges {
-    return _firebaseAuth.userChanges().map(_userFromFirebase);
+    return _firebaseAuth.userChanges().asyncMap((firebaseUser) async {
+      if (firebaseUser == null) return null;
+      
+      try {
+        final doc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(firebaseUser.uid)
+            .get();
+            
+        if (doc.exists && doc.data() != null) {
+          return AppUser.fromJson(doc.data()!, firebaseUser.uid);
+        }
+      } catch (e) {
+        debugPrint("Error fetching Firestore user: $e");
+      }
+      
+      return _userFromFirebase(firebaseUser);
+    });
   }
 
   @override

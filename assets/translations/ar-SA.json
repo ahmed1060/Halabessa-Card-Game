@@ -151,5 +151,12 @@
     "achievement_welcome": "مرحباً بك",
     "achievement_winner": "فائز",
     "tafweet_king": "ملك التفويت",
-    "achievement_pro": "محترف"
+    "achievement_pro": "محترف",
+    "total_cards_count": "إجمالي البطاقات: {0}",
+    "harvest_details": "مكتسبات {0}",
+    "no_captures_yet": "لا توجد مكتسبات بعد.",
+    "select_target_score": "اختر نقاط الفوز:",
+    "target_score_21": "21 نقطة (سريع)",
+    "target_score_41": "41 نقطة (قياسي)",
+    "target_score_61": "61 نقطة (طويل)"
 }

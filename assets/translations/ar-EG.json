@@ -151,5 +151,12 @@
     "achievement_welcome": "نورتنا",
     "achievement_winner": "كسبان",
     "tafweet_king": "ملك التفويت",
-    "achievement_pro": "محترف"
+    "achievement_pro": "محترف",
+    "total_cards_count": "إجمالي الورق: {0}",
+    "harvest_details": "مكتسبات {0}",
+    "no_captures_yet": "مفيش لمات لسه.",
+    "select_target_score": "اختار نقط الفوز:",
+    "target_score_21": "21 نقطة (سريع)",
+    "target_score_41": "41 نقطة (عادي)",
+    "target_score_61": "61 نقطة (طويل)"
 }
