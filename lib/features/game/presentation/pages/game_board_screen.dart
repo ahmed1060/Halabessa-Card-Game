@@ -541,7 +541,22 @@ class GameBoardScreen extends ConsumerWidget {
               if (relativeIdx == 1) { startX = -400; startY = 0; }
               else if (relativeIdx == 2) { startX = 0; startY = -400; }
               else if (relativeIdx == 3) { startX = 400; startY = 0; }
-              else if (relativeIdx == 0) { startX = 0; startY = 400; }
+              else if (relativeIdx == 0) { 
+                // Local player: Check for specific click origin
+                final localOrigins = ref.watch(localPlayOriginsProvider);
+                final customOrigin = localOrigins[card.firebaseKey];
+                if (customOrigin != null) {
+                  // The origin is relative to the FannedHandWidget center.
+                  // We need to translate it to our coordinate system (BoardCenter-relative).
+                  // FannedHandWidget is bottom-center, but shifted right by the avatar.
+                  // Static estimate for now, can be refined with GlobalKeys if needed.
+                  startX = customOrigin.dx + 40; // Shift right of center
+                  startY = customOrigin.dy + 350; // Near bottom
+                } else {
+                  startX = 0; 
+                  startY = 400; 
+                }
+              }
             }
           }
 
@@ -606,8 +621,8 @@ class GameBoardScreen extends ConsumerWidget {
                   cards: matchState.handCards[myUid] ?? [],
                   isMyTurn: matchState.playerIds.isNotEmpty && 
                            matchState.currentTurnIndex == _getAbsoluteIndex(matchState, myUid, 0),
-                  onCardTap: (card) {
-                    ref.read(matchStateProvider.notifier).playCard(myUid, card);
+                  onCardTap: (card, origin) {
+                    ref.read(matchStateProvider.notifier).playCard(myUid, card, origin: origin);
                   },
                 ),
             ],

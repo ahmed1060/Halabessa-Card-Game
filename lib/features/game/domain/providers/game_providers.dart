@@ -11,9 +11,9 @@ import '../../domain/models/card.dart' as game_card;
 import '../../domain/logic/deck.dart';
 import '../../domain/logic/game_engine_utils.dart';
 import '../../data/repositories/multiplayer_sync_service.dart';
-import 'package:flutter/foundation.dart';
 import '../../../../features/auth/presentation/providers/auth_providers.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
+import 'package:flutter/material.dart';
 import 'package:halabessa/core/services/multimedia_service.dart';
 
 final multiplayerSyncServiceProvider = Provider<MultiplayerSyncService>((ref) {
@@ -23,6 +23,8 @@ final multiplayerSyncServiceProvider = Provider<MultiplayerSyncService>((ref) {
   // For Halabessa, we use the default RTDB from the google-services/FirebaseOptions.
   return MultiplayerSyncService(db);
 });
+
+final localPlayOriginsProvider = StateProvider<Map<String, Offset>>((ref) => {});
 
 class MatchStateNotifier extends StateNotifier<MatchState?> {
   final Ref ref;
@@ -779,11 +781,15 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     await _publishState(currentState.copyWith(playerEmojis: emojis));
   }
 
-  Future<void> playCard(String playerId, game_card.Card card) async {
+  Future<void> playCard(String playerId, game_card.Card card, {Offset? origin}) async {
     try {
       final currentState = state;
       if (currentState == null || currentState.phase != GamePhase.playing) return;
       
+      if (origin != null) {
+        ref.read(localPlayOriginsProvider.notifier).update((m) => {...m, card.firebaseKey: origin});
+      }
+
       // Validate turn
       if (currentState.playerIds[currentState.currentTurnIndex] != playerId) return;
 

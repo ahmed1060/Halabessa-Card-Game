@@ -1,0 +1,5 @@
+Analyzing Halabessa-Card-Game...                                
+
+   info - The import of 'package:flutter/foundation.dart' is unnecessary because all of the used elements are also provided by the import of 'package:flutter/material.dart' - lib\features\game\domain\providers\game_providers.dart:14:8 - unnecessary_import
+
+1 issue found. (ran in 2.2s)
