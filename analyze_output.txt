@@ -1,12 +1,9 @@
 Analyzing Halabessa-Card-Game...                                
 
-warning - Unused import: 'package:easy_localization/easy_localization.dart' - lib\features\auth\presentation\pages\auth_wrapper.dart:4:8 - unused_import
-   info - Unnecessary cast - lib\features\game\data\repositories\multiplayer_sync_service.dart:156:48 - unnecessary_cast
-warning - Unused import: 'package:cloud_firestore/cloud_firestore.dart' - lib\features\game\domain\models\chat_message.dart:1:8 - unused_import
-  error - Target of URI doesn't exist: '../../auth/presentation/providers/auth_providers.dart' - lib\features\game\presentation\widgets\chat_overlay.dart:5:8 - uri_does_not_exist
-  error - Undefined name 'currentUserProvider' - lib\features\game\presentation\widgets\chat_overlay.dart:25:34 - undefined_identifier
-   info - Use 'const' literals as arguments to constructors of '@immutable' classes - lib\features\game\presentation\widgets\chat_overlay.dart:64:22 - prefer_const_literals_to_create_immutables
-   info - Use 'const' with the constructor to improve performance - lib\features\game\presentation\widgets\chat_overlay.dart:65:13 - prefer_const_constructors
-  error - Undefined name 'currentUserProvider' - lib\features\game\presentation\widgets\chat_overlay.dart:135:63 - undefined_identifier
-   info - Use 'const' with the constructor to improve performance - lib\features\game\presentation\widgets\chat_overlay.dart:217:86 - prefer_const_constructors
+  error - 'playerOnlineStatus' isn't a field in the enclosing class - lib\features\game\domain\models\match_state.dart:92:7 - initializing_formal_for_non_existent_field
+  error - The getter 'playerOnlineStatus' isn't defined for the type 'MatchState' - lib\features\game\domain\models\match_state.dart:165:54 - undefined_getter
+  error - Undefined name 'playerOnlineStatus' - lib\features\game\domain\models\match_state.dart:204:29 - undefined_identifier
+  error - The getter 'playerOnlineStatus' isn't defined for the type 'MatchState' - lib\features\game\domain\providers\game_providers.dart:147:67 - undefined_getter
+  error - The getter 'playerOnlineStatus' isn't defined for the type 'MatchState' - lib\features\game\domain\providers\game_providers.dart:270:41 - undefined_getter
+  error - The getter 'playerOnlineStatus' isn't defined for the type 'MatchState' - lib\features\game\domain\providers\game_providers.dart:278:30 - undefined_getter
 

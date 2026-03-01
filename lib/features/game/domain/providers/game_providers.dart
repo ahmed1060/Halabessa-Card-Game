@@ -495,7 +495,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
       mode: mode,
       maxPoints: maxPoints,
       isPublic: isPublic,
-      playerIds: [playerId],
+      playerIds: [playerId, "waiting_1", "waiting_2", "waiting_3"],
       playerNames: {playerId: displayName},
       dealerIndex: 0,
       currentTurnIndex: 1, // Player after dealer starts
@@ -531,13 +531,29 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     
     // Add player to the list if not already there
     if (!serverState.playerIds.contains(playerId)) {
-       final newPlayers = List<String>.from(serverState.playerIds)..add(playerId);
-       final newNames = Map<String, String>.from(serverState.playerNames)..[playerId] = displayName;
+       final newPlayers = List<String>.from(serverState.playerIds);
+       final newNames = Map<String, String>.from(serverState.playerNames);
        
-       await matchRef.update({
-         'playerIds': newPlayers,
-         'playerNames': newNames,
-       });
+       // Index 0: Host, Index 2: Partner
+       // Index 1, 3: Opponents
+       int targetIdx = -1;
+       if (newPlayers[2].startsWith('waiting_')) {
+         targetIdx = 2; // Partner seat first
+       } else if (newPlayers[1].startsWith('waiting_')) {
+         targetIdx = 1;
+       } else if (newPlayers[3].startsWith('waiting_')) {
+         targetIdx = 3;
+       }
+
+       if (targetIdx != -1) {
+         newPlayers[targetIdx] = playerId;
+         newNames[playerId] = displayName;
+         
+         await matchRef.update({
+           'playerIds': newPlayers,
+           'playerNames': newNames,
+         });
+       }
     }
   }
 
@@ -552,21 +568,23 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     
     // Check if ALL currently connected humans are Ready
     if (votes.length == newState.playerIds.length) {
-       // Unanimous Human Consent reached! Generate bots for empty seats.
-       final finalPlayers = List<String>.from(newState.playerIds);
-       final finalNames = Map<String, String>.from(newState.playerNames);
-       int botCount = 1;
-       while (finalPlayers.length < 4) {
-          String botId = 'bot_$botCount';
-          finalPlayers.add(botId);
-          finalNames[botId] = 'bot_name_template'; // Use a key for translation
-          botCount++;
-       }
-       state = newState.copyWith(
-         playerIds: finalPlayers, 
-         playerNames: finalNames,
-         botInjectionVotes: {}
-       );
+        // Unanimous Human Consent reached! Generate bots for empty seats.
+        final finalPlayers = List<String>.from(newState.playerIds);
+        final finalNames = Map<String, String>.from(newState.playerNames);
+        
+        for (int i = 0; i < finalPlayers.length; i++) {
+          if (finalPlayers[i].startsWith('waiting_')) {
+            final botId = 'bot_${100 + i}_${DateTime.now().millisecond}';
+            finalPlayers[i] = botId;
+            finalNames[botId] = 'bot_name_template'; 
+          }
+        }
+        
+        state = newState.copyWith(
+          playerIds: finalPlayers, 
+          playerNames: finalNames,
+          botInjectionVotes: {}
+        );
        _setupNewRound(isFirstRound: true);
     } else {
        _publishState(newState);
@@ -629,10 +647,22 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
       _multimedia.vibrate();
     }
 
+    // "The Last Card" (الاخر) is the first card in our Deck list (bottom of deck)
+    final lastCard = _secretDeck?.cards.first;
+
     await _publishState(currentState.copyWith(
       deckCount: _secretDeck?.cards.length ?? 0,
-      phase: GamePhase.dealingFasha,
+      phase: GamePhase.dealingFasha, // We transition to dealingFasha which triggers the 2s reveal in UI
+      cutLastCard: lastCard,
     ));
+
+    // Wait 2 seconds for the reveal before starting the deal
+    Future.delayed(const Duration(seconds: 2), () {
+      if (state?.id == currentState.id) {
+         state = state?.copyWith(cutLastCard: null);
+         dealInitialCards();
+      }
+    });
   }
 
   Future<void> dealInitialCards() async {

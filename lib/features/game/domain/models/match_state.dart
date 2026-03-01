@@ -11,6 +11,7 @@ class MatchState {
   final int maxPoints; // 21, 41, 61
   
   // Players Array: [T1_P1, T2_P1, T1_P2, T2_P2] -> [0, 1, 2, 3]
+  // Anticlockwise Visual Seats: Bottom(0) -> Right(1) -> Top(2) -> Left(3)
   // Teams: A is indices [0, 2], B is indices [1, 3]
   final List<String> playerIds;
   final Map<String, String> playerNames; // Synced ID -> DisplayName
@@ -54,47 +55,47 @@ class MatchState {
   final Map<String, List<String>> skippedMatches;
   final List<game_card.Card> playHistory;
   final Map<String, bool> playerOnlineStatus;
-  
-  // Capturing Animation Meta
   final List<game_card.Card> capturingCards;
   final String? capturingTeam;
   final int capturingStage; // 0: merge, 1: fly
-
-  MatchState({
-    required this.id,
-    required this.mode,
-    this.maxPoints = 41,
-    required this.playerIds,
-    this.board = const [],
-    this.recentFasha = const [],
-    this.handCards = const {},
-    this.harvestStacks = const {'teamA': [], 'teamB': []},
-    this.teamAScore = 0,
-    this.teamBScore = 0,
-    required this.dealerIndex,
-    required this.currentTurnIndex,
-    this.phase = GamePhase.preRoundCut,
-    this.lastCaptureTeam,
-    this.roundCount = 1,
-    this.roundsSinceLastShuffle = 0,
-    this.consecutiveTafweetCount = 0,
-    this.turnStartTime,
-    this.timerDurationSeconds = 10,
-    this.playerEmojis = const {},
-    this.shuffleVotes = const {},
-    this.rematchVotes = const {},
-    this.botInjectionVotes = const {},
-    this.playerNames = const {},
-    this.isPublic = false,
-    this.cardOwnership = const {},
-    this.deckCount = 0,
-    this.skippedMatches = const {},
-    this.playHistory = const [],
-    this.playerOnlineStatus = const {},
-    this.capturingCards = const [],
-    this.capturingTeam,
-    this.capturingStage = 0,
-  });
+  final game_card.Card? cutLastCard; // Revealed card after cut (The Last Card / الاخر)
+  
+    MatchState({
+      required this.id,
+      required this.mode,
+      this.maxPoints = 41,
+      required this.playerIds,
+      this.board = const [],
+      this.recentFasha = const [],
+      this.handCards = const {},
+      this.harvestStacks = const {'teamA': [], 'teamB': []},
+      this.teamAScore = 0,
+      this.teamBScore = 0,
+      required this.dealerIndex,
+      required this.currentTurnIndex,
+      this.phase = GamePhase.preRoundCut,
+      this.lastCaptureTeam,
+      this.roundCount = 1,
+      this.roundsSinceLastShuffle = 0,
+      this.consecutiveTafweetCount = 0,
+      this.turnStartTime,
+      this.timerDurationSeconds = 10,
+      this.playerEmojis = const {},
+      this.shuffleVotes = const {},
+      this.rematchVotes = const {},
+      this.botInjectionVotes = const {},
+      this.playerNames = const {},
+      this.isPublic = false,
+      this.cardOwnership = const {},
+      this.deckCount = 0,
+      this.skippedMatches = const {},
+      this.playHistory = const [],
+      this.playerOnlineStatus = const {},
+      this.capturingCards = const [],
+      this.capturingTeam,
+      this.capturingStage = 0,
+      this.cutLastCard,
+    });
 
   MatchState copyWith({
     String? id,
@@ -130,6 +131,7 @@ class MatchState {
     List<game_card.Card>? capturingCards,
     String? capturingTeam,
     int? capturingStage,
+    game_card.Card? cutLastCard,
   }) {
     return MatchState(
       id: id ?? this.id,
@@ -165,6 +167,7 @@ class MatchState {
       capturingCards: capturingCards ?? this.capturingCards,
       capturingTeam: capturingTeam ?? this.capturingTeam,
       capturingStage: capturingStage ?? this.capturingStage,
+      cutLastCard: cutLastCard ?? this.cutLastCard,
     );
   }
 
@@ -203,6 +206,7 @@ class MatchState {
       'capturingCards': capturingCards.map((c) => c.toJson()).toList(),
       'capturingTeam': capturingTeam,
       'capturingStage': capturingStage,
+      'cutLastCard': cutLastCard?.toJson(),
     };
   }
 
@@ -387,6 +391,7 @@ class MatchState {
         capturingCards: parseCards(json['capturingCards']),
         capturingTeam: json['capturingTeam']?.toString(),
         capturingStage: json['capturingStage'] is int ? json['capturingStage'] as int : 0,
+        cutLastCard: json['cutLastCard'] != null ? game_card.Card.fromJson(Map<String, dynamic>.from(json['cutLastCard'])) : null,
       );
     } catch (e, stack) {
       debugPrint('RECOVERED MatchState.fromJson failure: $e');

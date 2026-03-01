@@ -7,6 +7,7 @@ import 'package:halabessa/features/game/domain/providers/game_providers.dart';
 import 'package:halabessa/features/game/domain/models/match_state.dart';
 import 'package:halabessa/features/auth/presentation/providers/auth_providers.dart';
 import 'package:halabessa/features/auth/domain/models/app_user.dart';
+import 'package:halabessa/features/game/domain/models/card.dart' as game_card;
 import 'package:halabessa/features/game/presentation/widgets/card_widget.dart';
 import 'package:halabessa/features/game/presentation/widgets/player_avatar.dart';
 import 'package:halabessa/features/game/presentation/widgets/fanned_hand_widget.dart';
@@ -254,23 +255,9 @@ class GameBoardScreen extends ConsumerWidget {
                   ),
                 ),
 
-                // Left Player (Offset 1)
+                // Left Player (Offset 3 in Anticlockwise)
                 Align(
                   alignment: const Alignment(-0.95, -0.1),
-                  child: PlayerAvatar(
-                    user: _getAvatarUser(ref, matchState, myUid, 1),
-                    isCurrentTurn: matchState.currentTurnIndex == _getAbsoluteIndex(matchState, myUid, 1),
-                    turnStartTime: matchState.turnStartTime,
-                    timerDurationSeconds: matchState.timerDurationSeconds,
-                    activeEmoji: _getPlayerEmoji(matchState, myUid, 1),
-                    activeMessage: ref.watch(lastMessageForUserProvider(matchState.playerIds.isEmpty ? '' : matchState.playerIds[(_getAbsoluteIndex(matchState, myUid, 1)) % matchState.playerIds.length]))?.text,
-                    teamColor: _getTeamColorForOffset(matchState, myUid, 1),
-                  ),
-                ),
-
-                // Right Player (Offset 3)
-                Align(
-                  alignment: const Alignment(0.95, -0.1),
                   child: PlayerAvatar(
                     user: _getAvatarUser(ref, matchState, myUid, 3),
                     isCurrentTurn: matchState.currentTurnIndex == _getAbsoluteIndex(matchState, myUid, 3),
@@ -279,6 +266,20 @@ class GameBoardScreen extends ConsumerWidget {
                     activeEmoji: _getPlayerEmoji(matchState, myUid, 3),
                     activeMessage: ref.watch(lastMessageForUserProvider(matchState.playerIds.isEmpty ? '' : matchState.playerIds[(_getAbsoluteIndex(matchState, myUid, 3)) % matchState.playerIds.length]))?.text,
                     teamColor: _getTeamColorForOffset(matchState, myUid, 3),
+                  ),
+                ),
+
+                // Right Player (Offset 1 in Anticlockwise)
+                Align(
+                  alignment: const Alignment(0.95, -0.1),
+                  child: PlayerAvatar(
+                    user: _getAvatarUser(ref, matchState, myUid, 1),
+                    isCurrentTurn: matchState.currentTurnIndex == _getAbsoluteIndex(matchState, myUid, 1),
+                    turnStartTime: matchState.turnStartTime,
+                    timerDurationSeconds: matchState.timerDurationSeconds,
+                    activeEmoji: _getPlayerEmoji(matchState, myUid, 1),
+                    activeMessage: ref.watch(lastMessageForUserProvider(matchState.playerIds.isEmpty ? '' : matchState.playerIds[(_getAbsoluteIndex(matchState, myUid, 1)) % matchState.playerIds.length]))?.text,
+                    teamColor: _getTeamColorForOffset(matchState, myUid, 1),
                   ),
                 ),
 
@@ -296,7 +297,9 @@ class GameBoardScreen extends ConsumerWidget {
                 // Phase Overlays
                 if (matchState.phase == GamePhase.waitingForPlayers) _buildLobbyOverlay(context, ref, matchState, myUid),
                 if (matchState.phase == GamePhase.preRoundCut) _buildCutOverlay(context, ref, matchState, myUid),
-                if (matchState.phase == GamePhase.dealingFasha) _buildPhaseOverlay('dealing_cards'.tr()),
+                if (matchState.phase == GamePhase.dealingFasha && matchState.cutLastCard != null) 
+                   _buildLastCardReveal(matchState.cutLastCard!),
+                if (matchState.phase == GamePhase.dealingFasha && matchState.cutLastCard == null) _buildPhaseOverlay('dealing_cards'.tr()),
                 if (matchState.phase == GamePhase.dealingCards) _buildPhaseOverlay('memorize_fasha'.tr(args: ['5']), alignment: const Alignment(0, -0.4)),
                 if (matchState.phase == GamePhase.shuffleVoting) _buildShuffleVoteOverlay(context, ref, matchState, myUid),
                 if (matchState.phase == GamePhase.roundScoring) _buildContextualScoringOverlay(matchState, myUid),
@@ -538,23 +541,20 @@ class GameBoardScreen extends ConsumerWidget {
             int ownerIdx = matchState.playerIds.indexOf(effectiveOwnerId);
             if (myIdx != -1 && ownerIdx != -1) {
               int relativeIdx = (ownerIdx - myIdx + 4) % 4;
-              if (relativeIdx == 1) { startX = -400; startY = 0; }
-              else if (relativeIdx == 2) { startX = 0; startY = -400; }
-              else if (relativeIdx == 3) { startX = 400; startY = 0; }
+              if (relativeIdx == 1) { startX = 320; startY = 0; } // Right Avatar
+              else if (relativeIdx == 2) { startX = 0; startY = -320; } // Top Avatar
+              else if (relativeIdx == 3) { startX = -320; startY = 0; } // Left Avatar
               else if (relativeIdx == 0) { 
                 // Local player: Check for specific click origin
                 final localOrigins = ref.watch(localPlayOriginsProvider);
                 final customOrigin = localOrigins[card.firebaseKey];
                 if (customOrigin != null) {
-                  // The origin is relative to the FannedHandWidget center.
-                  // We need to translate it to our coordinate system (BoardCenter-relative).
-                  // FannedHandWidget is bottom-center, but shifted right by the avatar.
-                  // Static estimate for now, can be refined with GlobalKeys if needed.
-                  startX = customOrigin.dx + 40; // Shift right of center
-                  startY = customOrigin.dy + 350; // Near bottom
+                  // Coordinate translation: Hand is shifted right of avatar.
+                  startX = customOrigin.dx + 48; // Hand center offset
+                  startY = customOrigin.dy + 280; // Distance to hand center
                 } else {
                   startX = 0; 
-                  startY = 400; 
+                  startY = 350; // Closer to avatar
                 }
               }
             }
@@ -562,19 +562,24 @@ class GameBoardScreen extends ConsumerWidget {
 
           return TweenAnimationBuilder<double>(
             key: ValueKey(card.firebaseKey),
-            duration: Duration(milliseconds: isCapturing ? 800 : 600),
+            duration: Duration(milliseconds: isCapturing ? 800 : 500),
             curve: isCapturing ? Curves.easeInOutBack : Curves.easeOutCubic,
             tween: Tween(begin: 0.0, end: 1.0),
             builder: (context, value, child) {
               final currentX = startX * (1 - value) + targetX * value;
               final currentY = startY * (1 - value) + targetY * value;
               
+              // Smoother transition: If from hand (origin != null), start slightly larger (1.1).
+              // Otherwise (dealing/opponents), standard scaling.
+              final startScale = (startX != 0 || startY != 350) ? 1.1 : 1.0;
+              final currentScale = (startScale - (startScale - 1.0) * value) * (isCapturing ? scale : 1.0);
+
               return Transform.translate(
                 offset: Offset(currentX, currentY),
                 child: Transform.rotate(
                   angle: rotation * value,
                   child: Transform.scale(
-                    scale: (0.8 + 0.2 * value) * (isCapturing ? scale : 1.0),
+                    scale: currentScale,
                     child: child,
                   ),
                 ),
@@ -628,6 +633,56 @@ class GameBoardScreen extends ConsumerWidget {
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildLastCardReveal(game_card.Card card) {
+    return TweenAnimationBuilder<double>(
+      duration: const Duration(milliseconds: 600),
+      curve: Curves.elasticOut,
+      tween: Tween(begin: 0.0, end: 1.0),
+      builder: (context, value, child) {
+        return Transform.scale(
+          scale: 0.5 + (0.5 * value),
+          child: Opacity(
+            opacity: value.clamp(0.0, 1.0),
+            child: child,
+          ),
+        );
+      },
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.8),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: ThemeConfig.goldAccent.withOpacity(0.5)),
+                boxShadow: [
+                  BoxShadow(
+                    color: ThemeConfig.goldAccent.withOpacity(0.3),
+                    blurRadius: 20,
+                    spreadRadius: 2,
+                  ),
+                ],
+              ),
+              child: Text(
+                'last_card_label'.tr(),
+                style: const TextStyle(
+                  color: ThemeConfig.goldAccent,
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: ThemeConfig.fontHeading,
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+            CardWidget(card: card, width: 140, height: 210),
+          ],
+        ),
       ),
     );
   }
