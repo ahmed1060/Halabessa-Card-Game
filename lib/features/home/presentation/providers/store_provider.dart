@@ -1,7 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:easy_localization/easy_localization.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:halabessa/core/providers/settings_provider.dart';
+import '../../../auth/presentation/providers/auth_providers.dart';
 
 enum ShopItemType { cardBack, tableSkin, consumable }
 
@@ -189,8 +191,6 @@ class StoreNotifier extends StateNotifier<StoreState> {
       price: 0,
     ),
   ];
-}
-}
 }
 
 final storeProvider = StateNotifierProvider<StoreNotifier, StoreState>((ref) {

@@ -5,7 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:halabessa/core/theme/theme_config.dart';
-import '../../providers/auth_providers.dart';
+import '../providers/auth_providers.dart';
 
 class AvatarPicker extends ConsumerStatefulWidget {
   const AvatarPicker({super.key});
@@ -155,7 +155,7 @@ class _AvatarPickerState extends ConsumerState<AvatarPicker> {
             onPressed: () => Navigator.pop(context),
             child: Text('cancel'.tr(), style: const TextStyle(color: Colors.white54)),
           ),
-          const SizedBox(height: MediaQuery.of(context).viewInsets.bottom),
+          SizedBox(height: MediaQuery.of(context).viewInsets.bottom),
         ],
       ),
     );
