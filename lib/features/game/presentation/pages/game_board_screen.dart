@@ -539,24 +539,30 @@ class GameBoardScreen extends ConsumerWidget {
           if (effectiveOwnerId != null) {
             int myIdx = matchState.playerIds.indexOf(myUid);
             int ownerIdx = matchState.playerIds.indexOf(effectiveOwnerId);
-            if (myIdx != -1 && ownerIdx != -1) {
+            if (myIdx >= 0 && ownerIdx >= 0) {
               int relativeIdx = (ownerIdx - myIdx + 4) % 4;
-              if (relativeIdx == 1) { startX = 320; startY = 0; } // Right Avatar
-              else if (relativeIdx == 2) { startX = 0; startY = -320; } // Top Avatar
-              else if (relativeIdx == 3) { startX = -320; startY = 0; } // Left Avatar
-              else if (relativeIdx == 0) { 
+              if (relativeIdx == 1) { 
+                startX = 320; startY = 0; // Right Avatar
+              } else if (relativeIdx == 2) { 
+                startX = 0; startY = -320; // Top Avatar (Opposite/Partner)
+              } else if (relativeIdx == 3) { 
+                startX = -320; startY = 0; // Left Avatar
+              } else if (relativeIdx == 0) { 
                 // Local player: Check for specific click origin
-                final localOrigins = ref.watch(localPlayOriginsProvider);
+                final localOrigins = ref.read(localPlayOriginsProvider);
                 final customOrigin = localOrigins[card.firebaseKey];
                 if (customOrigin != null) {
-                  // Coordinate translation: Hand is shifted right of avatar.
-                  startX = customOrigin.dx + 48; // Hand center offset
-                  startY = customOrigin.dy + 280; // Distance to hand center
+                  // Coordinate translation: Hand is shifted relative to avatar.
+                  startX = customOrigin.dx + 48; // Dynamic hand offset
+                  startY = customOrigin.dy + 280; // Distance to hand
                 } else {
                   startX = 0; 
-                  startY = 350; // Closer to avatar
+                  startY = 350; // Standard bottom fly-in
                 }
               }
+            } else {
+              // Fallback if index not found yet (race condition)
+              startX = 0; startY = 400;
             }
           }
 
@@ -785,7 +791,8 @@ class GameBoardScreen extends ConsumerWidget {
   Widget _buildLobbyOverlay(BuildContext context, WidgetRef ref, MatchState state, String currentUid) {
     final isReady = state.botInjectionVotes.containsKey(currentUid);
     final readyCount = state.botInjectionVotes.length;
-    final totalPlayers = state.playerIds.length;
+    // Count only real humans (not placeholders)
+    final humanCount = state.playerIds.where((id) => !id.startsWith('waiting_')).toList().length;
     
     return Center(
       child: Container(
@@ -811,16 +818,16 @@ class GameBoardScreen extends ConsumerWidget {
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.hub, color: Colors.orangeAccent, size: 20),
-                  const SizedBox(width: 12),
-                  Text('room_id_label'.tr(args: [state.id]), 
-                    style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w500)
-                  ),
-                  const Spacer(),
-                  IconButton(
-                    icon: const Icon(Icons.share, color: Colors.tealAccent, size: 20),
-                    onPressed: () => _showInviteFriendDialog(context, ref, state, currentUid),
-                  ),
+                   const Icon(Icons.hub, color: Colors.orangeAccent, size: 20),
+                   const SizedBox(width: 12),
+                   Text('room_id_label'.tr(args: [state.id]), 
+                     style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w500)
+                   ),
+                   const Spacer(),
+                   IconButton(
+                     icon: const Icon(Icons.share, color: Colors.tealAccent, size: 20),
+                     onPressed: () => _showInviteFriendDialog(context, ref, state, currentUid),
+                   ),
                 ],
               ),
             ),
@@ -829,23 +836,23 @@ class GameBoardScreen extends ConsumerWidget {
               padding: const EdgeInsets.symmetric(vertical: 6.0),
               child: Row(
                 children: [
-                  CircleAvatar(
-                    radius: 12,
-                    backgroundColor: id == currentUid ? Colors.green : Colors.white10,
-                    child: Icon(Icons.person, size: 14, color: id == currentUid ? Colors.white : Colors.white38),
-                  ),
-                  const SizedBox(width: 12),
-                  Text(id == currentUid ? "you".tr() : (state.playerNames[id] ?? "player_default_name".tr()), 
-                    style: TextStyle(color: id == currentUid ? Colors.green : Colors.white)
-                  ),
-                  const Spacer(),
-                  if (state.botInjectionVotes.containsKey(id))
-                    const Icon(Icons.check_circle, color: Colors.green, size: 18),
+                   CircleAvatar(
+                     radius: 12,
+                     backgroundColor: id == currentUid ? Colors.green : Colors.white10,
+                     child: Icon(id.startsWith('waiting_') ? Icons.hourglass_empty : Icons.person, size: 14, color: id == currentUid ? Colors.white : Colors.white38),
+                   ),
+                   const SizedBox(width: 12),
+                   Text(id == currentUid ? "you".tr() : (id.startsWith('waiting_') ? "waiting_label".tr() : (state.playerNames[id] ?? "player_default_name".tr())), 
+                     style: TextStyle(color: id == currentUid ? Colors.green : Colors.white70)
+                   ),
+                   const Spacer(),
+                   if (state.botInjectionVotes.containsKey(id))
+                     const Icon(Icons.check_circle, color: Colors.green, size: 18),
                 ],
               ),
             )),
             const SizedBox(height: 32),
-            if (totalPlayers < 4) ...[
+            if (humanCount < 4) ...[
               if (!isReady)
                 ElevatedButton.icon(
                   onPressed: () => ref.read(matchStateProvider.notifier).voteForBots(currentUid),
@@ -859,7 +866,7 @@ class GameBoardScreen extends ConsumerWidget {
                   ),
                 )
               else
-                Text('waiting_human_consent'.tr(args: [readyCount.toString(), totalPlayers.toString()]), 
+                Text('waiting_human_consent'.tr(args: [readyCount.toString(), humanCount.toString()]), 
                   style: const TextStyle(color: Colors.orangeAccent, fontStyle: FontStyle.italic, fontSize: 13),
                   textAlign: TextAlign.center,
                 ),
@@ -1121,6 +1128,64 @@ class HarvestDetailsOverlay extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildLastCardReveal(game_card.Card card) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.black87,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: ThemeConfig.goldAccent.withOpacity(0.5)),
+            ),
+            child: Text(
+              'last_card_label'.tr(),
+              style: const TextStyle(color: ThemeConfig.goldAccent, fontWeight: FontWeight.bold, fontSize: 18),
+            ),
+          ),
+          const SizedBox(height: 20),
+          Transform.scale(
+            scale: 1.5,
+            child: CardWidget(card: card),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPhaseOverlay(String message, {Alignment alignment = Alignment.center}) {
+    return Align(
+      alignment: alignment,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.black.withOpacity(0.7),
+          borderRadius: BorderRadius.circular(30),
+          border: Border.all(color: Colors.white10),
+        ),
+        child: Text(
+          message,
+          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
+        ),
+      ),
+    );
+  }
+
+  void _showHarvestDetails(BuildContext context) {
+      // Handled by the HarvestDetailsOverlay widget bottom sheet in _buildTeamHarvestStack
+  }
+
+  void _showSettings(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => const SettingsOverlay(),
     );
   }
 }

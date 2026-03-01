@@ -46,7 +46,14 @@ class MultimediaService {
     try {
       final settings = _ref.read(settingsProvider);
       if (settings.isSoundEnabled) {
-        await _sfxPlayer.play(AssetSource(assetPath));
+        // On Web, if we use AssetSource('sfx/...'), it might double-prefix.
+        // audioplayers v6 AssetSource uses 'assets/' as default prefix.
+        // If the path already has 'assets/', we might get 'assets/assets/'.
+        String effectivePath = assetPath;
+        if (kIsWeb && assetPath.startsWith('assets/')) {
+           effectivePath = assetPath.replaceFirst('assets/', '');
+        }
+        await _sfxPlayer.play(AssetSource(effectivePath));
       }
     } catch (e) {
       debugPrint('MultimediaService: Failed to play SFX $assetPath: $e');

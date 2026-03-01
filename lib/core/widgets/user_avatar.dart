@@ -54,7 +54,11 @@ class UserAvatar extends StatelessWidget {
           child: CircleAvatar(
             radius: radius - 2,
             backgroundColor: ThemeConfig.darkBg,
-            backgroundImage: user.avatarUrl != null ? NetworkImage(user.avatarUrl!) : null,
+            backgroundImage: user.avatarUrl != null
+                ? (user.avatarUrl!.startsWith('assets/')
+                    ? AssetImage(user.avatarUrl!) as ImageProvider
+                    : NetworkImage(user.avatarUrl!))
+                : null,
             child: user.avatarUrl == null
                 ? Text(
                     user.displayName.isNotEmpty ? user.displayName[0].toUpperCase() : '?',

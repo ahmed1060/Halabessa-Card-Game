@@ -22,11 +22,13 @@ class FirebaseAuthRepository implements AuthRepository {
       if (!doc.exists) {
         await docRef.set(user.toJson());
       } else {
-        // Only update basic profile info, preserving scores/stats
+          // Only update basic profile info, preserving scores/stats
         await docRef.update({
           'displayName': user.displayName,
           'email': user.email,
           'avatarUrl': user.avatarUrl,
+          'inventory': user.inventory,
+          'isAdmin': user.isAdmin,
         });
       }
 
@@ -37,6 +39,8 @@ class FirebaseAuthRepository implements AuthRepository {
         'displayName': user.displayName,
         'email': user.email,
         'avatarUrl': user.avatarUrl,
+        'inventory': user.inventory,
+        'isAdmin': user.isAdmin,
       });
     } catch (e) {
       debugPrint("User Sync failed: $e");
@@ -52,6 +56,7 @@ class FirebaseAuthRepository implements AuthRepository {
       email: user.email ?? '',
       displayName: (user.displayName != null && user.displayName!.trim().isNotEmpty) ? user.displayName! : 'Player',
       avatarUrl: user.photoURL,
+      isAdmin: user.email == 'ahmed.hossam1060@gmail.com',
     );
   }
 
@@ -273,6 +278,43 @@ class FirebaseAuthRepository implements AuthRepository {
     final user = _firebaseAuth.currentUser;
     if (user != null) {
       await user.verifyBeforeUpdateEmail(newEmail);
+    }
+  }
+
+  @override
+  Future<void> updatePassword(String newPassword) async {
+    final user = _firebaseAuth.currentUser;
+    if (user != null) {
+      await user.updatePassword(newPassword);
+    }
+  }
+
+  @override
+  Future<void> updateProfile({String? displayName, String? avatarUrl}) async {
+    final user = _firebaseAuth.currentUser;
+    if (user != null) {
+      if (displayName != null) await user.updateDisplayName(displayName);
+      if (avatarUrl != null) await user.updatePhotoURL(avatarUrl);
+      
+      // Reload to get updated info
+      await user.reload();
+      final updatedUser = _firebaseAuth.currentUser;
+      final appUser = _userFromFirebase(updatedUser);
+      
+      if (appUser != null) {
+        // Fetch full record from firestore to preserve other fields
+        final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+        if (doc.exists && doc.data() != null) {
+          final fullUser = AppUser.fromJson(doc.data()!, user.uid);
+          final mergedUser = fullUser.copyWith(
+            displayName: displayName ?? fullUser.displayName,
+            avatarUrl: avatarUrl ?? fullUser.avatarUrl,
+          );
+          await _syncUserToDatabase(mergedUser);
+        } else {
+          await _syncUserToDatabase(appUser);
+        }
+      }
     }
   }
 }

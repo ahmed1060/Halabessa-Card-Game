@@ -3,7 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:halabessa/core/providers/settings_provider.dart';
 
-enum ShopItemType { cardBack, tableSkin }
+enum ShopItemType { cardBack, tableSkin, consumable }
 
 class ShopItem {
   final String id;
@@ -51,30 +51,87 @@ class StoreState {
 
 class StoreNotifier extends StateNotifier<StoreState> {
   final SharedPreferences _prefs;
+  final Ref _ref;
 
   static const _kOwnedIds = 'store_owned_ids';
   static const _kActiveCardBack = 'store_active_card_back';
   static const _kActiveTableSkin = 'store_active_table_skin';
 
-  StoreNotifier(this._prefs) : super(StoreState(
+  StoreNotifier(this._prefs, this._ref) : super(StoreState(
     ownedIds: _prefs.getStringList(_kOwnedIds) ?? ['default_card', 'default_table'],
     activeCardBackId: _prefs.getString(_kActiveCardBack) ?? 'default_card',
     activeTableSkinId: _prefs.getString(_kActiveTableSkin) ?? 'default_table',
   ));
 
-  void purchaseItem(String id) {
-    if (!state.ownedIds.contains(id)) {
-      final newOwned = [...state.ownedIds, id];
-      state = state.copyWith(ownedIds: newOwned);
-      _prefs.setStringList(_kOwnedIds, newOwned);
+  Future<void> purchaseItem(ShopItem item) async {
+    final user = _ref.read(currentUserProvider);
+    if (user == null) return;
+
+    // Admin bypass or free items (all items are free for now as requested)
+    if (!user.isAdmin && item.price > 0 && user.points < item.price) {
+      throw Exception('Not enough points');
     }
+
+    if (item.type == ShopItemType.consumable) {
+       // Consumables are tracked in AppUser.inventory (Firestore)
+       final currentCount = user.inventory[item.id] ?? 0;
+       final newInventory = Map<String, int>.from(user.inventory);
+       newInventory[item.id] = currentCount + 1;
+       
+       final pointsToDeduct = user.isAdmin ? 0 : item.price;
+       
+       await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
+         'points': user.points - pointsToDeduct,
+         'inventory': newInventory,
+       });
+    } else {
+      if (!state.ownedIds.contains(item.id)) {
+        final newOwned = [...state.ownedIds, item.id];
+        state = state.copyWith(ownedIds: newOwned);
+        _prefs.setStringList(_kOwnedIds, newOwned);
+        
+        // Deduct points if regular user
+        if (!user.isAdmin && item.price > 0) {
+          await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
+            'points': user.points - item.price,
+          });
+        }
+      }
+    }
+  }
+
+  Future<void> addItem(ShopItem item) async {
+    final user = _ref.read(currentUserProvider);
+    if (user == null || !user.isAdmin) return;
+    
+    // In a real app, we'd add to Firestore 'store_items' collection.
+    // For now, we'll append to the local list and could save to a global settings doc.
+    await FirebaseFirestore.instance.collection('settings').doc('store').update({
+      'items': FieldValue.arrayUnion([
+        {
+          'id': item.id,
+          'name': item.name,
+          'assetPath': item.assetPath,
+          'type': item.type.toString().split('.').last,
+          'price': item.price,
+        }
+      ])
+    });
+  }
+
+  Future<void> deleteItem(String id) async {
+    final user = _ref.read(currentUserProvider);
+    if (user == null || !user.isAdmin) return;
+
+    // Logic to remove item from Firestore
+    // For now, we'll just show the UI for it.
   }
 
   void setActiveSkin(String id, ShopItemType type) {
     if (type == ShopItemType.cardBack) {
       state = state.copyWith(activeCardBackId: id);
       _prefs.setString(_kActiveCardBack, id);
-    } else {
+    } else if (type == ShopItemType.tableSkin) {
       state = state.copyWith(activeTableSkinId: id);
       _prefs.setString(_kActiveTableSkin, id);
     }
@@ -96,6 +153,7 @@ class StoreNotifier extends StateNotifier<StoreState> {
       frontSkinPath: 'assets/images/cards/premium/card_front_premium_bg.png', 
       faceIllustrations: {'king': 'assets/images/cards/premium/card_face_premium.png'},
       type: ShopItemType.cardBack,
+      price: 0,
     ),
     ShopItem(
       id: 'neon_card', 
@@ -104,6 +162,7 @@ class StoreNotifier extends StateNotifier<StoreState> {
       frontSkinPath: 'assets/images/cards/neon/card_front_neon_bg.png', 
       faceIllustrations: {'king': 'assets/images/cards/neon/card_face_neon.png'},
       type: ShopItemType.cardBack,
+      price: 0,
     ),
     ShopItem(
       id: 'royal_card', 
@@ -116,14 +175,25 @@ class StoreNotifier extends StateNotifier<StoreState> {
         'jack': 'assets/images/cards/royal/card_face_royal.png', // Fallback to king for now
       },
       type: ShopItemType.cardBack,
+      price: 0,
     ),
     
-    ShopItem(id: 'default_table', name: 'skin_casino'.tr(), assetPath: 'assets/images/tables/table_skin_emerald.png', type: ShopItemType.tableSkin),
-    ShopItem(id: 'galaxy_table', name: 'skin_galaxy'.tr(), assetPath: 'assets/images/tables/table_skin_galaxy.png', type: ShopItemType.tableSkin),
+    ShopItem(id: 'default_table', name: 'skin_casino'.tr(), assetPath: 'assets/images/tables/table_skin_emerald.png', type: ShopItemType.tableSkin, price: 0),
+    ShopItem(id: 'galaxy_table', name: 'skin_galaxy'.tr(), assetPath: 'assets/images/tables/table_skin_galaxy.png', type: ShopItemType.tableSkin, price: 0),
+    
+    ShopItem(
+      id: 'name_change_ticket', 
+      name: 'name_change_ticket'.tr(), 
+      assetPath: 'assets/images/items/ticket.png', 
+      type: ShopItemType.consumable,
+      price: 0,
+    ),
   ];
+}
+}
 }
 
 final storeProvider = StateNotifierProvider<StoreNotifier, StoreState>((ref) {
   final prefs = ref.watch(sharedPreferencesProvider);
-  return StoreNotifier(prefs);
+  return StoreNotifier(prefs, ref);
 });

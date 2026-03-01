@@ -1,0 +1,163 @@
+import 'dart:io';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:easy_localization/easy_localization.dart';
+import 'package:halabessa/core/theme/theme_config.dart';
+import '../../providers/auth_providers.dart';
+
+class AvatarPicker extends ConsumerStatefulWidget {
+  const AvatarPicker({super.key});
+
+  @override
+  ConsumerState<AvatarPicker> createState() => _AvatarPickerState();
+}
+
+class _AvatarPickerState extends ConsumerState<AvatarPicker> {
+  final ImagePicker _picker = ImagePicker();
+  bool _isUploading = false;
+
+  final List<String> _builtInAvatars = [
+    'assets/images/avatars/avatar1.png',
+    'assets/images/avatars/avatar2.png',
+    'assets/images/avatars/avatar3.png',
+    'assets/images/avatars/avatar4.png',
+    'assets/images/avatars/avatar5.png',
+    'assets/images/avatars/avatar6.png',
+  ];
+
+  Future<void> _pickAndUploadImage() async {
+    try {
+      final XFile? image = await _picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 512,
+        maxHeight: 512,
+        imageQuality: 75,
+      );
+
+      if (image == null) return;
+
+      setState(() => _isUploading = true);
+
+      final user = ref.read(currentUserProvider);
+      if (user == null) return;
+
+      final storageRef = FirebaseStorage.instance
+          .ref()
+          .child('avatars')
+          .child('${user.uid}.jpg');
+
+      await storageRef.putFile(File(image.path));
+      final downloadUrl = await storageRef.getDownloadURL();
+
+      await ref.read(authRepositoryProvider).updateProfile(avatarUrl: downloadUrl);
+
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('profile_updated_success'.tr())),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('error_general'.tr(args: [e.toString()]))),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isUploading = false);
+    }
+  }
+
+  Future<void> _selectBuiltIn(String assetPath) async {
+    try {
+      await ref.read(authRepositoryProvider).updateProfile(avatarUrl: assetPath);
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('profile_updated_success'.tr())),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('error_general'.tr(args: [e.toString()]))),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: ThemeConfig.darkBg,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'choose_avatar_title'.tr(),
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              fontFamily: ThemeConfig.fontHeading,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 24),
+          SizedBox(
+            height: 100,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              itemCount: _builtInAvatars.length,
+              itemBuilder: (context, index) {
+                return GestureDetector(
+                  onTap: () => _selectBuiltIn(_builtInAvatars[index]),
+                  child: Container(
+                    margin: const EdgeInsets.only(right: 16),
+                    width: 80,
+                    height: 80,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white12),
+                      image: DecorationImage(
+                        image: AssetImage(_builtInAvatars[index]),
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 32),
+          ElevatedButton.icon(
+            onPressed: _isUploading ? null : _pickAndUploadImage,
+            icon: _isUploading 
+                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                : const Icon(Icons.cloud_upload_outlined),
+            label: Text(_isUploading ? 'loading'.tr() : 'upload_custom_avatar'.tr()),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: ThemeConfig.primaryTeal,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+            ),
+          ),
+          const SizedBox(height: 16),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('cancel'.tr(), style: const TextStyle(color: Colors.white54)),
+          ),
+          const SizedBox(height: MediaQuery.of(context).viewInsets.bottom),
+        ],
+      ),
+    );
+  }
+}

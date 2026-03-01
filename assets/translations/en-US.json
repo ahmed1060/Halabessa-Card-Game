@@ -193,5 +193,20 @@
     "item_unlocked": "{} unlocked!",
     "status_active": "ACTIVE",
     "status_free": "FREE",
-    "last_card_label": "The Last Card"
+    "last_card_label": "The Last Card",
+    "change_password_btn": "Change Password",
+    "new_password_label": "New Password",
+    "confirm_password_label": "Confirm Password",
+    "update_profile_btn": "Update Profile",
+    "choose_avatar_title": "Choose Avatar",
+    "upload_custom_avatar": "Upload Custom",
+    "name_change_ticket": "Name Change Ticket",
+    "not_enough_tickets": "You don't have any tickets.",
+    "buy_ticket_btn": "Go to Store",
+    "password_updated_success": "Password updated successfully!",
+    "profile_updated_success": "Profile updated successfully!",
+    "edit_name_hint": "Enter new name",
+    "use_ticket_btn": "Use Ticket",
+    "no_tickets_message": "Buy a ticket from the store to change your name.",
+    "items_label": "Items"
 }

@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easy_localization/easy_localization.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:halabessa/core/theme/theme_config.dart';
 import 'package:halabessa/core/widgets/user_avatar.dart';
 import '../providers/auth_providers.dart';
+import '../widgets/avatar_picker.dart';
+import '../../domain/models/app_user.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -56,14 +59,48 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               Center(
                 child: Column(
                   children: [
-                    UserAvatar(user: user, radius: 60),
-                    const SizedBox(height: 16),
-                    Text(
-                      user.displayName,
-                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
+                    Stack(
+                      children: [
+                        UserAvatar(user: user, radius: 60, onTap: () => _showAvatarPicker(context)),
+                        Positioned(
+                          right: 0,
+                          bottom: 0,
+                          child: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: const BoxDecoration(
+                              color: ThemeConfig.primaryTeal,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.edit, color: Colors.white, size: 20),
                           ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          user.displayName,
+                          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
+                        ),
+                        if (user.isAdmin)
+                          Container(
+                            margin: const EdgeInsets.only(left: 8),
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.redAccent,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Text(
+                              'ADMIN',
+                              style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                      ],
                     ),
                     const SizedBox(height: 8),
                     Container(
@@ -100,7 +137,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 children: [
                    Expanded(child: _buildStatCard(context, 'best_score'.tr(), user.bestScore.toString(), Icons.emoji_events, Colors.orange)),
                    const SizedBox(width: 16),
-                   Expanded(child: _buildStatCard(context, 'points'.tr(), user.points.toString(), Icons.stars, Colors.amber)),
+                   Expanded(child: _buildStatCard(context, 'points'.tr(), user.isAdmin ? '∞' : user.points.toString(), Icons.stars, Colors.amber)),
                 ],
               ),
               const SizedBox(height: 40),
@@ -123,6 +160,29 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
               // Auth Actions
               const Divider(color: Colors.white10),
+              
+              // Change Profile Actions
+              ListTile(
+                leading: const Icon(Icons.password, color: Colors.blueAccent),
+                title: Text('change_password_btn'.tr()),
+                onTap: () => _showChangePasswordDialog(context),
+              ),
+              ListTile(
+                leading: const Icon(Icons.edit, color: ThemeConfig.goldAccent),
+                title: Text('update_profile_btn'.tr()),
+                subtitle: Text(
+                  (user.inventory['name_change_ticket'] ?? 0) > 0 
+                    ? 'use_ticket_btn'.tr() 
+                    : 'no_tickets_message'.tr(),
+                  style: TextStyle(
+                    color: (user.inventory['name_change_ticket'] ?? 0) > 0 
+                      ? ThemeConfig.goldAccent 
+                      : Colors.white30,
+                    fontSize: 12,
+                  ),
+                ),
+                onTap: () => _handleNameChange(context, user),
+              ),
               ListTile(
                 leading: const Icon(Icons.logout, color: Colors.redAccent),
                 title: Text('log_out'.tr(), style: const TextStyle(color: Colors.redAccent)),
@@ -135,6 +195,139 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  void _showAvatarPicker(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => const AvatarPicker(),
+    );
+  }
+
+  void _showChangePasswordDialog(BuildContext context) {
+    final passwordController = TextEditingController();
+    final confirmController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: ThemeConfig.darkBg,
+        title: Text('change_password_btn'.tr(), style: const TextStyle(color: Colors.white)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: passwordController,
+              decoration: InputDecoration(labelText: 'new_password_label'.tr()),
+              obscureText: true,
+              style: const TextStyle(color: Colors.white),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: confirmController,
+              decoration: InputDecoration(labelText: 'confirm_password_label'.tr()),
+              obscureText: true,
+              style: const TextStyle(color: Colors.white),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: Text('cancel'.tr())),
+          ElevatedButton(
+            onPressed: () async {
+              if (passwordController.text != confirmController.text) {
+                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Passwords do not match')));
+                 return;
+              }
+              try {
+                await ref.read(authRepositoryProvider).updatePassword(passwordController.text);
+                if (context.mounted) {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('password_updated_success'.tr())));
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+                }
+              }
+            },
+            child: Text('update'.tr()),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _handleNameChange(BuildContext context, AppUser user) async {
+    final hasTicket = (user.inventory['name_change_ticket'] ?? 0) > 0;
+    
+    if (!hasTicket) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          backgroundColor: ThemeConfig.darkBg,
+          title: Text('name_change_ticket'.tr(), style: const TextStyle(color: Colors.white)),
+          content: Text('no_tickets_message'.tr(), style: const TextStyle(color: Colors.white70)),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: Text('cancel'.tr())),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context);
+                Navigator.pushNamed(context, '/store');
+              },
+              child: Text('buy_ticket_btn'.tr()),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    final nameController = TextEditingController(text: user.displayName);
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: ThemeConfig.darkBg,
+        title: Text('use_ticket_btn'.tr(), style: const TextStyle(color: Colors.white)),
+        content: TextField(
+          controller: nameController,
+          decoration: InputDecoration(labelText: 'edit_name_hint'.tr()),
+          style: const TextStyle(color: Colors.white),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: Text('cancel'.tr())),
+          ElevatedButton(
+            onPressed: () async {
+              final newName = nameController.text.trim();
+              if (newName.isEmpty || newName == user.displayName) return;
+
+              try {
+                // Consume ticket
+                final newInventory = Map<String, int>.from(user.inventory);
+                newInventory['name_change_ticket'] = newInventory['name_change_ticket']! - 1;
+                
+                await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
+                   'displayName': newName,
+                   'inventory': newInventory,
+                });
+                
+                if (context.mounted) {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('profile_updated_success'.tr())));
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+                }
+              }
+            },
+            child: Text('update'.tr()),
+          ),
+        ],
       ),
     );
   }
