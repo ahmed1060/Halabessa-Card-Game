@@ -22,98 +22,100 @@ class SettingsOverlay extends ConsumerWidget {
           borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
           border: Border.all(color: Colors.white.withOpacity(0.1)),
         ),
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Handle
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.3),
-                  borderRadius: BorderRadius.circular(2),
+        padding: const EdgeInsets.only(left: 24, right: 24, top: 12, bottom: 24),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Handle
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'settings'.tr(),
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    color: ThemeConfig.goldAccent,
-                    fontWeight: FontWeight.bold,
-                  ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 32),
-
-            // Audio Section
-            _buildSectionHeader(context, 'audio'.tr()),
-            _buildToggleTile(
-              context,
-              'sound_effects'.tr(),
-              Icons.volume_up_rounded,
-              settings.isSoundEnabled,
-              (val) => notifier.toggleSound(val),
-              isAdmin: ref.watch(currentUserProvider)?.isAdmin ?? false,
-              onManage: () => Navigator.pushNamed(context, '/admin/sfx'),
-            ),
-            _buildToggleTile(
-              context,
-              'music'.tr(),
-              Icons.music_note_rounded,
-              settings.isMusicEnabled,
-              (val) => notifier.toggleMusic(val),
-              isAdmin: ref.watch(currentUserProvider)?.isAdmin ?? false,
-              onManage: () => Navigator.pushNamed(context, '/admin/music'),
-            ),
-            _buildToggleTile(
-              context,
-              'haptic_feedback'.tr(),
-              Icons.vibration_rounded,
-              settings.isHapticsEnabled,
-              (val) => notifier.toggleHaptics(val),
-            ),
-            const SizedBox(height: 24),
-
-            // Language Section
-            _buildSectionHeader(context, 'language'.tr()),
-            const SizedBox(height: 12),
-            _buildLanguageSelector(context, ref),
-            const SizedBox(height: 24),
-
-            // Theme Section
-            _buildSectionHeader(context, 'theme'.tr()),
-            const SizedBox(height: 12),
-            _buildThemeSelector(context, ref),
-            const SizedBox(height: 24),
-
-            // Admin Actions (Optional)
-            if (ref.watch(currentUserProvider)?.isAdmin ?? false) ...[
-              _buildSectionHeader(context, 'admin_actions'.tr()),
-              _buildAdminTile(
-                context,
-                'manage_users'.tr(),
-                Icons.admin_panel_settings_rounded,
-                () => Navigator.pushNamed(context, '/admin/users'),
+              const SizedBox(height: 24),
+              Text(
+                'settings'.tr(),
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      color: ThemeConfig.goldAccent,
+                      fontWeight: FontWeight.bold,
+                    ),
+                textAlign: TextAlign.center,
               ),
-              _buildAdminTile(
+              const SizedBox(height: 32),
+
+              // Audio Section
+              _buildSectionHeader(context, 'audio'.tr()),
+              _buildToggleTile(
                 context,
-                'manage_music'.tr(),
-                Icons.music_note_rounded,
-                () => Navigator.pushNamed(context, '/admin/music'),
-              ),
-              _buildAdminTile(
-                context,
-                'manage_sfx'.tr(),
+                'sound_effects'.tr(),
                 Icons.volume_up_rounded,
-                () => Navigator.pushNamed(context, '/admin/sfx'),
+                settings.isSoundEnabled,
+                (val) => notifier.toggleSound(val),
+                isAdmin: ref.watch(currentUserProvider)?.isAdmin ?? false,
+                onManage: () => Navigator.pushNamed(context, '/admin/sfx'),
               ),
+              _buildToggleTile(
+                context,
+                'music'.tr(),
+                Icons.music_note_rounded,
+                settings.isMusicEnabled,
+                (val) => notifier.toggleMusic(val),
+                isAdmin: ref.watch(currentUserProvider)?.isAdmin ?? false,
+                onManage: () => Navigator.pushNamed(context, '/admin/music'),
+              ),
+              _buildToggleTile(
+                context,
+                'haptic_feedback'.tr(),
+                Icons.vibration_rounded,
+                settings.isHapticsEnabled,
+                (val) => notifier.toggleHaptics(val),
+              ),
+              const SizedBox(height: 24),
+
+              // Language Section
+              _buildSectionHeader(context, 'language'.tr()),
+              const SizedBox(height: 12),
+              _buildLanguageSelector(context, ref),
+              const SizedBox(height: 24),
+
+              // Theme Section
+              _buildSectionHeader(context, 'theme'.tr()),
+              const SizedBox(height: 12),
+              _buildThemeSelector(context, ref),
+              const SizedBox(height: 24),
+
+              // Admin Actions (Optional)
+              if (ref.watch(currentUserProvider)?.isAdmin ?? false) ...[
+                _buildSectionHeader(context, 'admin_actions'.tr()),
+                _buildAdminTile(
+                  context,
+                  'manage_users'.tr(),
+                  Icons.admin_panel_settings_rounded,
+                  () => Navigator.pushNamed(context, '/admin/users'),
+                ),
+                _buildAdminTile(
+                  context,
+                  'manage_music'.tr(),
+                  Icons.music_note_rounded,
+                  () => Navigator.pushNamed(context, '/admin/music'),
+                ),
+                _buildAdminTile(
+                  context,
+                  'manage_sfx'.tr(),
+                  Icons.volume_up_rounded,
+                  () => Navigator.pushNamed(context, '/admin/sfx'),
+                ),
+              ],
+              const SizedBox(height: 16),
             ],
-            const SizedBox(height: 40),
-          ],
+          ),
         ),
       ),
     );
