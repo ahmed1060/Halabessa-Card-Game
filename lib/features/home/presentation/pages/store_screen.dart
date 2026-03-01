@@ -56,13 +56,13 @@ class StoreScreen extends ConsumerWidget {
       body: CustomScrollView(
         slivers: [
           _buildSectionHeader(context, 'card_skins'.tr(), ShopItemType.cardBack, user, notifier),
-          _buildSkinGrid(context, notifier, store, ShopItemType.cardBack, user),
+          _buildSkinGrid(context, ref, notifier, store, ShopItemType.cardBack, user),
           _buildSectionHeader(context, 'table_skins'.tr(), ShopItemType.tableSkin, user, notifier),
-          _buildSkinGrid(context, notifier, store, ShopItemType.tableSkin, user),
+          _buildSkinGrid(context, ref, notifier, store, ShopItemType.tableSkin, user),
           _buildSectionHeader(context, 'avatars_label'.tr(), ShopItemType.avatar, user, notifier),
-          _buildSkinGrid(context, notifier, store, ShopItemType.avatar, user),
+          _buildSkinGrid(context, ref, notifier, store, ShopItemType.avatar, user),
           _buildSectionHeader(context, 'items_label'.tr(), ShopItemType.consumable, user, notifier),
-          _buildSkinGrid(context, notifier, store, ShopItemType.consumable, user),
+          _buildSkinGrid(context, ref, notifier, store, ShopItemType.consumable, user),
           const SliverPadding(padding: EdgeInsets.only(bottom: 40)),
         ],
       ),
@@ -99,7 +99,7 @@ class StoreScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildSkinGrid(BuildContext context, StoreNotifier notifier, StoreState store, ShopItemType type, AppUser? user) {
+  Widget _buildSkinGrid(BuildContext context, WidgetRef ref, StoreNotifier notifier, StoreState store, ShopItemType type, AppUser? user) {
     final items = notifier.allItems.where((i) => i.type == type).toList();
 
     return SliverPadding(
