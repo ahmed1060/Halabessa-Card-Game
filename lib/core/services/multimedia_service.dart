@@ -41,30 +41,34 @@ class MultimediaService {
         final globalSettings = _ref.read(globalSettingsProvider);
         final overrideUrl = globalSettings.musicOverrideUrl;
 
-        Source source;
+        Source? source;
         if (overrideUrl != null && overrideUrl.isNotEmpty) {
           if (overrideUrl.startsWith('data:')) {
-            final base64Data = overrideUrl.split(',').last;
-            source = BytesSource(base64Decode(base64Data));
+            // On Web, passing the Data URL directly is more stable than BytesSource
+            source = UrlSource(overrideUrl);
           } else {
             source = UrlSource(overrideUrl);
           }
         } else {
-          source = AssetSource(assetPath);
+          // Skip if no asset exists (avoiding Code 4 errors in empty projects)
+          debugPrint('MultimediaService: No override found for $assetPath and folder is empty. Skipping.');
+          return;
         }
 
-        await _musicPlayer.play(source).then((_) {
-          _hasInteracted = true;
-          _currentMusicPath = assetPath;
-          _pendingMusic = null;
-        }).catchError((e) {
-          if (e.toString().contains('NotAllowedError')) {
-            debugPrint('MultimediaService: Autoplay blocked. Queueing music.');
-            _pendingMusic = assetPath;
-          } else {
-            debugPrint('MultimediaService: Music Playback error: $e');
-          }
-        });
+        if (source != null) {
+          await _musicPlayer.play(source).then((_) {
+            _hasInteracted = true;
+            _currentMusicPath = assetPath;
+            _pendingMusic = null;
+          }).catchError((e) {
+            if (e.toString().contains('NotAllowedError')) {
+              debugPrint('MultimediaService: Autoplay blocked. Queueing music.');
+              _pendingMusic = assetPath;
+            } else {
+              debugPrint('MultimediaService: Music Playback error: $e');
+            }
+          });
+        }
       }
     } catch (e) {
       debugPrint('MultimediaService: Failed to play music $assetPath: $e');
@@ -88,33 +92,36 @@ class MultimediaService {
         final globalSettings = _ref.read(globalSettingsProvider);
         final overrideUrl = globalSettings.sfxOverrides[assetPath];
 
-        Source source;
+        Source? source;
         if (overrideUrl != null && overrideUrl.isNotEmpty) {
           if (overrideUrl.startsWith('data:')) {
-            final base64Data = overrideUrl.split(',').last;
-            source = BytesSource(base64Decode(base64Data));
+            source = UrlSource(overrideUrl);
           } else {
             source = UrlSource(overrideUrl);
           }
         } else {
-          source = AssetSource(assetPath);
+          // Only play AssetSource if we are SURE it's not one of the missing ones
+          // Since the user said there are NO original sounds, we skip.
+          return;
         }
 
-        await _sfxPlayer.play(source).then((_) {
-          // If we successfully played an SFX, we have user interaction!
-          if (!_hasInteracted) {
-             _hasInteracted = true;
-             if (_pendingMusic != null) {
-               playMusic(_pendingMusic!);
-             }
-          }
-        }).catchError((e) {
-          if (e.toString().contains('NotAllowedError')) {
-            debugPrint('MultimediaService: Autoplay blocked for SFX.');
-          } else {
-            debugPrint('MultimediaService: SFX Playback error: $e');
-          }
-        });
+        if (source != null) {
+          await _sfxPlayer.play(source).then((_) {
+            // If we successfully played an SFX, we have user interaction!
+            if (!_hasInteracted) {
+               _hasInteracted = true;
+               if (_pendingMusic != null) {
+                 playMusic(_pendingMusic!);
+               }
+            }
+          }).catchError((e) {
+            if (e.toString().contains('NotAllowedError')) {
+              debugPrint('MultimediaService: Autoplay blocked for SFX.');
+            } else {
+              debugPrint('MultimediaService: SFX Playback error: $e');
+            }
+          });
+        }
       }
     } catch (e) {
       debugPrint('MultimediaService: Failed to play SFX $assetPath: $e');
