@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:halabessa/core/providers/settings_provider.dart';
 
 enum ShopItemType { cardBack, tableSkin }

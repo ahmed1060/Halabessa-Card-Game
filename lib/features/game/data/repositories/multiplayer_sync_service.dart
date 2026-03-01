@@ -153,7 +153,7 @@ class MultiplayerSyncService {
         final value = event.snapshot.value;
         if (value == null || value is! Map) return [];
         
-        final Map<dynamic, dynamic> messages = value as Map<dynamic, dynamic>;
+        final messages = Map<dynamic, dynamic>.from(value);
         final sortedList = messages.entries.map((entry) {
           return ChatMessage.fromJson(Map<String, dynamic>.from(entry.value), entry.key.toString());
         }).toList();

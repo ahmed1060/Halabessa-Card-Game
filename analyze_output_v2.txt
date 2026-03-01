@@ -1,0 +1,9 @@
+Analyzing Halabessa-Card-Game...                                
+
+   info - Unnecessary cast - lib\features\game\data\repositories\multiplayer_sync_service.dart:156:57 - unnecessary_cast
+  error - Target of URI doesn't exist: '../../auth/presentation/providers/auth_providers.dart' - lib\features\game\presentation\widgets\chat_overlay.dart:5:8 - uri_does_not_exist
+  error - Undefined name 'currentUserProvider' - lib\features\game\presentation\widgets\chat_overlay.dart:25:34 - undefined_identifier
+   info - Use 'const' literals as arguments to constructors of '@immutable' classes - lib\features\game\presentation\widgets\chat_overlay.dart:64:22 - prefer_const_literals_to_create_immutables
+   info - Use 'const' with the constructor to improve performance - lib\features\game\presentation\widgets\chat_overlay.dart:65:13 - prefer_const_constructors
+  error - Undefined name 'currentUserProvider' - lib\features\game\presentation\widgets\chat_overlay.dart:135:63 - undefined_identifier
+

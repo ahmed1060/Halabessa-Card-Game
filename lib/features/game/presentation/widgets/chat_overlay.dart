@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easy_localization/easy_localization.dart';
 import '../providers/chat_providers.dart';
+import 'package:halabessa/features/auth/presentation/providers/auth_providers.dart';
 import '../../domain/providers/game_providers.dart';
 import '../../domain/models/chat_message.dart';
 import '../../../../core/theme/theme_config.dart';
@@ -58,8 +59,8 @@ class _ChatOverlayState extends ConsumerState<ChatOverlay> {
       bottom: 0,
       child: Container(
         width: panelWidth,
-        decoration: BoxDecoration(
-          color: Colors.black.withOpacity(0.85),
+        decoration: const BoxDecoration(
+          color: Colors.black87,
           boxShadow: [
             BoxShadow(color: Colors.black54, blurRadius: 20, spreadRadius: 5)
           ],
@@ -213,7 +214,7 @@ class _ChatOverlayState extends ConsumerState<ChatOverlay> {
       child: ActionChip(
         label: Text(label, style: const TextStyle(color: Colors.white, fontSize: 12)),
         backgroundColor: Colors.white10,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: BorderSide(color: Colors.white24)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: const BorderSide(color: Colors.white24)),
         onPressed: () => _sendMessage(label, isQuickChat: true),
       ),
     );

@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:easy_localization/easy_localization.dart';
-
 import 'auth_screen.dart';
 import '../providers/auth_providers.dart';
 import '../../../home/presentation/pages/home_screen.dart';

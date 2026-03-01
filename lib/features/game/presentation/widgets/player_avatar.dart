@@ -53,7 +53,7 @@ class PlayerAvatar extends StatelessWidget {
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(12),
                           boxShadow: [
-                            BoxShadow(color: Colors.black24, blurRadius: 4, offset: const Offset(0, 2))
+                            BoxShadow(color: Colors.black.withOpacity(0.24), blurRadius: 4, offset: const Offset(0, 2))
                           ],
                         ),
                         child: Stack(
