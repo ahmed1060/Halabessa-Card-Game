@@ -192,6 +192,6 @@
     "table_skins": "Table Skins",
     "item_unlocked": "{} unlocked!",
     "status_active": "ACTIVE",
-    "status_owned": "OWNED",
-    "status_free": "FREE"
+    "status_free": "FREE",
+    "last_card_label": "The Last Card"
 }
