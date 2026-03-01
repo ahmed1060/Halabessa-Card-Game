@@ -213,7 +213,8 @@ class GameBoardScreen extends ConsumerWidget {
             child: Consumer(
               builder: (context, ref, child) {
                 final store = ref.watch(storeProvider);
-                final activeTable = StoreNotifier.allItems.firstWhere((i) => i.id == store.activeTableSkinId, orElse: () => StoreNotifier.allItems[3]);
+                final notifier = ref.watch(storeProvider.notifier);
+                final activeTable = notifier.allItems.firstWhere((i) => i.id == store.activeTableSkinId, orElse: () => notifier.allItems[3]);
                 return Image.asset(
                   activeTable.assetPath,
                   fit: BoxFit.cover,
@@ -529,18 +530,21 @@ class GameBoardScreen extends ConsumerWidget {
           }
           
           String? ownerId = matchState.cardOwnership[card.firebaseKey];
-          double startX = 0;
-          double startY = 400;
-          
           final effectiveOwnerId = ownerId ?? ((matchState.phase == GamePhase.dealingFasha || matchState.phase == GamePhase.dealingCards) && matchState.playerIds.isNotEmpty
               ? matchState.playerIds[matchState.dealerIndex % matchState.playerIds.length] 
               : null);
 
+          // Default fallback: Fly from bottom
+          double startX = 0;
+          double startY = 350;
+
           if (effectiveOwnerId != null) {
-            int myIdx = matchState.playerIds.indexOf(myUid);
-            int ownerIdx = matchState.playerIds.indexOf(effectiveOwnerId);
-            if (myIdx >= 0 && ownerIdx >= 0) {
-              int relativeIdx = (ownerIdx - myIdx + 4) % 4;
+            final myIdx = matchState.playerIds.indexOf(myUid);
+            final pivotIdx = myIdx == -1 ? 0 : myIdx; // Spectators see from Host viewpoint
+            final ownerIdx = matchState.playerIds.indexOf(effectiveOwnerId);
+
+            if (ownerIdx >= 0) {
+              final relativeIdx = (ownerIdx - pivotIdx + 4) % 4;
               if (relativeIdx == 1) { 
                 startX = 320; startY = 0; // Right Avatar
               } else if (relativeIdx == 2) { 
@@ -548,7 +552,7 @@ class GameBoardScreen extends ConsumerWidget {
               } else if (relativeIdx == 3) { 
                 startX = -320; startY = 0; // Left Avatar
               } else if (relativeIdx == 0) { 
-                // Local player: Check for specific click origin
+                // Local player (or Host in spectator view): Check for specific click origin
                 final localOrigins = ref.read(localPlayOriginsProvider);
                 final customOrigin = localOrigins[card.firebaseKey];
                 if (customOrigin != null) {
@@ -560,9 +564,6 @@ class GameBoardScreen extends ConsumerWidget {
                   startY = 350; // Standard bottom fly-in
                 }
               }
-            } else {
-              // Fallback if index not found yet (race condition)
-              startX = 0; startY = 400;
             }
           }
 

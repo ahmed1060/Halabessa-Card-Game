@@ -6,6 +6,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:halabessa/core/theme/theme_config.dart';
 import '../providers/auth_providers.dart';
+import '../../../home/presentation/providers/store_provider.dart';
 
 class AvatarPicker extends ConsumerStatefulWidget {
   const AvatarPicker({super.key});
@@ -18,14 +19,6 @@ class _AvatarPickerState extends ConsumerState<AvatarPicker> {
   final ImagePicker _picker = ImagePicker();
   bool _isUploading = false;
 
-  final List<String> _builtInAvatars = [
-    'assets/images/avatars/avatar1.png',
-    'assets/images/avatars/avatar2.png',
-    'assets/images/avatars/avatar3.png',
-    'assets/images/avatars/avatar4.png',
-    'assets/images/avatars/avatar5.png',
-    'assets/images/avatars/avatar6.png',
-  ];
 
   Future<void> _pickAndUploadImage() async {
     try {
@@ -90,11 +83,15 @@ class _AvatarPickerState extends ConsumerState<AvatarPicker> {
 
   @override
   Widget build(BuildContext context) {
+    final avatarItems = ref.watch(storeProvider.notifier).allItems
+        .where((i) => i.type == ShopItemType.avatar)
+        .toList();
+
     return Container(
       padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         color: ThemeConfig.darkBg,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -115,10 +112,11 @@ class _AvatarPickerState extends ConsumerState<AvatarPicker> {
             height: 100,
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
-              itemCount: _builtInAvatars.length,
+              itemCount: avatarItems.length,
               itemBuilder: (context, index) {
+                final item = avatarItems[index];
                 return GestureDetector(
-                  onTap: () => _selectBuiltIn(_builtInAvatars[index]),
+                  onTap: () => _selectBuiltIn(item.assetPath),
                   child: Container(
                     margin: const EdgeInsets.only(right: 16),
                     width: 80,
@@ -127,7 +125,7 @@ class _AvatarPickerState extends ConsumerState<AvatarPicker> {
                       shape: BoxShape.circle,
                       border: Border.all(color: Colors.white12),
                       image: DecorationImage(
-                        image: AssetImage(_builtInAvatars[index]),
+                        image: AssetImage(item.assetPath),
                         fit: BoxFit.cover,
                       ),
                     ),

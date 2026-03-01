@@ -680,6 +680,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
       if (c == null) break;
       board.add(c);
     }
+    _multimedia.playSfx('sfx/deal.mp3');
     await _publishState(state!.copyWith(board: List.from(board), deckCount: _secretDeck?.cards.length ?? 0));
     await Future.delayed(const Duration(milliseconds: 500));
 
@@ -1005,6 +1006,17 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
      if (pointsA >= endPhase.maxPoints || pointsB >= endPhase.maxPoints) {
           final winnerTeam = pointsA >= endPhase.maxPoints ? 'teamA' : 'teamB';
           _updateUserStatsAfterMatch(winnerTeam, pointsA, pointsB);
+
+          // Play End Match SFX
+          final currentUser = ref.read(currentUserProvider);
+          if (currentUser != null) {
+            final myTeam = _getTeamOfPlayer(currentUser.uid);
+            if (myTeam == winnerTeam) {
+              _multimedia.playSfx('sfx/win.mp3');
+            } else {
+              _multimedia.playSfx('sfx/lose.mp3');
+            }
+          }
 
           await _publishState(endPhase.copyWith(
              phase: GamePhase.rematchVoting,

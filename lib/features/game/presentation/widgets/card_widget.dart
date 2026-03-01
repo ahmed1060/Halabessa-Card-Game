@@ -30,9 +30,10 @@ class CardWidget extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final store = ref.watch(storeProvider);
-    final activeCard = StoreNotifier.allItems.firstWhere(
+    final notifier = ref.watch(storeProvider.notifier);
+    final activeCard = notifier.allItems.firstWhere(
       (i) => i.id == store.activeCardBackId, 
-      orElse: () => StoreNotifier.allItems[0]
+      orElse: () => notifier.allItems[0]
     );
 
     final effectiveBackPath = customBackPath ?? activeCard.assetPath;

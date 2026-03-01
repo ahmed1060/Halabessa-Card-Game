@@ -193,5 +193,13 @@
     "item_unlocked": "تم فتح {}!",
     "status_active": "نشط",
     "status_owned": "ممتلك",
-    "status_free": "مجاني"
+    "status_free": "مجاني",
+    "items_label": "العناصر",
+    "avatars_label": "الصور الرمزية",
+    "avatar_1": "مواطن",
+    "avatar_2": "نينجا",
+    "avatar_3": "سايبر",
+    "avatar_4": "فارس",
+    "avatar_5": "مكتشف",
+    "avatar_6": "ملكي"
 }

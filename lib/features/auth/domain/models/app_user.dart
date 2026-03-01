@@ -14,6 +14,7 @@ class AppUser {
   final int bestScore;
   final List<String> achievements;
   final bool isAdmin;
+  final List<String> ownedSkins;
 
   final Map<String, int> inventory;
 
@@ -32,8 +33,9 @@ class AppUser {
     this.losses = 0,
     this.gamesPlayed = 0,
     this.bestScore = 0,
-    this.achievements = const [],
+     this.achievements = const [],
     this.isAdmin = false,
+    this.ownedSkins = const [],
   });
 
   factory AppUser.fromJson(Map<String, dynamic> json, String uid) {
@@ -73,6 +75,7 @@ class AppUser {
       bestScore: json['bestScore'] ?? 0,
       achievements: parseFriends(json['achievements']),
       isAdmin: json['isAdmin'] ?? false,
+      ownedSkins: parseFriends(json['owned_skins']),
     );
   }
 
@@ -93,6 +96,7 @@ class AppUser {
       'bestScore': bestScore,
       'achievements': achievements,
       'isAdmin': isAdmin,
+      'owned_skins': ownedSkins,
     };
   }
 
@@ -113,6 +117,7 @@ class AppUser {
     int? bestScore,
     List<String>? achievements,
     bool? isAdmin,
+    List<String>? ownedSkins,
   }) {
     return AppUser(
       uid: uid ?? this.uid,
@@ -131,6 +136,7 @@ class AppUser {
       bestScore: bestScore ?? this.bestScore,
       achievements: achievements ?? this.achievements,
       isAdmin: isAdmin ?? this.isAdmin,
+      ownedSkins: ownedSkins ?? this.ownedSkins,
     );
   }
 }

@@ -12,6 +12,7 @@ import 'package:halabessa/core/widgets/user_avatar.dart';
 import 'package:halabessa/core/theme/theme_config.dart';
 
 import 'package:halabessa/core/utils/error_handler.dart';
+import 'package:halabessa/core/services/multimedia_service.dart';
 import 'package:halabessa/core/services/asset_preloader_service.dart';
 
 class HomeScreen extends ConsumerWidget {
@@ -21,9 +22,10 @@ class HomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(currentUserProvider);
 
-    // Initiate Asset Preloading
+    // Initiate Asset Preloading & Background Music
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(assetPreloaderServiceProvider).preloadAll(context);
+      ref.read(multimediaServiceProvider).playMusic('music/bg_music.mp3');
     });
 
     return Scaffold(

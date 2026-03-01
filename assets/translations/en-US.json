@@ -218,5 +218,12 @@
     "edit_name_hint": "Enter new name",
     "use_ticket_btn": "Use Ticket",
     "no_tickets_message": "Buy a ticket from the store to change your name.",
-    "items_label": "Items"
+    "items_label": "Items",
+    "avatars_label": "Avatars",
+    "avatar_1": "Citizen",
+    "avatar_2": "Ninja",
+    "avatar_3": "Cyber",
+    "avatar_4": "Knight",
+    "avatar_5": "Explorer",
+    "avatar_6": "Royal"
 }

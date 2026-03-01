@@ -4,6 +4,7 @@ import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
+import 'dart:math';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import '../../domain/models/app_user.dart';
 import '../../domain/repositories/auth_repository.dart';
@@ -144,8 +145,19 @@ class FirebaseAuthRepository implements AuthRepository {
         email: email,
         password: password,
       );
+      
+      // Assign Random Default Avatar
+      final random = Random();
+      final avatarIndex = random.nextInt(6) + 1;
+      final defaultAvatar = 'assets/images/avatars/avatar$avatarIndex.png';
+      
       await credential.user?.updateDisplayName(displayName);
-      final user = _userFromFirebase(credential.user);
+      await credential.user?.updatePhotoURL(defaultAvatar);
+      
+      // Reload to ensure we have the photoURL
+      await credential.user?.reload();
+      
+      final user = _userFromFirebase(_firebaseAuth.currentUser);
       if (user != null) await _syncUserToDatabase(user);
       return user;
     } catch (e) {
@@ -237,14 +249,23 @@ class FirebaseAuthRepository implements AuthRepository {
   Future<AppUser?> signInAnonymously({String? displayName}) async {
     try {
       final credential = await _firebaseAuth.signInAnonymously();
+      
+      // Assign Random Default Avatar if not set
+      if (credential.user?.photoURL == null) {
+        final random = Random();
+        final avatarIndex = random.nextInt(6) + 1;
+        final defaultAvatar = 'assets/images/avatars/avatar$avatarIndex.png';
+        await credential.user?.updatePhotoURL(defaultAvatar);
+      }
+
       if (displayName != null && displayName.trim().isNotEmpty) {
         await credential.user?.updateDisplayName(displayName.trim());
-        // We need to reload the user to get the updated display name in the returned AppUser
-        await credential.user?.reload();
-        // Force token refresh to trigger authStateChanges listener with new data
-        await credential.user?.getIdToken(true);
       }
-      // Re-fetch the current user instance from Firebase after reload to ensure we have the latest payload
+      
+      // Reload to ensure we have the updated info
+      await credential.user?.reload();
+      
+      // Re-fetch the current user instance from Firebase after reload
       final updatedUser = _firebaseAuth.currentUser;
       final user = _userFromFirebase(updatedUser);
       if (user != null) await _syncUserToDatabase(user);

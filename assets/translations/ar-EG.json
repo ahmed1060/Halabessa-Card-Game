@@ -220,5 +220,12 @@
     "edit_name_hint": "اكتب الاسم الجديد",
     "use_ticket_btn": "استخدم التذكرة",
     "no_tickets_message": "اشتري تذكرة من المحل عشان تغير اسمك.",
-    "items_label": "المتطلبات"
+    "items_label": "المتطلبات",
+    "avatars_label": "الصور الرمزية",
+    "avatar_1": "مواطن",
+    "avatar_2": "نينجا",
+    "avatar_3": "سايبر",
+    "avatar_4": "فارس",
+    "avatar_5": "مكتشف",
+    "avatar_6": "ملكي"
 }

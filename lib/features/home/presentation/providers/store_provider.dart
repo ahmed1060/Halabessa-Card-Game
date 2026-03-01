@@ -4,15 +4,16 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:halabessa/core/providers/settings_provider.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
+import '../../../auth/domain/models/app_user.dart';
 
-enum ShopItemType { cardBack, tableSkin, consumable }
+enum ShopItemType { cardBack, tableSkin, consumable, avatar }
 
 class ShopItem {
   final String id;
   final String name;
   final String assetPath;
   final String? frontSkinPath;
-  final Map<String, String>? faceIllustrations; // e.g. {'jack': '...', 'queen': '...', 'king': '...'}
+  final Map<String, String>? faceIllustrations; 
   final ShopItemType type;
   final int price;
 
@@ -25,28 +26,52 @@ class ShopItem {
     required this.type,
     this.price = 0,
   });
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'name': name,
+    'assetPath': assetPath,
+    'frontSkinPath': frontSkinPath,
+    'faceIllustrations': faceIllustrations,
+    'type': type.name,
+    'price': price,
+  };
+
+  factory ShopItem.fromJson(Map<String, dynamic> json) => ShopItem(
+    id: json['id'] ?? '',
+    name: json['name'] ?? '',
+    assetPath: json['assetPath'] ?? '',
+    frontSkinPath: json['frontSkinPath'],
+    faceIllustrations: json['faceIllustrations'] != null ? Map<String, String>.from(json['faceIllustrations']) : null,
+    type: ShopItemType.values.firstWhere((e) => e.name == json['type'], orElse: () => ShopItemType.cardBack),
+    price: json['price'] ?? 0,
+  );
 }
 
 class StoreState {
   final List<String> ownedIds;
   final String activeCardBackId;
   final String activeTableSkinId;
+  final List<ShopItem> extraItems;
 
   StoreState({
     required this.ownedIds,
     required this.activeCardBackId,
     required this.activeTableSkinId,
+    this.extraItems = const [],
   });
 
   StoreState copyWith({
     List<String>? ownedIds,
     String? activeCardBackId,
     String? activeTableSkinId,
+    List<ShopItem>? extraItems,
   }) {
     return StoreState(
       ownedIds: ownedIds ?? this.ownedIds,
       activeCardBackId: activeCardBackId ?? this.activeCardBackId,
       activeTableSkinId: activeTableSkinId ?? this.activeTableSkinId,
+      extraItems: extraItems ?? this.extraItems,
     );
   }
 }
@@ -60,27 +85,59 @@ class StoreNotifier extends StateNotifier<StoreState> {
   static const _kActiveTableSkin = 'store_active_table_skin';
 
   StoreNotifier(this._prefs, this._ref) : super(StoreState(
-    ownedIds: _prefs.getStringList(_kOwnedIds) ?? ['default_card', 'default_table'],
+    ownedIds: _prefs.getStringList(_kOwnedIds) ?? ['default_card', 'default_table', 'avatar_1'],
     activeCardBackId: _prefs.getString(_kActiveCardBack) ?? 'default_card',
     activeTableSkinId: _prefs.getString(_kActiveTableSkin) ?? 'default_table',
-  ));
+  )) {
+    _initFirestoreSync();
+  }
+
+  void _initFirestoreSync() {
+    // Sync Store Items from Settings
+    FirebaseFirestore.instance.collection('settings').doc('store').snapshots().listen((doc) {
+      if (doc.exists) {
+        final data = doc.data();
+        if (data != null && data['items'] is List) {
+          final items = (data['items'] as List).map((i) => ShopItem.fromJson(Map<String, dynamic>.from(i))).toList();
+          state = state.copyWith(extraItems: items);
+        }
+      }
+    });
+
+    // Sync Owned IDs from User Profile (Persistent Cloud Storage)
+    _ref.listen<AppUser?>(currentUserProvider, (prev, next) {
+      if (next != null) {
+        final cloudOwned = next.ownedSkins;
+        final localOwned = state.ownedIds;
+        
+        // Simple set-based comparison to see if we need to sync from cloud
+        if (cloudOwned.isNotEmpty && 
+            (cloudOwned.length != localOwned.length || 
+             !cloudOwned.every((id) => localOwned.contains(id)))) {
+          state = state.copyWith(ownedIds: cloudOwned);
+          _prefs.setStringList(_kOwnedIds, cloudOwned);
+        }
+      }
+    });
+  }
+
+  List<ShopItem> get allItems => [..._defaultItems, ...state.extraItems];
 
   Future<void> purchaseItem(ShopItem item) async {
     final user = _ref.read(currentUserProvider);
     if (user == null) return;
 
-    // Admin bypass or free items (all items are free for now as requested)
     if (!user.isAdmin && item.price > 0 && user.points < item.price) {
       throw Exception('Not enough points');
     }
 
     if (item.type == ShopItemType.consumable) {
-       // Consumables are tracked in AppUser.inventory (Firestore)
        final currentCount = user.inventory[item.id] ?? 0;
        final newInventory = Map<String, int>.from(user.inventory);
        newInventory[item.id] = currentCount + 1;
        
-       final pointsToDeduct = user.isAdmin ? 0 : item.price;
+       // EVERYTHING IS FREE FOR NOW: pointsToDeduct is effectively 0
+       const pointsToDeduct = 0; 
        
        await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
          'points': user.points - pointsToDeduct,
@@ -92,12 +149,11 @@ class StoreNotifier extends StateNotifier<StoreState> {
         state = state.copyWith(ownedIds: newOwned);
         _prefs.setStringList(_kOwnedIds, newOwned);
         
-        // Deduct points if regular user
-        if (!user.isAdmin && item.price > 0) {
-          await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
-            'points': user.points - item.price,
-          });
-        }
+        // Persist to Firestore
+        await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
+          'points': user.points, // No points deducted for now
+          'owned_skins': newOwned, 
+        });
       }
     }
   }
@@ -106,27 +162,19 @@ class StoreNotifier extends StateNotifier<StoreState> {
     final user = _ref.read(currentUserProvider);
     if (user == null || !user.isAdmin) return;
     
-    // In a real app, we'd add to Firestore 'store_items' collection.
-    // For now, we'll append to the local list and could save to a global settings doc.
-    await FirebaseFirestore.instance.collection('settings').doc('store').update({
-      'items': FieldValue.arrayUnion([
-        {
-          'id': item.id,
-          'name': item.name,
-          'assetPath': item.assetPath,
-          'type': item.type.toString().split('.').last,
-          'price': item.price,
-        }
-      ])
-    });
+    await FirebaseFirestore.instance.collection('settings').doc('store').set({
+      'items': FieldValue.arrayUnion([item.toJson()])
+    }, SetOptions(merge: true));
   }
 
   Future<void> deleteItem(String id) async {
     final user = _ref.read(currentUserProvider);
     if (user == null || !user.isAdmin) return;
 
-    // Logic to remove item from Firestore
-    // For now, we'll just show the UI for it.
+    final itemToDelete = state.extraItems.firstWhere((i) => i.id == id);
+    await FirebaseFirestore.instance.collection('settings').doc('store').update({
+      'items': FieldValue.arrayRemove([itemToDelete.toJson()])
+    });
   }
 
   void setActiveSkin(String id, ShopItemType type) {
@@ -147,7 +195,7 @@ class StoreNotifier extends StateNotifier<StoreState> {
     return allItems.firstWhere((i) => i.id == state.activeTableSkinId, orElse: () => allItems[3]);
   }
 
-  static final allItems = [
+  static final _defaultItems = [
     ShopItem(
       id: 'default_card', 
       name: 'skin_premium'.tr(), 
@@ -190,6 +238,14 @@ class StoreNotifier extends StateNotifier<StoreState> {
       type: ShopItemType.consumable,
       price: 0,
     ),
+    
+    // Default Avatars
+    ShopItem(id: 'avatar_1', name: 'avatar_1'.tr(), assetPath: 'assets/images/avatars/avatar1.png', type: ShopItemType.avatar, price: 0),
+    ShopItem(id: 'avatar_2', name: 'avatar_2'.tr(), assetPath: 'assets/images/avatars/avatar2.png', type: ShopItemType.avatar, price: 0),
+    ShopItem(id: 'avatar_3', name: 'avatar_3'.tr(), assetPath: 'assets/images/avatars/avatar3.png', type: ShopItemType.avatar, price: 0),
+    ShopItem(id: 'avatar_4', name: 'avatar_4'.tr(), assetPath: 'assets/images/avatars/avatar4.png', type: ShopItemType.avatar, price: 0),
+    ShopItem(id: 'avatar_5', name: 'avatar_5'.tr(), assetPath: 'assets/images/avatars/avatar5.png', type: ShopItemType.avatar, price: 0),
+    ShopItem(id: 'avatar_6', name: 'avatar_6'.tr(), assetPath: 'assets/images/avatars/avatar6.png', type: ShopItemType.avatar, price: 0),
   ];
 }
 

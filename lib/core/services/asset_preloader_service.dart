@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:audioplayers/audioplayers.dart';
 import '../providers/global_settings_provider.dart';
+import '../../features/home/presentation/providers/store_provider.dart';
 
 class AssetPreloaderService {
   final Ref _ref;
@@ -19,6 +20,8 @@ class AssetPreloaderService {
     await Future.wait([
       precacheImage(const AssetImage('assets/images/logo.png'), context),
       precacheImage(const AssetImage('assets/images/items/ticket.png'), context),
+      // Precache Default Music if exists
+      _audioCache.setSource(AssetSource('music/bg_music.mp3')), 
     ]);
 
     // 2. Precache Cards (Partial/High priority)
@@ -34,7 +37,34 @@ class AssetPreloaderService {
       precacheImage(AssetImage(path), context);
     }
 
-    // 3. Precache Remote Audio Overrides
+    // 3. Precache Store Items (Avatars, Skins)
+    try {
+      final storeNotifier = _ref.read(storeProvider.notifier);
+      final allItems = storeNotifier.allItems;
+      
+      for (var item in allItems) {
+        if (!context.mounted) return;
+        
+        // Main Asset
+        precacheImage(AssetImage(item.assetPath), context);
+        
+        // Front Skin Asset (if applicable)
+        if (item.frontSkinPath != null) {
+          precacheImage(AssetImage(item.frontSkinPath!), context);
+        }
+        
+        // Face Illustrations (if applicable)
+        if (item.faceIllustrations != null) {
+          for (var path in item.faceIllustrations!.values) {
+             precacheImage(AssetImage(path), context);
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('PRELOADER: Failed to precache some store items: $e');
+    }
+
+    // 4. Precache Remote Audio Overrides
     final globalSettings = _ref.read(globalSettingsProvider);
     if (globalSettings.musicOverrideUrl != null) {
       await _audioCache.setSourceUrl(globalSettings.musicOverrideUrl!);

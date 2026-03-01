@@ -80,5 +80,6 @@ flutter:
     - assets/images/items/
     - assets/images/avatars/
     - assets/sfx/
+    - assets/music/
 
   # Fonts are provided via Google Fonts CDN in web/index.html to ensure Safari compatibility and avoid duplication errors.

@@ -16,10 +16,14 @@ class _AdminAddItemDialogState extends State<AdminAddItemDialog> {
   final _idController = TextEditingController();
   final _nameController = TextEditingController();
   final _assetController = TextEditingController();
+  final _frontPathController = TextEditingController();
+  final _kingIllustController = TextEditingController();
   final _priceController = TextEditingController(text: '0');
 
   @override
   Widget build(BuildContext context) {
+    bool isSkin = widget.type == ShopItemType.cardBack;
+
     return AlertDialog(
       backgroundColor: ThemeConfig.darkBg,
       title: Text('Add New ${widget.type.name}', style: const TextStyle(color: Colors.white)),
@@ -39,9 +43,21 @@ class _AdminAddItemDialogState extends State<AdminAddItemDialog> {
             ),
             TextField(
               controller: _assetController,
-              decoration: const InputDecoration(labelText: 'Asset Path'),
+              decoration: const InputDecoration(labelText: 'Asset Path (Back/Table/Icon)'),
               style: const TextStyle(color: Colors.white),
             ),
+            if (isSkin) ...[
+              TextField(
+                controller: _frontPathController,
+                decoration: const InputDecoration(labelText: 'Front Skin Path (Optional)'),
+                style: const TextStyle(color: Colors.white),
+              ),
+              TextField(
+                controller: _kingIllustController,
+                decoration: const InputDecoration(labelText: 'King Illustration Path (Optional)'),
+                style: const TextStyle(color: Colors.white),
+              ),
+            ],
             TextField(
               controller: _priceController,
               decoration: const InputDecoration(labelText: 'Price (Stars)'),
@@ -62,10 +78,17 @@ class _AdminAddItemDialogState extends State<AdminAddItemDialog> {
 
             if (id.isEmpty || name.isEmpty || asset.isEmpty) return;
 
+            Map<String, String>? faceIllusts;
+            if (_kingIllustController.text.isNotEmpty) {
+              faceIllusts = {'king': _kingIllustController.text.trim()};
+            }
+
             final item = ShopItem(
               id: id,
               name: name,
               assetPath: asset,
+              frontSkinPath: _frontPathController.text.isNotEmpty ? _frontPathController.text.trim() : null,
+              faceIllustrations: faceIllusts,
               type: widget.type,
               price: price,
             );

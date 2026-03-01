@@ -54,11 +54,13 @@ class StoreScreen extends ConsumerWidget {
       ),
       body: CustomScrollView(
         slivers: [
-          _buildSectionHeader(context, 'card_skins'.tr(), ShopItemType.cardBack, user),
+          _buildSectionHeader(context, 'card_skins'.tr(), ShopItemType.cardBack, user, notifier),
           _buildSkinGrid(context, notifier, store, ShopItemType.cardBack, user),
-          _buildSectionHeader(context, 'table_skins'.tr(), ShopItemType.tableSkin, user),
+          _buildSectionHeader(context, 'table_skins'.tr(), ShopItemType.tableSkin, user, notifier),
           _buildSkinGrid(context, notifier, store, ShopItemType.tableSkin, user),
-          _buildSectionHeader(context, 'items_label'.tr(), ShopItemType.consumable, user),
+          _buildSectionHeader(context, 'avatars_label'.tr(), ShopItemType.avatar, user, notifier),
+          _buildSkinGrid(context, notifier, store, ShopItemType.avatar, user),
+          _buildSectionHeader(context, 'items_label'.tr(), ShopItemType.consumable, user, notifier),
           _buildSkinGrid(context, notifier, store, ShopItemType.consumable, user),
           const SliverPadding(padding: EdgeInsets.only(bottom: 40)),
         ],
@@ -66,7 +68,7 @@ class StoreScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildSectionHeader(BuildContext context, String title, ShopItemType type, AppUser? user) {
+  Widget _buildSectionHeader(BuildContext context, String title, ShopItemType type, AppUser? user, StoreNotifier notifier) {
     return SliverToBoxAdapter(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(24, 32, 24, 16),
@@ -86,7 +88,7 @@ class StoreScreen extends ConsumerWidget {
                     builder: (context) => AdminAddItemDialog(type: type),
                   );
                   if (newItem != null) {
-                    // Logic to add item
+                    await notifier.addItem(newItem);
                   }
                 },
               ),
@@ -97,7 +99,7 @@ class StoreScreen extends ConsumerWidget {
   }
 
   Widget _buildSkinGrid(BuildContext context, StoreNotifier notifier, StoreState store, ShopItemType type, AppUser? user) {
-    final items = StoreNotifier.allItems.where((i) => i.type == type).toList();
+    final items = notifier.allItems.where((i) => i.type == type).toList();
 
     return SliverPadding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -140,7 +142,7 @@ class StoreScreen extends ConsumerWidget {
                   ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
                 }
               }
-            });
+            }, onDelete: () => notifier.deleteItem(item.id));
           },
           childCount: items.length,
         ),
@@ -148,7 +150,7 @@ class StoreScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildStoreItem(BuildContext context, ShopItem item, bool isOwned, bool isActive, AppUser? user, VoidCallback onTap) {
+  Widget _buildStoreItem(BuildContext context, ShopItem item, bool isOwned, bool isActive, AppUser? user, VoidCallback onTap, {required VoidCallback onDelete}) {
     String statusText = item.price > 0 ? '${item.price} ⭐' : 'status_free'.tr();
     if (isActive) {
       statusText = 'status_active'.tr();
@@ -185,7 +187,7 @@ class StoreScreen extends ConsumerWidget {
                       borderRadius: BorderRadius.circular(16),
                       child: item.assetPath.contains('assets/') ? Image.asset(
                         item.assetPath,
-                        fit: item.type == ShopItemType.cardBack ? BoxFit.contain : BoxFit.cover,
+                        fit: (item.type == ShopItemType.cardBack || item.type == ShopItemType.avatar) ? BoxFit.contain : BoxFit.cover,
                         width: double.infinity,
                         errorBuilder: (_, __, ___) => const Icon(Icons.style, color: Colors.white24, size: 40),
                       ) : const Icon(Icons.style, color: Colors.white24, size: 40),
@@ -230,9 +232,7 @@ class StoreScreen extends ConsumerWidget {
               top: 8,
               right: 8,
               child: GestureDetector(
-                onTap: () {
-                  // Logic to delete item
-                },
+                onTap: onDelete,
                 child: Container(
                   padding: const EdgeInsets.all(4),
                   decoration: BoxDecoration(

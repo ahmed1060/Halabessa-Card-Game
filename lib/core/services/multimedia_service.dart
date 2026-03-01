@@ -23,10 +23,14 @@ class MultimediaService {
   }
 
   // Audio - Background Music
+  String? _currentMusicPath;
+
   Future<void> playMusic(String assetPath) async {
     try {
       final settings = _ref.read(settingsProvider);
       if (settings.isMusicEnabled) {
+        if (_currentMusicPath == assetPath) return; // Already playing
+
         final globalSettings = _ref.read(globalSettingsProvider);
         final overrideUrl = globalSettings.musicOverrideUrl;
 
@@ -35,6 +39,7 @@ class MultimediaService {
         } else {
           await _musicPlayer.play(AssetSource(assetPath));
         }
+        _currentMusicPath = assetPath;
       }
     } catch (e) {
       debugPrint('MultimediaService: Failed to play music $assetPath: $e');
@@ -44,6 +49,7 @@ class MultimediaService {
   Future<void> stopMusic() async {
     try {
       await _musicPlayer.stop();
+      _currentMusicPath = null;
     } catch (e) {
       debugPrint('MultimediaService: Failed to stop music: $e');
     }
@@ -55,6 +61,8 @@ class MultimediaService {
       final settings = _ref.read(settingsProvider);
       if (settings.isSoundEnabled) {
         final globalSettings = _ref.read(globalSettingsProvider);
+        
+        // Lookup using the "clean" path (e.g. 'sfx/capture.mp3')
         final overrideUrl = globalSettings.sfxOverrides[assetPath];
 
         if (overrideUrl != null && overrideUrl.isNotEmpty) {
@@ -64,15 +72,8 @@ class MultimediaService {
            return;
         }
 
-        // On Web, audioplayers v6 AssetSource uses 'assets/' as default prefix.
-        // If the path already has 'assets/', we clean it to avoid 'assets/assets/'.
-        String effectivePath = assetPath;
-        if (assetPath.startsWith('assets/')) {
-           effectivePath = assetPath.replaceFirst('assets/', '');
-        }
-        
-        // Use a local try-catch to avoid crashing the whole caller
-        await _sfxPlayer.play(AssetSource(effectivePath)).catchError((e) {
+        // Use the path directly as AssetSource (caller provides clean path)
+        await _sfxPlayer.play(AssetSource(assetPath)).catchError((e) {
           debugPrint('MultimediaService: SFX Playback error (caught): $e');
         });
       }

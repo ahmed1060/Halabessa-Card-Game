@@ -18,11 +18,11 @@ class _AdminAudioManagementScreenState extends ConsumerState<AdminAudioManagemen
   bool _isUploading = false;
 
   final List<Map<String, String>> _audioItems = [
-    {'label': 'background_music', 'path': 'assets/music/bg_music.mp3', 'type': 'music'},
-    {'label': 'capture_sfx', 'path': 'assets/sfx/capture.mp3', 'type': 'sfx'},
-    {'label': 'deal_sfx', 'path': 'assets/sfx/deal.mp3', 'type': 'sfx'},
-    {'label': 'win_sfx', 'path': 'assets/sfx/win.mp3', 'type': 'sfx'},
-    {'label': 'lose_sfx', 'path': 'assets/sfx/lose.mp3', 'type': 'sfx'},
+    {'label': 'background_music', 'path': 'music/bg_music.mp3', 'type': 'music'},
+    {'label': 'capture_sfx', 'path': 'sfx/capture.mp3', 'type': 'sfx'},
+    {'label': 'deal_sfx', 'path': 'sfx/deal.mp3', 'type': 'sfx'},
+    {'label': 'win_sfx', 'path': 'sfx/win.mp3', 'type': 'sfx'},
+    {'label': 'lose_sfx', 'path': 'sfx/lose.mp3', 'type': 'sfx'},
   ];
 
   Future<void> _pickAndUpload(String assetPath, String type) async {
