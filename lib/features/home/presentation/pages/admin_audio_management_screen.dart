@@ -1,0 +1,171 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:easy_localization/easy_localization.dart';
+import 'package:halabessa/core/providers/global_settings_provider.dart';
+import 'package:halabessa/core/theme/theme_config.dart';
+import 'package:halabessa/core/services/multimedia_service.dart';
+
+class AdminAudioManagementScreen extends ConsumerStatefulWidget {
+  const AdminAudioManagementScreen({super.key});
+
+  @override
+  ConsumerState<AdminAudioManagementScreen> createState() => _AdminAudioManagementScreenState();
+}
+
+class _AdminAudioManagementScreenState extends ConsumerState<AdminAudioManagementScreen> {
+  bool _isUploading = false;
+
+  final List<Map<String, String>> _audioItems = [
+    {'label': 'background_music', 'path': 'assets/music/bg_music.mp3', 'type': 'music'},
+    {'label': 'capture_sfx', 'path': 'assets/sfx/capture.mp3', 'type': 'sfx'},
+    {'label': 'deal_sfx', 'path': 'assets/sfx/deal.mp3', 'type': 'sfx'},
+    {'label': 'win_sfx', 'path': 'assets/sfx/win.mp3', 'type': 'sfx'},
+    {'label': 'lose_sfx', 'path': 'assets/sfx/lose.mp3', 'type': 'sfx'},
+  ];
+
+  Future<void> _pickAndUpload(String assetPath, String type) async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['mp3', 'wav', 'm4a'],
+      );
+
+      if (result != null && result.files.single.bytes != null) {
+        setState(() => _isUploading = true);
+        
+        final fileName = '${DateTime.now().millisecondsSinceEpoch}_${result.files.single.name}';
+        final storageRef = FirebaseStorage.instance.ref().child('audio/$fileName');
+        
+        final uploadTask = storageRef.putData(
+          result.files.single.bytes!,
+          SettableMetadata(contentType: 'audio/mpeg'),
+        );
+        
+        final snapshot = await uploadTask;
+        final downloadUrl = await snapshot.ref.getDownloadURL();
+        
+        final currentSettings = ref.read(globalSettingsProvider);
+        if (type == 'music') {
+          await ref.read(globalSettingsProvider.notifier).updateSettings(
+            currentSettings.copyWith(musicOverrideUrl: downloadUrl),
+          );
+        } else {
+          final newSfx = Map<String, String>.from(currentSettings.sfxOverrides);
+          newSfx[assetPath] = downloadUrl;
+          await ref.read(globalSettingsProvider.notifier).updateSettings(
+            currentSettings.copyWith(sfxOverrides: newSfx),
+          );
+        }
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('upload_success'.tr())),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Error uploading audio: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('upload_failed'.tr(args: [e.toString()]))),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isUploading = false);
+    }
+  }
+
+  Future<void> _resetToDefault(String assetPath, String type) async {
+    final currentSettings = ref.read(globalSettingsProvider);
+    if (type == 'music') {
+      await ref.read(globalSettingsProvider.notifier).updateSettings(
+        currentSettings.copyWith(musicOverrideUrl: null),
+      );
+    } else {
+      final newSfx = Map<String, String>.from(currentSettings.sfxOverrides);
+      newSfx.remove(assetPath);
+      await ref.read(globalSettingsProvider.notifier).updateSettings(
+        currentSettings.copyWith(sfxOverrides: newSfx),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final globalSettings = ref.watch(globalSettingsProvider);
+
+    return Scaffold(
+      backgroundColor: const Color(0xFF0D1B2A),
+      appBar: AppBar(
+        title: Text('manage_audio'.tr()),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+      ),
+      body: Stack(
+        children: [
+          ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: _audioItems.length,
+            itemBuilder: (context, index) {
+              final item = _audioItems[index];
+              final assetPath = item['path']!;
+              final type = item['type']!;
+              final isOverridden = type == 'music' 
+                  ? globalSettings.musicOverrideUrl != null 
+                  : globalSettings.sfxOverrides.containsKey(assetPath);
+
+              return Container(
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: isOverridden ? ThemeConfig.goldAccent.withOpacity(0.3) : Colors.white10),
+                ),
+                child: ListTile(
+                  title: Text(item['label']!.tr(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  subtitle: Text(
+                    isOverridden ? 'status_custom'.tr() : 'status_default'.tr(),
+                    style: TextStyle(color: isOverridden ? ThemeConfig.goldAccent : Colors.white54, fontSize: 12),
+                  ),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.play_arrow_rounded, color: Colors.white70),
+                        onPressed: () {
+                          if (type == 'music') {
+                            ref.read(multimediaServiceProvider).playMusic(assetPath);
+                          } else {
+                            ref.read(multimediaServiceProvider).playSfx(assetPath);
+                          }
+                        },
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.upload_file_rounded, color: ThemeConfig.goldAccent),
+                        onPressed: () => _pickAndUpload(assetPath, type),
+                      ),
+                      if (isOverridden)
+                        IconButton(
+                          icon: const Icon(Icons.history_rounded, color: Colors.redAccent),
+                          onPressed: () => _resetToDefault(assetPath, type),
+                        ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+          if (_isUploading)
+            Container(
+              color: Colors.black54,
+              child: const Center(
+                child: CircularProgressIndicator(color: ThemeConfig.goldAccent),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}

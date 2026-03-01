@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:halabessa/core/providers/settings_provider.dart';
 import 'package:halabessa/core/theme/theme_config.dart';
+import 'package:halabessa/features/auth/presentation/providers/auth_providers.dart';
 
 class SettingsOverlay extends ConsumerWidget {
   const SettingsOverlay({super.key});
@@ -56,6 +57,8 @@ class SettingsOverlay extends ConsumerWidget {
               Icons.volume_up_rounded,
               settings.isSoundEnabled,
               (val) => notifier.toggleSound(val),
+              isAdmin: ref.watch(currentUserProvider)?.isAdmin ?? false,
+              onManage: () => Navigator.pushNamed(context, '/admin/audio'),
             ),
             _buildToggleTile(
               context,
@@ -63,6 +66,8 @@ class SettingsOverlay extends ConsumerWidget {
               Icons.music_note_rounded,
               settings.isMusicEnabled,
               (val) => notifier.toggleMusic(val),
+              isAdmin: ref.watch(currentUserProvider)?.isAdmin ?? false,
+              onManage: () => Navigator.pushNamed(context, '/admin/audio'),
             ),
             _buildToggleTile(
               context,
@@ -110,8 +115,10 @@ class SettingsOverlay extends ConsumerWidget {
     String title,
     IconData icon,
     bool value,
-    ValueChanged<bool> onChanged,
-  ) {
+    ValueChanged<bool> onChanged, {
+    bool isAdmin = false,
+    VoidCallback? onManage,
+  }) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
@@ -121,10 +128,21 @@ class SettingsOverlay extends ConsumerWidget {
       child: ListTile(
         leading: Icon(icon, color: ThemeConfig.goldAccent),
         title: Text(title, style: const TextStyle(color: Colors.white)),
-        trailing: Switch.adaptive(
-          value: value,
-          onChanged: onChanged,
-          activeColor: ThemeConfig.goldAccent,
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (isAdmin && onManage != null)
+              IconButton(
+                icon: const Icon(Icons.settings_suggest, color: ThemeConfig.goldAccent, size: 20),
+                onPressed: onManage,
+                tooltip: 'manage_audio'.tr(),
+              ),
+            Switch.adaptive(
+              value: value,
+              onChanged: onChanged,
+              activeColor: ThemeConfig.goldAccent,
+            ),
+          ],
         ),
       ),
     );

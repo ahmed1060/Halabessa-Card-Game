@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/settings_provider.dart';
+import '../providers/global_settings_provider.dart';
 
 class MultimediaService {
   final AudioPlayer _musicPlayer = AudioPlayer();
@@ -26,7 +27,14 @@ class MultimediaService {
     try {
       final settings = _ref.read(settingsProvider);
       if (settings.isMusicEnabled) {
-        await _musicPlayer.play(AssetSource(assetPath));
+        final globalSettings = _ref.read(globalSettingsProvider);
+        final overrideUrl = globalSettings.musicOverrideUrl;
+
+        if (overrideUrl != null && overrideUrl.isNotEmpty) {
+          await _musicPlayer.play(UrlSource(overrideUrl));
+        } else {
+          await _musicPlayer.play(AssetSource(assetPath));
+        }
       }
     } catch (e) {
       debugPrint('MultimediaService: Failed to play music $assetPath: $e');
@@ -46,14 +54,27 @@ class MultimediaService {
     try {
       final settings = _ref.read(settingsProvider);
       if (settings.isSoundEnabled) {
-        // On Web, if we use AssetSource('sfx/...'), it might double-prefix.
-        // audioplayers v6 AssetSource uses 'assets/' as default prefix.
-        // If the path already has 'assets/', we might get 'assets/assets/'.
+        final globalSettings = _ref.read(globalSettingsProvider);
+        final overrideUrl = globalSettings.sfxOverrides[assetPath];
+
+        if (overrideUrl != null && overrideUrl.isNotEmpty) {
+           await _sfxPlayer.play(UrlSource(overrideUrl)).catchError((e) {
+             debugPrint('MultimediaService: Remote SFX Playback error: $e');
+           });
+           return;
+        }
+
+        // On Web, audioplayers v6 AssetSource uses 'assets/' as default prefix.
+        // If the path already has 'assets/', we clean it to avoid 'assets/assets/'.
         String effectivePath = assetPath;
-        if (kIsWeb && assetPath.startsWith('assets/')) {
+        if (assetPath.startsWith('assets/')) {
            effectivePath = assetPath.replaceFirst('assets/', '');
         }
-        await _sfxPlayer.play(AssetSource(effectivePath));
+        
+        // Use a local try-catch to avoid crashing the whole caller
+        await _sfxPlayer.play(AssetSource(effectivePath)).catchError((e) {
+          debugPrint('MultimediaService: SFX Playback error (caught): $e');
+        });
       }
     } catch (e) {
       debugPrint('MultimediaService: Failed to play SFX $assetPath: $e');

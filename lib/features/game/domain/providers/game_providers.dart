@@ -12,7 +12,6 @@ import '../../domain/logic/deck.dart';
 import '../../domain/logic/game_engine_utils.dart';
 import '../../data/repositories/multiplayer_sync_service.dart';
 import '../../../../features/auth/presentation/providers/auth_providers.dart';
-import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'package:flutter/material.dart';
 import 'package:halabessa/core/services/multimedia_service.dart';
 
@@ -449,7 +448,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
         if (isTafweetMode && matchingCards.length >= 2 && hand.length > 1) {
            final nonMatching = hand.where((c) => c.rank != topRank).toList();
            if (nonMatching.isNotEmpty) {
-             debugPrint('BOT STRATEGY: Baiting Tafweet for ${topRank.name}');
+             // debugPrint('BOT STRATEGY: Baiting Tafweet for ${topRank.name}');
              playCard(botId, nonMatching[Random().nextInt(nonMatching.length)]);
              return;
            }
@@ -1019,7 +1018,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
          // 3. Otherwise, just deal next round.
          
          if (endPhase.roundsSinceLastShuffle >= 5) {
-            debugPrint('SHUFFLE: Forced shuffle triggered (6th round).');
+// debugPrint('SHUFFLE: Forced shuffle triggered (6th round).');
             await _setupNewRound(forceShuffle: true);
          } else if (endPhase.roundsSinceLastShuffle >= 2) {
             // Rotate dealer, trigger UI prompt for Shuffle/No-Shuffle
@@ -1030,7 +1029,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
                playHistory: [],
             ));
          } else {
-            debugPrint('SHUFFLE: Skipping vote, moving to round ${endPhase.roundCount + 1}');
+// debugPrint('SHUFFLE: Skipping vote, moving to round ${endPhase.roundCount + 1}');
             await _setupNewRound(forceShuffle: false);
          }
       }
@@ -1122,7 +1121,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     if (skipped[playerId]?.contains(skipKey) == true) {
       skipped[playerId]?.remove(skipKey);
       _publishState(currentState.copyWith(skippedMatches: skipped));
-      debugPrint('TAFWEET: Skip $skipKey for $playerId expired.');
+// debugPrint('TAFWEET: Skip $skipKey for $playerId expired.');
     }
   }
 
@@ -1143,7 +1142,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     // Only Host records stats in Firestore to prevent duplicate writes
     if (!isHost) return;
 
-    debugPrint('FIRESTORE: Recording match stats for winner $winnerTeam');
+// debugPrint('FIRESTORE: Recording match stats for winner $winnerTeam');
 
     for (int i = 0; i < currentState.playerIds.length; i++) {
       final playerId = currentState.playerIds[i];

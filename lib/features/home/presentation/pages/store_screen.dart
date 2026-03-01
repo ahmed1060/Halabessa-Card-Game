@@ -1,11 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easy_localization/easy_localization.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:halabessa/features/auth/presentation/providers/auth_providers.dart';
-import 'package:halabessa/features/auth/domain/repositories/auth_repository.dart';
 import 'package:halabessa/features/auth/domain/models/app_user.dart';
-import 'package:halabessa/features/auth/presentation/providers/auth_providers.dart';
 import '../../../../core/theme/theme_config.dart';
 import '../providers/store_provider.dart';
 import '../widgets/admin_add_item_dialog.dart';

@@ -49,6 +49,7 @@ dependencies:
   firebase_storage: ^12.1.0
   image_picker: ^1.1.2
   quiver: ^3.2.1
+  file_picker: ^8.0.0+1
 
 dev_dependencies:
   flutter_test:
@@ -76,6 +77,8 @@ flutter:
     - assets/images/cards/neon/
     - assets/images/cards/royal/
     - assets/images/tables/
+    - assets/images/items/
+    - assets/images/avatars/
     - assets/sfx/
 
   # Fonts are provided via Google Fonts CDN in web/index.html to ensure Safari compatibility and avoid duplication errors.

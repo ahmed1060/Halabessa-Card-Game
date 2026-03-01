@@ -12,6 +12,7 @@ import 'package:halabessa/core/widgets/user_avatar.dart';
 import 'package:halabessa/core/theme/theme_config.dart';
 
 import 'package:halabessa/core/utils/error_handler.dart';
+import 'package:halabessa/core/services/asset_preloader_service.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -19,6 +20,11 @@ class HomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(currentUserProvider);
+
+    // Initiate Asset Preloading
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(assetPreloaderServiceProvider).preloadAll(context);
+    });
 
     return Scaffold(
       extendBodyBehindAppBar: true,
