@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
@@ -22,6 +23,7 @@ class _AdminSfxManagementScreenState extends ConsumerState<AdminSfxManagementScr
     {'label': 'deal_sfx', 'path': 'sfx/deal.mp3', 'type': 'sfx'},
     {'label': 'win_sfx', 'path': 'sfx/win.mp3', 'type': 'sfx'},
     {'label': 'lose_sfx', 'path': 'sfx/lose.mp3', 'type': 'sfx'},
+    {'label': 'purchase_sfx', 'path': 'sfx/purchase.mp3', 'type': 'sfx'},
   ];
 
   Future<void> _pickAndUpload(String assetPath, String type) async {
@@ -29,32 +31,33 @@ class _AdminSfxManagementScreenState extends ConsumerState<AdminSfxManagementScr
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['mp3', 'wav', 'm4a'],
-        withData: true, // Crucial for web and some mobile scenarios
+        withData: true,
       );
 
       if (result != null && result.files.single.bytes != null) {
+        final bytes = result.files.single.bytes!;
+        
+        // Firestore 1MB limit check (1,048,576 bytes)
+        // Base64 adds ~33% overhead, so we check for ~750KB to be safe
+        if (bytes.length > 750 * 1024) {
+          throw Exception('file_too_large');
+        }
+
         setState(() => _isUploading = true);
         
-        final fileName = '${DateTime.now().millisecondsSinceEpoch}_${result.files.single.name}';
-        final storageRef = FirebaseStorage.instance.ref().child('audio/$fileName');
-        
-        final uploadTask = storageRef.putData(
-          result.files.single.bytes!,
-          SettableMetadata(contentType: 'audio/mpeg'),
-        );
-        
-        // Use a timeout to prevent "forever loading"
-        final snapshot = await uploadTask.timeout(const Duration(seconds: 30));
-        final downloadUrl = await snapshot.ref.getDownloadURL();
+        final base64String = base64Encode(bytes);
+        final extension = result.files.single.extension ?? 'mp3';
+        final mimeType = extension == 'wav' ? 'audio/wav' : 'audio/mpeg';
+        final dataUri = 'data:$mimeType;base64,$base64String';
         
         final currentSettings = ref.read(globalSettingsProvider);
         if (type == 'music') {
           await ref.read(globalSettingsProvider.notifier).updateSettings(
-            currentSettings.copyWith(musicOverrideUrl: downloadUrl),
+            currentSettings.copyWith(musicOverrideUrl: dataUri),
           );
         } else {
           final newSfx = Map<String, String>.from(currentSettings.sfxOverrides);
-          newSfx[assetPath] = downloadUrl;
+          newSfx[assetPath] = dataUri;
           await ref.read(globalSettingsProvider.notifier).updateSettings(
             currentSettings.copyWith(sfxOverrides: newSfx),
           );
@@ -69,10 +72,11 @@ class _AdminSfxManagementScreenState extends ConsumerState<AdminSfxManagementScr
     } catch (e) {
       debugPrint('Error uploading audio: $e');
       String errorMessage = e.toString();
-      if (e is FirebaseException) {
-        errorMessage = 'Firebase Error: ${e.code} - ${e.message}';
+      
+      if (errorMessage.contains('file_too_large')) {
+        errorMessage = 'File too large for free storage (max 750KB). Please use a small MP3.';
       } else if (e is StateError) {
-        errorMessage = 'Upload failed or timed out. Please try again.';
+        errorMessage = 'Upload failed. Please try again.';
       }
 
       if (mounted) {

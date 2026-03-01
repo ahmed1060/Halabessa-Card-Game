@@ -67,6 +67,7 @@
     "deal_sfx": "Deal Cards Sound",
     "win_sfx": "Victory Sound",
     "lose_sfx": "Defeat Sound",
+    "purchase_sfx": "Purchase Sound",
     "player_profile": "Player Profile",
     "not_logged_in": "Not logged in.",
     "guest_account": "Guest Account",

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:halabessa/features/auth/presentation/providers/auth_providers.dart';
 import 'package:halabessa/features/auth/domain/models/app_user.dart';
+import '../../../../core/services/multimedia_service.dart';
 import '../../../../core/theme/theme_config.dart';
 import '../providers/store_provider.dart';
 import '../widgets/admin_add_item_dialog.dart';
@@ -123,6 +124,7 @@ class StoreScreen extends ConsumerWidget {
                 if (item.type == ShopItemType.consumable) {
                   await notifier.purchaseItem(item);
                   if (context.mounted) {
+                    ref.read(multimediaServiceProvider).playSfx('sfx/purchase.mp3');
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(content: Text('item_unlocked'.tr(args: [item.name]))),
                     );
@@ -132,6 +134,7 @@ class StoreScreen extends ConsumerWidget {
                 } else {
                   await notifier.purchaseItem(item);
                   if (context.mounted) {
+                    ref.read(multimediaServiceProvider).playSfx('sfx/purchase.mp3');
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(content: Text('item_unlocked'.tr(args: [item.name]))),
                     );

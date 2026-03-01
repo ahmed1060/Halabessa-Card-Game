@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -35,7 +37,13 @@ class MultimediaService {
         final overrideUrl = globalSettings.musicOverrideUrl;
 
         if (overrideUrl != null && overrideUrl.isNotEmpty) {
-          await _musicPlayer.play(UrlSource(overrideUrl));
+          if (overrideUrl.startsWith('data:')) {
+            final base64Data = overrideUrl.split(',').last;
+            final bytes = base64Decode(base64Data);
+            await _musicPlayer.play(BytesSource(bytes));
+          } else {
+            await _musicPlayer.play(UrlSource(overrideUrl));
+          }
         } else {
           await _musicPlayer.play(AssetSource(assetPath));
         }
@@ -66,10 +74,18 @@ class MultimediaService {
         final overrideUrl = globalSettings.sfxOverrides[assetPath];
 
         if (overrideUrl != null && overrideUrl.isNotEmpty) {
-           await _sfxPlayer.play(UrlSource(overrideUrl)).catchError((e) {
-             debugPrint('MultimediaService: Remote SFX Playback error: $e');
-           });
-           return;
+          if (overrideUrl.startsWith('data:')) {
+            final base64Data = overrideUrl.split(',').last;
+            final bytes = base64Decode(base64Data);
+            await _sfxPlayer.play(BytesSource(bytes)).catchError((e) {
+              debugPrint('MultimediaService: Base64 SFX Playback error: $e');
+            });
+          } else {
+            await _sfxPlayer.play(UrlSource(overrideUrl)).catchError((e) {
+              debugPrint('MultimediaService: Remote SFX Playback error: $e');
+            });
+          }
+          return;
         }
 
         // Use the path directly as AssetSource (caller provides clean path)
