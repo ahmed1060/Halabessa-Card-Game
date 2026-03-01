@@ -136,9 +136,9 @@ class SettingsOverlay extends ConsumerWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
-        _buildLangButton(context, ref, 'English', const Locale('en', 'US'), currentLocale),
-        _buildLangButton(context, ref, 'عربي (مصر)', const Locale('ar', 'EG'), currentLocale),
-        _buildLangButton(context, ref, 'عربي (سعودي)', const Locale('ar', 'SA'), currentLocale),
+        _buildLangButton(context, ref, 'english'.tr(), const Locale('en', 'US'), currentLocale),
+        _buildLangButton(context, ref, 'arabic_eg'.tr(), const Locale('ar', 'EG'), currentLocale),
+        _buildLangButton(context, ref, 'arabic_sa'.tr(), const Locale('ar', 'SA'), currentLocale),
       ],
     );
   }

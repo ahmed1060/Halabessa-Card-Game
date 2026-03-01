@@ -90,7 +90,7 @@ class StoreNotifier extends StateNotifier<StoreState> {
   static final allItems = [
     ShopItem(
       id: 'default_card', 
-      name: 'Classic Premium', 
+      name: 'skin_premium'.tr(), 
       assetPath: 'assets/images/cards/premium/card_back_premium.png', 
       frontSkinPath: 'assets/images/cards/premium/card_front_premium_bg.png', 
       faceIllustrations: {'king': 'assets/images/cards/premium/card_face_premium.png'},
@@ -98,7 +98,7 @@ class StoreNotifier extends StateNotifier<StoreState> {
     ),
     ShopItem(
       id: 'neon_card', 
-      name: 'Neon Cyber', 
+      name: 'skin_neon'.tr(), 
       assetPath: 'assets/images/cards/neon/card_back_neon.png', 
       frontSkinPath: 'assets/images/cards/neon/card_front_neon_bg.png', 
       faceIllustrations: {'king': 'assets/images/cards/neon/card_face_neon.png'},
@@ -106,7 +106,7 @@ class StoreNotifier extends StateNotifier<StoreState> {
     ),
     ShopItem(
       id: 'royal_card', 
-      name: 'Royal Velvet', 
+      name: 'skin_royal'.tr(), 
       assetPath: 'assets/images/cards/royal/card_back_royal.png', 
       frontSkinPath: 'assets/images/cards/royal/card_front_royal_bg.png', 
       faceIllustrations: {
@@ -117,8 +117,8 @@ class StoreNotifier extends StateNotifier<StoreState> {
       type: ShopItemType.cardBack,
     ),
     
-    ShopItem(id: 'default_table', name: 'Casino Felt', assetPath: 'assets/images/tables/table_skin_emerald.png', type: ShopItemType.tableSkin),
-    ShopItem(id: 'galaxy_table', name: 'Cosmic Galaxy', assetPath: 'assets/images/tables/table_skin_galaxy.png', type: ShopItemType.tableSkin),
+    ShopItem(id: 'default_table', name: 'skin_casino'.tr(), assetPath: 'assets/images/tables/table_skin_emerald.png', type: ShopItemType.tableSkin),
+    ShopItem(id: 'galaxy_table', name: 'skin_galaxy'.tr(), assetPath: 'assets/images/tables/table_skin_galaxy.png', type: ShopItemType.tableSkin),
   ];
 }
 

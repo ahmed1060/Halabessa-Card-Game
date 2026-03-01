@@ -17,13 +17,13 @@ class StoreScreen extends ConsumerWidget {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        title: const Text('Halabessa Store', style: TextStyle(fontFamily: ThemeConfig.fontHeading, letterSpacing: 1.5)),
+        title: Text('store_title'.tr(), style: const TextStyle(fontFamily: ThemeConfig.fontHeading, letterSpacing: 1.5)),
       ),
       body: CustomScrollView(
         slivers: [
-          _buildSectionHeader('Card Skins'),
+          _buildSectionHeader('card_skins'.tr()),
           _buildSkinGrid(context, notifier, store, ShopItemType.cardBack),
-          _buildSectionHeader('Table Skins'),
+          _buildSectionHeader('table_skins'.tr()),
           _buildSkinGrid(context, notifier, store, ShopItemType.tableSkin),
           const SliverPadding(padding: EdgeInsets.only(bottom: 40)),
         ],
@@ -69,7 +69,7 @@ class StoreScreen extends ConsumerWidget {
               } else {
                 notifier.purchaseItem(item.id);
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('${item.name} unlocked!')),
+                  SnackBar(content: Text('item_unlocked'.tr(args: [item.name]))),
                 );
               }
             });
@@ -81,6 +81,13 @@ class StoreScreen extends ConsumerWidget {
   }
 
   Widget _buildStoreItem(BuildContext context, ShopItem item, bool isOwned, bool isActive, VoidCallback onTap) {
+    String statusText = 'status_free'.tr();
+    if (isActive) {
+      statusText = 'status_active'.tr();
+    } else if (isOwned) {
+      statusText = 'status_owned'.tr();
+    }
+
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
@@ -130,7 +137,7 @@ class StoreScreen extends ConsumerWidget {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
-                      isActive ? 'ACTIVE' : (isOwned ? 'OWNED' : 'FREE'),
+                      statusText,
                       style: TextStyle(
                         fontFamily: ThemeConfig.fontBody,
                         fontSize: 10, 

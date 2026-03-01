@@ -100,11 +100,11 @@ class _ChatOverlayState extends ConsumerState<ChatOverlay> {
                   scrollDirection: Axis.horizontal,
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   children: [
-                    _buildQuickChatChip('GG! 🤝'),
-                    _buildQuickChatChip('Nice Play! ✨'),
-                    _buildQuickChatChip('Your Turn ⏳'),
-                    _buildQuickChatChip('Hala8essa! 🔥'),
-                    _buildQuickChatChip('Oops 😅'),
+                    _buildQuickChatChip('msg_gg'.tr()),
+                    _buildQuickChatChip('msg_nice_play'.tr()),
+                    _buildQuickChatChip('msg_your_turn'.tr()),
+                    _buildQuickChatChip('msg_hala8essa'.tr()),
+                    _buildQuickChatChip('msg_oops'.tr()),
                   ],
                 ),
               ),
@@ -164,7 +164,7 @@ class _ChatOverlayState extends ConsumerState<ChatOverlay> {
                     );
                   },
                   loading: () => const Center(child: CircularProgressIndicator()),
-                  error: (e, _) => Center(child: Text('Error loading chat', style: TextStyle(color: Colors.red))),
+                  error: (e, _) => Center(child: Text('chat_error'.tr(), style: const TextStyle(color: Colors.red))),
                 ),
               ),
 
