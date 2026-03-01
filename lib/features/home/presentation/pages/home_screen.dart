@@ -337,17 +337,27 @@ class HomeScreen extends ConsumerWidget {
                onPressed: () => Navigator.pop(dialogContext),
                child: Text('cancel'.tr()),
              ),
-             ElevatedButton(
-               onPressed: () {
-                 final roomId = roomController.text.trim().toUpperCase();
-                 if (roomId.isNotEmpty) {
-                    Navigator.pop(dialogContext);
-                    ref.read(matchStateProvider.notifier).joinMatch(roomId, playerId, displayName);
-                    Navigator.pushNamed(context, '/game');
-                 }
-               },
-               child: Text('join'.tr()),
-             ),
+              ElevatedButton(
+                onPressed: () async {
+                  final roomId = roomController.text.trim().toUpperCase();
+                  if (roomId.isNotEmpty) {
+                    try {
+                      await ref.read(matchStateProvider.notifier).joinMatch(roomId, playerId, displayName);
+                      if (context.mounted) {
+                        Navigator.pop(dialogContext);
+                        Navigator.pushNamed(context, '/game');
+                      }
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(ErrorHandler.getAuthErrorMessage(e))),
+                        );
+                      }
+                    }
+                  }
+                },
+                child: Text('join'.tr()),
+              ),
           ],
         );
       }

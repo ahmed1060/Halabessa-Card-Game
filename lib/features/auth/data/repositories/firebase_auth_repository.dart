@@ -92,6 +92,39 @@ class FirebaseAuthRepository implements AuthRepository {
       final user = _userFromFirebase(credential.user);
       if (user != null) await _syncUserToDatabase(user);
       return user;
+    } on firebase_auth.FirebaseAuthException catch (e) {
+      debugPrint("Email Login failed: ${e.code}");
+      
+      // If Firebase returns generic "invalid-credential" (common with email enumeration protection),
+      // we manually check Firestore to give the specific message the user wants.
+      if (e.code == 'invalid-credential') {
+        try {
+          final snapshot = await FirebaseFirestore.instance
+              .collection('users')
+              .where('email', isEqualTo: email)
+              .limit(1)
+              .get();
+              
+          if (snapshot.docs.isEmpty) {
+            // No user found with this email in our database
+            throw firebase_auth.FirebaseAuthException(
+              code: 'user-not-found',
+              message: 'This email is not registered.',
+            );
+          } else {
+            // User exists, so the password must be wrong
+            throw firebase_auth.FirebaseAuthException(
+              code: 'wrong-password',
+              message: 'Incorrect password.',
+            );
+          }
+        } catch (checkError) {
+          if (checkError is firebase_auth.FirebaseAuthException) rethrow;
+          // If Firestore check fails, fall back to the original error
+          rethrow;
+        }
+      }
+      rethrow;
     } catch (e) {
       debugPrint("Email Login failed: $e");
       rethrow;

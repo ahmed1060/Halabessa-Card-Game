@@ -1,0 +1,6 @@
+Analyzing Halabessa-Card-Game...                                
+
+  error - Undefined name '_matchRef' - lib\features\game\data\repositories\multiplayer_sync_service.dart:149:12 - undefined_identifier
+  error - Too many positional arguments: 1 expected, but 2 found - lib\features\game\domain\providers\game_providers.dart:520:95 - extra_positional_arguments
+
+2 issues found. (ran in 2.2s)

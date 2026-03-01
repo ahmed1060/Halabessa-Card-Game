@@ -46,6 +46,8 @@ class ErrorHandler {
         return 'error_service_unavailable'.tr();
       case 'not-found':
         return 'error_not_found'.tr();
+      case 'room-full':
+        return 'error_room_full'.tr();
       default:
         return 'error_general'.tr(args: [error.message ?? error.code]);
     }

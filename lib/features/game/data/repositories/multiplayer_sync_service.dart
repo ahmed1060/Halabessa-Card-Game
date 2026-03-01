@@ -9,20 +9,20 @@ class MultiplayerSyncService {
 
   MultiplayerSyncService(this._db);
 
-  DatabaseReference get _matchRef => _db.ref('matches');
+  DatabaseReference get matchRef => _db.ref('matches');
 
   /// Create a new match room in Firebase Realtime Database
   Future<void> createMatch(MatchState matchState) async {
-    await _matchRef.child(matchState.id).set(matchState.toJson());
+    await matchRef.child(matchState.id).set(matchState.toJson());
   }
 
   /// Update an entire existing match state
   Future<void> updateMatchState(MatchState matchState) async {
-    await _matchRef.child(matchState.id).update(matchState.toJson());
+    await matchRef.child(matchState.id).update(matchState.toJson());
   }
 
   Stream<MatchState?> watchMatch(String matchId) {
-    return _matchRef.child(matchId).onValue.map((event) {
+    return matchRef.child(matchId).onValue.map((event) {
       final value = event.snapshot.value;
       if (value == null || value is! Map) return null;
       
@@ -40,7 +40,7 @@ class MultiplayerSyncService {
 
   /// Sync presence for a player: sets online status and removes it on disconnect
   Future<void> syncPresence(String matchId, String playerId) async {
-    final presenceRef = _matchRef.child(matchId).child('presence').child(playerId);
+    final presenceRef = matchRef.child(matchId).child('presence').child(playerId);
     // Set online status to true
     await presenceRef.set(true);
     // Set onDisconnect behavior
@@ -49,7 +49,7 @@ class MultiplayerSyncService {
 
   /// Watch presence changes for all players in a match
   Stream<Map<String, bool>> watchPresence(String matchId) {
-    return _matchRef.child(matchId).child('presence').onValue.map((event) {
+    return matchRef.child(matchId).child('presence').onValue.map((event) {
       final value = event.snapshot.value;
       if (value == null || value is! Map) return <String, bool>{};
       return Map<String, bool>.from(value.map((k, v) => MapEntry(k.toString(), v == true)));
@@ -58,7 +58,7 @@ class MultiplayerSyncService {
 
   /// Listen to all public matches
   Stream<List<MatchState>> watchPublicMatches() {
-    return _matchRef.onValue.map((event) {
+    return matchRef.onValue.map((event) {
       if (event.snapshot.value == null) return [];
       try {
         if (event.snapshot.value is! Map) return [];
@@ -90,7 +90,7 @@ class MultiplayerSyncService {
 
   /// Add a specific action/move event to a log (if needed for replay or verification)
   Future<void> submitAction(String matchId, String playerId, Map<String, dynamic> actionData) async {
-    final actionRef = _matchRef.child(matchId).child('actions').push();
+    final actionRef = matchRef.child(matchId).child('actions').push();
     await actionRef.set({
       'playerId': playerId,
       'timestamp': ServerValue.timestamp,
@@ -140,13 +140,13 @@ class MultiplayerSyncService {
 
   /// CHAT: Send a message to the match chat
   Future<void> sendChatMessage(String matchId, ChatMessage message) async {
-    final chatRef = _matchRef.child(matchId).child('chat').push();
+    final chatRef = matchRef.child(matchId).child('chat').push();
     await chatRef.set(message.toJson());
   }
 
   /// CHAT: Watch for new messages in a match
   Stream<List<ChatMessage>> watchChatMessages(String matchId) {
-    return _matchRef.child(matchId).child('chat')
+    return matchRef.child(matchId).child('chat')
       .orderByChild('timestamp')
       .limitToLast(50)
       .onValue.map((event) {

@@ -13,6 +13,7 @@ import '../../domain/logic/game_engine_utils.dart';
 import '../../data/repositories/multiplayer_sync_service.dart';
 import 'package:flutter/foundation.dart';
 import '../../../../features/auth/presentation/providers/auth_providers.dart';
+import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'package:halabessa/core/services/multimedia_service.dart';
 
 final multiplayerSyncServiceProvider = Provider<MultiplayerSyncService>((ref) {
@@ -504,37 +505,38 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     bindToMatch(newId);
   }
 
-  void joinMatch(String matchId, String playerId, String displayName) async {
+  Future<void> joinMatch(String matchId, String playerId, String displayName) async {
+    // Check if room exists before binding
+    final matchRef = ref.read(multiplayerSyncServiceProvider).matchRef.child(matchId);
+    final snapshot = await matchRef.get();
+    
+    if (!snapshot.exists) {
+      throw firebase_auth.FirebaseAuthException(
+        code: 'not-found',
+        message: 'The room code is invalid.',
+      );
+    }
+
+    final serverState = MatchState.fromJson(Map<String, dynamic>.from(snapshot.value as Map));
+    if (serverState.playerIds.length >= 4 && !serverState.playerIds.contains(playerId)) {
+      throw firebase_auth.FirebaseAuthException(
+        code: 'room-full',
+        message: 'The room is full.',
+      );
+    }
+
     bindToMatch(matchId);
     
-    // Listen for the first non-null state specifically for this join event
-    StreamSubscription? sub;
-    sub = ref.read(multiplayerSyncServiceProvider).watchMatch(matchId).listen((serverState) {
-      if (serverState != null) {
-        try {
-          sub?.cancel();
-          
-          // Atomic Add check
-          if (serverState.phase == GamePhase.waitingForPlayers && serverState.playerIds.length < 4) {
-            if (!serverState.playerIds.contains(playerId)) {
-               final newPlayers = List<String>.from(serverState.playerIds)..add(playerId);
-               final newNames = Map<String, String>.from(serverState.playerNames)..[playerId] = displayName;
-               
-               _publishState(serverState.copyWith(
-                 playerIds: newPlayers,
-                 playerNames: newNames,
-               ));
-            }
-          }
-        } catch (e, stack) {
-          debugPrint('ERROR in joinMatch listener callback: $e');
-          debugPrint('Stack: $stack');
-        }
-      }
-    });
-    
-    // Safety timeout to cancel listener if room doesn't exist
-    Future.delayed(const Duration(seconds: 5), () => sub?.cancel());
+    // Add player to the list if not already there
+    if (!serverState.playerIds.contains(playerId)) {
+       final newPlayers = List<String>.from(serverState.playerIds)..add(playerId);
+       final newNames = Map<String, String>.from(serverState.playerNames)..[playerId] = displayName;
+       
+       await matchRef.update({
+         'playerIds': newPlayers,
+         'playerNames': newNames,
+       });
+    }
   }
 
   void voteForBots(String playerId) {
