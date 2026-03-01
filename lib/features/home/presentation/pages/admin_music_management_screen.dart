@@ -90,18 +90,7 @@ class _AdminMusicManagementScreenState extends ConsumerState<AdminMusicManagemen
   }
 
   Future<void> _resetToDefault(String assetPath, String type) async {
-    final currentSettings = ref.read(globalSettingsProvider);
-    if (type == 'music') {
-      await ref.read(globalSettingsProvider.notifier).updateSettings(
-        currentSettings.copyWith(musicOverrideUrl: null),
-      );
-    } else {
-      final newSfx = Map<String, String>.from(currentSettings.sfxOverrides);
-      newSfx.remove(assetPath);
-      await ref.read(globalSettingsProvider.notifier).updateSettings(
-        currentSettings.copyWith(sfxOverrides: newSfx),
-      );
-    }
+    await ref.read(globalSettingsProvider.notifier).clearOverride(assetPath, type);
   }
 
   @override
@@ -127,6 +116,9 @@ class _AdminMusicManagementScreenState extends ConsumerState<AdminMusicManagemen
               final isOverridden = type == 'music' 
                   ? globalSettings.musicOverrideUrl != null 
                   : globalSettings.sfxOverrides.containsKey(assetPath);
+              final isDefault = type == 'music'
+                  ? globalSettings.musicOverrideUrl == globalSettings.musicBackupUrl && globalSettings.musicBackupUrl != null
+                  : globalSettings.sfxOverrides[assetPath] == globalSettings.sfxBackups[assetPath] && globalSettings.sfxBackups.containsKey(assetPath);
 
               return Container(
                 margin: const EdgeInsets.only(bottom: 16),
@@ -139,9 +131,27 @@ class _AdminMusicManagementScreenState extends ConsumerState<AdminMusicManagemen
                   dense: true,
                   visualDensity: VisualDensity.compact,
                   title: Text(item['label']!.tr(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
-                  subtitle: Text(
-                    isOverridden ? 'status_custom'.tr() : 'status_default'.tr(),
-                    style: TextStyle(color: isOverridden ? ThemeConfig.goldAccent : Colors.white54, fontSize: 10),
+                  subtitle: Row(
+                    children: [
+                      Text(
+                        isOverridden ? 'status_custom'.tr() : 'no_sound_set'.tr(),
+                        style: TextStyle(color: isOverridden ? ThemeConfig.goldAccent : Colors.white24, fontSize: 10),
+                      ),
+                      if (isDefault) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: ThemeConfig.goldAccent.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            'is_default_label'.tr(),
+                            style: const TextStyle(color: ThemeConfig.goldAccent, fontSize: 8, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -162,6 +172,13 @@ class _AdminMusicManagementScreenState extends ConsumerState<AdminMusicManagemen
                         icon: const Icon(Icons.upload_file_rounded, color: ThemeConfig.goldAccent),
                         onPressed: () => _pickAndUpload(assetPath, type),
                       ),
+                      if (isOverridden && !isDefault)
+                        IconButton(
+                          iconSize: 18,
+                          tooltip: 'mark_as_default'.tr(),
+                          icon: const Icon(Icons.star_outline_rounded, color: Colors.blueAccent),
+                          onPressed: () => ref.read(globalSettingsProvider.notifier).markAsDefault(assetPath, type),
+                        ),
                       if (isOverridden)
                         IconButton(
                           iconSize: 18,

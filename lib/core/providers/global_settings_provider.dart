@@ -22,7 +22,7 @@ class GlobalSettingsNotifier extends StateNotifier<GlobalSettings> {
       }
     });
 
-    // Listen to overrides sub-collection (audio data)
+    // Listen to overrides sub-collection (audio data and backups)
     FirebaseFirestore.instance
         .collection('settings')
         .doc('global')
@@ -30,51 +30,117 @@ class GlobalSettingsNotifier extends StateNotifier<GlobalSettings> {
         .snapshots()
         .listen((snapshot) {
       Map<String, String> newSfx = {};
+      Map<String, String> newSfxBackups = {};
       String? newMusic;
+      String? newMusicBackup;
 
       for (var doc in snapshot.docs) {
+        final data = doc.data();
+        final url = data['url'] as String?;
+        final isBackup = data['isBackup'] as bool? ?? false;
+        final assetPath = data['assetPath'] as String?;
+
         if (doc.id == 'music') {
-          newMusic = doc.data()['url'] as String?;
+          newMusic = url;
+        } else if (doc.id == 'music_backup') {
+          newMusicBackup = url;
         } else if (doc.id.startsWith('sfx_')) {
-          final assetPath = doc.data()['assetPath'] as String;
-          newSfx[assetPath] = doc.data()['url'] as String;
+          if (assetPath != null && url != null) {
+            if (doc.id.endsWith('_backup')) {
+              newSfxBackups[assetPath] = url;
+            } else {
+              newSfx[assetPath] = url;
+            }
+          }
         }
       }
 
       state = state.copyWith(
         sfxOverrides: newSfx,
+        sfxBackups: newSfxBackups,
         musicOverrideUrl: newMusic,
+        musicBackupUrl: newMusicBackup,
       );
     });
   }
 
   Future<void> updateSettings(GlobalSettings newSettings) async {
     final batch = FirebaseFirestore.instance.batch();
-    
-    // 1. Update main document (minimal data)
     final mainDoc = FirebaseFirestore.instance.collection('settings').doc('global');
+    final overridesColl = mainDoc.collection('overrides');
+    
+    // 1. Update main document
     batch.set(mainDoc, {
       'defaultTurnTimer': newSettings.defaultTurnTimer,
       'defaultTargetScore': newSettings.defaultTargetScore,
     }, SetOptions(merge: true));
 
-    // 2. Update Music override in its own document
+    // 2. Music logic
     if (newSettings.musicOverrideUrl != null) {
-       final musicDoc = mainDoc.collection('overrides').doc('music');
-       batch.set(musicDoc, {'url': newSettings.musicOverrideUrl});
+       batch.set(overridesColl.doc('music'), {'url': newSettings.musicOverrideUrl});
     }
 
-    // 3. Update SFX overrides (each in its own document)
+    // 3. SFX logic
     for (var entry in newSettings.sfxOverrides.entries) {
-      final sfxId = 'sfx_${entry.key.replaceAll('/', '_')}';
-      final sfxDoc = mainDoc.collection('overrides').doc(sfxId);
-      batch.set(sfxDoc, {
-        'assetPath': entry.key,
-        'url': entry.value,
+      final assetPath = entry.key;
+      final url = entry.value;
+      final safeId = assetPath.replaceAll('/', '_');
+      
+      batch.set(overridesColl.doc('sfx_$safeId'), {
+        'assetPath': assetPath,
+        'url': url,
       });
     }
 
     await batch.commit();
+  }
+
+  Future<void> markAsDefault(String assetPath, String type) async {
+    final mainDoc = FirebaseFirestore.instance.collection('settings').doc('global');
+    final overridesColl = mainDoc.collection('overrides');
+
+    if (type == 'music') {
+      if (state.musicOverrideUrl != null) {
+        await overridesColl.doc('music_backup').set({
+          'url': state.musicOverrideUrl,
+          'isBackup': true,
+        });
+      }
+    } else {
+      final url = state.sfxOverrides[assetPath];
+      if (url != null) {
+        final safeId = assetPath.replaceAll('/', '_');
+        await overridesColl.doc('sfx_${safeId}_backup').set({
+          'assetPath': assetPath,
+          'url': url,
+          'isBackup': true,
+        });
+      }
+    }
+  }
+
+  Future<void> clearOverride(String assetPath, String type) async {
+    final mainDoc = FirebaseFirestore.instance.collection('settings').doc('global');
+    final overridesColl = mainDoc.collection('overrides');
+
+    if (type == 'music') {
+      // If there's a backup, restore IT instead of deleting
+      if (state.musicBackupUrl != null) {
+        await overridesColl.doc('music').set({'url': state.musicBackupUrl});
+      } else {
+        await overridesColl.doc('music').delete();
+      }
+    } else {
+      final safeId = assetPath.replaceAll('/', '_');
+      if (state.sfxBackups.containsKey(assetPath)) {
+        await overridesColl.doc('sfx_$safeId').set({
+          'assetPath': assetPath,
+          'url': state.sfxBackups[assetPath],
+        });
+      } else {
+        await overridesColl.doc('sfx_$safeId').delete();
+      }
+    }
   }
 }
 

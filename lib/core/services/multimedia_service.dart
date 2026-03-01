@@ -16,6 +16,11 @@ class MultimediaService {
     _musicPlayer.setReleaseMode(ReleaseMode.loop);
   }
 
+  // Web Autoplay Handling
+  bool _hasInteracted = false;
+  String? _pendingMusic;
+  final Map<String, bool> _pendingSfx = {};
+
   // Haptics
   Future<void> vibrate() async {
     final settings = _ref.read(settingsProvider);
@@ -31,23 +36,35 @@ class MultimediaService {
     try {
       final settings = _ref.read(settingsProvider);
       if (settings.isMusicEnabled) {
-        if (_currentMusicPath == assetPath) return; // Already playing
+        if (_currentMusicPath == assetPath && _hasInteracted) return;
 
         final globalSettings = _ref.read(globalSettingsProvider);
         final overrideUrl = globalSettings.musicOverrideUrl;
 
+        Source source;
         if (overrideUrl != null && overrideUrl.isNotEmpty) {
           if (overrideUrl.startsWith('data:')) {
             final base64Data = overrideUrl.split(',').last;
-            final bytes = base64Decode(base64Data);
-            await _musicPlayer.play(BytesSource(bytes));
+            source = BytesSource(base64Decode(base64Data));
           } else {
-            await _musicPlayer.play(UrlSource(overrideUrl));
+            source = UrlSource(overrideUrl);
           }
         } else {
-          await _musicPlayer.play(AssetSource(assetPath));
+          source = AssetSource(assetPath);
         }
-        _currentMusicPath = assetPath;
+
+        await _musicPlayer.play(source).then((_) {
+          _hasInteracted = true;
+          _currentMusicPath = assetPath;
+          _pendingMusic = null;
+        }).catchError((e) {
+          if (e.toString().contains('NotAllowedError')) {
+            debugPrint('MultimediaService: Autoplay blocked. Queueing music.');
+            _pendingMusic = assetPath;
+          } else {
+            debugPrint('MultimediaService: Music Playback error: $e');
+          }
+        });
       }
     } catch (e) {
       debugPrint('MultimediaService: Failed to play music $assetPath: $e');
@@ -69,28 +86,34 @@ class MultimediaService {
       final settings = _ref.read(settingsProvider);
       if (settings.isSoundEnabled) {
         final globalSettings = _ref.read(globalSettingsProvider);
-        
-        // Lookup using the "clean" path (e.g. 'sfx/capture.mp3')
         final overrideUrl = globalSettings.sfxOverrides[assetPath];
 
+        Source source;
         if (overrideUrl != null && overrideUrl.isNotEmpty) {
           if (overrideUrl.startsWith('data:')) {
             final base64Data = overrideUrl.split(',').last;
-            final bytes = base64Decode(base64Data);
-            await _sfxPlayer.play(BytesSource(bytes)).catchError((e) {
-              debugPrint('MultimediaService: Base64 SFX Playback error: $e');
-            });
+            source = BytesSource(base64Decode(base64Data));
           } else {
-            await _sfxPlayer.play(UrlSource(overrideUrl)).catchError((e) {
-              debugPrint('MultimediaService: Remote SFX Playback error: $e');
-            });
+            source = UrlSource(overrideUrl);
           }
-          return;
+        } else {
+          source = AssetSource(assetPath);
         }
 
-        // Use the path directly as AssetSource (caller provides clean path)
-        await _sfxPlayer.play(AssetSource(assetPath)).catchError((e) {
-          debugPrint('MultimediaService: SFX Playback error (caught): $e');
+        await _sfxPlayer.play(source).then((_) {
+          // If we successfully played an SFX, we have user interaction!
+          if (!_hasInteracted) {
+             _hasInteracted = true;
+             if (_pendingMusic != null) {
+               playMusic(_pendingMusic!);
+             }
+          }
+        }).catchError((e) {
+          if (e.toString().contains('NotAllowedError')) {
+            debugPrint('MultimediaService: Autoplay blocked for SFX.');
+          } else {
+            debugPrint('MultimediaService: SFX Playback error: $e');
+          }
         });
       }
     } catch (e) {
