@@ -26,6 +26,7 @@ class _AdminMusicManagementScreenState extends ConsumerState<AdminMusicManagemen
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['mp3', 'wav', 'm4a'],
+        withData: true, // Crucial for web and some mobile scenarios
       );
 
       if (result != null && result.files.single.bytes != null) {
@@ -39,7 +40,8 @@ class _AdminMusicManagementScreenState extends ConsumerState<AdminMusicManagemen
           SettableMetadata(contentType: 'audio/mpeg'),
         );
         
-        final snapshot = await uploadTask;
+        // Use a timeout to prevent "forever loading"
+        final snapshot = await uploadTask.timeout(const Duration(seconds: 30));
         final downloadUrl = await snapshot.ref.getDownloadURL();
         
         final currentSettings = ref.read(globalSettingsProvider);
@@ -63,9 +65,20 @@ class _AdminMusicManagementScreenState extends ConsumerState<AdminMusicManagemen
       }
     } catch (e) {
       debugPrint('Error uploading audio: $e');
+      String errorMessage = e.toString();
+      if (e is FirebaseException) {
+        errorMessage = 'Firebase Error: ${e.code} - ${e.message}';
+      } else if (e is StateError) {
+        errorMessage = 'Upload failed or timed out. Please try again.';
+      }
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('upload_failed'.tr(args: [e.toString()]))),
+          SnackBar(
+            content: Text('upload_failed'.tr(args: [errorMessage])),
+            backgroundColor: Colors.redAccent,
+            duration: const Duration(seconds: 5),
+          ),
         );
       }
     } finally {
