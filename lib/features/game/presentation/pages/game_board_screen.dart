@@ -17,9 +17,30 @@ import 'package:halabessa/core/theme/theme_config.dart';
 import 'package:halabessa/core/widgets/settings_overlay.dart';
 import 'package:halabessa/features/game/presentation/providers/chat_providers.dart';
 import 'package:halabessa/features/game/presentation/widgets/chat_overlay.dart';
+import 'package:confetti/confetti.dart';
+import 'package:flutter/services.dart';
 
-class GameBoardScreen extends ConsumerWidget {
+class GameBoardScreen extends ConsumerStatefulWidget {
   const GameBoardScreen({super.key});
+
+  @override
+  ConsumerState<GameBoardScreen> createState() => _GameBoardScreenState();
+}
+
+class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
+  late ConfettiController _confettiController;
+
+  @override
+  void initState() {
+    super.initState();
+    _confettiController = ConfettiController(duration: const Duration(seconds: 5));
+  }
+
+  @override
+  void dispose() {
+    _confettiController.dispose();
+    super.dispose();
+  }
 
   AppUser _getAvatarUser(WidgetRef ref, MatchState matchState, String currentUserUid, int relativeOffset) {
      if (matchState.playerIds.isEmpty) return AppUser(uid: 'empty', email: '', displayName: 'waiting_label'.tr());
@@ -92,10 +113,29 @@ class GameBoardScreen extends ConsumerWidget {
     return team == 'teamA' ? ThemeConfig.primaryTeal : ThemeConfig.goldAccent;
   }
 
+  void _checkWinner(MatchState? state, String myUid) {
+    if (state == null) return;
+    if (state.phase == GamePhase.matchOver) {
+      final myTeamId = _getTeamOfPlayer(myUid, state.playerIds);
+      final aWins = state.teamAScore >= state.teamBScore;
+      final iWin = aWins == (myTeamId == 'teamA');
+      
+      if (iWin) {
+        _confettiController.play();
+        HapticFeedback.vibrate();
+      }
+    }
+  }
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final matchState = ref.watch(matchStateProvider);
     final currentUser = ref.watch(currentUserProvider);
+
+    // Trigger celebration if match is over and we won
+    if (currentUser != null) {
+      _checkWinner(matchState, currentUser.uid);
+    }
 
     if (matchState == null || currentUser == null) {
       if (currentUser != null && matchState == null) {
@@ -215,10 +255,15 @@ class GameBoardScreen extends ConsumerWidget {
                 final store = ref.watch(storeProvider);
                 final notifier = ref.watch(storeProvider.notifier);
                 final activeTable = notifier.allItems.firstWhere((i) => i.id == store.activeTableSkinId, orElse: () => notifier.allItems[3]);
-                return Image.asset(
-                  activeTable.assetPath,
-                  fit: BoxFit.cover,
-                );
+                return activeTable.assetPath.startsWith('http')
+                  ? Image.network(
+                      activeTable.assetPath,
+                      fit: BoxFit.cover,
+                    )
+                  : Image.asset(
+                      activeTable.assetPath,
+                      fit: BoxFit.cover,
+                    );
               },
             ),
           ),
@@ -346,9 +391,48 @@ class GameBoardScreen extends ConsumerWidget {
           
           // Chat Panel
           const ChatOverlay(),
+
+          // Confetti Celebration
+          Align(
+            alignment: Alignment.topCenter,
+            child: ConfettiWidget(
+              confettiController: _confettiController,
+              blastDirectionality: BlastDirectionality.explosive,
+              shouldLoop: false,
+              colors: const [
+                ThemeConfig.goldAccent,
+                ThemeConfig.primaryTeal,
+                Colors.white,
+                ThemeConfig.accentPink,
+              ],
+              createParticlePath: _drawStar,
+            ),
+          ),
         ],
       ),
     );
+  }
+
+  Path _drawStar(Size size) {
+    double degToRad(double deg) => deg * (pi / 180.0);
+    const numberOfPoints = 5;
+    final halfWidth = size.width / 2;
+    final externalRadius = halfWidth;
+    final internalRadius = halfWidth / 2.5;
+    final degreesPerStep = degToRad(360 / numberOfPoints);
+    final halfDegreesPerStep = degreesPerStep / 2;
+    final path = Path();
+    final fullAngle = degToRad(360);
+    path.moveTo(size.width, halfWidth);
+
+    for (double step = 0; step < fullAngle; step += degreesPerStep) {
+      path.lineTo(halfWidth + externalRadius * cos(step),
+          halfWidth + externalRadius * sin(step));
+      path.lineTo(halfWidth + internalRadius * cos(step + halfDegreesPerStep),
+          halfWidth + internalRadius * sin(step + halfDegreesPerStep));
+    }
+    path.close();
+    return path;
   }
 
   void _showSettings(BuildContext context) {
@@ -634,6 +718,7 @@ class GameBoardScreen extends ConsumerWidget {
                   isMyTurn: matchState.playerIds.isNotEmpty && 
                            matchState.currentTurnIndex == _getAbsoluteIndex(matchState, myUid, 0),
                   onCardTap: (card, origin) {
+                    HapticFeedback.lightImpact();
                     ref.read(matchStateProvider.notifier).playCard(myUid, card, origin: origin);
                   },
                 ),

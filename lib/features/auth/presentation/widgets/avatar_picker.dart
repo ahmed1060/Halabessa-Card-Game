@@ -109,25 +109,29 @@ class _AvatarPickerState extends ConsumerState<AvatarPicker> {
           ),
           const SizedBox(height: 24),
           SizedBox(
-            height: 100,
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
+            height: 240, // Fixed height for the grid
+            child: GridView.builder(
+              padding: EdgeInsets.zero,
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 3,
+                mainAxisSpacing: 12,
+                crossAxisSpacing: 12,
+                childAspectRatio: 1,
+              ),
               itemCount: avatarItems.length,
               itemBuilder: (context, index) {
                 final item = avatarItems[index];
                 return GestureDetector(
                   onTap: () => _selectBuiltIn(item.assetPath),
                   child: Container(
-                    margin: const EdgeInsets.only(right: 16),
-                    width: 80,
-                    height: 80,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       border: Border.all(color: Colors.white12),
-                      image: DecorationImage(
-                        image: AssetImage(item.assetPath),
-                        fit: BoxFit.cover,
-                      ),
+                    ),
+                    child: ClipOval(
+                      child: item.assetPath.startsWith('http')
+                        ? Image.network(item.assetPath, fit: BoxFit.cover)
+                        : Image.asset(item.assetPath, fit: BoxFit.cover),
                     ),
                   ),
                 );

@@ -105,10 +105,10 @@ class StoreScreen extends ConsumerWidget {
       padding: const EdgeInsets.symmetric(horizontal: 20),
       sliver: SliverGrid(
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          mainAxisSpacing: 20,
-          crossAxisSpacing: 20,
-          childAspectRatio: 0.85,
+          crossAxisCount: 3,
+          mainAxisSpacing: 12,
+          crossAxisSpacing: 12,
+          childAspectRatio: 0.75,
         ),
         delegate: SliverChildBuilderDelegate(
           (context, index) {
@@ -167,55 +167,63 @@ class StoreScreen extends ConsumerWidget {
           AnimatedContainer(
             duration: const Duration(milliseconds: 300),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.05),
-              borderRadius: BorderRadius.circular(24),
+              color: Colors.white.withOpacity(0.04),
+              borderRadius: BorderRadius.circular(16),
               border: Border.all(
                 color: isActive ? ThemeConfig.goldAccent : (isOwned ? Colors.white24 : Colors.white10),
-                width: isActive ? 2 : 1,
+                width: isActive ? 1.5 : 1,
               ),
               boxShadow: [
                 if (isActive)
-                  BoxShadow(color: ThemeConfig.goldAccent.withOpacity(0.2), blurRadius: 10, spreadRadius: 1),
+                  BoxShadow(color: ThemeConfig.goldAccent.withOpacity(0.15), blurRadius: 8, spreadRadius: 1),
               ],
             ),
             child: Column(
               children: [
                 Expanded(
                   child: Padding(
-                    padding: const EdgeInsets.all(12.0),
+                    padding: const EdgeInsets.all(8.0),
                     child: ClipRRect(
-                      borderRadius: BorderRadius.circular(16),
-                      child: item.assetPath.contains('assets/') ? Image.asset(
-                        item.assetPath,
-                        fit: (item.type == ShopItemType.cardBack || item.type == ShopItemType.avatar) ? BoxFit.contain : BoxFit.cover,
-                        width: double.infinity,
-                        errorBuilder: (_, __, ___) => const Icon(Icons.style, color: Colors.white24, size: 40),
-                      ) : const Icon(Icons.style, color: Colors.white24, size: 40),
+                      borderRadius: BorderRadius.circular(12),
+                      child: item.assetPath.startsWith('http') 
+                        ? Image.network(
+                            item.assetPath,
+                            fit: (item.type == ShopItemType.cardBack || item.type == ShopItemType.avatar) ? BoxFit.contain : BoxFit.cover,
+                            width: double.infinity,
+                            errorBuilder: (_, __, ___) => const Icon(Icons.broken_image, color: Colors.white24, size: 30),
+                          )
+                        : Image.asset(
+                            item.assetPath,
+                            fit: (item.type == ShopItemType.cardBack || item.type == ShopItemType.avatar) ? BoxFit.contain : BoxFit.cover,
+                            width: double.infinity,
+                            errorBuilder: (_, __, ___) => const Icon(Icons.style, color: Colors.white24, size: 30),
+                          ),
                     ),
                   ),
                 ),
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                  padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
                   child: Column(
                     children: [
                        Text(
                         item.name,
-                        style: const TextStyle(fontFamily: ThemeConfig.fontHeading, fontSize: 16, color: Colors.white),
+                        style: const TextStyle(fontFamily: ThemeConfig.fontHeading, fontSize: 13, color: Colors.white),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 4),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(
                           color: isActive ? ThemeConfig.goldAccent : (isOwned ? Colors.teal.withOpacity(0.2) : Colors.white10),
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
                           statusText,
                           style: TextStyle(
                             fontFamily: ThemeConfig.fontBody,
-                            fontSize: 10, 
+                            fontSize: 9, 
                             fontWeight: FontWeight.bold,
                             color: isActive ? Colors.black : (isOwned ? Colors.teal : Colors.white38),
                           ),

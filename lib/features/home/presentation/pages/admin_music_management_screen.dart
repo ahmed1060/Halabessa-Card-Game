@@ -7,22 +7,18 @@ import 'package:halabessa/core/providers/global_settings_provider.dart';
 import 'package:halabessa/core/theme/theme_config.dart';
 import 'package:halabessa/core/services/multimedia_service.dart';
 
-class AdminAudioManagementScreen extends ConsumerStatefulWidget {
-  const AdminAudioManagementScreen({super.key});
+class AdminMusicManagementScreen extends ConsumerStatefulWidget {
+  const AdminMusicManagementScreen({super.key});
 
   @override
-  ConsumerState<AdminAudioManagementScreen> createState() => _AdminAudioManagementScreenState();
+  ConsumerState<AdminMusicManagementScreen> createState() => _AdminMusicManagementScreenState();
 }
 
-class _AdminAudioManagementScreenState extends ConsumerState<AdminAudioManagementScreen> {
+class _AdminMusicManagementScreenState extends ConsumerState<AdminMusicManagementScreen> {
   bool _isUploading = false;
 
   final List<Map<String, String>> _audioItems = [
     {'label': 'background_music', 'path': 'music/bg_music.mp3', 'type': 'music'},
-    {'label': 'capture_sfx', 'path': 'sfx/capture.mp3', 'type': 'sfx'},
-    {'label': 'deal_sfx', 'path': 'sfx/deal.mp3', 'type': 'sfx'},
-    {'label': 'win_sfx', 'path': 'sfx/win.mp3', 'type': 'sfx'},
-    {'label': 'lose_sfx', 'path': 'sfx/lose.mp3', 'type': 'sfx'},
   ];
 
   Future<void> _pickAndUpload(String assetPath, String type) async {
@@ -99,7 +95,7 @@ class _AdminAudioManagementScreenState extends ConsumerState<AdminAudioManagemen
     return Scaffold(
       backgroundColor: const Color(0xFF0D1B2A),
       appBar: AppBar(
-        title: Text('manage_audio'.tr()),
+        title: Text('manage_music'.tr()),
         backgroundColor: Colors.transparent,
         elevation: 0,
       ),
@@ -124,15 +120,18 @@ class _AdminAudioManagementScreenState extends ConsumerState<AdminAudioManagemen
                   border: Border.all(color: isOverridden ? ThemeConfig.goldAccent.withOpacity(0.3) : Colors.white10),
                 ),
                 child: ListTile(
-                  title: Text(item['label']!.tr(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  dense: true,
+                  visualDensity: VisualDensity.compact,
+                  title: Text(item['label']!.tr(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
                   subtitle: Text(
                     isOverridden ? 'status_custom'.tr() : 'status_default'.tr(),
-                    style: TextStyle(color: isOverridden ? ThemeConfig.goldAccent : Colors.white54, fontSize: 12),
+                    style: TextStyle(color: isOverridden ? ThemeConfig.goldAccent : Colors.white54, fontSize: 10),
                   ),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       IconButton(
+                        iconSize: 18,
                         icon: const Icon(Icons.play_arrow_rounded, color: Colors.white70),
                         onPressed: () {
                           if (type == 'music') {
@@ -143,11 +142,13 @@ class _AdminAudioManagementScreenState extends ConsumerState<AdminAudioManagemen
                         },
                       ),
                       IconButton(
+                        iconSize: 18,
                         icon: const Icon(Icons.upload_file_rounded, color: ThemeConfig.goldAccent),
                         onPressed: () => _pickAndUpload(assetPath, type),
                       ),
                       if (isOverridden)
                         IconButton(
+                          iconSize: 18,
                           icon: const Icon(Icons.history_rounded, color: Colors.redAccent),
                           onPressed: () => _resetToDefault(assetPath, type),
                         ),

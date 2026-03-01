@@ -29,7 +29,7 @@ class FirebaseAuthRepository implements AuthRepository {
           'email': user.email,
           'avatarUrl': user.avatarUrl,
           'inventory': user.inventory,
-          'isAdmin': user.isAdmin,
+          // 'isAdmin' is preserved in Firestore
         });
       }
 
@@ -41,7 +41,7 @@ class FirebaseAuthRepository implements AuthRepository {
         'email': user.email,
         'avatarUrl': user.avatarUrl,
         'inventory': user.inventory,
-        'isAdmin': user.isAdmin,
+        // 'isAdmin' is preserved
       });
     } catch (e) {
       debugPrint("User Sync failed: $e");

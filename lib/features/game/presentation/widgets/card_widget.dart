@@ -55,10 +55,9 @@ class CardWidget extends ConsumerWidget {
             style: PlayingCardViewStyle(
               cardBackContentBuilder: (context) => ClipRRect(
                 borderRadius: BorderRadius.circular(10),
-                child: Image.asset(
-                  effectiveBackPath,
-                  fit: BoxFit.cover,
-                ),
+                child: effectiveBackPath.startsWith('http')
+                  ? Image.network(effectiveBackPath, fit: BoxFit.cover)
+                  : Image.asset(effectiveBackPath, fit: BoxFit.cover),
               ),
             ),
             shape: RoundedRectangleBorder(
@@ -91,10 +90,9 @@ class CardWidget extends ConsumerWidget {
               Positioned.fill(
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(10),
-                  child: Image.asset(
-                    effectiveFrontPath,
-                    fit: BoxFit.cover,
-                  ),
+                  child: effectiveFrontPath.startsWith('http')
+                    ? Image.network(effectiveFrontPath, fit: BoxFit.cover)
+                    : Image.asset(effectiveFrontPath, fit: BoxFit.cover),
                 ),
               ),
               // Face Card Illustration
@@ -107,7 +105,9 @@ class CardWidget extends ConsumerWidget {
                         opacity: 0.8,
                         child: Padding(
                           padding: const EdgeInsets.symmetric(vertical: 18.0),
-                          child: Image.asset(illustrationPath, fit: BoxFit.contain),
+                          child: illustrationPath.startsWith('http')
+                            ? Image.network(illustrationPath, fit: BoxFit.contain)
+                            : Image.asset(illustrationPath, fit: BoxFit.contain),
                         ),
                       ),
                     );

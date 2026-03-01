@@ -58,7 +58,7 @@ class SettingsOverlay extends ConsumerWidget {
               settings.isSoundEnabled,
               (val) => notifier.toggleSound(val),
               isAdmin: ref.watch(currentUserProvider)?.isAdmin ?? false,
-              onManage: () => Navigator.pushNamed(context, '/admin/audio'),
+              onManage: () => Navigator.pushNamed(context, '/admin/sfx'),
             ),
             _buildToggleTile(
               context,
@@ -67,7 +67,7 @@ class SettingsOverlay extends ConsumerWidget {
               settings.isMusicEnabled,
               (val) => notifier.toggleMusic(val),
               isAdmin: ref.watch(currentUserProvider)?.isAdmin ?? false,
-              onManage: () => Navigator.pushNamed(context, '/admin/audio'),
+              onManage: () => Navigator.pushNamed(context, '/admin/music'),
             ),
             _buildToggleTile(
               context,
@@ -88,6 +88,30 @@ class SettingsOverlay extends ConsumerWidget {
             _buildSectionHeader(context, 'theme'.tr()),
             const SizedBox(height: 12),
             _buildThemeSelector(context, ref),
+            const SizedBox(height: 24),
+
+            // Admin Actions (Optional)
+            if (ref.watch(currentUserProvider)?.isAdmin ?? false) ...[
+              _buildSectionHeader(context, 'admin_actions'.tr()),
+              _buildAdminTile(
+                context,
+                'manage_users'.tr(),
+                Icons.admin_panel_settings_rounded,
+                () => Navigator.pushNamed(context, '/admin/users'),
+              ),
+              _buildAdminTile(
+                context,
+                'manage_music'.tr(),
+                Icons.music_note_rounded,
+                () => Navigator.pushNamed(context, '/admin/music'),
+              ),
+              _buildAdminTile(
+                context,
+                'manage_sfx'.tr(),
+                Icons.volume_up_rounded,
+                () => Navigator.pushNamed(context, '/admin/sfx'),
+              ),
+            ],
             const SizedBox(height: 40),
           ],
         ),
@@ -223,6 +247,23 @@ class SettingsOverlay extends ConsumerWidget {
             fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildAdminTile(BuildContext context, String label, IconData icon, VoidCallback onTap) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: ThemeConfig.goldAccent.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: ThemeConfig.goldAccent.withOpacity(0.3)),
+      ),
+      child: ListTile(
+        leading: Icon(icon, color: ThemeConfig.goldAccent),
+        title: Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        trailing: const Icon(Icons.chevron_right, color: ThemeConfig.goldAccent),
+        onTap: onTap,
       ),
     );
   }
