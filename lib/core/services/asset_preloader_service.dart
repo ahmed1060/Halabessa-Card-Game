@@ -18,10 +18,8 @@ class AssetPreloaderService {
     // 1. Precache Essential Images
     if (!context.mounted) return;
     await Future.wait([
-      precacheImage(const AssetImage('assets/images/logo.png'), context),
-      precacheImage(const AssetImage('assets/images/items/ticket.png'), context),
-      // Precache Default Music if exists
-      _audioCache.setSource(AssetSource('music/bg_music.mp3')), 
+      precacheImage(const AssetImage('assets/images/logo.png'), context).catchError((_) => null),
+      precacheImage(const AssetImage('assets/images/items/ticket.png'), context).catchError((_) => null),
     ]);
 
     // 2. Precache Cards (Partial/High priority)
