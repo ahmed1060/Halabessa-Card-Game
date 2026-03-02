@@ -41,6 +41,7 @@ class MatchState {
   
   // Round Counter & Memory Shuffle tracker
   final int roundCount;
+  final int handInRound; // 1, 2, or 3
   final int roundsSinceLastShuffle;
   final int consecutiveTafweetCount;
 
@@ -79,6 +80,7 @@ class MatchState {
       this.phase = GamePhase.preRoundCut,
       this.lastCaptureTeam,
       this.roundCount = 1,
+      this.handInRound = 1,
       this.roundsSinceLastShuffle = 0,
       this.consecutiveTafweetCount = 0,
       this.turnStartTime,
@@ -118,6 +120,7 @@ class MatchState {
     GamePhase? phase,
     String? lastCaptureTeam,
     int? roundCount,
+    int? handInRound,
     int? roundsSinceLastShuffle,
     int? consecutiveTafweetCount,
     DateTime? turnStartTime,
@@ -156,6 +159,7 @@ class MatchState {
       phase: phase ?? this.phase,
       lastCaptureTeam: lastCaptureTeam ?? this.lastCaptureTeam,
       roundCount: roundCount ?? this.roundCount,
+      handInRound: handInRound ?? this.handInRound,
       roundsSinceLastShuffle: roundsSinceLastShuffle ?? this.roundsSinceLastShuffle,
       consecutiveTafweetCount: consecutiveTafweetCount ?? this.consecutiveTafweetCount,
       turnStartTime: turnStartTime ?? this.turnStartTime,
@@ -200,6 +204,7 @@ class MatchState {
       'phase': phase.name,
       'lastCaptureTeam': lastCaptureTeam,
       'roundCount': roundCount,
+      'handInRound': handInRound,
       'roundsSinceLastShuffle': roundsSinceLastShuffle,
       'consecutiveTafweetCount': consecutiveTafweetCount,
       'turnStartTime': turnStartTime?.toIso8601String(),
@@ -384,6 +389,7 @@ class MatchState {
         ),
         lastCaptureTeam: json['lastCaptureTeam']?.toString(),
         roundCount: json['roundCount'] is int ? json['roundCount'] as int : 1,
+        handInRound: json['handInRound'] is int ? json['handInRound'] as int : 1,
         roundsSinceLastShuffle: json['roundsSinceLastShuffle'] is int ? json['roundsSinceLastShuffle'] as int : 0,
         consecutiveTafweetCount: json['consecutiveTafweetCount'] is int ? json['consecutiveTafweetCount'] as int : 0,
         turnStartTime: json['turnStartTime'] != null ? DateTime.tryParse(json['turnStartTime'].toString()) : null,

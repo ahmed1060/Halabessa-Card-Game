@@ -90,7 +90,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     _clearMatchId();
   }
 
-  bool _amIHost(MatchState s) {
+  bool _amIHost(MatchState s, {Map<String, bool>? presenceMap}) {
     final currentUser = ref.read(currentUserProvider);
     if (currentUser == null) return false;
     
@@ -100,7 +100,10 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     for (var id in s.playerIds) {
       if (id.startsWith('bot_')) continue;
       
-      final isOnline = s.playerOnlineStatus[id] ?? false;
+      final isOnline = (presenceMap != null) 
+          ? (presenceMap[id] == true) 
+          : (s.playerOnlineStatus[id] ?? false);
+          
       if (isOnline) {
         return id == currentUser.uid;
       }
@@ -158,17 +161,22 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
        final serverState = state;
        if (serverState == null) return;
        
-       // Anyone can potentially update presence if they realize they are the Host
-       final imHost = _amIHost(serverState);
-       // LOBBY RECOVERY: If NO ONE is online, the FIRST one to join becomes host for a split second 
-       // to thaw the game.
-       final noOneWasOnline = serverState.playerOnlineStatus.values.every((v) => v == false);
-       if (!imHost && !noOneWasOnline) return;
+       // Host Transition: We use the ACTUAL presence map from RTDB during this transition to avoid circular locks.
+       // If I am the first human online according to the presence map, I take over the state-update duties.
+       final imPotentialHost = _amIHost(serverState, presenceMap: presence);
+       if (!imPotentialHost) return;
 
        final newOnlineStatus = Map<String, bool>.from(serverState.playerOnlineStatus);
+       final newPlayerNames = Map<String, String>.from(serverState.playerNames);
        bool changed = false;
 
        for (var playerId in serverState.playerIds) {
+         // Fix bot names on the fly if they were accidentally saved as 'Player'
+         if (playerId.startsWith('bot_') && newPlayerNames[playerId] == 'player_default_name') {
+           newPlayerNames[playerId] = 'bot_name_template';
+           changed = true;
+         }
+
          final isOnline = presence[playerId] == true;
          // Special case: if prefix is bot_, always online
          final actualOnline = playerId.startsWith('bot_') ? true : isOnline;
@@ -209,6 +217,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
        if (changed) {
          _publishState(serverState.copyWith(
            playerOnlineStatus: newOnlineStatus,
+           playerNames: newPlayerNames,
            spectatorCount: currentSpectators,
            expireAt: newExpireAt,
          ));
@@ -301,6 +310,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
          }
 
         final activePlayerId = currentState.playerIds[currentState.currentTurnIndex];
+        debugPrint('BOT_DEBUG: Turn for $activePlayerId (Phase: ${currentState.phase.name})');
         
         if (activePlayerId.startsWith('bot_')) {
           // Dynamic reaction time: 0.8-2.3 seconds
@@ -644,7 +654,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
         if (newPlayerIds[i].startsWith('waiting_')) {
           final botId = 'bot_${i + 1}';
           newPlayerIds[i] = botId;
-          newPlayerNames[botId] = 'player_default_name'; // Key for translation
+          newPlayerNames[botId] = 'bot_name_template';
         }
       }
       
@@ -696,6 +706,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
           rematchVotes: {},
           phase: GamePhase.preRoundCut,
           roundCount: currentState.roundCount + (isFirstRound ? 0 : 1),
+          handInRound: 0, // Reset to 0, dealInitialCards will set to 1
           dealerIndex: dealerIdx,
           cardOwnership: {},
         ));
@@ -772,6 +783,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
       handCards: Map.from(hands),
       deckCount: _secretDeck?.cards.length ?? 0,
       recentFasha: List.from(board),
+      handInRound: 1, // First distribution
       phase: GamePhase.dealingCards,
     ));
 
@@ -827,7 +839,8 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
         // Update each player's hand in one go or incrementally
         await _publishState(state!.copyWith(
           handCards: Map.from(hands), 
-          deckCount: _secretDeck?.cards.length ?? 0
+          deckCount: _secretDeck?.cards.length ?? 0,
+          handInRound: state!.handInRound + 1, // Subsequent distribution
         ));
         await Future.delayed(const Duration(milliseconds: 300));
       }

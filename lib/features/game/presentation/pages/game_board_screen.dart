@@ -19,6 +19,7 @@ import 'package:halabessa/features/game/presentation/providers/chat_providers.da
 import 'package:halabessa/features/game/presentation/widgets/chat_overlay.dart';
 import 'package:confetti/confetti.dart';
 import '../widgets/player_profile_preview.dart';
+import '../widgets/harvest_piles_widget.dart';
 import 'package:flutter/services.dart';
 import 'package:halabessa/core/services/multimedia_service.dart';
 
@@ -90,16 +91,63 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
      return AppUser(uid: targetUid, email: '', displayName: targetName);
   }
 
-  Widget _buildTeamHarvestStack(MatchState matchState, String teamId, {required bool isMyTeam}) {
+  Widget _buildTeamHarvestPiles(MatchState matchState, String teamId, {required bool isMyTeam}) {
     final captures = matchState.harvestStacks[teamId] ?? [];
     if (captures.isEmpty) return const SizedBox.shrink();
 
-    // Alignment logic: Team A typically bottom/left-ish, Team B top/right-ish or vice versa.
-    final alignment = teamId == 'teamA' ? const Alignment(-0.85, 0.45) : const Alignment(0.85, -0.45);
+    // Alignment: 
+    // Team A (Partner) -> Top Left area (beside top avatar)
+    // Team B (Opponents) -> Mid Right area
+    final alignment = teamId == 'teamA' 
+        ? const Alignment(-0.8, -0.7) // Top left-ish
+        : const Alignment(0.8, -0.4); // Mid right-ish
 
     return Align(
       alignment: alignment,
-      child: HarvestStackWidget(captures: captures, teamName: isMyTeam ? 'my_team'.tr() : 'opponent_team'.tr()),
+      child: HarvestPilesWidget(
+        captures: captures, 
+        teamName: isMyTeam ? 'my_team'.tr() : 'opponent_team'.tr(),
+        isMyTeam: isMyTeam,
+      ),
+    );
+  }
+
+  Widget _buildFloatingMatchStatus(MatchState matchState) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.4),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white10),
+        boxShadow: [
+          BoxShadow(color: Colors.black26, blurRadius: 10, offset: const Offset(0, 4)),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildMatchStatusRow(Icons.refresh, 'round_label'.tr(args: [matchState.roundCount.toString()])),
+          const SizedBox(height: 8),
+          _buildMatchStatusRow(Icons.layers_outlined, 'hand_label'.tr(args: [matchState.handInRound.toString()])),
+          const SizedBox(height: 8),
+          _buildMatchStatusRow(Icons.style_outlined, 'cards_count'.tr(args: [matchState.handCards[matchState.playerIds[matchState.currentTurnIndex]]?.length.toString() ?? '0'])),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMatchStatusRow(IconData icon, String text) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, color: ThemeConfig.goldAccent.withOpacity(0.8), size: 14),
+        const SizedBox(width: 8),
+        Text(
+          text,
+          style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+        ),
+      ],
     );
   }
 
@@ -252,16 +300,20 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
         elevation: 0,
         centerTitle: false,
         leading: const SizedBox.shrink(), // Remove default back button if any
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
+        title: Row(
           children: [
-            Text('app_title'.tr(), 
-              style: const TextStyle(fontFamily: ThemeConfig.fontHeading, fontWeight: FontWeight.bold, letterSpacing: 1.2, color: Colors.white)
-            ),
-            Text(
-              'room_id_label'.tr(args: [matchState.id]),
-              style: TextStyle(fontSize: 10, color: Colors.white.withOpacity(0.5)),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('app_title'.tr(), 
+                  style: const TextStyle(fontFamily: ThemeConfig.fontHeading, fontWeight: FontWeight.bold, fontSize: 16, letterSpacing: 1.2, color: Colors.white)
+                ),
+                Text(
+                  'room_id_label'.tr(args: [matchState.id]),
+                  style: TextStyle(fontSize: 10, color: Colors.white.withOpacity(0.5)),
+                ),
+              ],
             ),
           ],
         ),
@@ -366,10 +418,19 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
                   ),
                 ),
 
-                // Harvest Stacks & Board Center
-                _buildTeamHarvestStack(matchState, 'teamA', isMyTeam: _getTeamOfPlayer(myUid, matchState.playerIds) == 'teamA'),
-                _buildTeamHarvestStack(matchState, 'teamB', isMyTeam: _getTeamOfPlayer(myUid, matchState.playerIds) == 'teamB'),
+                // Harvest Piles
+                _buildTeamHarvestPiles(matchState, 'teamA', isMyTeam: _getTeamOfPlayer(myUid, matchState.playerIds) == 'teamA'),
+                _buildTeamHarvestPiles(matchState, 'teamB', isMyTeam: _getTeamOfPlayer(myUid, matchState.playerIds) == 'teamB'),
+
                 Center(child: _buildBoardCenter(context, ref, matchState, myUid)),
+
+                // Match Status (Round/Hand) - Floating near Top Avatar
+                if (matchState.phase != GamePhase.waitingForPlayers)
+                  Positioned(
+                    top: 100, // Near the top opponent/partner
+                    left: 20,
+                    child: _buildFloatingMatchStatus(matchState),
+                  ),
 
                 // Local Player (Bottom Center)
                 Align(
@@ -537,6 +598,25 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildMiniBadge(String text) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          color: Colors.white.withOpacity(0.9),
+          fontSize: 9,
+          fontWeight: FontWeight.w600,
+          fontFamily: ThemeConfig.fontBody,
+        ),
       ),
     );
   }
@@ -732,10 +812,10 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
               final teamId = matchState.capturingTeam;
               if (teamId == 'teamA') {
                 targetX = -size.width * 0.35;
-                targetY = size.height * 0.35;
+                targetY = -size.height * 0.3; // Fly to Top Left
               } else {
-                targetX = size.width * 0.35;
-                targetY = -size.height * 0.35;
+                targetX = size.width * 0.4;
+                targetY = -size.height * 0.1; // Fly to Mid Right
               }
               rotation = 1.5; // Tumble while flying
               scale = 0.5; // Shrink as it goes to the box
@@ -960,10 +1040,63 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
   }
 
   Widget _buildContextualScoringOverlay(MatchState matchState, String myUid) {
-    final myTeamId = _getTeamOfPlayer(myUid, matchState.playerIds);
-    final myScore = myTeamId == 'teamA' ? matchState.teamAScore : matchState.teamBScore;
-    final oppScore = myTeamId == 'teamA' ? matchState.teamBScore : matchState.teamAScore;
-    return _buildPhaseOverlay('round_scoring'.tr(args: [myScore.toString(), oppScore.toString()]), alignment: Alignment.center);
+    // Premium Round Summary Overlay
+    return Container(
+      color: Colors.black.withOpacity(0.9),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text('round_finished'.tr(), style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold, fontFamily: ThemeConfig.fontHeading)),
+            const SizedBox(height: 48),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _buildScoringTeamCard('my_team'.tr(), matchState.harvestStacks['teamA']?.fold(0, (sum, cap) => sum + cap.capturedCards.length + 1) ?? 0, ThemeConfig.primaryTeal),
+                _buildScoringTeamCard('opponent_team'.tr(), matchState.harvestStacks['teamB']?.fold(0, (sum, cap) => sum + cap.capturedCards.length + 1) ?? 0, ThemeConfig.goldAccent),
+              ],
+            ),
+            const SizedBox(height: 64),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: ThemeConfig.primaryTeal,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 20),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              ),
+              onPressed: () => ref.read(matchStateProvider.notifier).startNewRound(),
+              child: Text('next_round'.tr().toUpperCase(), style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 2)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildScoringTeamCard(String title, int count, Color color) {
+    return Column(
+      children: [
+        Text(title, style: const TextStyle(color: Colors.white70, fontSize: 16)),
+        const SizedBox(height: 12),
+        Container(
+          width: 120,
+          height: 120,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(color: color.withOpacity(0.5), width: 4),
+            boxShadow: [BoxShadow(color: color.withOpacity(0.2), blurRadius: 20, spreadRadius: 5)],
+          ),
+          child: Center(
+            child: Text(
+              count.toString(),
+              style: TextStyle(color: color, fontSize: 48, fontWeight: FontWeight.bold, fontFamily: ThemeConfig.fontHeading),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Text('total_cards'.tr(), style: TextStyle(color: color.withOpacity(0.8), fontSize: 12, fontWeight: FontWeight.w600)),
+      ],
+    );
   }
 
   Widget _buildContextualGameOverOverlay(MatchState matchState, String myUid) {
@@ -1308,15 +1441,6 @@ class HarvestStackWidget extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-
-  void _showHarvestDetails(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (context) => HarvestDetailsOverlay(captures: captures, teamName: teamName),
     );
   }
 }
