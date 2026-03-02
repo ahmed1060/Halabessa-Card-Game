@@ -650,11 +650,13 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
       final newPlayerIds = List<String>.from(currentState.playerIds);
       final newPlayerNames = Map<String, String>.from(currentState.playerNames);
       
+      int botCount = 0;
       for (int i = 0; i < newPlayerIds.length; i++) {
         if (newPlayerIds[i].startsWith('waiting_')) {
-          final botId = 'bot_${i + 1}';
+          botCount++;
+          final botId = 'bot_${i + 1}'; // Keep ID tied to index for stability
           newPlayerIds[i] = botId;
-          newPlayerNames[botId] = 'bot_name_template';
+          newPlayerNames[botId] = 'Bot $botCount';
         }
       }
       
@@ -822,19 +824,23 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
         return;
       }
 
-      final hands = Map<String, List<game_card.Card>>.from(state!.handCards);
-      
-      // Optimized Sequential Dealing
-      _multimedia.playSfx('sfx/deal.mp3');
-      
-      for (var playerId in state!.playerIds) {
-        final playerHand = <game_card.Card>[];
-        for (int i = 0; i < 4; i++) {
-          final c = _secretDeck?.draw();
-          if (c == null) break;
-          playerHand.add(c);
+        bool anyCardDealt = false;
+        for (var playerId in state!.playerIds) {
+          final playerHand = <game_card.Card>[];
+          for (int i = 0; i < 4; i++) {
+            final c = _secretDeck?.draw();
+            if (c == null) break;
+            playerHand.add(c);
+            anyCardDealt = true;
+          }
+          hands[playerId] = List.from(playerHand);
         }
-        hands[playerId] = List.from(playerHand);
+
+        if (!anyCardDealt) {
+          debugPrint('CLEANUP: Failed to deal any cards, forcing round end.');
+          await _handleRoundEnd();
+          return;
+        }
         
         // Update each player's hand in one go or incrementally
         await _publishState(state!.copyWith(
@@ -842,8 +848,6 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
           deckCount: _secretDeck?.cards.length ?? 0,
           handInRound: state!.handInRound + 1, // Subsequent distribution
         ));
-        await Future.delayed(const Duration(milliseconds: 300));
-      }
 
       final finalState = state;
       if (finalState != null) {

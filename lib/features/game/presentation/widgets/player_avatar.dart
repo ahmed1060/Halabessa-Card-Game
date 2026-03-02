@@ -137,14 +137,16 @@ class PlayerAvatar extends StatelessWidget {
                           : NetworkImage(user.avatarUrl!))
                       : null,
                   child: user.avatarUrl == null
-                      ? Text(
-                          user.displayName.isNotEmpty ? user.displayName[0].toUpperCase() : '?',
-                          style: TextStyle(
-                            fontSize: size * 0.4, 
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        )
+                      ? (user.uid.startsWith('bot_')
+                          ? Icon(Icons.smart_toy_rounded, size: size * 0.6, color: Colors.white)
+                          : Text(
+                              user.displayName.isNotEmpty ? user.displayName[0].toUpperCase() : '?',
+                              style: TextStyle(
+                                fontSize: size * 0.4, 
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ))
                       : null,
                 ),
               ),
