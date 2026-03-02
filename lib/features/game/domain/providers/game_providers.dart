@@ -156,8 +156,23 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
          }
        }
 
+       // Calculate spectators: those in presence map but not in playerIds
+       int currentSpectators = 0;
+       presence.forEach((uid, isOnline) {
+         if (isOnline && !serverState.playerIds.contains(uid)) {
+           currentSpectators++;
+         }
+       });
+
+       if (serverState.spectatorCount != currentSpectators) {
+         changed = true;
+       }
+
        if (changed) {
-         _publishState(serverState.copyWith(playerOnlineStatus: newOnlineStatus));
+         _publishState(serverState.copyWith(
+           playerOnlineStatus: newOnlineStatus,
+           spectatorCount: currentSpectators,
+         ));
        }
     });
   }

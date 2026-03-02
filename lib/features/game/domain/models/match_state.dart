@@ -59,6 +59,8 @@ class MatchState {
   final String? capturingTeam;
   final int capturingStage; // 0: merge, 1: fly
   final game_card.Card? cutLastCard; // Revealed card after cut (The Last Card / الاخر)
+  final int spectatorCount;
+
   
     MatchState({
       required this.id,
@@ -95,6 +97,7 @@ class MatchState {
       this.capturingTeam,
       this.capturingStage = 0,
       this.cutLastCard,
+      this.spectatorCount = 0,
     });
 
   MatchState copyWith({
@@ -132,6 +135,7 @@ class MatchState {
     String? capturingTeam,
     int? capturingStage,
     game_card.Card? cutLastCard,
+    int? spectatorCount,
   }) {
     return MatchState(
       id: id ?? this.id,
@@ -168,6 +172,7 @@ class MatchState {
       capturingTeam: capturingTeam ?? this.capturingTeam,
       capturingStage: capturingStage ?? this.capturingStage,
       cutLastCard: cutLastCard ?? this.cutLastCard,
+      spectatorCount: spectatorCount ?? this.spectatorCount,
     );
   }
 
@@ -207,6 +212,7 @@ class MatchState {
       'capturingTeam': capturingTeam,
       'capturingStage': capturingStage,
       'cutLastCard': cutLastCard?.toJson(),
+      'spectatorCount': spectatorCount,
     };
   }
 
@@ -392,6 +398,7 @@ class MatchState {
         capturingTeam: json['capturingTeam']?.toString(),
         capturingStage: json['capturingStage'] is int ? json['capturingStage'] as int : 0,
         cutLastCard: json['cutLastCard'] != null ? game_card.Card.fromJson(Map<String, dynamic>.from(json['cutLastCard'])) : null,
+        spectatorCount: json['spectatorCount'] is int ? json['spectatorCount'] as int : 0,
       );
     } catch (e, stack) {
       debugPrint('RECOVERED MatchState.fromJson failure: $e');

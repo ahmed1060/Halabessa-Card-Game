@@ -67,20 +67,27 @@ class PublicRoomsList extends ConsumerWidget {
                       tooltip: 'spectate'.tr(),
                     ),
                     const SizedBox(width: 8),
-                    ElevatedButton(
-                      onPressed: () {
-                        final currentUser = ref.read(currentUserProvider);
-                        if (currentUser != null) {
-                          ref.read(matchStateProvider.notifier).joinMatch(
-                            match.id, 
-                            currentUser.uid, 
-                            currentUser.displayName
-                          );
-                          Navigator.pushNamed(context, '/game');
-                        }
+                    Consumer(
+                      builder: (context, ref, child) {
+                        final bool isFull = !match.playerIds.any((id) => id.startsWith('waiting_'));
+                        return ElevatedButton(
+                          onPressed: isFull ? null : () {
+                            final currentUser = ref.read(currentUserProvider);
+                            if (currentUser != null) {
+                              ref.read(matchStateProvider.notifier).joinMatch(
+                                match.id, 
+                                currentUser.uid, 
+                                currentUser.displayName
+                              );
+                              Navigator.pushNamed(context, '/game');
+                            }
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: isFull ? Colors.grey.withOpacity(0.3) : Colors.teal,
+                          ),
+                          child: Text(isFull ? 'full'.tr() : 'join'.tr()),
+                        );
                       },
-                      style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
-                      child: Text('join'.tr()),
                     ),
                   ],
                 ),

@@ -74,8 +74,7 @@ class MultiplayerSyncService {
             })
             .whereType<MatchState>()
             .where((match) => match.isPublic && 
-                             match.phase == GamePhase.waitingForPlayers && 
-                             match.playerIds.any((id) => id.startsWith('waiting_')))
+                             match.phase == GamePhase.waitingForPlayers)
             .toList();
       } catch (e) {
         debugPrint('Error parsing public matches: $e');

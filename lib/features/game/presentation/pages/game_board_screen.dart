@@ -227,6 +227,8 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
     }
 
     final myUid = currentUser.uid;
+    final bool isSpectator = matchState.playerIds.indexOf(myUid) == -1;
+
 
     return Scaffold(
       extendBodyBehindAppBar: true,
@@ -248,6 +250,10 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
           ],
         ),
         actions: [
+          if (matchState.spectatorCount > 0) ...[
+            _buildSpectatorCountBadge(matchState.spectatorCount),
+            const SizedBox(width: 8),
+          ],
           _buildScoreBadge(matchState),
           const SizedBox(width: 8),
           IconButton(
@@ -350,8 +356,9 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
                   child: _buildLocalPlayerArea(context, ref, matchState, myUid),
                 ),
 
-                // Phase Overlays
+                // Overlays
                 if (matchState.phase == GamePhase.waitingForPlayers) _buildLobbyOverlay(context, ref, matchState, myUid),
+                if (isSpectator && matchState.phase != GamePhase.waitingForPlayers) _buildSpectatorIndicator(),
                 if (matchState.phase == GamePhase.preRoundCut) _buildCutOverlay(context, ref, matchState, myUid),
                 if (matchState.phase == GamePhase.dealingFasha && matchState.cutLastCard != null) 
                    _buildLastCardReveal(matchState.cutLastCard!),
@@ -515,6 +522,35 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
                 fontSize: 16, 
                 color: ThemeConfig.goldAccent,
                 shadows: [Shadow(color: ThemeConfig.goldAccent, blurRadius: 8)],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSpectatorCountBadge(int count) {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.black45,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white10),
+      ),
+      child: Center(
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.visibility_outlined, color: ThemeConfig.goldAccent, size: 16),
+            const SizedBox(width: 6),
+            Text(
+              count.toString(),
+              style: const TextStyle(
+                fontWeight: FontWeight.bold, 
+                fontSize: 14, 
+                color: Colors.white,
               ),
             ),
           ],
@@ -888,7 +924,10 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
     final isReady = state.botInjectionVotes.containsKey(currentUid);
     final readyCount = state.botInjectionVotes.length;
     // Count only real humans (not placeholders)
-    final humanCount = state.playerIds.where((id) => !id.startsWith('waiting_')).toList().length;
+    final myIdx = state.playerIds.indexOf(currentUid);
+    final isSpectator = myIdx == -1;
+    final humanCount = state.playerIds.where((id) => !id.startsWith('waiting_')).length;
+
     
     return Center(
       child: Container(
@@ -902,7 +941,7 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('waiting_for_players'.tr(), 
+            Text(isSpectator ? 'spectating_label'.tr() : 'waiting_for_players'.tr(), 
               style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)
             ),
             const SizedBox(height: 24),
@@ -920,10 +959,11 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
                      style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w500)
                    ),
                    const Spacer(),
-                   IconButton(
-                     icon: const Icon(Icons.share, color: Colors.tealAccent, size: 20),
-                     onPressed: () => _showInviteFriendDialog(context, ref, state, currentUid),
-                   ),
+                   if (!isSpectator)
+                     IconButton(
+                       icon: const Icon(Icons.share, color: Colors.tealAccent, size: 20),
+                       onPressed: () => _showInviteFriendDialog(context, ref, state, currentUid),
+                     ),
                 ],
               ),
             ),
@@ -948,26 +988,29 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
               ),
             )),
             const SizedBox(height: 32),
-            if (humanCount < 4) ...[
-              if (!isReady)
-                ElevatedButton.icon(
-                  onPressed: () => ref.read(matchStateProvider.notifier).voteForBots(currentUid),
-                  icon: const Icon(Icons.smart_toy),
-                  label: Text('ready_fill_bots'.tr()),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.teal,
-                    foregroundColor: Colors.white,
-                    minimumSize: const Size(double.infinity, 50),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            if (!isSpectator) ...[
+              if (humanCount < 4) ...[
+                if (!isReady)
+                  ElevatedButton.icon(
+                    onPressed: () => ref.read(matchStateProvider.notifier).voteForBots(currentUid),
+                    icon: const Icon(Icons.smart_toy),
+                    label: Text('ready_fill_bots'.tr()),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.teal,
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size(double.infinity, 50),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  )
+                else
+                  Text('waiting_human_consent'.tr(args: [readyCount.toString(), humanCount.toString()]), 
+                    style: const TextStyle(color: Colors.orangeAccent, fontStyle: FontStyle.italic, fontSize: 13),
+                    textAlign: TextAlign.center,
                   ),
-                )
-              else
-                Text('waiting_human_consent'.tr(args: [readyCount.toString(), humanCount.toString()]), 
-                  style: const TextStyle(color: Colors.orangeAccent, fontStyle: FontStyle.italic, fontSize: 13),
-                  textAlign: TextAlign.center,
-                ),
-            ] else
-              Text('room_full_starting'.tr(), style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+              ] else
+                Text('room_full_starting'.tr(), style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+            ] else 
+              Text('you_are_spectating'.tr(), style: const TextStyle(color: ThemeConfig.goldAccent, fontStyle: FontStyle.italic)),
           ],
         ),
       ),
@@ -1223,6 +1266,31 @@ class HarvestDetailsOverlay extends StatelessWidget {
                   ),
           ),
         ],
+      ),
+    );
+  }
+  Widget _buildSpectatorIndicator() {
+    return Positioned(
+      top: 100,
+      right: 20,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: Colors.black54,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: ThemeConfig.goldAccent.withOpacity(0.5)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.visibility_outlined, color: ThemeConfig.goldAccent, size: 16),
+            const SizedBox(width: 8),
+            Text(
+              'spectating_label'.tr().toUpperCase(),
+              style: const TextStyle(color: ThemeConfig.goldAccent, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1),
+            ),
+          ],
+        ),
       ),
     );
   }
