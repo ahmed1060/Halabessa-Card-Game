@@ -119,16 +119,17 @@ class GlobalSettingsNotifier extends StateNotifier<GlobalSettings> {
     }
   }
 
-  Future<void> clearOverride(String assetPath, String type) async {
+  Future<bool> clearOverride(String assetPath, String type) async {
     final mainDoc = FirebaseFirestore.instance.collection('settings').doc('global');
     final overridesColl = mainDoc.collection('overrides');
 
     if (type == 'music') {
-      // If there's a backup, restore IT instead of deleting
       if (state.musicBackupUrl != null) {
         await overridesColl.doc('music').set({'url': state.musicBackupUrl});
+        return true;
       } else {
         await overridesColl.doc('music').delete();
+        return false;
       }
     } else {
       final safeId = assetPath.replaceAll('/', '_');
@@ -137,8 +138,10 @@ class GlobalSettingsNotifier extends StateNotifier<GlobalSettings> {
           'assetPath': assetPath,
           'url': state.sfxBackups[assetPath],
         });
+        return true;
       } else {
         await overridesColl.doc('sfx_$safeId').delete();
+        return false;
       }
     }
   }

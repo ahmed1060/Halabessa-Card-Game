@@ -94,7 +94,16 @@ class _AdminSfxManagementScreenState extends ConsumerState<AdminSfxManagementScr
   }
 
   Future<void> _resetToDefault(String assetPath, String type) async {
-    await ref.read(globalSettingsProvider.notifier).clearOverride(assetPath, type);
+    final success = await ref.read(globalSettingsProvider.notifier).clearOverride(assetPath, type);
+
+    if (!success && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('no_default_yet'.tr()),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    }
   }
 
   @override

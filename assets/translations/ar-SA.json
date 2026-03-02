@@ -216,6 +216,7 @@
     "status_default": "الأصلي",
     "no_sound_set": "لا يوجد صوت حالياً",
     "mark_as_default": "تعيين كافتراضي",
+    "no_default_yet": "لا يوجد صوت افتراضي لهذا الصوت بعد.",
     "is_default_label": "الافتراضي",
     "avatar_1": "مواطن",
     "avatar_2": "نينجا",

@@ -234,6 +234,7 @@
     "status_default": "Original (App)",
     "no_sound_set": "No Sound Set",
     "mark_as_default": "Set as Default",
+    "no_default_yet": "No default set for this sound yet.",
     "is_default_label": "DEFAULT",
     "avatar_1": "Citizen",
     "avatar_2": "Ninja",
