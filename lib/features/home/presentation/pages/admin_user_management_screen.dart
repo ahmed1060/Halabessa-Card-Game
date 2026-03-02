@@ -106,7 +106,7 @@ class AdminUserManagementScreen extends ConsumerWidget {
   void _handleAction(BuildContext context, WidgetRef ref, AppUser user, String action) async {
     if (action == 'admin') {
       await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
-        'is_admin': !user.isAdmin,
+        'isAdmin': !user.isAdmin,
       });
     } else if (action == 'points') {
       _showPointsEditor(context, user);

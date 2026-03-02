@@ -54,20 +54,34 @@ class PublicRoomsList extends ConsumerWidget {
                   'room_players_info'.tr(args: [match.playerIds.length.toString(), match.id]),
                   style: const TextStyle(color: Colors.white70),
                 ),
-                trailing: ElevatedButton(
-                  onPressed: () {
-                    final currentUser = ref.read(currentUserProvider);
-                    if (currentUser != null) {
-                      ref.read(matchStateProvider.notifier).joinMatch(
-                        match.id, 
-                        currentUser.uid, 
-                        currentUser.displayName
-                      );
-                      Navigator.pushNamed(context, '/game');
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
-                  child: Text('join'.tr()),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.visibility_outlined, color: ThemeConfig.goldAccent),
+                      onPressed: () {
+                        ref.read(matchStateProvider.notifier).spectateMatch(match.id);
+                        Navigator.pushNamed(context, '/game');
+                      },
+                      tooltip: 'spectate'.tr(),
+                    ),
+                    const SizedBox(width: 8),
+                    ElevatedButton(
+                      onPressed: () {
+                        final currentUser = ref.read(currentUserProvider);
+                        if (currentUser != null) {
+                          ref.read(matchStateProvider.notifier).joinMatch(
+                            match.id, 
+                            currentUser.uid, 
+                            currentUser.displayName
+                          );
+                          Navigator.pushNamed(context, '/game');
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
+                      child: Text('join'.tr()),
+                    ),
+                  ],
                 ),
               ),
             );

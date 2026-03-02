@@ -509,6 +509,10 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     bindToMatch(newId);
   }
 
+  void spectateMatch(String matchId) {
+    bindToMatch(matchId);
+  }
+
   Future<void> joinMatch(String matchId, String playerId, String displayName) async {
     final dbRef = FirebaseDatabase.instance.ref('matches/$matchId');
     final snapshot = await dbRef.get();

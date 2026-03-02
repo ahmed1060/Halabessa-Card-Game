@@ -35,6 +35,11 @@ class HomeScreen extends ConsumerWidget {
         title: Text('app_title'.tr(), style: const TextStyle(fontFamily: ThemeConfig.fontHeading, letterSpacing: 2)),
         actions: [
           IconButton(
+            icon: const Icon(Icons.shopping_bag_outlined, color: ThemeConfig.goldAccent),
+            onPressed: () => Navigator.pushNamed(context, '/store'),
+            tooltip: 'store'.tr(),
+          ),
+          IconButton(
             icon: const Icon(Icons.people_alt_outlined, color: Colors.white70),
             onPressed: () => showModalBottomSheet(
               context: context,

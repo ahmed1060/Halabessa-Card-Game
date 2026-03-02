@@ -73,7 +73,9 @@ class MultiplayerSyncService {
               }
             })
             .whereType<MatchState>()
-            .where((match) => match.isPublic && match.phase == GamePhase.waitingForPlayers && match.playerIds.length < 4)
+            .where((match) => match.isPublic && 
+                             match.phase == GamePhase.waitingForPlayers && 
+                             match.playerIds.any((id) => id.startsWith('waiting_')))
             .toList();
       } catch (e) {
         debugPrint('Error parsing public matches: $e');
