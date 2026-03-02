@@ -61,6 +61,11 @@ class GlobalSettingsNotifier extends StateNotifier<GlobalSettings> {
         musicOverrideUrl: newMusic,
         musicBackupUrl: newMusicBackup,
       );
+    }, onError: (error) {
+      debugPrint('GlobalSettingsNotifier: Firestore Error: $error');
+      if (error.toString().contains('permission-denied')) {
+        debugPrint('GlobalSettingsNotifier: Possible Ad-blocker or Permission issue.');
+      }
     });
   }
 
