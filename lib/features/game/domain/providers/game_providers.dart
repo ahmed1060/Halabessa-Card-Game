@@ -277,7 +277,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
           final finalState = state;
           if (finalState != null && finalState.phase == GamePhase.waitingForPlayers && 
               finalState.playerIds.where((id) => !id.startsWith('waiting_')).length == 4) {
-            _setupNewRound(isFirstRound: true);
+            startNewRound(isFirstRound: true);
           }
         }
       }
@@ -433,7 +433,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
            final votes = currentState.shuffleVotes;
            bool anyoneVotedNo = votes.values.any((v) => v == false);
            if (anyoneVotedNo || votes.length == 4) {
-             await _setupNewRound(forceShuffle: !anyoneVotedNo && votes.values.any((v) => v == true));
+             await startNewRound(forceShuffle: !anyoneVotedNo && votes.values.any((v) => v == true));
            }
         } else if (currentState.phase == GamePhase.rematchVoting) {
            final votes = currentState.rematchVotes;
@@ -668,7 +668,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     }
   }
 
-  Future<void> _setupNewRound({bool isFirstRound = false, bool forceShuffle = false}) async {
+  Future<void> startNewRound({bool isFirstRound = false, bool forceShuffle = false}) async {
     try {
       final currentState = state;
       if (currentState == null) return;
@@ -712,7 +712,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
         ));
       }
     } catch (e, stack) {
-      debugPrint('ERROR in _setupNewRound: $e');
+      debugPrint('ERROR in startNewRound: $e');
       debugPrint('Stack: $stack');
     }
   }
@@ -1123,7 +1123,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
          
          if (endPhase.roundsSinceLastShuffle >= 5) {
 // debugPrint('SHUFFLE: Forced shuffle triggered (6th round).');
-            await _setupNewRound(forceShuffle: true);
+            await startNewRound(forceShuffle: true);
          } else if (endPhase.roundsSinceLastShuffle >= 2) {
             // Rotate dealer, trigger UI prompt for Shuffle/No-Shuffle
             await _publishState(endPhase.copyWith(
@@ -1134,7 +1134,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
             ));
          } else {
 // debugPrint('SHUFFLE: Skipping vote, moving to round ${endPhase.roundCount + 1}');
-            await _setupNewRound(forceShuffle: false);
+            await startNewRound(forceShuffle: false);
          }
       }
     } catch (e, stack) {
@@ -1162,11 +1162,11 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
       if (isHost) {
          if (wantsShuffle == false) {
             // Unilateral Veto
-            await _setupNewRound(forceShuffle: false);
+            await startNewRound(forceShuffle: false);
          } else if (votes.length == 4) {
             // All voted, check if all are Yes
             bool allYes = votes.values.every((v) => v == true);
-            await _setupNewRound(forceShuffle: allYes);
+            await startNewRound(forceShuffle: allYes);
          }
       }
   }
@@ -1193,7 +1193,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
               rematchVotes: {},
               shuffleVotes: {},
            ));
-           await _setupNewRound(isFirstRound: true);
+           await startNewRound(isFirstRound: true);
         } else {
            // End Match completely
            await _publishState(newState.copyWith(phase: GamePhase.matchOver));

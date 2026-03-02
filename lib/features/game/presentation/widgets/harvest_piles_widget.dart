@@ -81,12 +81,14 @@ class HarvestPilesWidget extends StatelessWidget {
             left: 1,
             child: _buildFaceDownPlaceholder(),
           ),
-          // Top: The actual leading card
-          Transform.rotate(
-            angle: rotation,
-            child: CardWidget(
-              card: capture.leadingCard,
-              fontSize: 10,
+          Positioned.fill(
+            child: Transform.rotate(
+              angle: rotation,
+              child: CardWidget(
+                card: capture.leadingCard,
+                width: 40,
+                height: 54,
+              ),
             ),
           ),
         ],
