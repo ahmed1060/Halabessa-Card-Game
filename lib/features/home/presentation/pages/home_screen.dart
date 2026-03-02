@@ -68,73 +68,74 @@ class HomeScreen extends ConsumerWidget {
             colors: [Color(0xFF1B263B), Color(0xFF0D1B2A)],
           ),
         ),
-        child: Column(
-          children: [
-            const SizedBox(height: 120),
-            // User Profile Section
-            if (user != null)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () => Navigator.pushNamed(context, '/profile'),
-                  child: Row(
-                    children: [
-                      UserAvatar(radius: 30, user: user),
-                      const SizedBox(width: 16),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'welcome_player'.tr(args: [user.displayName]),
-                            style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-                          ),
-                          Text(
-                            'points_and_rank'.tr(args: [user.points.toString(), user.rank.toString()]),
-                            style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 12),
-                          ),
-                        ],
-                      ),
-                    ],
+        child: SingleChildScrollView(
+          child: Column(
+            children: [
+              const SizedBox(height: 120),
+              // User Profile Section
+              if (user != null)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => Navigator.pushNamed(context, '/profile'),
+                    child: Row(
+                      children: [
+                        UserAvatar(radius: 30, user: user),
+                        const SizedBox(width: 16),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'welcome_player'.tr(args: [user.displayName]),
+                              style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                            ),
+                            Text(
+                              'points_and_rank'.tr(args: [user.points.toString(), user.rank.toString()]),
+                              style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 12),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            
-            const SizedBox(height: 48),
-            
-            // Main Actions
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24.0),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: _buildMainButton(
-                      context,
-                      label: 'create_room'.tr(),
-                      icon: Icons.add_box_outlined,
-                      color: ThemeConfig.primaryTeal,
-                      onTap: () => _showCreateRoomDialog(context, ref, user?.uid ?? '', user?.displayName ?? ''),
+              
+              const SizedBox(height: 48),
+              
+              // Main Actions
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _buildMainButton(
+                        context,
+                        label: 'create_room'.tr(),
+                        icon: Icons.add_box_outlined,
+                        color: ThemeConfig.primaryTeal,
+                        onTap: () => _showCreateRoomDialog(context, ref, user?.uid ?? '', user?.displayName ?? ''),
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: _buildMainButton(
-                      context,
-                      label: 'join_room'.tr(),
-                      icon: Icons.login_outlined,
-                      color: ThemeConfig.goldAccent,
-                      onTap: () => _showJoinRoomDialog(context, ref, user?.uid ?? '', user?.displayName ?? ''),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: _buildMainButton(
+                        context,
+                        label: 'join_room'.tr(),
+                        icon: Icons.login_outlined,
+                        color: ThemeConfig.goldAccent,
+                        onTap: () => _showJoinRoomDialog(context, ref, user?.uid ?? '', user?.displayName ?? ''),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
 
-            const SizedBox(height: 32),
-            
-            // Public Matches List
-            Expanded(
-              child: Container(
+              const SizedBox(height: 32),
+              
+              // Public Matches List
+              Container(
+                width: double.infinity,
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
                   color: Colors.black.withOpacity(0.2),
@@ -148,12 +149,12 @@ class HomeScreen extends ConsumerWidget {
                       style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 16),
-                    const Expanded(child: PublicRoomsList()),
+                    const PublicRoomsList(),
                   ],
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
