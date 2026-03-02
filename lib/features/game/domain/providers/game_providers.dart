@@ -241,6 +241,12 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
       return;
     }
 
+    final currentUser = ref.read(currentUserProvider);
+    if (currentUser == null) {
+       _isHandlingBotLogic = false;
+       return;
+    }
+
     // Safety delay to allow state to settle
     await Future.delayed(const Duration(milliseconds: 100));
     
@@ -1136,8 +1142,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
      // ALWAYS publish vote for others to see
      await _publishState(newState);
 
-     final currentUser = ref.read(currentUserProvider);
-     final isHost = currentUser != null && currentState.playerIds.indexOf(currentUser.uid) == 0;
+     final isHost = _amIHost(currentState);
 
       // VETO RULE: If anyone votes "No", the shuffle is cancelled immediately.
       // Otherwise, we wait for all 4 players to vote "Yes".
@@ -1221,8 +1226,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     final currentState = state;
     if (currentState == null) return;
 
-    final currentUser = ref.read(currentUserProvider);
-    final isHost = currentUser != null && currentState.playerIds.indexOf(currentUser.uid) == 0;
+    final isHost = _amIHost(currentState);
     
     // Only Host records stats in Firestore to prevent duplicate writes
     if (!isHost) return;
