@@ -131,7 +131,11 @@ class PlayerAvatar extends StatelessWidget {
                 child: CircleAvatar(
                   radius: size / 2,
                   backgroundColor: teamColor?.withOpacity(0.2) ?? (isCurrentTurn ? Colors.white10 : Colors.teal.shade200),
-                  backgroundImage: user.avatarUrl != null ? NetworkImage(user.avatarUrl!) : null,
+                  backgroundImage: user.avatarUrl != null
+                      ? (user.avatarUrl!.startsWith('assets/')
+                          ? AssetImage(user.avatarUrl!) as ImageProvider
+                          : NetworkImage(user.avatarUrl!))
+                      : null,
                   child: user.avatarUrl == null
                       ? Text(
                           user.displayName.isNotEmpty ? user.displayName[0].toUpperCase() : '?',

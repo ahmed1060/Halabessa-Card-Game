@@ -51,9 +51,11 @@ class AdminUserManagementScreen extends ConsumerWidget {
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         leading: CircleAvatar(
-          backgroundImage: (user.avatarUrl?.startsWith('http') ?? false)
-              ? NetworkImage(user.avatarUrl!)
-              : AssetImage(user.avatarUrl ?? 'assets/images/avatars/avatar_1.png') as ImageProvider,
+          backgroundImage: user.avatarUrl != null
+              ? (user.avatarUrl!.startsWith('assets/')
+                  ? AssetImage(user.avatarUrl!) as ImageProvider
+                  : NetworkImage(user.avatarUrl!))
+              : const AssetImage('assets/images/avatars/avatar1.png') as ImageProvider,
         ),
         title: Row(
           children: [

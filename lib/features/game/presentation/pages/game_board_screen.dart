@@ -148,6 +148,20 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
       _checkWinner(matchState, currentUser.uid);
     }
 
+    // Room Expiry Check (Hibernation Timeout)
+    if (matchState != null && matchState.expireAt != null && DateTime.now().isAfter(matchState.expireAt!)) {
+       WidgetsBinding.instance.addPostFrameCallback((_) {
+         if (mounted) {
+           ScaffoldMessenger.of(context).showSnackBar(
+             SnackBar(content: Text('room_expired'.tr()))
+           );
+           ref.read(matchStateProvider.notifier).leaveMatch();
+           Navigator.of(context).popUntil((route) => route.isFirst);
+         }
+       });
+       return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
     if (matchState == null || currentUser == null) {
       if (currentUser != null && matchState == null) {
         Future.microtask(() => ref.read(matchStateProvider.notifier).tryRecoverLastMatch());

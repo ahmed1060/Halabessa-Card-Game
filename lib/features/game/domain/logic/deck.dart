@@ -35,6 +35,47 @@ class Deck {
     return Deck(restoredCards);
   }
 
+  /// RECONSTRUCTION: Rebuilds the hidden part of the deck by subtracting all visible cards 
+  /// (Board + Hands + Harvested) from a standard 52-card deck.
+  /// This is used when a new Host takes over or when rejoining a "hibernated" game.
+  factory Deck.reconstructRemaining(
+    List<game_card.Card> board,
+    Map<String, List<game_card.Card>> hands,
+    Map<String, List<Capture>> harvest,
+  ) {
+    // 1. Start with a full 52-card deck
+    final fullDeck = Deck.standard().cards;
+    
+    // 2. Collect all "Visible/Accounted" card keys
+    final visibleKeys = <String>{};
+    
+    for (var c in board) {
+      visibleKeys.add(c.firebaseKey);
+    }
+    
+    hands.forEach((playerId, hand) {
+      for (var c in hand) {
+        visibleKeys.add(c.firebaseKey);
+      }
+    });
+    
+    harvest.forEach((teamId, captures) {
+      for (var capture in captures) {
+        visibleKeys.add(capture.leadingCard.firebaseKey);
+        for (var c in capture.capturedCards) {
+          visibleKeys.add(c.firebaseKey);
+        }
+      }
+    });
+
+    // 3. Subtract visible cards to find the remaining hidden cards
+    final remainingCards = fullDeck.where((c) => !visibleKeys.contains(c.firebaseKey)).toList();
+    
+    // Note: We don't shuffle here because the original order is lost,
+    // but the remaining cards ARE the deck for the rest of this round.
+    return Deck(remainingCards);
+  }
+
   void shuffle() {
     cards.shuffle();
   }

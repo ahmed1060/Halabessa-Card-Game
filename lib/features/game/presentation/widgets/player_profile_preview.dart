@@ -50,7 +50,11 @@ class PlayerProfilePreview extends ConsumerWidget {
                       CircleAvatar(
                         radius: 50,
                         backgroundColor: ThemeConfig.primaryTeal.withOpacity(0.1),
-                        backgroundImage: displayUser.avatarUrl != null ? NetworkImage(displayUser.avatarUrl!) : null,
+                        backgroundImage: displayUser.avatarUrl != null
+                            ? (displayUser.avatarUrl!.startsWith('assets/')
+                                ? AssetImage(displayUser.avatarUrl!) as ImageProvider
+                                : NetworkImage(displayUser.avatarUrl!))
+                            : null,
                         child: displayUser.avatarUrl == null
                             ? Text(
                                 displayUser.displayName.isNotEmpty ? displayUser.displayName[0].toUpperCase() : '?',

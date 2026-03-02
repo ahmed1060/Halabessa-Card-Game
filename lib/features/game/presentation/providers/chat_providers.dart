@@ -4,10 +4,11 @@ import '../../domain/providers/game_providers.dart';
 import 'dart:async';
 
 final chatMessagesProvider = StreamProvider.autoDispose<List<ChatMessage>>((ref) {
-  final matchState = ref.watch(matchStateProvider);
-  if (matchState == null) return Stream.value([]);
+  // Use select to only watch the ID, preventing stream recreation on every score/state change
+  final matchId = ref.watch(matchStateProvider.select((s) => s?.id));
+  if (matchId == null) return Stream.value([]);
   
-  return ref.read(multiplayerSyncServiceProvider).watchChatMessages(matchState.id);
+  return ref.read(multiplayerSyncServiceProvider).watchChatMessages(matchId);
 });
 
 class ChatState {

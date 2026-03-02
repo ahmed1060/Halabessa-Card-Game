@@ -96,7 +96,11 @@ class _SocialOverlayState extends ConsumerState<SocialOverlay> {
                   
                   return ListTile(
                     leading: CircleAvatar(
-                      backgroundImage: user.avatarUrl != null ? NetworkImage(user.avatarUrl!) : null,
+                      backgroundImage: user.avatarUrl != null
+                          ? (user.avatarUrl!.startsWith('assets/')
+                              ? AssetImage(user.avatarUrl!) as ImageProvider
+                              : NetworkImage(user.avatarUrl!))
+                          : null,
                       child: user.avatarUrl == null ? const Icon(Icons.person) : null,
                     ),
                     title: Text(user.displayName, style: const TextStyle(color: Colors.white)),

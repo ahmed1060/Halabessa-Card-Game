@@ -21,6 +21,11 @@ class MultiplayerSyncService {
     await matchRef.child(matchState.id).update(matchState.toJson());
   }
 
+  /// Delete a match room
+  Future<void> deleteMatch(String matchId) async {
+    await matchRef.child(matchId).remove();
+  }
+
   Stream<MatchState?> watchMatch(String matchId) {
     return matchRef.child(matchId).onValue.map((event) {
       final value = event.snapshot.value;
@@ -63,19 +68,30 @@ class MultiplayerSyncService {
       try {
         if (event.snapshot.value is! Map) return [];
         final Map<dynamic, dynamic> matches = event.snapshot.value as Map<dynamic, dynamic>;
-        return matches.entries
-            .map((entry) {
-              try {
-                if (entry.value is! Map) return null;
-                return MatchState.fromJson(Map<String, dynamic>.from(entry.value as Map));
-              } catch (e) {
-                return null;
-              }
-            })
-            .whereType<MatchState>()
-            .where((match) => match.isPublic && 
-                             match.phase == GamePhase.waitingForPlayers)
-            .toList();
+        
+        final List<MatchState> validMatches = [];
+        final now = DateTime.now();
+
+        matches.forEach((id, data) {
+          try {
+            if (data is! Map) return;
+            final match = MatchState.fromJson(Map<String, dynamic>.from(data));
+            
+            // AUTO-DESTRUCT: If the room is expired, delete it and don't show it
+            if (match.expireAt != null && now.isAfter(match.expireAt!)) {
+              deleteMatch(match.id);
+              return;
+            }
+
+            if (match.isPublic && match.phase == GamePhase.waitingForPlayers) {
+              validMatches.add(match);
+            }
+          } catch (e) {
+            // Skip invalid data
+          }
+        });
+
+        return validMatches;
       } catch (e) {
         debugPrint('Error parsing public matches: $e');
         return [];
@@ -147,11 +163,14 @@ class MultiplayerSyncService {
   }
 
   Stream<List<ChatMessage>> watchChatMessages(String matchId) {
+    if (matchId.isEmpty) return Stream.value([]);
+    
     return matchRef.child(matchId).child('chat')
+      .orderByKey()
       .limitToLast(50)
       .onValue.map((event) {
         final value = event.snapshot.value;
-        if (value == null) return [];
+        if (value == null) return <ChatMessage>[];
         
         Map<dynamic, dynamic> messages;
         if (value is List) {
@@ -159,16 +178,27 @@ class MultiplayerSyncService {
         } else if (value is Map) {
           messages = value;
         } else {
-          return [];
+          debugPrint('Chat data is not a Map or List: ${value.runtimeType}');
+          return <ChatMessage>[];
         }
         
-        final sortedList = messages.entries.map((entry) {
-          if (entry.value is! Map) return null;
-          return ChatMessage.fromJson(Map<String, dynamic>.from(entry.value), entry.key.toString());
+        final list = messages.entries.map((entry) {
+          final val = entry.value;
+          if (val == null || val is! Map) return null;
+          try {
+            return ChatMessage.fromJson(Map<String, dynamic>.from(val), entry.key.toString());
+          } catch (e) {
+            debugPrint('Error parsing chat message at ${entry.key}: $e');
+            return null;
+          }
         }).whereType<ChatMessage>().toList();
         
-        sortedList.sort((a, b) => a.timestamp.compareTo(b.timestamp));
-        return sortedList;
-    });
+        // Ensure consistent chronological order
+        list.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+        return list;
+      }).handleError((error) {
+        debugPrint('CHAT STREAM ERROR for $matchId: $error');
+        return <ChatMessage>[];
+      });
   }
 }

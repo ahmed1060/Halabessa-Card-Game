@@ -90,6 +90,24 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     _clearMatchId();
   }
 
+  bool _amIHost(MatchState s) {
+    final currentUser = ref.read(currentUserProvider);
+    if (currentUser == null) return false;
+    
+    // HUMAN PRIORITY HOST ELECTION:
+    // The Host is the first ONLINE human player in the playerIds list.
+    // This ensures bot logic always runs if at least one human is connected.
+    for (var id in s.playerIds) {
+      if (id.startsWith('bot_')) continue;
+      
+      final isOnline = s.playerOnlineStatus[id] ?? false;
+      if (isOnline) {
+        return id == currentUser.uid;
+      }
+    }
+    return false;
+  }
+
   void bindToMatch(String matchId) {
     lastBoundMatchId = matchId;
     _saveMatchId(matchId);
@@ -101,8 +119,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
             state = serverState;
             
             // Manage Heartbeat: Start if Host, stop if not
-            final currentUser = ref.read(currentUserProvider);
-            if (currentUser != null && serverState.playerIds.indexOf(currentUser.uid) == 0) {
+            if (_amIHost(serverState)) {
               if (_heartbeatTimer == null || !_heartbeatTimer!.isActive) {
                 _heartbeatTimer?.cancel();
                 _heartbeatTimer = Timer.periodic(const Duration(seconds: 4), (timer) {
@@ -141,8 +158,12 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
        final serverState = state;
        if (serverState == null) return;
        
-       final isHost = currentUser != null && serverState.playerIds.indexOf(currentUser.uid) == 0;
-       if (!isHost) return;
+       // Anyone can potentially update presence if they realize they are the Host
+       final imHost = _amIHost(serverState);
+       // LOBBY RECOVERY: If NO ONE is online, the FIRST one to join becomes host for a split second 
+       // to thaw the game.
+       final noOneWasOnline = serverState.playerOnlineStatus.values.every((v) => v == false);
+       if (!imHost && !noOneWasOnline) return;
 
        final newOnlineStatus = Map<String, bool>.from(serverState.playerOnlineStatus);
        bool changed = false;
@@ -155,6 +176,22 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
            newOnlineStatus[playerId] = actualOnline;
            changed = true;
          }
+       }
+
+       // Hibernation / Auto-Destruct Logic
+       DateTime? newExpireAt = serverState.expireAt;
+       final anyoneOnline = newOnlineStatus.entries
+           .where((e) => !e.key.startsWith('bot_'))
+           .any((e) => e.value == true);
+
+       if (!anyoneOnline && serverState.expireAt == null) {
+         // Everyone left! Set 10-minute countdown
+         newExpireAt = DateTime.now().add(const Duration(minutes: 10));
+         changed = true;
+       } else if (anyoneOnline && serverState.expireAt != null) {
+         // Someone returned! Clear countdown
+         newExpireAt = null;
+         changed = true;
        }
 
        // Calculate spectators: those in presence map but not in playerIds
@@ -173,6 +210,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
          _publishState(serverState.copyWith(
            playerOnlineStatus: newOnlineStatus,
            spectatorCount: currentSpectators,
+           expireAt: newExpireAt,
          ));
        }
     });
@@ -198,16 +236,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     _isHandlingBotLogic = true;
     _lastBotLogicTime = DateTime.now();
 
-    // Determine if the LOCAL client is the Host (index 0) of the match.
-    // We only want ONE client (the Host) to execute Bot logic to prevent duplicate Firebase writes.
-    final currentUser = ref.read(currentUserProvider);
-    if (currentUser == null || serverState.playerIds.isEmpty) {
-      _isHandlingBotLogic = false;
-      return;
-    }
-    
-    final isHost = serverState.playerIds.indexOf(currentUser.uid) == 0;
-    if (!isHost) {
+    if (!_amIHost(serverState)) {
       _isHandlingBotLogic = false;
       return;
     }
@@ -545,6 +574,16 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     final snapshot = await dbRef.get();
     if (snapshot.exists) {
       final json = Map<String, dynamic>.from(snapshot.value as Map);
+      
+      // AUTO-DESTRUCT check: If trying to join an expired room, delete it.
+      if (json['expireAt'] != null) {
+         final expireAt = DateTime.tryParse(json['expireAt'].toString());
+         if (expireAt != null && DateTime.now().isAfter(expireAt)) {
+           await ref.read(multiplayerSyncServiceProvider).deleteMatch(matchId);
+           throw Exception('room_expired'); // Translation key
+         }
+      }
+
       final playerIds = List<String>.from(json['playerIds'] ?? []);
       final playerNames = Map<String, String>.from(json['playerNames'] ?? {});
       
@@ -624,8 +663,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
         return;
       }
 
-      final currentUser = ref.read(currentUserProvider);
-      final isHost = currentState.playerIds.indexOf(currentUser?.uid ?? '') == 0;
+      final isHost = _amIHost(currentState);
       
       MatchState nextState = currentState;
       if (isHost) {
@@ -692,9 +730,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     final currentState = state;
     if (currentState == null || currentState.phase != GamePhase.dealingFasha) return;
 
-    final currentUser = ref.read(currentUserProvider);
-    final isHost = state!.playerIds.indexOf(currentUser?.uid ?? '') == 0;
-    if (!isHost) return;
+    if (!_amIHost(state!)) return;
 
     if (_secretDeck == null) {
       _secretDeck = Deck.standard();
@@ -748,61 +784,60 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
 }
 
   Future<void> dealSubsequentCards() async {
-  try {
-   if (state == null) return;
-   
-   final currentUser = ref.read(currentUserProvider);
-   final isHost = state!.playerIds.indexOf(currentUser?.uid ?? '') == 0;
-   if (!isHost) return;
-   
-   // RECOVERY: Minimal mid-round recovery
-   if (_secretDeck == null) {
-     debugPrint('RECOVERY: Host lost secret deck in dealSubsequentCards. Regenerating.');
-     _secretDeck = Deck.restoreFromHarvest(state!.harvestStacks);
-     // This might result in duplicate hand cards if we don't subtract them, 
-     // but it's better than a hard hang. 
-     // Round 1 start is the most common place for this hang.
-   }
+    try {
+      if (state == null) return;
+      
+      if (!_amIHost(state!)) return;
+      
+      // RECOVERY: Mid-round host transition recovery
+      if (_secretDeck == null) {
+        debugPrint('RECOVERY: New Host reconstructing deck from visible state.');
+        _secretDeck = Deck.reconstructRemaining(
+          state!.board,
+          state!.handCards,
+          state!.harvestStacks,
+        );
+      }
 
-   if (_secretDeck!.isEmpty) {
-      await _handleRoundEnd();
-      return;
-   }
+      if (_secretDeck!.isEmpty) {
+        await _handleRoundEnd();
+        return;
+      }
 
-   final hands = Map<String, List<game_card.Card>>.from(state!.handCards);
-   
-   // Optimized Sequential Dealing
-   _multimedia.playSfx('sfx/deal.mp3');
-   
-   for (var playerId in state!.playerIds) {
-     final playerHand = <game_card.Card>[];
-     for (int i = 0; i < 4; i++) {
-        final c = _secretDeck?.draw();
-        if (c == null) break;
-        playerHand.add(c);
-     }
-     hands[playerId] = List.from(playerHand);
-     
-     // Update each player's hand in one go or incrementally
-     await _publishState(state!.copyWith(
-       handCards: Map.from(hands), 
-       deckCount: _secretDeck?.cards.length ?? 0
-     ));
-     await Future.delayed(const Duration(milliseconds: 300));
-   }
+      final hands = Map<String, List<game_card.Card>>.from(state!.handCards);
+      
+      // Optimized Sequential Dealing
+      _multimedia.playSfx('sfx/deal.mp3');
+      
+      for (var playerId in state!.playerIds) {
+        final playerHand = <game_card.Card>[];
+        for (int i = 0; i < 4; i++) {
+          final c = _secretDeck?.draw();
+          if (c == null) break;
+          playerHand.add(c);
+        }
+        hands[playerId] = List.from(playerHand);
+        
+        // Update each player's hand in one go or incrementally
+        await _publishState(state!.copyWith(
+          handCards: Map.from(hands), 
+          deckCount: _secretDeck?.cards.length ?? 0
+        ));
+        await Future.delayed(const Duration(milliseconds: 300));
+      }
 
-   final finalState = state;
-   if (finalState != null) {
-     await _publishState(finalState.copyWith(
-       phase: GamePhase.playing,
-       turnStartTime: DateTime.now(),
-     ));
-   }
-  } catch (e, stack) {
-    debugPrint('ERROR in dealSubsequentCards: $e');
-    debugPrint('Stack: $stack');
+      final finalState = state;
+      if (finalState != null) {
+        await _publishState(finalState.copyWith(
+          phase: GamePhase.playing,
+          turnStartTime: DateTime.now(),
+        ));
+      }
+    } catch (e, stack) {
+      debugPrint('ERROR in dealSubsequentCards: $e');
+      debugPrint('Stack: $stack');
+    }
   }
-}
 
   Future<void> sendEmoji(String playerId, String emoji) async {
     final currentState = state;

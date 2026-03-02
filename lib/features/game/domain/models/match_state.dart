@@ -59,6 +59,7 @@ class MatchState {
   final String? capturingTeam;
   final int capturingStage; // 0: merge, 1: fly
   final game_card.Card? cutLastCard; // Revealed card after cut (The Last Card / الاخر)
+  final DateTime? expireAt;
   final int spectatorCount;
 
   
@@ -98,6 +99,7 @@ class MatchState {
       this.capturingStage = 0,
       this.cutLastCard,
       this.spectatorCount = 0,
+      this.expireAt,
     });
 
   MatchState copyWith({
@@ -136,6 +138,7 @@ class MatchState {
     int? capturingStage,
     game_card.Card? cutLastCard,
     int? spectatorCount,
+    DateTime? expireAt,
   }) {
     return MatchState(
       id: id ?? this.id,
@@ -173,6 +176,7 @@ class MatchState {
       capturingStage: capturingStage ?? this.capturingStage,
       cutLastCard: cutLastCard ?? this.cutLastCard,
       spectatorCount: spectatorCount ?? this.spectatorCount,
+      expireAt: expireAt ?? this.expireAt,
     );
   }
 
@@ -213,6 +217,7 @@ class MatchState {
       'capturingStage': capturingStage,
       'cutLastCard': cutLastCard?.toJson(),
       'spectatorCount': spectatorCount,
+      'expireAt': expireAt?.toIso8601String(),
     };
   }
 
@@ -399,6 +404,7 @@ class MatchState {
         capturingStage: json['capturingStage'] is int ? json['capturingStage'] as int : 0,
         cutLastCard: json['cutLastCard'] != null ? game_card.Card.fromJson(Map<String, dynamic>.from(json['cutLastCard'])) : null,
         spectatorCount: json['spectatorCount'] is int ? json['spectatorCount'] as int : 0,
+        expireAt: json['expireAt'] != null ? DateTime.tryParse(json['expireAt'].toString()) : null,
       );
     } catch (e, stack) {
       debugPrint('RECOVERED MatchState.fromJson failure: $e');
