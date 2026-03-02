@@ -46,20 +46,24 @@ class HalabessaApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final settings = ref.watch(settingsProvider);
 
-    return Listener(
-      onPointerDown: (_) => ref.read(multimediaServiceProvider).handleInteraction(),
-      child: MaterialApp(
-        title: '7alabessa',
-        localizationsDelegates: context.localizationDelegates,
-        supportedLocales: context.supportedLocales,
-        locale: context.locale,
-        theme: ThemeConfig.lightTheme,
-        darkTheme: ThemeConfig.darkTheme,
-        themeMode: settings.themeMode,
-        initialRoute: AppRoutes.initial,
-        routes: AppRoutes.routes,
-        debugShowCheckedModeBanner: false,
-      ),
+    return MaterialApp(
+      title: '7alabessa',
+      localizationsDelegates: context.localizationDelegates,
+      supportedLocales: context.supportedLocales,
+      locale: context.locale,
+      theme: ThemeConfig.lightTheme,
+      darkTheme: ThemeConfig.darkTheme,
+      themeMode: settings.themeMode,
+      initialRoute: AppRoutes.initial,
+      routes: AppRoutes.routes,
+      debugShowCheckedModeBanner: false,
+      builder: (context, child) {
+        return Listener(
+          behavior: HitTestBehavior.translucent,
+          onPointerDown: (_) => ref.read(multimediaServiceProvider).handleInteraction(),
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
     );
   }
 }

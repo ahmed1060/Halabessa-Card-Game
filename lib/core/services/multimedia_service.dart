@@ -26,8 +26,10 @@ class MultimediaService extends ChangeNotifier {
     if (!_hasInteracted) {
       debugPrint('MultimediaService: Interaction detected. Rescuing audio...');
       _hasInteracted = true;
-      if (_pendingMusic != null) {
-        playMusic(_pendingMusic!);
+      final musicToRescue = _pendingMusic;
+      _pendingMusic = null; // Clear first to avoid re-triggering while playing
+      if (musicToRescue != null) {
+        playMusic(musicToRescue);
       }
       notifyListeners();
     }
@@ -55,6 +57,7 @@ class MultimediaService extends ChangeNotifier {
       final settings = _ref.read(settingsProvider);
       if (settings.isMusicEnabled) {
         if (_currentMusicPath == assetPath && _hasInteracted) return;
+        if (_pendingMusic == assetPath && !_hasInteracted) return; // Already queued
 
         final globalSettings = _ref.read(globalSettingsProvider);
         final overrideUrl = globalSettings.musicOverrideUrl;
