@@ -63,6 +63,7 @@
     "upload_success": "Uploaded Successfully",
     "upload_failed": "Upload Failed: {}",
     "background_music": "Background Music",
+    "room_music": "Room Music",
     "capture_sfx": "Capture Sound",
     "deal_sfx": "Deal Cards Sound",
     "win_sfx": "Victory Sound",

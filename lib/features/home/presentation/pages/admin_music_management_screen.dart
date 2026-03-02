@@ -20,6 +20,7 @@ class _AdminMusicManagementScreenState extends ConsumerState<AdminMusicManagemen
 
   final List<Map<String, String>> _audioItems = [
     {'label': 'background_music', 'path': 'music/bg_music.mp3', 'type': 'music'},
+    {'label': 'room_music', 'path': 'music/room_music.mp3', 'type': 'room_music'},
   ];
 
   Future<void> _pickAndUpload(String assetPath, String type) async {
@@ -50,6 +51,10 @@ class _AdminMusicManagementScreenState extends ConsumerState<AdminMusicManagemen
         if (type == 'music') {
           await ref.read(globalSettingsProvider.notifier).updateSettings(
             currentSettings.copyWith(musicOverrideUrl: dataUri),
+          );
+        } else if (type == 'room_music') {
+          await ref.read(globalSettingsProvider.notifier).updateSettings(
+            currentSettings.copyWith(roomMusicOverrideUrl: dataUri),
           );
         } else {
           final newSfx = Map<String, String>.from(currentSettings.sfxOverrides);
@@ -105,6 +110,7 @@ class _AdminMusicManagementScreenState extends ConsumerState<AdminMusicManagemen
   @override
   Widget build(BuildContext context) {
     final globalSettings = ref.watch(globalSettingsProvider);
+    final multimedia = ref.watch(multimediaServiceProvider);
 
     return Scaffold(
       backgroundColor: const Color(0xFF0D1B2A),
@@ -124,10 +130,14 @@ class _AdminMusicManagementScreenState extends ConsumerState<AdminMusicManagemen
               final type = item['type']!;
               final isOverridden = type == 'music' 
                   ? globalSettings.musicOverrideUrl != null 
-                  : globalSettings.sfxOverrides.containsKey(assetPath);
+                  : type == 'room_music'
+                      ? globalSettings.roomMusicOverrideUrl != null
+                      : globalSettings.sfxOverrides.containsKey(assetPath);
               final isDefault = type == 'music'
                   ? globalSettings.musicOverrideUrl == globalSettings.musicBackupUrl && globalSettings.musicBackupUrl != null
-                  : globalSettings.sfxOverrides[assetPath] == globalSettings.sfxBackups[assetPath] && globalSettings.sfxBackups.containsKey(assetPath);
+                  : type == 'room_music'
+                      ? globalSettings.roomMusicOverrideUrl == globalSettings.roomMusicBackupUrl && globalSettings.roomMusicBackupUrl != null
+                      : globalSettings.sfxOverrides[assetPath] == globalSettings.sfxBackups[assetPath] && globalSettings.sfxBackups.containsKey(assetPath);
 
               return Container(
                 margin: const EdgeInsets.only(bottom: 16),
@@ -174,12 +184,21 @@ class _AdminMusicManagementScreenState extends ConsumerState<AdminMusicManagemen
                     children: [
                       IconButton(
                         iconSize: 18,
-                        icon: const Icon(Icons.play_arrow_rounded, color: Colors.white70),
+                        icon: Icon(
+                          (multimedia.currentMusicPath == assetPath && multimedia.musicState == PlayerState.playing)
+                              ? Icons.pause_rounded
+                              : Icons.play_arrow_rounded,
+                          color: Colors.white70,
+                        ),
                         onPressed: () {
-                          if (type == 'music') {
-                            ref.read(multimediaServiceProvider).playMusic(assetPath);
+                          if (multimedia.currentMusicPath == assetPath && multimedia.musicState == PlayerState.playing) {
+                            multimedia.stopMusic();
                           } else {
-                            ref.read(multimediaServiceProvider).playSfx(assetPath);
+                            if (type == 'music') {
+                              multimedia.playMusic(assetPath, loop: false);
+                            } else if (type == 'room_music') {
+                              multimedia.playRoomMusic(assetPath, loop: false);
+                            }
                           }
                         },
                       ),

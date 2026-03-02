@@ -109,6 +109,7 @@ class _AdminSfxManagementScreenState extends ConsumerState<AdminSfxManagementScr
   @override
   Widget build(BuildContext context) {
     final globalSettings = ref.watch(globalSettingsProvider);
+    final multimedia = ref.watch(multimediaServiceProvider);
 
     return Scaffold(
       backgroundColor: const Color(0xFF0D1B2A),
@@ -178,12 +179,17 @@ class _AdminSfxManagementScreenState extends ConsumerState<AdminSfxManagementScr
                     children: [
                       IconButton(
                         iconSize: 18,
-                        icon: const Icon(Icons.play_arrow_rounded, color: Colors.white70),
+                        icon: Icon(
+                          (multimedia.sfxState == PlayerState.playing)
+                              ? Icons.pause_rounded
+                              : Icons.play_arrow_rounded,
+                          color: Colors.white70,
+                        ),
                         onPressed: () {
-                          if (type == 'music') {
-                            ref.read(multimediaServiceProvider).playMusic(assetPath);
+                          if (multimedia.sfxState == PlayerState.playing) {
+                            multimedia.stopSfx();
                           } else {
-                            ref.read(multimediaServiceProvider).playSfx(assetPath);
+                            multimedia.playSfx(assetPath);
                           }
                         },
                       ),

@@ -7,19 +7,31 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/settings_provider.dart';
 import '../providers/global_settings_provider.dart';
 
-class MultimediaService {
+class MultimediaService extends ChangeNotifier {
   final AudioPlayer _musicPlayer = AudioPlayer();
   final AudioPlayer _sfxPlayer = AudioPlayer();
   final Ref _ref;
 
   MultimediaService(this._ref) {
-    _musicPlayer.setReleaseMode(ReleaseMode.loop);
+    // Notify listeners when state changes so UI can update icons
+    _musicPlayer.onPlayerStateChanged.listen((_) => notifyListeners());
+    _sfxPlayer.onPlayerStateChanged.listen((_) => notifyListeners());
   }
 
   // Web Autoplay Handling
   bool _hasInteracted = false;
   String? _pendingMusic;
-  final Map<String, bool> _pendingSfx = {};
+
+  void handleInteraction() {
+    if (!_hasInteracted) {
+      debugPrint('MultimediaService: Interaction detected. Rescuing audio...');
+      _hasInteracted = true;
+      if (_pendingMusic != null) {
+        playMusic(_pendingMusic!);
+      }
+      notifyListeners();
+    }
+  }
 
   // Haptics
   Future<void> vibrate() async {
@@ -31,8 +43,14 @@ class MultimediaService {
 
   // Audio - Background Music
   String? _currentMusicPath;
+  String? get currentMusicPath => _currentMusicPath;
+  PlayerState get musicState => _musicPlayer.state;
+  PlayerState get sfxState => _sfxPlayer.state;
 
-  Future<void> playMusic(String assetPath) async {
+  Stream<PlayerState> get musicStateStream => _musicPlayer.onPlayerStateChanged;
+  Stream<PlayerState> get sfxStateStream => _sfxPlayer.onPlayerStateChanged;
+
+  Future<void> playMusic(String assetPath, {bool loop = true}) async {
     try {
       final settings = _ref.read(settingsProvider);
       if (settings.isMusicEnabled) {
@@ -56,10 +74,12 @@ class MultimediaService {
         }
 
         if (source != null) {
+          await _musicPlayer.setReleaseMode(loop ? ReleaseMode.loop : ReleaseMode.release);
           await _musicPlayer.play(source).then((_) {
             _hasInteracted = true;
             _currentMusicPath = assetPath;
             _pendingMusic = null;
+            notifyListeners();
           }).catchError((e) {
             if (e.toString().contains('NotAllowedError')) {
               debugPrint('MultimediaService: Autoplay blocked. Queueing music.');
@@ -70,8 +90,40 @@ class MultimediaService {
           });
         }
       }
+    }
+  }
+
+  Future<void> playRoomMusic(String assetPath, {bool loop = true}) async {
+    try {
+      final settings = _ref.read(settingsProvider);
+      if (settings.isMusicEnabled) {
+        final globalSettings = _ref.read(globalSettingsProvider);
+        final overrideUrl = globalSettings.roomMusicOverrideUrl;
+
+        Source? source;
+        if (overrideUrl != null && overrideUrl.isNotEmpty) {
+          source = UrlSource(overrideUrl);
+        } else {
+          debugPrint('MultimediaService: No room music override found. Skipping.');
+          return;
+        }
+
+        if (source != null) {
+          await _musicPlayer.setReleaseMode(loop ? ReleaseMode.loop : ReleaseMode.release);
+          await _musicPlayer.play(source).then((_) {
+            _hasInteracted = true;
+            _currentMusicPath = assetPath;
+            _pendingMusic = null;
+            notifyListeners();
+          }).catchError((e) {
+            if (e.toString().contains('NotAllowedError')) {
+              _pendingMusic = assetPath;
+            }
+          });
+        }
+      }
     } catch (e) {
-      debugPrint('MultimediaService: Failed to play music $assetPath: $e');
+      debugPrint('MultimediaService: Failed to play room music: $e');
     }
   }
 
@@ -79,6 +131,7 @@ class MultimediaService {
     try {
       await _musicPlayer.stop();
       _currentMusicPath = null;
+      notifyListeners();
     } catch (e) {
       debugPrint('MultimediaService: Failed to stop music: $e');
     }
@@ -107,13 +160,7 @@ class MultimediaService {
 
         if (source != null) {
           await _sfxPlayer.play(source).then((_) {
-            // If we successfully played an SFX, we have user interaction!
-            if (!_hasInteracted) {
-               _hasInteracted = true;
-               if (_pendingMusic != null) {
-                 playMusic(_pendingMusic!);
-               }
-            }
+            handleInteraction(); // Success! Mark interaction and rescue music
           }).catchError((e) {
             if (e.toString().contains('NotAllowedError')) {
               debugPrint('MultimediaService: Autoplay blocked for SFX.');
@@ -128,14 +175,21 @@ class MultimediaService {
     }
   }
 
+  Future<void> stopSfx() async {
+    try {
+      await _sfxPlayer.stop();
+    } catch (e) {
+      debugPrint('MultimediaService: Failed to stop SFX: $e');
+    }
+  }
+
   void dispose() {
     _musicPlayer.dispose();
     _sfxPlayer.dispose();
   }
 }
 
-final multimediaServiceProvider = Provider<MultimediaService>((ref) {
+final multimediaServiceProvider = ChangeNotifierProvider<MultimediaService>((ref) {
   final service = MultimediaService(ref);
-  ref.onDispose(() => service.dispose());
   return service;
 });

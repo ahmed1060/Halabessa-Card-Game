@@ -34,11 +34,20 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
   void initState() {
     super.initState();
     _confettiController = ConfettiController(duration: const Duration(seconds: 5));
+    
+    // Start Room Music
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(multimediaServiceProvider).playRoomMusic('music/room_music.mp3');
+    });
   }
 
   @override
   void dispose() {
     _confettiController.dispose();
+    // Resume Background Music when leaving room
+    Future.microtask(() {
+      ref.read(multimediaServiceProvider).playMusic('music/bg_music.mp3');
+    });
     super.dispose();
   }
 

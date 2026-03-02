@@ -34,6 +34,8 @@ class GlobalSettingsNotifier extends StateNotifier<GlobalSettings> {
       Map<String, String> newSfxBackups = {};
       String? newMusic;
       String? newMusicBackup;
+      String? newRoomMusic;
+      String? newRoomMusicBackup;
 
       for (var doc in snapshot.docs) {
         final data = doc.data();
@@ -45,6 +47,10 @@ class GlobalSettingsNotifier extends StateNotifier<GlobalSettings> {
           newMusic = url;
         } else if (doc.id == 'music_backup') {
           newMusicBackup = url;
+        } else if (doc.id == 'room_music') {
+          newRoomMusic = url;
+        } else if (doc.id == 'room_music_backup') {
+          newRoomMusicBackup = url;
         } else if (doc.id.startsWith('sfx_')) {
           if (assetPath != null && url != null) {
             if (doc.id.endsWith('_backup')) {
@@ -61,6 +67,8 @@ class GlobalSettingsNotifier extends StateNotifier<GlobalSettings> {
         sfxBackups: newSfxBackups,
         musicOverrideUrl: newMusic,
         musicBackupUrl: newMusicBackup,
+        roomMusicOverrideUrl: newRoomMusic,
+        roomMusicBackupUrl: newRoomMusicBackup,
       );
     }, onError: (error) {
       debugPrint('GlobalSettingsNotifier: Firestore Error: $error');
@@ -84,6 +92,9 @@ class GlobalSettingsNotifier extends StateNotifier<GlobalSettings> {
     // 2. Music logic
     if (newSettings.musicOverrideUrl != null) {
        batch.set(overridesColl.doc('music'), {'url': newSettings.musicOverrideUrl});
+    }
+    if (newSettings.roomMusicOverrideUrl != null) {
+       batch.set(overridesColl.doc('room_music'), {'url': newSettings.roomMusicOverrideUrl});
     }
 
     // 3. SFX logic
@@ -112,6 +123,13 @@ class GlobalSettingsNotifier extends StateNotifier<GlobalSettings> {
           'isBackup': true,
         });
       }
+    } else if (type == 'room_music') {
+      if (state.roomMusicOverrideUrl != null) {
+        await overridesColl.doc('room_music_backup').set({
+          'url': state.roomMusicOverrideUrl,
+          'isBackup': true,
+        });
+      }
     } else {
       final url = state.sfxOverrides[assetPath];
       if (url != null) {
@@ -135,6 +153,14 @@ class GlobalSettingsNotifier extends StateNotifier<GlobalSettings> {
         return true;
       } else {
         await overridesColl.doc('music').delete();
+        return false;
+      }
+    } else if (type == 'room_music') {
+      if (state.roomMusicBackupUrl != null) {
+        await overridesColl.doc('room_music').set({'url': state.roomMusicBackupUrl});
+        return true;
+      } else {
+        await overridesColl.doc('room_music').delete();
         return false;
       }
     } else {
