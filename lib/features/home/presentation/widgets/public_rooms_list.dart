@@ -4,6 +4,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:halabessa/features/game/domain/models/match_state.dart';
 import 'package:halabessa/features/game/domain/providers/game_providers.dart';
 import 'package:halabessa/features/auth/presentation/providers/auth_providers.dart';
+import 'package:halabessa/core/theme/theme_config.dart';
 
 class PublicRoomsList extends ConsumerWidget {
   const PublicRoomsList({super.key});
@@ -58,7 +59,7 @@ class PublicRoomsList extends ConsumerWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     IconButton(
-                      icon: const Icon(Icons.visibility_outlined, color: ThemeConfig.goldAccent),
+                      icon: Icon(Icons.visibility_outlined, color: ThemeConfig.goldAccent),
                       onPressed: () {
                         ref.read(matchStateProvider.notifier).spectateMatch(match.id);
                         Navigator.pushNamed(context, '/game');

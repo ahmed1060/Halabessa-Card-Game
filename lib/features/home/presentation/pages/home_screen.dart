@@ -35,7 +35,7 @@ class HomeScreen extends ConsumerWidget {
         title: Text('app_title'.tr(), style: const TextStyle(fontFamily: ThemeConfig.fontHeading, letterSpacing: 2)),
         actions: [
           IconButton(
-            icon: const Icon(Icons.shopping_bag_outlined, color: ThemeConfig.goldAccent),
+            icon: Icon(Icons.shopping_bag_outlined, color: ThemeConfig.goldAccent),
             onPressed: () => Navigator.pushNamed(context, '/store'),
             tooltip: 'store'.tr(),
           ),
