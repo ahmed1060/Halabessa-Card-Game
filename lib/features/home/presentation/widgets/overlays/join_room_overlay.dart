@@ -57,51 +57,73 @@ class _JoinRoomOverlayState extends ConsumerState<JoinRoomOverlay> {
               ),
             ),
             const SizedBox(height: 24),
-            Text(
-              'join_room'.tr(),
-              style: const TextStyle(
-                color: ThemeConfig.goldAccent,
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                fontFamily: ThemeConfig.fontHeading,
-                letterSpacing: 1.2,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 32),
 
-            Text(
-              'enter_code'.tr(),
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.5),
-                fontSize: 12,
-              ),
-            ),
-            const SizedBox(height: 16),
+            Flexible(
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      'join_room'.tr(),
+                      style: const TextStyle(
+                        color: ThemeConfig.goldAccent,
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: ThemeConfig.fontHeading,
+                        letterSpacing: 1.2,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 32),
 
-            _buildRoomCodeInput(),
+                    Text(
+                      'enter_code'.tr(),
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.5),
+                        fontSize: 12,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
 
-            const SizedBox(height: 32),
+                    _buildRoomCodeInput(),
 
-            GestureDetector(
-              onTap: _isLoading ? null : _joinMatch,
-              child: Container(
-                height: 56,
-                decoration: BoxDecoration(
-                  color: ThemeConfig.goldAccent,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(color: ThemeConfig.goldAccent.withOpacity(0.3), blurRadius: 15, offset: const Offset(0, 5)),
+                    const SizedBox(height: 32),
+
+                    GestureDetector(
+                      onTap: _isLoading ? null : _joinMatch,
+                      child: Container(
+                        height: 56,
+                        decoration: BoxDecoration(
+                          color: ThemeConfig.goldAccent,
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                                color: ThemeConfig.goldAccent.withOpacity(0.3),
+                                blurRadius: 15,
+                                offset: const Offset(0, 5)),
+                          ],
+                        ),
+                        alignment: Alignment.center,
+                        child: _isLoading
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                    color: Colors.black, strokeWidth: 2))
+                            : Text(
+                                'join'.tr().toUpperCase(),
+                                style: const TextStyle(
+                                    color: Colors.black,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                    letterSpacing: 2),
+                              ),
+                      ),
+                    ),
                   ],
                 ),
-                alignment: Alignment.center,
-                child: _isLoading 
-                  ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2))
-                  : Text(
-                      'join'.tr().toUpperCase(),
-                      style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 16, letterSpacing: 2),
-                    ),
               ),
             ),
           ],

@@ -52,53 +52,64 @@ class _CreateRoomOverlayState extends ConsumerState<CreateRoomOverlay> {
               ),
             ),
             const SizedBox(height: 24),
-            Text(
-              'create_room'.tr(),
-              style: const TextStyle(
-                color: ThemeConfig.goldAccent,
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                fontFamily: ThemeConfig.fontHeading,
-                letterSpacing: 1.2,
+
+            Flexible(
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      'create_room'.tr(),
+                      style: const TextStyle(
+                        color: ThemeConfig.goldAccent,
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: ThemeConfig.fontHeading,
+                        letterSpacing: 1.2,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 32),
+
+                    _buildLabel('select_target_score'.tr()),
+                    const SizedBox(height: 12),
+                    _buildScoreSelector(),
+                    const SizedBox(height: 24),
+
+                    _buildLabel('select_timer'.tr()),
+                    const SizedBox(height: 12),
+                    _buildTimerSelector(),
+                    const SizedBox(height: 24),
+
+                    _buildLabel('select_game_mode'.tr()),
+                    const SizedBox(height: 12),
+                    _buildPublicSwitch(),
+                    const SizedBox(height: 40),
+
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildActionButton(
+                            label: 'classic_mode'.tr(),
+                            isPrimary: true,
+                            onTap: () => _createMatch(GameMode.classic),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: _buildActionButton(
+                            label: 'tafweet_mode'.tr(),
+                            isPrimary: false,
+                            accentColor: Colors.deepPurpleAccent,
+                            onTap: () => _createMatch(GameMode.tafweet),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 32),
-
-            _buildLabel('select_target_score'.tr()),
-            const SizedBox(height: 12),
-            _buildScoreSelector(),
-            const SizedBox(height: 24),
-
-            _buildLabel('select_timer'.tr()),
-            const SizedBox(height: 12),
-            _buildTimerSelector(),
-            const SizedBox(height: 24),
-
-            _buildLabel('select_game_mode'.tr()),
-            const SizedBox(height: 12),
-            _buildPublicSwitch(),
-            const SizedBox(height: 40),
-
-            Row(
-              children: [
-                Expanded(
-                  child: _buildActionButton(
-                    label: 'classic_mode'.tr(),
-                    isPrimary: true,
-                    onTap: () => _createMatch(GameMode.classic),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: _buildActionButton(
-                    label: 'tafweet_mode'.tr(),
-                    isPrimary: false,
-                    accentColor: Colors.deepPurpleAccent,
-                    onTap: () => _createMatch(GameMode.tafweet),
-                  ),
-                ),
-              ],
             ),
           ],
         ),
