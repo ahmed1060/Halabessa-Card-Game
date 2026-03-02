@@ -482,7 +482,7 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
         backgroundColor: const Color(0xFF1A1A1A),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: Colors.white10),
+          side: const BorderSide(color: Colors.white10),
         ),
         title: Row(
           children: [
