@@ -137,8 +137,15 @@ class _AdminMusicManagementScreenState extends ConsumerState<AdminMusicManagemen
                   border: Border.all(color: isOverridden ? ThemeConfig.goldAccent.withOpacity(0.3) : Colors.white10),
                 ),
                 child: ListTile(
-                  dense: true,
-                  visualDensity: VisualDensity.compact,
+                  leading: isOverridden ? IconButton(
+                    iconSize: 20,
+                    tooltip: isDefault ? 'is_default_label'.tr() : 'mark_as_default'.tr(),
+                    icon: Icon(
+                      isDefault ? Icons.star_rounded : Icons.star_outline_rounded,
+                      color: isDefault ? ThemeConfig.goldAccent : Colors.blueAccent,
+                    ),
+                    onPressed: isDefault ? null : () => ref.read(globalSettingsProvider.notifier).markAsDefault(assetPath, type),
+                  ) : const Icon(Icons.audiotrack_rounded, color: Colors.white24, size: 20),
                   title: Text(item['label']!.tr(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
                   subtitle: Row(
                     children: [
@@ -181,13 +188,6 @@ class _AdminMusicManagementScreenState extends ConsumerState<AdminMusicManagemen
                         icon: const Icon(Icons.upload_file_rounded, color: ThemeConfig.goldAccent),
                         onPressed: () => _pickAndUpload(assetPath, type),
                       ),
-                      if (isOverridden && !isDefault)
-                        IconButton(
-                          iconSize: 18,
-                          tooltip: 'mark_as_default'.tr(),
-                          icon: const Icon(Icons.star_outline_rounded, color: Colors.blueAccent),
-                          onPressed: () => ref.read(globalSettingsProvider.notifier).markAsDefault(assetPath, type),
-                        ),
                       if (isOverridden)
                         IconButton(
                           iconSize: 18,
