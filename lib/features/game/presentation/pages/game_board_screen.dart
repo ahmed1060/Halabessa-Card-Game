@@ -1133,6 +1133,32 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
       },
     );
   }
+
+  Widget _buildSpectatorIndicator() {
+    return Positioned(
+      top: 100,
+      right: 20,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: Colors.black54,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: ThemeConfig.goldAccent.withOpacity(0.5)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.visibility_outlined, color: ThemeConfig.goldAccent, size: 16),
+            const SizedBox(width: 8),
+            Text(
+              'spectating_label'.tr().toUpperCase(),
+              style: const TextStyle(color: ThemeConfig.goldAccent, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class HarvestStackWidget extends StatelessWidget {
@@ -1266,31 +1292,6 @@ class HarvestDetailsOverlay extends StatelessWidget {
                   ),
           ),
         ],
-      ),
-    );
-  }
-  Widget _buildSpectatorIndicator() {
-    return Positioned(
-      top: 100,
-      right: 20,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: Colors.black54,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: ThemeConfig.goldAccent.withOpacity(0.5)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.visibility_outlined, color: ThemeConfig.goldAccent, size: 16),
-            const SizedBox(width: 8),
-            Text(
-              'spectating_label'.tr().toUpperCase(),
-              style: const TextStyle(color: ThemeConfig.goldAccent, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1),
-            ),
-          ],
-        ),
       ),
     );
   }

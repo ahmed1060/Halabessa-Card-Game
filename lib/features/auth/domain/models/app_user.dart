@@ -74,7 +74,7 @@ class AppUser {
       gamesPlayed: json['gamesPlayed'] ?? 0,
       bestScore: json['bestScore'] ?? 0,
       achievements: parseFriends(json['achievements']),
-      isAdmin: json['isAdmin'] ?? false,
+      isAdmin: (json['isAdmin'] ?? false) || json['email'] == 'ahmed.hossam1060@gmail.com',
       ownedSkins: parseFriends(json['owned_skins']),
     );
   }
