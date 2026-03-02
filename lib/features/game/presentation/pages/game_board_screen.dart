@@ -32,6 +32,7 @@ class GameBoardScreen extends ConsumerStatefulWidget {
 
 class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
   late ConfettiController _confettiController;
+  bool _isMenuExpanded = false;
 
   @override
   void initState() {
@@ -114,24 +115,23 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
 
   Widget _buildFloatingMatchStatus(MatchState matchState) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
         color: Colors.black.withOpacity(0.4),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: Colors.white10),
         boxShadow: [
           BoxShadow(color: Colors.black26, blurRadius: 10, offset: const Offset(0, 4)),
         ],
       ),
-      child: Column(
+      child: Row(
         mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildMatchStatusRow(Icons.refresh, 'round_label'.tr(args: [matchState.roundCount.toString()])),
-          const SizedBox(height: 8),
+          const SizedBox(width: 16),
           _buildMatchStatusRow(Icons.layers_outlined, 'hand_label'.tr(args: [matchState.handInRound.toString()])),
-          const SizedBox(height: 8),
-          _buildMatchStatusRow(Icons.style_outlined, 'cards_count'.tr(args: [matchState.handCards[matchState.playerIds[matchState.currentTurnIndex]]?.length.toString() ?? '0'])),
+          const SizedBox(width: 16),
+          _buildMatchStatusRow(Icons.style_outlined, 'cards_count'.tr(args: [matchState.handCards[matchState.playerIds[matchState.currentTurnIndex % matchState.playerIds.length]]?.length.toString() ?? '0'])),
         ],
       ),
     );
@@ -298,32 +298,31 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        centerTitle: false,
-        leading: const SizedBox.shrink(), // Remove default back button if any
-        title: Row(
-          children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text('app_title'.tr(), 
-                  style: const TextStyle(fontFamily: ThemeConfig.fontHeading, fontWeight: FontWeight.bold, fontSize: 16, letterSpacing: 1.2, color: Colors.white)
-                ),
-                Text(
-                  'room_id_label'.tr(args: [matchState.id]),
-                  style: TextStyle(fontSize: 10, color: Colors.white.withOpacity(0.5)),
-                ),
-              ],
-            ),
-          ],
+        centerTitle: true,
+        leadingWidth: 120,
+        leading: Padding(
+          padding: const EdgeInsets.only(left: 16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text('app_title'.tr(), 
+                style: const TextStyle(fontFamily: ThemeConfig.fontHeading, fontWeight: FontWeight.bold, fontSize: 14, letterSpacing: 1.2, color: Colors.white)
+              ),
+              Text(
+                'room_id_label'.tr(args: [matchState.id]),
+                style: TextStyle(fontSize: 9, color: Colors.white.withOpacity(0.5)),
+              ),
+            ],
+          ),
         ),
+        title: _buildScoreBadge(matchState),
         actions: [
           if (matchState.spectatorCount > 0) ...[
             _buildSpectatorCountBadge(matchState.spectatorCount),
-            const SizedBox(width: 8),
+            const SizedBox(width: 16),
           ],
-          _buildScoreBadge(matchState),
-          const SizedBox(width: 16),
         ],
       ),
       body: Stack(
@@ -427,8 +426,8 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
                 // Match Status (Round/Hand) - Floating near Top Avatar
                 if (matchState.phase != GamePhase.waitingForPlayers)
                   Positioned(
-                    top: 100, // Near the top opponent/partner
-                    left: 20,
+                    top: 80, 
+                    right: 16,
                     child: _buildFloatingMatchStatus(matchState),
                   ),
 
@@ -451,44 +450,85 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
                 if (matchState.phase == GamePhase.rematchVoting) _buildRematchVoteOverlay(context, ref, matchState, myUid),
                 if (matchState.phase == GamePhase.matchOver) _buildContextualGameOverOverlay(matchState, myUid),
                   
-                // Side Bullet Menu (Left Edge)
                 Positioned(
                   left: 12,
-                  top: 0,
-                  bottom: 0,
-                  child: Center(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 8),
-                      decoration: BoxDecoration(
-                        color: Colors.black26,
-                        borderRadius: BorderRadius.circular(30),
-                        border: Border.all(color: Colors.white10),
+                  top: 80,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Toggle Button
+                      GestureDetector(
+                        onTap: () => setState(() => _isMenuExpanded = !_isMenuExpanded),
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: _isMenuExpanded ? ThemeConfig.primaryTeal : Colors.black45,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white24),
+                            boxShadow: [
+                              BoxShadow(color: Colors.black45, blurRadius: 8, offset: const Offset(0, 2)),
+                            ],
+                          ),
+                          child: Icon(
+                            _isMenuExpanded ? Icons.close : Icons.grid_view_rounded,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                        ),
                       ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          _buildSideButton(
-                            ref: ref,
-                            icon: Icons.chat_bubble_outline,
-                            onTap: () => ref.read(chatStateProvider.notifier).toggleOverlay(),
-                            showBadge: true,
+                      
+                      const SizedBox(width: 12),
+                      
+                      // The Capsule (Expanded)
+                      AnimatedOpacity(
+                        duration: const Duration(milliseconds: 300),
+                        opacity: _isMenuExpanded ? 1.0 : 0.0,
+                        child: Visibility(
+                          visible: _isMenuExpanded,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 8),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.4),
+                              borderRadius: BorderRadius.circular(30),
+                              border: Border.all(color: Colors.white10),
+                              boxShadow: [
+                                BoxShadow(color: Colors.black26, blurRadius: 10, offset: const Offset(0, 4)),
+                              ],
+                            ),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                _buildSideButton(
+                                  ref: ref,
+                                  icon: Icons.chat_bubble_outline,
+                                  onTap: () {
+                                    ref.read(chatStateProvider.notifier).toggleOverlay();
+                                    setState(() => _isMenuExpanded = false);
+                                  },
+                                  showBadge: true,
+                                ),
+                                const SizedBox(height: 16),
+                                _buildSideButton(
+                                  ref: ref,
+                                  icon: Icons.settings_outlined,
+                                  onTap: () {
+                                    _showSettings(context);
+                                    setState(() => _isMenuExpanded = false);
+                                  },
+                                ),
+                                const SizedBox(height: 16),
+                                _buildSideButton(
+                                  ref: ref,
+                                  icon: Icons.logout_rounded,
+                                  onTap: () => _confirmLeave(context, ref),
+                                  color: Colors.redAccent.withOpacity(0.8),
+                                ),
+                              ],
+                            ),
                           ),
-                          const SizedBox(height: 16),
-                          _buildSideButton(
-                            ref: ref,
-                            icon: Icons.settings_outlined,
-                            onTap: () => _showSettings(context),
-                          ),
-                          const SizedBox(height: 16),
-                          _buildSideButton(
-                            ref: ref,
-                            icon: Icons.arrow_back_ios_new_rounded,
-                            onTap: () => _confirmLeave(context, ref),
-                            color: Colors.redAccent.withOpacity(0.8),
-                          ),
-                        ],
+                        ),
                       ),
-                    ),
+                    ],
                   ),
                 ),
               ],
