@@ -18,6 +18,7 @@ import 'package:halabessa/core/widgets/settings_overlay.dart';
 import 'package:halabessa/features/game/presentation/providers/chat_providers.dart';
 import 'package:halabessa/features/game/presentation/widgets/chat_overlay.dart';
 import 'package:confetti/confetti.dart';
+import '../widgets/player_profile_preview.dart';
 import 'package:flutter/services.dart';
 import 'package:halabessa/core/services/multimedia_service.dart';
 
@@ -236,6 +237,7 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: false,
+        leading: const SizedBox.shrink(), // Remove default back button if any
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
@@ -255,11 +257,7 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
             const SizedBox(width: 8),
           ],
           _buildScoreBadge(matchState),
-          const SizedBox(width: 8),
-          IconButton(
-            icon: const Icon(Icons.settings, color: Colors.white70), 
-            onPressed: () => _showSettings(context),
-          ),
+          const SizedBox(width: 16),
         ],
       ),
       body: Stack(
@@ -305,14 +303,17 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
                   alignment: Alignment.topCenter,
                   child: Padding(
                     padding: const EdgeInsets.only(top: 16.0),
-                    child: PlayerAvatar(
-                      user: _getAvatarUser(ref, matchState, myUid, 2),
-                      isCurrentTurn: matchState.currentTurnIndex == _getAbsoluteIndex(matchState, myUid, 2),
-                      turnStartTime: matchState.turnStartTime,
-                      timerDurationSeconds: matchState.timerDurationSeconds,
-                      activeEmoji: _getPlayerEmoji(matchState, myUid, 2),
-                      activeMessage: ref.watch(lastMessageForUserProvider(matchState.playerIds.isEmpty ? '' : matchState.playerIds[(_getAbsoluteIndex(matchState, myUid, 2)) % matchState.playerIds.length]))?.text,
-                      teamColor: _getTeamColorForOffset(matchState, myUid, 2),
+                    child: GestureDetector(
+                      onTap: () => _showPlayerProfile(context, ref, matchState, myUid, 2),
+                      child: PlayerAvatar(
+                        user: _getAvatarUser(ref, matchState, myUid, 2),
+                        isCurrentTurn: matchState.currentTurnIndex == _getAbsoluteIndex(matchState, myUid, 2),
+                        turnStartTime: matchState.turnStartTime,
+                        timerDurationSeconds: matchState.timerDurationSeconds,
+                        activeEmoji: _getPlayerEmoji(matchState, myUid, 2),
+                        activeMessage: ref.watch(lastMessageForUserProvider(matchState.playerIds.isEmpty ? '' : matchState.playerIds[(_getAbsoluteIndex(matchState, myUid, 2)) % matchState.playerIds.length]))?.text,
+                        teamColor: _getTeamColorForOffset(matchState, myUid, 2),
+                      ),
                     ),
                   ),
                 ),
@@ -320,28 +321,34 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
                 // Left Player (Offset 3 in Anticlockwise)
                 Align(
                   alignment: const Alignment(-0.95, -0.1),
-                  child: PlayerAvatar(
-                    user: _getAvatarUser(ref, matchState, myUid, 3),
-                    isCurrentTurn: matchState.currentTurnIndex == _getAbsoluteIndex(matchState, myUid, 3),
-                    turnStartTime: matchState.turnStartTime,
-                    timerDurationSeconds: matchState.timerDurationSeconds,
-                    activeEmoji: _getPlayerEmoji(matchState, myUid, 3),
-                    activeMessage: ref.watch(lastMessageForUserProvider(matchState.playerIds.isEmpty ? '' : matchState.playerIds[(_getAbsoluteIndex(matchState, myUid, 3)) % matchState.playerIds.length]))?.text,
-                    teamColor: _getTeamColorForOffset(matchState, myUid, 3),
+                  child: GestureDetector(
+                    onTap: () => _showPlayerProfile(context, ref, matchState, myUid, 3),
+                    child: PlayerAvatar(
+                      user: _getAvatarUser(ref, matchState, myUid, 3),
+                      isCurrentTurn: matchState.currentTurnIndex == _getAbsoluteIndex(matchState, myUid, 3),
+                      turnStartTime: matchState.turnStartTime,
+                      timerDurationSeconds: matchState.timerDurationSeconds,
+                      activeEmoji: _getPlayerEmoji(matchState, myUid, 3),
+                      activeMessage: ref.watch(lastMessageForUserProvider(matchState.playerIds.isEmpty ? '' : matchState.playerIds[(_getAbsoluteIndex(matchState, myUid, 3)) % matchState.playerIds.length]))?.text,
+                      teamColor: _getTeamColorForOffset(matchState, myUid, 3),
+                    ),
                   ),
                 ),
 
                 // Right Player (Offset 1 in Anticlockwise)
                 Align(
                   alignment: const Alignment(0.95, -0.1),
-                  child: PlayerAvatar(
-                    user: _getAvatarUser(ref, matchState, myUid, 1),
-                    isCurrentTurn: matchState.currentTurnIndex == _getAbsoluteIndex(matchState, myUid, 1),
-                    turnStartTime: matchState.turnStartTime,
-                    timerDurationSeconds: matchState.timerDurationSeconds,
-                    activeEmoji: _getPlayerEmoji(matchState, myUid, 1),
-                    activeMessage: ref.watch(lastMessageForUserProvider(matchState.playerIds.isEmpty ? '' : matchState.playerIds[(_getAbsoluteIndex(matchState, myUid, 1)) % matchState.playerIds.length]))?.text,
-                    teamColor: _getTeamColorForOffset(matchState, myUid, 1),
+                  child: GestureDetector(
+                    onTap: () => _showPlayerProfile(context, ref, matchState, myUid, 1),
+                    child: PlayerAvatar(
+                      user: _getAvatarUser(ref, matchState, myUid, 1),
+                      isCurrentTurn: matchState.currentTurnIndex == _getAbsoluteIndex(matchState, myUid, 1),
+                      turnStartTime: matchState.turnStartTime,
+                      timerDurationSeconds: matchState.timerDurationSeconds,
+                      activeEmoji: _getPlayerEmoji(matchState, myUid, 1),
+                      activeMessage: ref.watch(lastMessageForUserProvider(matchState.playerIds.isEmpty ? '' : matchState.playerIds[(_getAbsoluteIndex(matchState, myUid, 1)) % matchState.playerIds.length]))?.text,
+                      teamColor: _getTeamColorForOffset(matchState, myUid, 1),
+                    ),
                   ),
                 ),
 
@@ -369,14 +376,14 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
                 if (matchState.phase == GamePhase.rematchVoting) _buildRematchVoteOverlay(context, ref, matchState, myUid),
                 if (matchState.phase == GamePhase.matchOver) _buildContextualGameOverOverlay(matchState, myUid),
                   
-                // Chat Toggle (Left Edge)
+                // Side Bullet Menu (Left Edge)
                 Positioned(
                   left: 12,
                   top: 0,
                   bottom: 0,
                   child: Center(
                     child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 20),
+                      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 8),
                       decoration: BoxDecoration(
                         color: Colors.black26,
                         borderRadius: BorderRadius.circular(30),
@@ -396,6 +403,13 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
                             ref: ref,
                             icon: Icons.settings_outlined,
                             onTap: () => _showSettings(context),
+                          ),
+                          const SizedBox(height: 16),
+                          _buildSideButton(
+                            ref: ref,
+                            icon: Icons.arrow_back_ios_new_rounded,
+                            onTap: () => _confirmLeave(context, ref),
+                            color: Colors.redAccent.withOpacity(0.8),
                           ),
                         ],
                       ),
@@ -461,19 +475,78 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
     );
   }
 
-  Widget _buildSideButton({required WidgetRef ref, required IconData icon, required VoidCallback onTap, bool showBadge = false}) {
+  void _confirmLeave(BuildContext context, WidgetRef ref) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A1A),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: Colors.white10),
+        ),
+        title: Row(
+          children: [
+            const Icon(Icons.warning_amber_rounded, color: Colors.redAccent),
+            const SizedBox(width: 12),
+            Text(
+              'leave_game_title'.tr(),
+              style: const TextStyle(color: Colors.white, fontFamily: ThemeConfig.fontHeading),
+            ),
+          ],
+        ),
+        content: Text(
+          'leave_game_warning'.tr(),
+          style: const TextStyle(color: Colors.white70, fontSize: 14),
+        ),
+        actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('cancel'.tr(), style: const TextStyle(color: Colors.white38)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            ),
+            onPressed: () {
+              ref.read(matchStateProvider.notifier).leaveMatch();
+              Navigator.pop(context); // Close dialog
+              Navigator.pop(context); // Exit Game Screen
+            },
+            child: Text(
+              'leave'.tr(),
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSideButton({
+    required WidgetRef ref, 
+    required IconData icon, 
+    required VoidCallback onTap, 
+    bool showBadge = false,
+    Color? color,
+  }) {
     final unreadCount = ref.watch(unreadMessagesCountProvider);
     return Stack(
       clipBehavior: Clip.none,
       children: [
         IconButton(
-          icon: Icon(icon, color: Colors.white, size: 28),
+          icon: Icon(icon, color: color ?? Colors.white, size: 24),
           onPressed: onTap,
+          visualDensity: VisualDensity.compact,
         ),
         if (showBadge && unreadCount > 0)
           Positioned(
-            right: 0,
-            top: 0,
+            right: 4,
+            top: 4,
             child: Container(
               padding: const EdgeInsets.all(4),
               decoration: const BoxDecoration(color: ThemeConfig.accentPink, shape: BoxShape.circle),
@@ -743,14 +816,17 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
               Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  PlayerAvatar(
-                    user: _getAvatarUser(ref, matchState, myUid, 0),
-                    isCurrentTurn: matchState.playerIds.isNotEmpty && matchState.currentTurnIndex == _getAbsoluteIndex(matchState, myUid, 0),
-                    turnStartTime: matchState.turnStartTime,
-                    timerDurationSeconds: matchState.timerDurationSeconds,
-                    activeEmoji: matchState.playerEmojis[myUid],
-                    activeMessage: ref.watch(lastMessageForUserProvider(myUid))?.text,
-                    teamColor: _getTeamColorForOffset(matchState, myUid, 0),
+                  GestureDetector(
+                    onTap: () => _showPlayerProfile(context, ref, matchState, myUid, 0),
+                    child: PlayerAvatar(
+                      user: _getAvatarUser(ref, matchState, myUid, 0),
+                      isCurrentTurn: matchState.playerIds.isNotEmpty && matchState.currentTurnIndex == _getAbsoluteIndex(matchState, myUid, 0),
+                      turnStartTime: matchState.turnStartTime,
+                      timerDurationSeconds: matchState.timerDurationSeconds,
+                      activeEmoji: matchState.playerEmojis[myUid],
+                      activeMessage: ref.watch(lastMessageForUserProvider(myUid))?.text,
+                      teamColor: _getTeamColorForOffset(matchState, myUid, 0),
+                    ),
                   ),
                   const SizedBox(height: 8),
                   _buildReactionBar(ref, myUid),
@@ -1157,6 +1233,22 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
           ],
         ),
       ),
+    );
+  }
+  void _showPlayerProfile(BuildContext context, WidgetRef ref, MatchState matchState, String myUid, int offset) {
+    if (matchState.playerIds.isEmpty) return;
+    
+    final absoluteIndex = _getAbsoluteIndex(matchState, myUid, offset);
+    final targetPlayerId = matchState.playerIds[absoluteIndex % matchState.playerIds.length];
+    
+    // Don't show for bots
+    if (targetPlayerId.startsWith('bot_')) return;
+    
+    final user = _getAvatarUser(ref, matchState, myUid, offset);
+    
+    showDialog(
+      context: context,
+      builder: (context) => PlayerProfilePreview(user: user),
     );
   }
 }

@@ -182,8 +182,8 @@
     "achievement_winner": "كسبان",
     "tafweet_king": "ملك التفويت",
     "achievement_pro": "محترف",
-    "total_cards_count": "إجمالي الورق: {0}",
-    "harvest_details": "مكتسبات {0}",
+    "total_cards_count": "إجمالي الورق: {}",
+    "harvest_details": "مكتسبات {}",
     "no_captures_yet": "مفيش لمات لسه.",
     "select_target_score": "اختار نقط الفوز:",
     "target_score_21": "21 نقطة (سريع)",
@@ -247,5 +247,9 @@
     "avatar_3": "سايبر",
     "avatar_4": "فارس",
     "avatar_5": "مكتشف",
-    "avatar_6": "ملكي"
+    "avatar_6": "ملكي",
+    "leave_game_title": "عايز تخرج؟",
+    "leave_game_warning": "متأكد إنك عايز تخرج؟ لو خرجت دلوقتي ممكن يتخصم منك نقط عشان اللعب لسه شغال.",
+    "profile_preview": "حساب اللاعب",
+    "friend_request_sent": "تم إرسال طلب الصداقة!"
 }

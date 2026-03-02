@@ -40,6 +40,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
   
   // Prevents multiple concurrent bot logic evaluations for the same state change
   bool _isHandlingBotLogic = false;
+  DateTime? _lastBotLogicTime;
   Timer? _heartbeatTimer;
   StreamSubscription<CountdownTimer>? _autoplaySubscription;
   final Map<String, StreamSubscription<CountdownTimer>> _tafweetSubscriptions = {};
@@ -183,8 +184,19 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
   }
 
   Future<void> _evaluateBotActions(MatchState serverState) async {
-    if (_isHandlingBotLogic) return;
+    if (_isHandlingBotLogic) {
+      // WATCHDOG: If stuck for more than 15 seconds, reset
+      if (_lastBotLogicTime != null && 
+          DateTime.now().difference(_lastBotLogicTime!).inSeconds > 15) {
+        debugPrint('WATCHDOG: Bot logic stuck detected. Resetting flag.');
+        _isHandlingBotLogic = false;
+      } else {
+        return;
+      }
+    }
+    
     _isHandlingBotLogic = true;
+    _lastBotLogicTime = DateTime.now();
 
     // Determine if the LOCAL client is the Host (index 0) of the match.
     // We only want ONE client (the Host) to execute Bot logic to prevent duplicate Firebase writes.
@@ -759,17 +771,24 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
 
    final hands = Map<String, List<game_card.Card>>.from(state!.handCards);
    
-   // Sequential Dealing
+   // Optimized Sequential Dealing
+   _multimedia.playSfx('sfx/deal.mp3');
+   
    for (var playerId in state!.playerIds) {
      final playerHand = <game_card.Card>[];
      for (int i = 0; i < 4; i++) {
         final c = _secretDeck?.draw();
         if (c == null) break;
         playerHand.add(c);
-        hands[playerId] = List.from(playerHand);
-        await _publishState(state!.copyWith(handCards: Map.from(hands), deckCount: _secretDeck?.cards.length ?? 0));
-        await Future.delayed(const Duration(milliseconds: 250));
      }
+     hands[playerId] = List.from(playerHand);
+     
+     // Update each player's hand in one go or incrementally
+     await _publishState(state!.copyWith(
+       handCards: Map.from(hands), 
+       deckCount: _secretDeck?.cards.length ?? 0
+     ));
+     await Future.delayed(const Duration(milliseconds: 300));
    }
 
    final finalState = state;

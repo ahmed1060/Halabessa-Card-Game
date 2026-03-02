@@ -15,8 +15,12 @@ class AppUser {
   final List<String> achievements;
   final bool isAdmin;
   final List<String> ownedSkins;
+  final String searchName;
 
   final Map<String, int> inventory;
+  
+  double get winRate => gamesPlayed == 0 ? 0 : wins / gamesPlayed;
+  int get level => (points / 1000).floor() + 1;
 
   AppUser({
     required this.uid,
@@ -33,9 +37,10 @@ class AppUser {
     this.losses = 0,
     this.gamesPlayed = 0,
     this.bestScore = 0,
-     this.achievements = const [],
+    this.achievements = const [],
     this.isAdmin = false,
     this.ownedSkins = const [],
+    this.searchName = '',
   });
 
   factory AppUser.fromJson(Map<String, dynamic> json, String uid) {
@@ -76,6 +81,7 @@ class AppUser {
       achievements: parseFriends(json['achievements']),
       isAdmin: (json['isAdmin'] ?? false) || json['email'] == 'ahmed.hossam1060@gmail.com',
       ownedSkins: parseFriends(json['owned_skins']),
+      searchName: json['searchName'] ?? (json['displayName'] ?? '').toString().toLowerCase(),
     );
   }
 
@@ -97,6 +103,7 @@ class AppUser {
       'achievements': achievements,
       'isAdmin': isAdmin,
       'owned_skins': ownedSkins,
+      'searchName': searchName.isEmpty ? displayName.toLowerCase() : searchName,
     };
   }
 
@@ -118,6 +125,7 @@ class AppUser {
     List<String>? achievements,
     bool? isAdmin,
     List<String>? ownedSkins,
+    String? searchName,
   }) {
     return AppUser(
       uid: uid ?? this.uid,
@@ -137,6 +145,7 @@ class AppUser {
       achievements: achievements ?? this.achievements,
       isAdmin: isAdmin ?? this.isAdmin,
       ownedSkins: ownedSkins ?? this.ownedSkins,
+      searchName: searchName ?? this.searchName,
     );
   }
 }

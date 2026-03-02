@@ -172,8 +172,8 @@
     "achievement_winner": "فائز",
     "tafweet_king": "ملك التفويت",
     "achievement_pro": "محترف",
-    "total_cards_count": "إجمالي البطاقات: {0}",
-    "harvest_details": "مكتسبات {0}",
+    "total_cards_count": "إجمالي البطاقات: {}",
+    "harvest_details": "مكتسبات {}",
     "no_captures_yet": "لا توجد مكتسبات بعد.",
     "select_target_score": "اختر نقاط الفوز:",
     "target_score_21": "21 نقطة (سريع)",
@@ -230,5 +230,9 @@
     "avatar_3": "سايبر",
     "avatar_4": "فارس",
     "avatar_5": "مكتشف",
-    "avatar_6": "ملكي"
+    "avatar_6": "ملكي",
+    "leave_game_title": "مغادرة اللعبة؟",
+    "leave_game_warning": "هل أنت متأكد من رغبتك في المغادرة؟ قد يتم خصم نقاط منك بسبب مغادرة مباراة جارية.",
+    "profile_preview": "الملف الشخصي للاعب",
+    "friend_request_sent": "تم إرسال طلب الصداقة!"
 }

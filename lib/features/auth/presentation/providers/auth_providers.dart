@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../domain/models/app_user.dart';
 import '../../domain/repositories/auth_repository.dart';
@@ -23,4 +24,13 @@ final authStateChangesProvider = StreamProvider<AppUser?>((ref) {
 // 4. Provides the current logged in user directly if available
 final currentUserProvider = Provider<AppUser?>((ref) {
   return ref.watch(authStateChangesProvider).value;
+});
+
+// 5. Fetches any user's profile from Firestore
+final userProfileProvider = FutureProvider.family<AppUser?, String>((ref, uid) async {
+  final doc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+  if (doc.exists) {
+    return AppUser.fromJson(doc.data()!, uid);
+  }
+  return null;
 });

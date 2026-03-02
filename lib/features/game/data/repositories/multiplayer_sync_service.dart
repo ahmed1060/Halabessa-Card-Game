@@ -108,9 +108,10 @@ class MultiplayerSyncService {
   /// Search for users by display name (basic prefix search)
   Future<List<AppUser>> searchUsers(String query) async {
     final usersRef = _db.ref('users');
-    final snapshot = await usersRef.orderByChild('displayName')
-        .startAt(query)
-        .endAt('$query\uf8ff')
+    final lowercaseQuery = query.toLowerCase();
+    final snapshot = await usersRef.orderByChild('searchName')
+        .startAt(lowercaseQuery)
+        .endAt('$lowercaseQuery\uf8ff')
         .limitToFirst(20)
         .get();
     
@@ -145,19 +146,26 @@ class MultiplayerSyncService {
     await chatRef.set(message.toJson());
   }
 
-  /// CHAT: Watch for new messages in a match
   Stream<List<ChatMessage>> watchChatMessages(String matchId) {
     return matchRef.child(matchId).child('chat')
-      .orderByChild('timestamp')
       .limitToLast(50)
       .onValue.map((event) {
         final value = event.snapshot.value;
-        if (value == null || value is! Map) return [];
+        if (value == null) return [];
         
-        final messages = Map<dynamic, dynamic>.from(value);
+        Map<dynamic, dynamic> messages;
+        if (value is List) {
+          messages = value.asMap();
+        } else if (value is Map) {
+          messages = value;
+        } else {
+          return [];
+        }
+        
         final sortedList = messages.entries.map((entry) {
+          if (entry.value is! Map) return null;
           return ChatMessage.fromJson(Map<String, dynamic>.from(entry.value), entry.key.toString());
-        }).toList();
+        }).whereType<ChatMessage>().toList();
         
         sortedList.sort((a, b) => a.timestamp.compareTo(b.timestamp));
         return sortedList;

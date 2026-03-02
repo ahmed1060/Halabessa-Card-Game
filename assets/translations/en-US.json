@@ -182,8 +182,8 @@
     "achievement_winner": "Winner",
     "tafweet_king": "Tafweet King",
     "achievement_pro": "Pro",
-    "total_cards_count": "Total cards: {0}",
-    "harvest_details": "{0}'s Captures",
+    "total_cards_count": "Total cards: {}",
+    "harvest_details": "{}'s Captures",
     "no_captures_yet": "No captures yet.",
     "select_target_score": "Select winning score:",
     "target_score_21": "21 Points (Quick)",
@@ -247,5 +247,9 @@
     "avatar_3": "Cyber",
     "avatar_4": "Knight",
     "avatar_5": "Explorer",
-    "avatar_6": "Royal"
+    "avatar_6": "Royal",
+    "leave_game_title": "Leave Game?",
+    "leave_game_warning": "Are you sure you want to leave the game? You might lose points for abandoning an active match.",
+    "profile_preview": "Player Profile",
+    "friend_request_sent": "Friend request sent!"
 }

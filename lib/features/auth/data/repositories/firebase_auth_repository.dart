@@ -29,6 +29,7 @@ class FirebaseAuthRepository implements AuthRepository {
           'email': user.email,
           'avatarUrl': user.avatarUrl,
           'inventory': user.inventory,
+          'searchName': user.displayName.toLowerCase(),
           // 'isAdmin' is preserved in Firestore
         });
       }
@@ -41,6 +42,7 @@ class FirebaseAuthRepository implements AuthRepository {
         'email': user.email,
         'avatarUrl': user.avatarUrl,
         'inventory': user.inventory,
+        'searchName': user.displayName.toLowerCase(),
         // 'isAdmin' is preserved
       });
     } catch (e) {

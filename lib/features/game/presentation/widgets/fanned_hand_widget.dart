@@ -65,7 +65,8 @@ class _FannedHandWidgetState extends State<FannedHandWidget> {
 
   void _handleHoverUpdate(Offset localPosition, double fanWidth, double preferredSpacing, int cardCount) {
     // Magnetic/Exit logic: If finger is too far left/right or too far up, clear hover
-    if (localPosition.dx < -50 || localPosition.dx > fanWidth + 50 || localPosition.dy < -100 || localPosition.dy > 200) {
+    // Fix: Increased right boundary to include the full width of the rightmost card
+    if (localPosition.dx < -50 || localPosition.dx > (fanWidth + 100) || localPosition.dy < -100 || localPosition.dy > 200) {
       if (hoveredIndex != null) {
         setState(() => hoveredIndex = null);
       }
@@ -140,8 +141,14 @@ class _FannedHandWidgetState extends State<FannedHandWidget> {
                 // Pre-selection mode
                 HapticFeedback.lightImpact();
                 setState(() {
-                  preSelectedIndex = hoveredIndex;
-                  preSelectedOrigin = origin;
+                  // Toggle logic: If tapping the same card, deselect it
+                  if (preSelectedIndex == hoveredIndex) {
+                    preSelectedIndex = null;
+                    preSelectedOrigin = null;
+                  } else {
+                    preSelectedIndex = hoveredIndex;
+                    preSelectedOrigin = origin;
+                  }
                 });
               }
             }
