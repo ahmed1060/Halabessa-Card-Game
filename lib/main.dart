@@ -7,6 +7,7 @@ import 'firebase_options.dart';
 import 'core/routes/app_routes.dart';
 import 'core/theme/theme_config.dart';
 import 'core/providers/settings_provider.dart';
+import 'core/services/multimedia_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() async {

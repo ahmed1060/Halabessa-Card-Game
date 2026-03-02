@@ -19,6 +19,7 @@ import 'package:halabessa/features/game/presentation/providers/chat_providers.da
 import 'package:halabessa/features/game/presentation/widgets/chat_overlay.dart';
 import 'package:confetti/confetti.dart';
 import 'package:flutter/services.dart';
+import 'package:halabessa/core/services/multimedia_service.dart';
 
 class GameBoardScreen extends ConsumerStatefulWidget {
   const GameBoardScreen({super.key});

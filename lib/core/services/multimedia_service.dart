@@ -90,6 +90,8 @@ class MultimediaService extends ChangeNotifier {
           });
         }
       }
+    } catch (e) {
+      debugPrint('MultimediaService: Failed to play music $assetPath: $e');
     }
   }
 
