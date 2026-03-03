@@ -68,7 +68,8 @@ final lastMessageForUserProvider = Provider.family<ChatMessage?, String>((ref, u
         
         final latest = userMessages.last;
         final now = DateTime.now();
-        if (now.difference(latest.timestamp).inSeconds < 5) {
+        // Allow a small buffer for server/client clock drift
+        if (now.difference(latest.timestamp).inSeconds.abs() < 5) {
           return latest;
         }
       } catch (e) {
@@ -81,15 +82,25 @@ final lastMessageForUserProvider = Provider.family<ChatMessage?, String>((ref, u
   );
 });
 
-// Corrected unread count based on lastSeenTimestamp
+// Robust unread count based on lastSeenTimestamp and current user filtering
 final unreadMessagesCountProvider = Provider.autoDispose<int>((ref) {
   final messagesAsync = ref.watch(chatMessagesProvider);
   final chatState = ref.watch(chatStateProvider);
+  final currentUser = ref.read(currentUserProvider);
   
+  if (chatState.isOverlayOpen) return 0;
+
   return messagesAsync.when(
     data: (messages) {
-      if (chatState.isOverlayOpen) return 0;
-      return messages.where((m) => m.timestamp.isAfter(chatState.lastSeenTimestamp)).length;
+      if (messages.isEmpty) return 0;
+      final myUid = currentUser?.uid;
+      
+      // We only count messages sent by OTHERS that arrived AFTER we started/last saw the chat
+      return messages.where((m) {
+        final isFromMe = myUid != null && m.senderId == myUid;
+        final isNew = m.timestamp.isAfter(chatState.lastSeenTimestamp);
+        return !isFromMe && isNew;
+      }).length;
     },
     loading: () => 0,
     error: (_, __) => 0,

@@ -107,7 +107,7 @@ class Deck {
     return drawn;
   }
 
-  game_card.Card get lastCardRevealed => cards.first; // Last card to be drawn (bottom of the deck conceptually)
+  game_card.Card? get lastCardRevealed => cards.isNotEmpty ? cards.first : null; // Last card to be drawn (bottom of the deck conceptually)
   
   bool get isEmpty => cards.isEmpty;
   int get remaining => cards.length;

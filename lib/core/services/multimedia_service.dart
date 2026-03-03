@@ -16,6 +16,27 @@ class MultimediaService extends ChangeNotifier {
     // Notify listeners when state changes so UI can update icons
     _musicPlayer.onPlayerStateChanged.listen((_) => notifyListeners());
     _sfxPlayer.onPlayerStateChanged.listen((_) => notifyListeners());
+
+    // Auto-rescue music when global settings overrides are loaded
+    _ref.listen(globalSettingsProvider, (previous, next) {
+      if (_pendingMusic != null && next.musicOverrideUrl != null) {
+        debugPrint('MultimediaService: Global settings loaded. Rescuing pending music: $_pendingMusic');
+        final musicToRescue = _pendingMusic!;
+        _pendingMusic = null;
+        playMusic(musicToRescue);
+      }
+    });
+
+    // Stop music immediately if disabled in settings
+    _ref.listen(settingsProvider, (previous, next) {
+      if (previous?.isMusicEnabled == true && next.isMusicEnabled == false) {
+        stopMusic();
+      } else if (previous?.isMusicEnabled == false && next.isMusicEnabled == true) {
+        if (_currentMusicPath != null) {
+          playMusic(_currentMusicPath!);
+        }
+      }
+    });
   }
 
   // Web Autoplay Handling
@@ -27,8 +48,8 @@ class MultimediaService extends ChangeNotifier {
       debugPrint('MultimediaService: Interaction detected. Rescuing audio...');
       _hasInteracted = true;
       final musicToRescue = _pendingMusic;
-      _pendingMusic = null; // Clear first to avoid re-triggering while playing
       if (musicToRescue != null) {
+        _pendingMusic = null;
         playMusic(musicToRescue);
       }
       notifyListeners();
@@ -54,45 +75,44 @@ class MultimediaService extends ChangeNotifier {
 
   Future<void> playMusic(String assetPath, {bool loop = true}) async {
     try {
+      _currentMusicPath = assetPath;
       final settings = _ref.read(settingsProvider);
-      if (settings.isMusicEnabled) {
-        if (_currentMusicPath == assetPath && _hasInteracted) return;
-        if (_pendingMusic == assetPath && !_hasInteracted) return; // Already queued
+      
+      if (!settings.isMusicEnabled) return;
 
-        final globalSettings = _ref.read(globalSettingsProvider);
-        final overrideUrl = globalSettings.musicOverrideUrl;
-
-        Source? source;
-        if (overrideUrl != null && overrideUrl.isNotEmpty) {
-          if (overrideUrl.startsWith('data:')) {
-            // On Web, passing the Data URL directly is more stable than BytesSource
-            source = UrlSource(overrideUrl);
-          } else {
-            source = UrlSource(overrideUrl);
-          }
-        } else {
-          // Skip if no asset exists (avoiding Code 4 errors in empty projects)
-          debugPrint('MultimediaService: No override found for $assetPath and folder is empty. Skipping.');
-          return;
-        }
-
-        if (source != null) {
-          await _musicPlayer.setReleaseMode(loop ? ReleaseMode.loop : ReleaseMode.release);
-          await _musicPlayer.play(source).then((_) {
-            _hasInteracted = true;
-            _currentMusicPath = assetPath;
-            _pendingMusic = null;
-            notifyListeners();
-          }).catchError((e) {
-            if (e.toString().contains('NotAllowedError')) {
-              debugPrint('MultimediaService: Autoplay blocked. Queueing music.');
-              _pendingMusic = assetPath;
-            } else {
-              debugPrint('MultimediaService: Music Playback error: $e');
-            }
-          });
-        }
+      if (!_hasInteracted) {
+        debugPrint('MultimediaService: Autoplay blocked. Queueing music: $assetPath');
+        _pendingMusic = assetPath;
+        return;
       }
+
+      final globalSettings = _ref.read(globalSettingsProvider);
+      final overrideUrl = globalSettings.musicOverrideUrl;
+
+      if (overrideUrl == null || overrideUrl.isEmpty) {
+        debugPrint('MultimediaService: No override URL found for $assetPath yet. Queueing.');
+        _pendingMusic = assetPath;
+        return;
+      }
+
+      // If already playing this source, don't restart
+      if (_musicPlayer.state == PlayerState.playing && _pendingMusic == null) {
+        // We assume the current source matches the overrideUrl
+        return;
+      }
+
+      debugPrint('MultimediaService: Playing music from $overrideUrl');
+      await _musicPlayer.setReleaseMode(loop ? ReleaseMode.loop : ReleaseMode.release);
+      await _musicPlayer.play(UrlSource(overrideUrl)).then((_) {
+        _pendingMusic = null;
+        notifyListeners();
+      }).catchError((e) {
+        if (e.toString().contains('NotAllowedError')) {
+          _pendingMusic = assetPath;
+        } else {
+          debugPrint('MultimediaService: Music Playback error: $e');
+        }
+      });
     } catch (e) {
       debugPrint('MultimediaService: Failed to play music $assetPath: $e');
     }
@@ -100,33 +120,32 @@ class MultimediaService extends ChangeNotifier {
 
   Future<void> playRoomMusic(String assetPath, {bool loop = true}) async {
     try {
+      _currentMusicPath = assetPath;
       final settings = _ref.read(settingsProvider);
-      if (settings.isMusicEnabled) {
-        final globalSettings = _ref.read(globalSettingsProvider);
-        final overrideUrl = globalSettings.roomMusicOverrideUrl;
+      if (!settings.isMusicEnabled) return;
 
-        Source? source;
-        if (overrideUrl != null && overrideUrl.isNotEmpty) {
-          source = UrlSource(overrideUrl);
-        } else {
-          debugPrint('MultimediaService: No room music override found. Skipping.');
-          return;
-        }
-
-        if (source != null) {
-          await _musicPlayer.setReleaseMode(loop ? ReleaseMode.loop : ReleaseMode.release);
-          await _musicPlayer.play(source).then((_) {
-            _hasInteracted = true;
-            _currentMusicPath = assetPath;
-            _pendingMusic = null;
-            notifyListeners();
-          }).catchError((e) {
-            if (e.toString().contains('NotAllowedError')) {
-              _pendingMusic = assetPath;
-            }
-          });
-        }
+      if (!_hasInteracted) {
+        _pendingMusic = assetPath;
+        return;
       }
+
+      final globalSettings = _ref.read(globalSettingsProvider);
+      final overrideUrl = globalSettings.roomMusicOverrideUrl;
+
+      if (overrideUrl == null || overrideUrl.isEmpty) {
+        _pendingMusic = assetPath;
+        return;
+      }
+
+      await _musicPlayer.setReleaseMode(loop ? ReleaseMode.loop : ReleaseMode.release);
+      await _musicPlayer.play(UrlSource(overrideUrl)).then((_) {
+        _pendingMusic = null;
+        notifyListeners();
+      }).catchError((e) {
+        if (e.toString().contains('NotAllowedError')) {
+          _pendingMusic = assetPath;
+        }
+      });
     } catch (e) {
       debugPrint('MultimediaService: Failed to play room music: $e');
     }
@@ -135,7 +154,7 @@ class MultimediaService extends ChangeNotifier {
   Future<void> stopMusic() async {
     try {
       await _musicPlayer.stop();
-      _currentMusicPath = null;
+      _pendingMusic = null; // Clear pending on manual stop
       notifyListeners();
     } catch (e) {
       debugPrint('MultimediaService: Failed to stop music: $e');

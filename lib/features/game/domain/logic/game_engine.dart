@@ -146,7 +146,7 @@ class GameEngine {
       secretDeck.cut(action.cutIndex);
     }
 
-    final lastCard = secretDeck?.cards.first;
+    final lastCard = (secretDeck != null && secretDeck.cards.isNotEmpty) ? secretDeck.cards.first : null;
     
     return GameEngineResult(
       state.copyWith(

@@ -192,7 +192,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
             _manageAFKWatchdog(serverState);
             _evaluateBotActions(serverState);
             _manageAutoplayTimer(serverState);
-          } catch (e, stack) {
+          } catch (e) {
             debugPrint('ERROR in match listener callback: $e');
           }
         } else if (lastBoundMatchId != null) {
@@ -382,7 +382,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
         default:
           break;
       }
-    } catch (e, stack) {
+    } catch (e) {
       debugPrint('CRITICAL ASYNC ERROR in _evaluateBotActions: $e');
     } finally {
       _isHandlingBotLogic = false;
@@ -605,6 +605,9 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     if (shouldShuffle) {
       _secretDeck = Deck.standard();
       _secretDeck?.shuffle();
+    } else {
+      // RESTORE LOGIC: Pick up cards from last round
+      _secretDeck = Deck.restoreFromHarvest(currentState.harvestStacks);
     }
 
     final newState = currentState.copyWith(
@@ -619,8 +622,10 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
       shuffleVotes: {},
       rematchVotes: {},
       deckCount: _secretDeck?.cards.length ?? 0,
+      lastCardRevealed: _secretDeck?.lastCardRevealed,
       recentFasha: [],
       lastCaptureTeam: null,
+      cardOwnership: {},
     );
 
     await _publishState(newState);
@@ -705,7 +710,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
 
   Future<void> playCard(String playerId, game_card.Card card, {Offset? origin}) async {
     try {
-      final currentState = state;
+      MatchState? currentState = state;
       if (currentState == null || currentState.phase != GamePhase.playing) return;
 
       final result = GameEngine.apply(currentState, PlayCardAction(playerId, card));
@@ -754,7 +759,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
       final harvest = Map<String, List<Capture>>.from(currentState.harvestStacks);
       final board = List<game_card.Card>.from(currentState.board);
       
-      // Last Capture Rule
+      // 1. Last Capture Rule
       if (board.isNotEmpty && currentState.lastCaptureTeam != null) {
          harvest[currentState.lastCaptureTeam!]?.add(Capture(
            leadingCard: board.first, 
@@ -762,41 +767,52 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
          ));
       }
 
-      // Al-Ard logic
+      // 2. Al-Ard logic (Counting total cards)
+      int totalCardsA = harvest['teamA']?.fold(0, (prev, cap) => prev! + 1 + cap.capturedCards.length) ?? 0;
+      int totalCardsB = harvest['teamB']?.fold(0, (prev, cap) => prev! + 1 + cap.capturedCards.length) ?? 0;
+
       int pointsA = currentState.teamAScore;
       int pointsB = currentState.teamBScore;
-      
-      int teamACaptureCount = harvest['teamA']?.fold(0, (prev, cap) => prev! + 1 + cap.capturedCards.length) ?? 0;
-      int teamBCaptureCount = harvest['teamB']?.fold(0, (prev, cap) => prev! + 1 + cap.capturedCards.length) ?? 0;
 
-      if (teamACaptureCount > teamBCaptureCount) {
+      if (totalCardsA > totalCardsB) {
          pointsA += 3;
-      } else if (teamBCaptureCount > teamACaptureCount) {
+      } else if (totalCardsB > totalCardsA) {
          pointsB += 3;
       }
 
-      MatchState endPhase = currentState.copyWith(
+      // 3. SHOW SCORING PHASE (Popping up the cards collected)
+      final scoringState = currentState.copyWith(
          board: [],
          teamAScore: pointsA,
          teamBScore: pointsB,
+         harvestStacks: harvest,
          phase: GamePhase.roundScoring,
       );
       
-     if (pointsA >= endPhase.maxPoints || pointsB >= endPhase.maxPoints) {
-          final winnerTeam = pointsA >= endPhase.maxPoints ? 'teamA' : 'teamB';
+      await _publishState(scoringState);
+      
+      // Wait for users to see the result
+      await Future.delayed(const Duration(seconds: 5));
+      
+      // Check if we are still in roundScoring (hasn't been interrupted)
+      if (state?.phase != GamePhase.roundScoring) return;
+
+      // 4. Check Match Win or Next Round
+      if (pointsA >= scoringState.maxPoints || pointsB >= scoringState.maxPoints) {
+          final winnerTeam = pointsA >= scoringState.maxPoints ? 'teamA' : 'teamB';
           _updateUserStatsAfterMatch(winnerTeam, pointsA, pointsB);
 
-          await _publishState(endPhase.copyWith(
+          await _publishState(scoringState.copyWith(
              phase: GamePhase.rematchVoting,
              skippedMatches: {},
              playHistory: [],
           ));
       } else {
-         if (endPhase.roundsSinceLastShuffle >= 5) {
+         if (scoringState.roundsSinceLastShuffle >= 5) {
             await startNewRound(forceShuffle: true);
-         } else if (endPhase.roundsSinceLastShuffle >= 2) {
-            await _publishState(endPhase.copyWith(
-               dealerIndex: (endPhase.dealerIndex + 1) % 4,
+         } else if (scoringState.roundsSinceLastShuffle >= 2) {
+            await _publishState(scoringState.copyWith(
+               dealerIndex: (scoringState.dealerIndex + 1) % 4,
                phase: GamePhase.shuffleVoting,
                skippedMatches: {},
                playHistory: [],

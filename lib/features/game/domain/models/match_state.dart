@@ -21,6 +21,8 @@ class MatchState {
   // Deck & Board State
   // Removed shared deck list for security (Anti-Cheat)
   final List<game_card.Card> board; 
+  final game_card.Card? cutLastCard; // Revealed card after cut (The Last Card / الاخر)
+  final game_card.Card? lastCardRevealed;
   final List<game_card.Card> recentFasha; // Temporarily holds the layout of Fasha for 5s preview
 
   // Player Hands: Map<PlayerId, List<game_card.Card>>
@@ -60,7 +62,6 @@ class MatchState {
   final List<game_card.Card> capturingCards;
   final String? capturingTeam;
   final int capturingStage; // 0: merge, 1: fly
-  final game_card.Card? cutLastCard; // Revealed card after cut (The Last Card / الاخر)
   final DateTime? expireAt;
   final int spectatorCount;
 
@@ -71,6 +72,8 @@ class MatchState {
       this.maxPoints = 41,
       required this.playerIds,
       this.board = const [],
+      this.cutLastCard,
+      this.lastCardRevealed,
       this.recentFasha = const [],
       this.handCards = const {},
       this.harvestStacks = const {'teamA': [], 'teamB': []},
@@ -101,7 +104,6 @@ class MatchState {
       this.capturingCards = const [],
       this.capturingTeam,
       this.capturingStage = 0,
-      this.cutLastCard,
       this.spectatorCount = 0,
       this.expireAt,
     });
@@ -143,6 +145,7 @@ class MatchState {
     String? capturingTeam,
     int? capturingStage,
     game_card.Card? cutLastCard,
+    game_card.Card? lastCardRevealed,
     int? spectatorCount,
     DateTime? expireAt,
   }) {
@@ -183,6 +186,7 @@ class MatchState {
       capturingTeam: capturingTeam ?? this.capturingTeam,
       capturingStage: capturingStage ?? this.capturingStage,
       cutLastCard: cutLastCard ?? this.cutLastCard,
+      lastCardRevealed: lastCardRevealed ?? this.lastCardRevealed,
       spectatorCount: spectatorCount ?? this.spectatorCount,
       expireAt: expireAt ?? this.expireAt,
     );
@@ -196,6 +200,8 @@ class MatchState {
       'playerIds': playerIds,
       'deckCount': deckCount,
       'board': board.map((c) => c.toJson()).toList(),
+      'cutLastCard': cutLastCard?.toJson(),
+      'lastCardRevealed': lastCardRevealed?.toJson(),
       'recentFasha': recentFasha.map((c) => c.toJson()).toList(),
       'handCards': handCards.map((k, v) => MapEntry(k, v.map((c) => c.toJson()).toList())),
       'harvestStacks': harvestStacks.map((k, v) => MapEntry(k, v.map((c) => c.toJson()).toList())),
@@ -225,7 +231,6 @@ class MatchState {
       'capturingCards': capturingCards.map((c) => c.toJson()).toList(),
       'capturingTeam': capturingTeam,
       'capturingStage': capturingStage,
-      'cutLastCard': cutLastCard?.toJson(),
       'spectatorCount': spectatorCount,
       'expireAt': expireAt?.toIso8601String(),
     };
@@ -426,6 +431,7 @@ class MatchState {
         capturingTeam: json['capturingTeam']?.toString(),
         capturingStage: json['capturingStage'] is int ? json['capturingStage'] as int : 0,
         cutLastCard: json['cutLastCard'] != null ? game_card.Card.fromJson(Map<String, dynamic>.from(json['cutLastCard'])) : null,
+        lastCardRevealed: json['lastCardRevealed'] != null ? game_card.Card.fromJson(Map<String, dynamic>.from(json['lastCardRevealed'])) : null,
         spectatorCount: json['spectatorCount'] is int ? json['spectatorCount'] as int : 0,
         expireAt: json['expireAt'] != null ? DateTime.tryParse(json['expireAt'].toString()) : null,
       );

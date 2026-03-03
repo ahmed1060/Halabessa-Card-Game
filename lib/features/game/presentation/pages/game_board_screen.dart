@@ -32,7 +32,6 @@ class GameBoardScreen extends ConsumerStatefulWidget {
 
 class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
   late ConfettiController _confettiController;
-  bool _isMenuExpanded = false;
 
   @override
   void initState() {
@@ -397,7 +396,7 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
                 Align(
                   alignment: Alignment.topCenter,
                   child: Padding(
-                    padding: const EdgeInsets.only(top: 0.0), // Moved up from 8.0
+                    padding: const EdgeInsets.only(top: -12.0), // Moved further up
                     child: GestureDetector(
                       onTap: () => _showPlayerProfile(context, ref, matchState, myUid, 2),
                       child: PlayerAvatar(
@@ -456,7 +455,7 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
 
                 // Local Player (Bottom Center - shifted left)
                 Align(
-                  alignment: const Alignment(-0.5, 1.0), // Moved left from -0.4
+                  alignment: const Alignment(-1.5, 1.0), // Moved further left from -0.5
                   child: _buildLocalPlayerArea(context, ref, matchState, myUid),
                 ),
 
@@ -476,82 +475,44 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
                 Positioned(
                   left: 12,
                   top: 80,
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Toggle Button
-                      GestureDetector(
-                        onTap: () => setState(() => _isMenuExpanded = !_isMenuExpanded),
-                        child: Container(
-                          padding: const EdgeInsets.all(14), // Restored to a larger size
-                          decoration: BoxDecoration(
-                            color: _isMenuExpanded ? ThemeConfig.primaryTeal : Colors.black45,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white24),
-                            boxShadow: [
-                              BoxShadow(color: Colors.black45, blurRadius: 8, offset: const Offset(0, 2)),
-                            ],
-                          ),
-                          child: Icon(
-                            _isMenuExpanded ? Icons.close : Icons.grid_view_rounded,
-                            color: Colors.white,
-                            size: 24, // Restored to a larger size
-                          ),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.4),
+                      borderRadius: BorderRadius.circular(30),
+                      border: Border.all(color: Colors.white10),
+                      boxShadow: [
+                        BoxShadow(color: Colors.black26, blurRadius: 10, offset: const Offset(0, 4)),
+                      ],
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _buildSideButton(
+                          ref: ref,
+                          icon: Icons.chat_bubble_outline,
+                          onTap: () {
+                            ref.read(chatStateProvider.notifier).toggleOverlay();
+                          },
+                          showBadge: true,
                         ),
-                      ),
-                      
-                      const SizedBox(width: 12),
-                      
-                      // The Capsule (Expanded)
-                      AnimatedOpacity(
-                        duration: const Duration(milliseconds: 300),
-                        opacity: _isMenuExpanded ? 1.0 : 0.0,
-                        child: Visibility(
-                          visible: _isMenuExpanded,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 8),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.4),
-                              borderRadius: BorderRadius.circular(30),
-                              border: Border.all(color: Colors.white10),
-                              boxShadow: [
-                                BoxShadow(color: Colors.black26, blurRadius: 10, offset: const Offset(0, 4)),
-                              ],
-                            ),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                _buildSideButton(
-                                  ref: ref,
-                                  icon: Icons.chat_bubble_outline,
-                                  onTap: () {
-                                    ref.read(chatStateProvider.notifier).toggleOverlay();
-                                    setState(() => _isMenuExpanded = false);
-                                  },
-                                  showBadge: true,
-                                ),
-                                const SizedBox(height: 16),
-                                _buildSideButton(
-                                  ref: ref,
-                                  icon: Icons.settings_outlined,
-                                  onTap: () {
-                                    _showSettings(context);
-                                    setState(() => _isMenuExpanded = false);
-                                  },
-                                ),
-                                const SizedBox(height: 16),
-                                _buildSideButton(
-                                  ref: ref,
-                                  icon: Icons.logout_rounded,
-                                  onTap: () => _confirmLeave(context, ref),
-                                  color: Colors.redAccent.withOpacity(0.8),
-                                ),
-                              ],
-                            ),
-                          ),
+                        const SizedBox(height: 16),
+                        _buildSideButton(
+                          ref: ref,
+                          icon: Icons.settings_outlined,
+                          onTap: () {
+                            _showSettings(context);
+                          },
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 16),
+                        _buildSideButton(
+                          ref: ref,
+                          icon: Icons.logout_rounded,
+                          onTap: () => _confirmLeave(context, ref),
+                          color: Colors.redAccent.withOpacity(0.8),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ],
