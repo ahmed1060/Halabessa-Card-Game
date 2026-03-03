@@ -392,11 +392,11 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
           SafeArea(
             child: Stack(
               children: [
-                // Opponent (Top Center, Offset 2)
+                // Partner / Opposite Player (Offset 2 in Anticlockwise)
                 Align(
-                  alignment: Alignment.topCenter,
+                  alignment: const Alignment(0.0, -1.0),
                   child: Padding(
-                    padding: const EdgeInsets.only(top: -12.0), // Moved further up
+                    padding: const EdgeInsets.only(top: -50.0), // Aggressively moved up
                     child: GestureDetector(
                       onTap: () => _showPlayerProfile(context, ref, matchState, myUid, 2),
                       child: PlayerAvatar(
@@ -455,7 +455,7 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
 
                 // Local Player (Bottom Center - shifted left)
                 Align(
-                  alignment: const Alignment(-1.5, 1.0), // Moved further left from -0.5
+                  alignment: const Alignment(-0.4, 1.0), // Clear left shift
                   child: _buildLocalPlayerArea(context, ref, matchState, myUid),
                 ),
 
@@ -474,7 +474,7 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
                   
                 Positioned(
                   left: 12,
-                  top: 40,
+                  top: 10, // Absolute top of SafeArea
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 8),
                     decoration: BoxDecoration(
