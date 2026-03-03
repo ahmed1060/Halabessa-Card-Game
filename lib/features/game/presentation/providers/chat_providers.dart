@@ -13,14 +13,17 @@ final chatMessagesProvider = StreamProvider.autoDispose<List<ChatMessage>>((ref)
 
 class ChatState {
   final bool isOverlayOpen;
-  final String? lastMessageId; // To track which message was last "seen" or handled
+  final DateTime lastSeenTimestamp;
 
-  ChatState({this.isOverlayOpen = false, this.lastMessageId});
+  ChatState({
+    this.isOverlayOpen = false, 
+    DateTime? lastSeenTimestamp
+  }) : lastSeenTimestamp = lastSeenTimestamp ?? DateTime.now();
 
-  ChatState copyWith({bool? isOverlayOpen, String? lastMessageId}) {
+  ChatState copyWith({bool? isOverlayOpen, DateTime? lastSeenTimestamp}) {
     return ChatState(
       isOverlayOpen: isOverlayOpen ?? this.isOverlayOpen,
-      lastMessageId: lastMessageId ?? this.lastMessageId,
+      lastSeenTimestamp: lastSeenTimestamp ?? this.lastSeenTimestamp,
     );
   }
 }
@@ -29,15 +32,26 @@ class ChatNotifier extends StateNotifier<ChatState> {
   ChatNotifier() : super(ChatState());
 
   void toggleOverlay() {
-    state = state.copyWith(isOverlayOpen: !state.isOverlayOpen);
+    final newOpen = !state.isOverlayOpen;
+    if (newOpen) {
+      markAllSeen();
+    }
+    state = state.copyWith(isOverlayOpen: newOpen);
   }
 
   void setOverlayOpen(bool open) {
+    if (open) {
+      markAllSeen();
+    }
     state = state.copyWith(isOverlayOpen: open);
+  }
+
+  void markAllSeen() {
+    state = state.copyWith(lastSeenTimestamp: DateTime.now());
   }
 }
 
-final chatStateProvider = StateNotifierProvider<ChatNotifier, ChatState>((ref) {
+final chatStateProvider = StateNotifierProvider.autoDispose<ChatNotifier, ChatState>((ref) {
   return ChatNotifier();
 });
 
@@ -67,11 +81,16 @@ final lastMessageForUserProvider = Provider.family<ChatMessage?, String>((ref, u
   );
 });
 
-// Simplified unread count based on total messages
+// Corrected unread count based on lastSeenTimestamp
 final unreadMessagesCountProvider = Provider.autoDispose<int>((ref) {
   final messagesAsync = ref.watch(chatMessagesProvider);
+  final chatState = ref.watch(chatStateProvider);
+  
   return messagesAsync.when(
-    data: (messages) => messages.length,
+    data: (messages) {
+      if (chatState.isOverlayOpen) return 0;
+      return messages.where((m) => m.timestamp.isAfter(chatState.lastSeenTimestamp)).length;
+    },
     loading: () => 0,
     error: (_, __) => 0,
   );

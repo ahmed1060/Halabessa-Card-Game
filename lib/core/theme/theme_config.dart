@@ -42,9 +42,10 @@ class ThemeConfig {
         brightness: Brightness.dark,
         primary: primaryTeal,
         secondary: goldAccent,
-        surface: darkTeal,
+        surface: const Color(0xFF1B263B), // Match surfaceGlass/AppBar color
         error: crimsonAccent,
       ),
+      scaffoldBackgroundColor: darkBg,
       textTheme: const TextTheme(
         headlineMedium: TextStyle(fontFamily: fontHeading, fontWeight: FontWeight.bold, color: Colors.white),
         headlineSmall: TextStyle(fontFamily: fontHeading, color: Colors.white),

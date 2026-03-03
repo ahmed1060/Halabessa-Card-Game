@@ -56,6 +56,7 @@ class MatchState {
   final Map<String, List<String>> skippedMatches;
   final List<game_card.Card> playHistory;
   final Map<String, bool> playerOnlineStatus;
+  final Map<String, DateTime> playerLastActive;
   final List<game_card.Card> capturingCards;
   final String? capturingTeam;
   final int capturingStage; // 0: merge, 1: fly
@@ -77,7 +78,7 @@ class MatchState {
       this.teamBScore = 0,
       required this.dealerIndex,
       required this.currentTurnIndex,
-      this.phase = GamePhase.preRoundCut,
+      this.phase = GamePhase.waitingForPlayers,
       this.lastCaptureTeam,
       this.roundCount = 1,
       this.handInRound = 1,
@@ -96,6 +97,7 @@ class MatchState {
       this.skippedMatches = const {},
       this.playHistory = const [],
       this.playerOnlineStatus = const {},
+      this.playerLastActive = const {},
       this.capturingCards = const [],
       this.capturingTeam,
       this.capturingStage = 0,
@@ -136,6 +138,7 @@ class MatchState {
     Map<String, List<String>>? skippedMatches,
     List<game_card.Card>? playHistory,
     Map<String, bool>? playerOnlineStatus,
+    Map<String, DateTime>? playerLastActive,
     List<game_card.Card>? capturingCards,
     String? capturingTeam,
     int? capturingStage,
@@ -175,6 +178,7 @@ class MatchState {
       skippedMatches: skippedMatches ?? this.skippedMatches,
       playHistory: playHistory ?? this.playHistory,
       playerOnlineStatus: playerOnlineStatus ?? this.playerOnlineStatus,
+      playerLastActive: playerLastActive ?? this.playerLastActive,
       capturingCards: capturingCards ?? this.capturingCards,
       capturingTeam: capturingTeam ?? this.capturingTeam,
       capturingStage: capturingStage ?? this.capturingStage,
@@ -217,6 +221,7 @@ class MatchState {
       'isPublic': isPublic,
       'cardOwnership': cardOwnership,
       'playerOnlineStatus': playerOnlineStatus,
+      'playerLastActive': playerLastActive.map((k, v) => MapEntry(k, v.toIso8601String())),
       'capturingCards': capturingCards.map((c) => c.toJson()).toList(),
       'capturingTeam': capturingTeam,
       'capturingStage': capturingStage,
@@ -250,6 +255,16 @@ class MatchState {
     Map<String, bool> parseBoolMap(dynamic map) {
       if (map == null || map is! Map) return {};
       return map.map((k, v) => MapEntry(k.toString(), v == true));
+    }
+
+    Map<String, DateTime> parseDateTimeMap(dynamic map) {
+      if (map == null || map is! Map) return {};
+      final result = <String, DateTime>{};
+      map.forEach((k, v) {
+        final dt = DateTime.tryParse(v.toString());
+        if (dt != null) result[k.toString()] = dt;
+      });
+      return result;
     }
 
     List<game_card.Card> parseCards(dynamic list) {
@@ -369,6 +384,7 @@ class MatchState {
       final playerNames = parseStringMap(json['playerNames']);
       final cardOwnership = parseStringMap(json['cardOwnership']);
       final playerOnlineStatus = parseBoolMap(json['playerOnlineStatus']);
+      final playerLastActive = parseDateTimeMap(json['playerLastActive']);
 
       return MatchState(
         id: id,
@@ -405,6 +421,7 @@ class MatchState {
         skippedMatches: parseSkipMap(json['skippedMatches']),
         playHistory: parseCards(json['playHistory']),
         playerOnlineStatus: playerOnlineStatus,
+        playerLastActive: playerLastActive,
         capturingCards: parseCards(json['capturingCards']),
         capturingTeam: json['capturingTeam']?.toString(),
         capturingStage: json['capturingStage'] is int ? json['capturingStage'] as int : 0,

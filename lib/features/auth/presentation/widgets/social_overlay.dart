@@ -24,12 +24,22 @@ class _SocialOverlayState extends ConsumerState<SocialOverlay> {
     }
     
     if (mounted) setState(() => _isSearching = true);
-    final results = await ref.read(multiplayerSyncServiceProvider).searchUsers(query);
-    if (mounted) {
-      setState(() {
-        _searchResults = results;
-        _isSearching = false;
-      });
+    try {
+      final results = await ref.read(multiplayerSyncServiceProvider).searchUsers(query);
+      if (mounted) {
+        setState(() {
+          _searchResults = results;
+          _isSearching = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error in _performSearch: $e');
+      if (mounted) {
+        setState(() {
+          _searchResults = [];
+          _isSearching = false;
+        });
+      }
     }
   }
 

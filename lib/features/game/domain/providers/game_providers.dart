@@ -8,8 +8,10 @@ import 'package:quiver/async.dart';
 import '../../domain/models/match_state.dart';
 import '../../domain/models/capture.dart';
 import '../../domain/models/card.dart' as game_card;
+import '../../domain/models/game_action.dart';
 import '../../domain/logic/deck.dart';
-import '../../domain/logic/game_engine_utils.dart';
+import '../../domain/logic/game_engine.dart';
+import '../../domain/logic/bot_brain.dart';
 import '../../data/repositories/multiplayer_sync_service.dart';
 import '../../../../features/auth/presentation/providers/auth_providers.dart';
 import 'package:flutter/material.dart';
@@ -40,8 +42,9 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
   
   // Prevents multiple concurrent bot logic evaluations for the same state change
   bool _isHandlingBotLogic = false;
-  DateTime? _lastBotLogicTime;
+  // Timers for heartbeat and AFK monitoring
   Timer? _heartbeatTimer;
+  Timer? _afkWatchdogTimer;
   StreamSubscription<CountdownTimer>? _autoplaySubscription;
   final Map<String, StreamSubscription<CountdownTimer>> _tafweetSubscriptions = {};
   
@@ -49,12 +52,68 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
   StreamSubscription? _matchListener;
   StreamSubscription? _presenceListener;
 
+  static const String _matchIdKey = 'last_match_id';
+
   Future<void> _publishState(MatchState newState) async {
     state = newState;
     await ref.read(multiplayerSyncServiceProvider).updateMatchState(newState);
   }
 
-  static const String _matchIdKey = 'last_match_id';
+  void _startHeartbeat() {
+    _heartbeatTimer?.cancel();
+    _heartbeatTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
+      if (lastBoundMatchId != null) {
+        final currentUser = ref.read(currentUserProvider);
+        if (currentUser != null) {
+           ref.read(multiplayerSyncServiceProvider).heartbeat(lastBoundMatchId!, currentUser.uid);
+        }
+      }
+    });
+  }
+
+  void _manageAFKWatchdog(MatchState serverState) {
+    if (!_amIHost(serverState)) {
+      _afkWatchdogTimer?.cancel();
+      _afkWatchdogTimer = null;
+      return;
+    }
+
+    if (_afkWatchdogTimer == null || !_afkWatchdogTimer!.isActive) {
+      _afkWatchdogTimer = Timer.periodic(const Duration(seconds: 4), (timer) {
+        final currentState = state;
+        if (currentState != null) {
+          _checkAndHandleAFK(currentState);
+          _evaluateBotActions(currentState);
+        }
+      });
+    }
+  }
+
+  void _checkAndHandleAFK(MatchState serverState) {
+    final now = DateTime.now();
+    bool changed = false;
+    final newOnlineStatus = Map<String, bool>.from(serverState.playerOnlineStatus);
+    
+    for (var playerId in serverState.playerIds) {
+      if (playerId.startsWith('bot_')) continue;
+      
+      final lastActive = serverState.playerLastActive[playerId];
+      if (lastActive != null) {
+        final diff = now.difference(lastActive).inSeconds;
+        // 15s threshold for "Offline" (AFK)
+        final isOnline = diff < 15;
+        if (newOnlineStatus[playerId] != isOnline) {
+          newOnlineStatus[playerId] = isOnline;
+          changed = true;
+          debugPrint('PRESENCE: Player $playerId is now ${isOnline ? 'Online' : 'Offline (AFK)'}');
+        }
+      }
+    }
+
+    if (changed) {
+      _publishState(serverState.copyWith(playerOnlineStatus: newOnlineStatus));
+    }
+  }
 
   Future<void> _saveMatchId(String id) async {
     final prefs = await SharedPreferences.getInstance();
@@ -86,6 +145,8 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     _presenceListener?.cancel();
     _heartbeatTimer?.cancel();
     _heartbeatTimer = null;
+    _afkWatchdogTimer?.cancel();
+    _afkWatchdogTimer = null;
     _autoplaySubscription?.cancel();
     _autoplaySubscription = null;
     for (var sub in _tafweetSubscriptions.values) {
@@ -102,7 +163,6 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     
     // HUMAN PRIORITY HOST ELECTION:
     // The Host is the first ONLINE human player in the playerIds list.
-    // This ensures bot logic always runs if at least one human is connected.
     for (var id in s.playerIds) {
       if (id.startsWith('bot_')) continue;
       
@@ -120,35 +180,22 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
   void bindToMatch(String matchId) {
     lastBoundMatchId = matchId;
     _saveMatchId(matchId);
-    _matchListener?.cancel(); // Cancel previous listener if any
+    _matchListener?.cancel(); 
+    
+    _startHeartbeat();
+
     _matchListener = ref.read(multiplayerSyncServiceProvider).watchMatch(matchId).listen(
       (serverState) {
         if (serverState != null) {
           try {
             state = serverState;
-            
-            // Manage Heartbeat: Start if Host, stop if not
-            if (_amIHost(serverState)) {
-              if (_heartbeatTimer == null || !_heartbeatTimer!.isActive) {
-                _heartbeatTimer?.cancel();
-                _heartbeatTimer = Timer.periodic(const Duration(seconds: 4), (timer) {
-                   final currentState = state;
-                   if (currentState != null) _evaluateBotActions(currentState);
-                });
-              }
-            } else {
-              _heartbeatTimer?.cancel();
-              _heartbeatTimer = null;
-            }
-
+            _manageAFKWatchdog(serverState);
             _evaluateBotActions(serverState);
             _manageAutoplayTimer(serverState);
           } catch (e, stack) {
             debugPrint('ERROR in match listener callback: $e');
-            debugPrint('Stack: $stack');
           }
         } else if (lastBoundMatchId != null) {
-          debugPrint('LISTENER: Match $lastBoundMatchId was deleted. Leaving.');
           leaveMatch();
         }
       },
@@ -240,227 +287,139 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
   }
 
   Future<void> _evaluateBotActions(MatchState serverState) async {
-    if (_isHandlingBotLogic) {
-      // WATCHDOG: If stuck for more than 15 seconds, reset
-      if (_lastBotLogicTime != null && 
-          DateTime.now().difference(_lastBotLogicTime!).inSeconds > 15) {
-        debugPrint('WATCHDOG: Bot logic stuck detected. Resetting flag.');
-        _isHandlingBotLogic = false;
-      } else {
-        return;
-      }
-    }
-    
+    if (_isHandlingBotLogic) return;
     _isHandlingBotLogic = true;
-    _lastBotLogicTime = DateTime.now();
 
     if (!_amIHost(serverState)) {
       _isHandlingBotLogic = false;
       return;
     }
-
-    final currentUser = ref.read(currentUserProvider);
-    if (currentUser == null) {
-       _isHandlingBotLogic = false;
-       return;
-    }
-
     // Safety delay to allow state to settle
     await Future.delayed(const Duration(milliseconds: 100));
     
     try {
       final currentState = serverState;
       if (currentState.playerIds.isEmpty) return;
-      // Host specific global phase handling (Dealing Cards)
-      if (currentState.phase == GamePhase.dealingFasha) {
-        // This is where Host deals Initial Board + Hands
-        final currentState = state;
-        if (currentState != null && currentState.phase == GamePhase.dealingFasha) {
-          await dealInitialCards();
-        }
-      } else if (currentState.phase == GamePhase.waitingForPlayers) {
-        // LOBBY AUTO-START: If 4 REAL players join, Host triggers start automatically.
-        final humanCount = currentState.playerIds.where((id) => !id.startsWith('waiting_')).toList().length;
+
+      // 1. LOBBY AUTO-START
+      if (currentState.phase == GamePhase.waitingForPlayers) {
+        final humanCount = currentState.playerIds.where((id) => !id.startsWith('waiting_')).length;
         if (humanCount == 4) {
           await Future.delayed(const Duration(milliseconds: 1000));
-          final finalState = state;
-          if (finalState != null && finalState.phase == GamePhase.waitingForPlayers && 
-              finalState.playerIds.where((id) => !id.startsWith('waiting_')).length == 4) {
+          if (state?.phase == GamePhase.waitingForPlayers) {
             startNewRound(isFirstRound: true);
           }
         }
+        return;
       }
 
-      // Determine active turning logic
-      if (currentState.phase == GamePhase.preRoundCut) {
-        int cutterIdx = (currentState.dealerIndex + 3) % 4;
-        String cutterId = currentState.playerIds[cutterIdx];
-        if (cutterId.startsWith('bot_')) {
-          // Dynamic reaction time: 1-2.5 seconds
-          await Future.delayed(Duration(milliseconds: 1000 + Random().nextInt(1500)));
-          final finalState = state;
-          if (finalState != null && finalState.phase == GamePhase.preRoundCut) {
-            // Cut at a more varied random depth
-            int deckSize = currentState.deckCount;
-            int cutPoint = deckSize > 6 ? (3 + Random().nextInt(deckSize - 6)) : 1;
-            performCut(cutPoint); 
+      // 2. PHASE-BASED LOGIC (Host as Authority)
+      switch (currentState.phase) {
+        case GamePhase.preRoundCut:
+          int cutterIdx = (currentState.dealerIndex + 3) % 4;
+          String cutterId = currentState.playerIds[cutterIdx];
+          bool isBot = cutterId.startsWith('bot_');
+          bool isAFK = currentState.playerOnlineStatus[cutterId] == false;
+
+          if (isBot || isAFK) {
+            await Future.delayed(Duration(milliseconds: 1500 + Random().nextInt(1000)));
+            if (state?.phase == GamePhase.preRoundCut) {
+              performCut(BotBrain.decideCut(currentState.deckCount));
+            }
           }
-        }
-      } else if (currentState.phase == GamePhase.playing) {
-        // PROACTIVE DEAL CHECK: If all hands are empty during playing phase, Host must deal.
-        bool allHandsEmpty = currentState.handCards.values.every((hand) => hand.isEmpty);
-         if (allHandsEmpty) {
+          break;
+
+        case GamePhase.dealingFasha:
+          await dealInitialCards();
+          break;
+
+        case GamePhase.playing:
+          // Check for subsequent deal
+          bool allHandsEmpty = currentState.handCards.values.every((h) => h.isEmpty);
+          if (allHandsEmpty && currentState.deckCount > 0) {
             await Future.delayed(const Duration(milliseconds: 1000));
-            final finalState = state;
-            if (finalState != null && finalState.phase == GamePhase.playing && finalState.handCards.values.every((hand) => hand.isEmpty)) {
+            if (state?.phase == GamePhase.playing && state?.deckCount == currentState.deckCount) {
               await dealSubsequentCards();
             }
-            return; 
-         }
-
-        final activePlayerId = currentState.playerIds[currentState.currentTurnIndex];
-        debugPrint('BOT_DEBUG: Turn for $activePlayerId (Phase: ${currentState.phase.name})');
-        
-        if (activePlayerId.startsWith('bot_')) {
-          // Dynamic reaction time: 0.8-2.3 seconds
-          await Future.delayed(Duration(milliseconds: 800 + Random().nextInt(1500)));
-          final finalState = state;
-          if (finalState != null && finalState.phase == GamePhase.playing && finalState.playerIds[finalState.currentTurnIndex] == activePlayerId) {
-            _executeBotPlayCard(activePlayerId);
-          }
-        } else {
-          // HUMAN Turner: Handle Auto-Play logic
-          
-          // 1. Single-Card Auto-Play
-          final hand = currentState.handCards[activePlayerId] ?? [];
-          if (hand.length == 1) {
-              await Future.delayed(const Duration(milliseconds: 1500));
-              final finalState = state;
-              if (finalState != null && 
-                  finalState.phase == GamePhase.playing && 
-                  finalState.playerIds[finalState.currentTurnIndex] == activePlayerId &&
-                  finalState.handCards[activePlayerId]?.length == 1) {
-                 // If it's MY turn and MY client, I play it.
-                 if (currentUser.uid == activePlayerId) {
-                   playCard(activePlayerId, hand.first);
-                   return; 
-                 }
-              }
+            return;
           }
 
-          // 2. Bot Takeover (for offline humans) - ONLY Host does this
-          final isOnline = currentState.playerOnlineStatus[activePlayerId] ?? true;
-          if (!isOnline) {
-             // Host takes over for disconnected player
-              await Future.delayed(const Duration(milliseconds: 2000));
-              final finalState = state;
-              if (finalState != null && 
-                  finalState.phase == GamePhase.playing && 
-                  finalState.playerIds[finalState.currentTurnIndex] == activePlayerId &&
-                  finalState.playerOnlineStatus[activePlayerId] == false) {
-                 _executeBotPlayCard(activePlayerId);
-                 return;
-              }
-          }
+          // Bot/AFK Turn Takeover
+          final activeId = currentState.playerIds[currentState.currentTurnIndex];
+          bool isBot = activeId.startsWith('bot_');
+          bool isAFK = currentState.playerOnlineStatus[activeId] == false;
 
-          // 3. Timeout Failsafe (Proactive client-side)
-          if (currentState.turnStartTime != null) {
-            final elapsed = DateTime.now().difference(currentState.turnStartTime!).inSeconds;
-            if (elapsed >= currentState.timerDurationSeconds) {
-               // If it's ME, I auto-play because timer expired
-               if (currentUser.uid == activePlayerId) {
-                 final possibleCards = currentState.handCards[activePlayerId] ?? [];
-                 if (possibleCards.isNotEmpty) {
-                    playCard(activePlayerId, possibleCards[Random().nextInt(possibleCards.length)]);
-                 }
-               }
-            }
-          }
-        }
-      } else if (currentState.phase == GamePhase.shuffleVoting || currentState.phase == GamePhase.rematchVoting) {
-        // 1. Bot Voting Logic
-        for (var playerId in currentState.playerIds) {
-          if (playerId.startsWith('bot_')) {
-            if (currentState.phase == GamePhase.shuffleVoting && !currentState.shuffleVotes.containsKey(playerId)) {
-              // Bot follows human majority or votes random if draw/no human votes
-              await Future.delayed(Duration(milliseconds: 1500 + Random().nextInt(1500)));
-              
-              final currentVotes = state?.shuffleVotes ?? {}; // Use current state
-              final humanVotes = currentVotes.entries
-                  .where((e) => !e.key.startsWith('bot_'))
-                  .map((e) => e.value)
-                  .toList();
-              
-              bool botChoice;
-              if (humanVotes.isEmpty) {
-                botChoice = Random().nextDouble() < 0.2; // Default 20% shuffle
-              } else {
-                int yesCount = humanVotes.where((v) => v == true).length;
-                int noCount = humanVotes.length - yesCount;
-                if (yesCount > noCount) {
-                  botChoice = true;
-                } else if (noCount > yesCount) {
-                  botChoice = false;
-                } else {
-                  botChoice = Random().nextBool();
+          if (isBot || isAFK) {
+             if (isAFK) debugPrint('AFK TAKEOVER: Host playing for $activeId');
+             
+             await Future.delayed(Duration(milliseconds: 800 + Random().nextInt(1500)));
+             final finalState = state;
+             if (finalState != null && finalState.phase == GamePhase.playing && 
+                 finalState.playerIds[finalState.currentTurnIndex] == activeId) {
+                
+                try {
+                  final action = BotBrain.decidePlay(finalState, activeId);
+                  playCard(activeId, action.card);
+                } catch (e) {
+                  // Stuck failsafe: advance turn if BotBrain fails (e.g. no cards)
+                  _publishState(finalState.copyWith(
+                    currentTurnIndex: (finalState.currentTurnIndex + 1) % 4,
+                    turnStartTime: DateTime.now(),
+                  ));
                 }
-              }
-              
-              voteShuffle(playerId, botChoice); 
-            } else if (currentState.phase == GamePhase.rematchVoting && !currentState.rematchVotes.containsKey(playerId)) {
-              // Rematch: Bots follow human majority for rematch too
-              await Future.delayed(Duration(milliseconds: 1500 + Random().nextInt(1500)));
-              
-              final currentVotes = state?.rematchVotes ?? {}; // Use current state
-              final humanVotes = currentVotes.entries
-                  .where((e) => !e.key.startsWith('bot_'))
-                  .map((e) => e.value)
-                  .toList();
-              
-              bool botChoice;
-              if (humanVotes.isEmpty) {
-                botChoice = true; // Bots like playing!
-              } else {
-                int yesCount = humanVotes.where((v) => v == true).length;
-                int noCount = humanVotes.length - yesCount;
-                if (yesCount > noCount) {
-                  botChoice = true;
-                } else if (noCount > yesCount) {
-                  botChoice = false;
-                } else {
-                  botChoice = true; // Tie-breaker: bots want to play
-                }
-              }
-              
-              voteRematch(playerId, botChoice);
-            }
-          }
-        }
-
-        // 2. Host Transition Logic (Trigger if votes complete or short-circuited)
-        if (currentState.phase == GamePhase.shuffleVoting) {
-           final votes = currentState.shuffleVotes;
-           bool anyoneVotedNo = votes.values.any((v) => v == false);
-           if (anyoneVotedNo || votes.length == 4) {
-             await startNewRound(forceShuffle: !anyoneVotedNo && votes.values.any((v) => v == true));
-           }
-        } else if (currentState.phase == GamePhase.rematchVoting) {
-           final votes = currentState.rematchVotes;
-           if (votes.length == 4) {
-             bool unanimous = votes.values.every((v) => v == true);
-             if (unanimous) {
-                // ... Reset logic handled in voteRematch currently, 
-                // but let's move it to host logic for safety if needed.
              }
-           }
-        }
-      }
+          }
+          break;
 
+        case GamePhase.shuffleVoting:
+          _handleBotVotes(currentState, isRematch: false);
+          break;
+          
+        case GamePhase.rematchVoting:
+          _handleBotVotes(currentState, isRematch: true);
+          break;
+
+        default:
+          break;
+      }
     } catch (e, stack) {
       debugPrint('CRITICAL ASYNC ERROR in _evaluateBotActions: $e');
-      debugPrint('Stack: $stack');
     } finally {
       _isHandlingBotLogic = false;
+    }
+  }
+
+  Future<void> _handleBotVotes(MatchState currentState, {required bool isRematch}) async {
+    for (var playerId in currentState.playerIds) {
+      if (!playerId.startsWith('bot_')) continue;
+      
+      final votes = isRematch ? currentState.rematchVotes : currentState.shuffleVotes;
+      if (!votes.containsKey(playerId)) {
+        await Future.delayed(Duration(milliseconds: 1500 + Random().nextInt(1500)));
+        if (isRematch) {
+          voteRematch(playerId, BotBrain.decideRematchVote());
+        } else {
+          voteShuffle(playerId, BotBrain.decideShuffleVote(currentState, playerId));
+        }
+      }
+    }
+
+    // Host Transition after voting
+    final latestState = state;
+    if (latestState == null) return;
+
+    if (isRematch) {
+      if (latestState.rematchVotes.length == 4) {
+        if (latestState.rematchVotes.values.every((v) => v == true)) {
+          // Rematch handled in voteRematch currently
+        }
+      }
+    } else {
+      final sVotes = latestState.shuffleVotes;
+       bool anyoneVotedNo = sVotes.values.any((v) => v == false);
+       if (anyoneVotedNo || sVotes.length == 4) {
+         startNewRound(forceShuffle: !anyoneVotedNo && sVotes.values.any((v) => v == true));
+       }
     }
   }
 
@@ -509,56 +468,6 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     if (hand.isNotEmpty) {
       playCard(myUid, hand[Random().nextInt(hand.length)]);
     }
-  }
-
-  void _executeBotPlayCard(String botId) {
-        final currentState = state;
-        if (currentState == null) return;
-        final hand = currentState.handCards[botId];
-        if (hand == null || hand.isEmpty) return;
-
-        final board = currentState.board;
-        
-        // HEURISTIC 1: Can I capture?
-        if (board.isNotEmpty) {
-          final topRank = board.last.rank;
-          final matchingCards = hand.where((c) => c.rank == topRank).toList();
-          
-          if (matchingCards.isNotEmpty) {
-            bool isTafweetMode = currentState.mode == GameMode.tafweet;
-        if (isTafweetMode && matchingCards.length >= 2 && hand.length > 1) {
-           final nonMatching = hand.where((c) => c.rank != topRank).toList();
-           if (nonMatching.isNotEmpty) {
-             // debugPrint('BOT STRATEGY: Baiting Tafweet for ${topRank.name}');
-             playCard(botId, nonMatching[Random().nextInt(nonMatching.length)]);
-             return;
-           }
-        }
-
-        // Otherwise, TAKE THE CAPTURE!
-        // 5% chance of "human error" (missing a capture)
-        if (Random().nextDouble() > 0.05) {
-          playCard(botId, matchingCards[Random().nextInt(matchingCards.length)]);
-          return;
-        }
-      }
-    }
-
-    // HEURISTIC 2: No capture available, setup for next turn.
-    // Try to play a card that I have a duplicate of in my hand.
-    final rankCounts = <game_card.Rank, int>{};
-    for (var c in hand) {
-      rankCounts[c.rank] = (rankCounts[c.rank] ?? 0) + 1;
-    }
-    final duplicates = hand.where((c) => rankCounts[c.rank]! > 1).toList();
-    if (duplicates.isNotEmpty && Random().nextDouble() < 0.7) {
-       playCard(botId, duplicates[Random().nextInt(duplicates.length)]);
-       return;
-    }
-
-    // FALLBACK: Play a random card.
-    final cardToPlay = hand[Random().nextInt(hand.length)];
-    playCard(botId, cardToPlay);
   }
 
   String _generateRoomId() {
@@ -680,124 +589,72 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
   }
 
   Future<void> startNewRound({bool isFirstRound = false, bool forceShuffle = false}) async {
-    try {
-      final currentState = state;
-      if (currentState == null) return;
-      
-      // CRITICAL: Ensure we don't start with placeholders!
-      if (currentState.playerIds.any((id) => id.startsWith('waiting_'))) {
-        debugPrint('ABORT: Attempted to start round with placeholders in playerIds');
-        return;
-      }
-
-      final isHost = _amIHost(currentState);
-      
-      MatchState nextState = currentState;
-      if (isHost) {
-        if (isFirstRound || forceShuffle || currentState.roundsSinceLastShuffle >= 5) {
-          _secretDeck = Deck.standard();
-          _secretDeck!.shuffle();
-          nextState = nextState.copyWith(roundsSinceLastShuffle: 0);
-        } else {
-          _secretDeck = Deck.restoreFromHarvest(currentState.harvestStacks);
-          nextState = nextState.copyWith(roundsSinceLastShuffle: currentState.roundsSinceLastShuffle + 1);
-        }
-        
-        final dealerIdx = isFirstRound ? 0 : (currentState.phase == GamePhase.shuffleVoting ? currentState.dealerIndex : (currentState.dealerIndex + 1) % 4);
-
-        await _publishState(nextState.copyWith(
-          deckCount: _secretDeck?.cards.length ?? 0,
-          board: [],
-          recentFasha: [],
-          handCards: { for (var id in currentState.playerIds) id: [] },
-          harvestStacks: { 'teamA': [], 'teamB': [] },
-          skippedMatches: {},
-          playHistory: [],
-          shuffleVotes: {},
-          rematchVotes: {},
-          phase: GamePhase.preRoundCut,
-          roundCount: currentState.roundCount + (isFirstRound ? 0 : 1),
-          handInRound: 0, // Reset to 0, dealInitialCards will set to 1
-          dealerIndex: dealerIdx,
-          cardOwnership: {},
-        ));
-      }
-    } catch (e, stack) {
-      debugPrint('ERROR in startNewRound: $e');
-      debugPrint('Stack: $stack');
+    final currentState = state;
+    if (currentState == null) return;
+    
+    // CRITICAL: Ensure we don't start with placeholders
+    if (currentState.playerIds.any((id) => id.startsWith('waiting_'))) {
+      debugPrint('ABORT: Attempted to start round with placeholders');
+      return;
     }
+
+    int nextDealer = isFirstRound ? 0 : (currentState.dealerIndex + 1) % 4;
+    
+    // Shuffle check
+    bool shouldShuffle = isFirstRound || forceShuffle;
+    if (shouldShuffle) {
+      _secretDeck = Deck.standard();
+      _secretDeck?.shuffle();
+    }
+
+    final newState = currentState.copyWith(
+      dealerIndex: nextDealer,
+      currentTurnIndex: (nextDealer + 1) % 4,
+      phase: GamePhase.preRoundCut,
+      roundCount: isFirstRound ? 1 : currentState.roundCount + 1,
+      roundsSinceLastShuffle: shouldShuffle ? 0 : currentState.roundsSinceLastShuffle + 1,
+      board: [],
+      handCards: {},
+      harvestStacks: {'teamA': [], 'teamB': []},
+      shuffleVotes: {},
+      rematchVotes: {},
+      deckCount: _secretDeck?.cards.length ?? 0,
+      recentFasha: [],
+      lastCaptureTeam: null,
+    );
+
+    await _publishState(newState);
+    _multimedia.playSfx('sfx/shuffle.mp3');
   }
 
   Future<void> performCut(int index) async {
     final currentState = state;
-    if (currentState == null || currentState.phase != GamePhase.preRoundCut) return;
+    if (currentState == null) return;
     
-    if (_secretDeck != null) {
-      _secretDeck!.cut(index);
-      _multimedia.vibrate();
-    }
-
-    final lastCard = _secretDeck?.cards.first;
-
-    await _publishState(currentState.copyWith(
-      deckCount: _secretDeck?.cards.length ?? 0,
-      phase: GamePhase.dealingFasha, 
-      cutLastCard: lastCard,
-    ));
-
-    Future.delayed(const Duration(seconds: 2), () {
-      if (state?.id == currentState.id && state?.phase == GamePhase.dealingFasha) {
-         state = state?.copyWith(cutLastCard: null);
-         dealInitialCards();
-      }
-    });
+    final result = GameEngine.apply(
+      currentState, 
+      CutAction(currentState.playerIds[(currentState.dealerIndex + 3) % 4], index),
+      secretDeck: _secretDeck
+    );
+    
+    await _publishState(result.newState);
+    _multimedia.playSfx('sfx/cut.mp3');
   }
 
   Future<void> dealInitialCards() async {
-  try {
     final currentState = state;
-    if (currentState == null || currentState.phase != GamePhase.dealingFasha) return;
+    if (currentState == null) return;
 
-    if (!_amIHost(state!)) return;
+    final result = GameEngine.apply(
+      currentState, 
+      DealAction(currentState.playerIds[currentState.dealerIndex], isInitial: true),
+      secretDeck: _secretDeck
+    );
 
-    if (_secretDeck == null) {
-      _secretDeck = Deck.standard();
-      _secretDeck!.shuffle();
-      _secretDeck!.cut(Random().nextInt(40) + 5);
-    }
-
-    final hands = Map<String, List<game_card.Card>>.from(state!.handCards);
-    final board = <game_card.Card>[];
-
-    // Consolidated Dealing: 1. Board
-    for (int i = 0; i < 4; i++) {
-      final c = _secretDeck?.draw();
-      if (c == null) break;
-      board.add(c);
-    }
+    await _publishState(result.newState);
     _multimedia.playSfx('sfx/deal.mp3');
-    await _publishState(state!.copyWith(board: List.from(board), deckCount: _secretDeck?.cards.length ?? 0));
-    await Future.delayed(const Duration(milliseconds: 500));
 
-    // 2. Players
-    for (var playerId in state!.playerIds) {
-      final playerHand = <game_card.Card>[];
-      for (int i = 0; i < 4; i++) {
-        final c = _secretDeck?.draw();
-        if (c == null) break;
-        playerHand.add(c);
-      }
-      hands[playerId] = List.from(playerHand);
-    }
-    
-    await _publishState(state!.copyWith(
-      handCards: Map.from(hands),
-      deckCount: _secretDeck?.cards.length ?? 0,
-      recentFasha: List.from(board),
-      handInRound: 1, // First distribution
-      phase: GamePhase.dealingCards,
-    ));
-
+    // Memory phase delay
     await Future.delayed(const Duration(seconds: 5));
     
     if (state?.phase == GamePhase.dealingCards) {
@@ -806,71 +663,25 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
         turnStartTime: DateTime.now(),
       ));
     }
-  } catch (e, stack) {
-    debugPrint('ERROR in dealInitialCards: $e');
-    debugPrint('Stack: $stack');
   }
-}
 
   Future<void> dealSubsequentCards() async {
-    try {
-      if (state == null) return;
-      
-      if (!_amIHost(state!)) return;
-      
-      // RECOVERY: Mid-round host transition recovery
-      if (_secretDeck == null) {
-        debugPrint('RECOVERY: New Host reconstructing deck from visible state.');
-        _secretDeck = Deck.reconstructRemaining(
-          state!.board,
-          state!.handCards,
-          state!.harvestStacks,
-        );
+    final currentState = state;
+    if (currentState == null || _secretDeck == null || _secretDeck!.cards.isEmpty) {
+      if (currentState != null && currentState.deckCount == 0) {
+        _handleRoundEnd();
       }
-
-      if (_secretDeck!.isEmpty) {
-        await _handleRoundEnd();
-        return;
-      }
-
-      final hands = Map<String, List<game_card.Card>>.from(state!.handCards);
-      bool anyCardDealt = false;
-      
-      for (var playerId in state!.playerIds) {
-        final playerHand = List<game_card.Card>.from(hands[playerId] ?? []);
-        for (int i = 0; i < 4; i++) {
-          final c = _secretDeck?.draw();
-          if (c == null) break;
-          playerHand.add(c);
-          anyCardDealt = true;
-        }
-        hands[playerId] = playerHand;
-      }
-
-      if (!anyCardDealt) {
-        debugPrint('CLEANUP: Failed to deal any cards, forcing round end.');
-        await _handleRoundEnd();
-        return;
-      }
-        
-        // Update each player's hand in one go or incrementally
-        await _publishState(state!.copyWith(
-          handCards: Map.from(hands), 
-          deckCount: _secretDeck?.cards.length ?? 0,
-          handInRound: state!.handInRound + 1, // Subsequent distribution
-        ));
-
-      final finalState = state;
-      if (finalState != null) {
-        await _publishState(finalState.copyWith(
-          phase: GamePhase.playing,
-          turnStartTime: DateTime.now(),
-        ));
-      }
-    } catch (e, stack) {
-      debugPrint('ERROR in dealSubsequentCards: $e');
-      debugPrint('Stack: $stack');
+      return;
     }
+
+    final result = GameEngine.apply(
+      currentState, 
+      DealAction(currentState.playerIds[currentState.dealerIndex], isInitial: false),
+      secretDeck: _secretDeck
+    );
+
+    await _publishState(result.newState);
+    _multimedia.playSfx('sfx/deal.mp3');
   }
 
   Future<void> sendEmoji(String playerId, String emoji) async {
@@ -880,6 +691,8 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     emojis[playerId] = emoji;
     _multimedia.vibrate();
     await _publishState(currentState.copyWith(playerEmojis: emojis));
+    
+    Future.delayed(const Duration(seconds: 3), () => clearEmoji(playerId));
   }
 
   Future<void> clearEmoji(String playerId) async {
@@ -894,182 +707,42 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     try {
       final currentState = state;
       if (currentState == null || currentState.phase != GamePhase.playing) return;
-      
-      if (origin != null) {
-        ref.read(localPlayOriginsProvider.notifier).update((m) => {...m, card.firebaseKey: origin});
-      }
 
-      // Validate turn
-      if (currentState.playerIds[currentState.currentTurnIndex] != playerId) return;
+      final result = GameEngine.apply(currentState, PlayCardAction(playerId, card));
+      final newState = result.newState;
 
-      // 1. Prepare local state with DEEP COPIES
-      final prePlayBoard = List<game_card.Card>.from(currentState.board);
-      // Deep copy handCards Map and its nested Lists
-      final hands = Map<String, List<game_card.Card>>.from(
-        currentState.handCards.map((k, v) => MapEntry(k, List<game_card.Card>.from(v)))
-      );
-      // Deep copy harvestStacks Map and its nested Lists
-      final harvest = Map<String, List<Capture>>.from(
-        currentState.harvestStacks.map((k, v) => MapEntry(k, List<Capture>.from(v)))
-      );
-      // Deep copy skippedMatches Map and its nested Lists
-      final skipped = Map<String, List<String>>.from(
-        currentState.skippedMatches.map((k, v) => MapEntry(k, List<String>.from(v)))
-      );
-      
-      final history = List<game_card.Card>.from(currentState.playHistory);
-      final ownership = Map<String, String>.from(currentState.cardOwnership);
-      final emojis = Map<String, String>.from(currentState.playerEmojis);
-      
-      // 0. Detect Skips (Deliberately not capturing)
-      if (prePlayBoard.isNotEmpty) {
-        final topCard = prePlayBoard.last;
-        bool hasMatchInHand = hands[playerId]?.any((c) => c.rank == topCard.rank) ?? false;
+      if (result.capturedCards.isNotEmpty) {
+        final intermediateBoard = List<game_card.Card>.from(currentState.board)..add(card);
+        final intermediateHands = Map<String, List<game_card.Card>>.from(currentState.handCards);
+        intermediateHands[playerId]?.removeWhere((c) => c.firebaseKey == card.firebaseKey);
         
-        if (hasMatchInHand && card.rank != topCard.rank) {
-          final sourceId = ownership[topCard.firebaseKey] ?? 'fasha';
-          final skipKey = '${topCard.rank.name}:$sourceId';
-          
-          final playerSkips = List<String>.from(skipped[playerId] ?? []);
-          if (!playerSkips.contains(skipKey)) {
-            playerSkips.add(skipKey);
-            skipped[playerId] = playerSkips;
-            
-            // Start a Tafweet window timer (e.g. 45s) using quiver
-            _startTafweetExpiry(playerId, skipKey, const Duration(seconds: 45));
-          }
-        }
-      }
-
-      // 1. Remove card from player hand (Use firebaseKey for robust removal)
-      hands[playerId]?.removeWhere((c) => c.firebaseKey == card.firebaseKey);
-      final allHandsEmpty = hands.values.every((hand) => hand.isEmpty);
-
-      // 2. Calculate capture
-      final capturedCards = GameEngineUtils.calculateCapture(card, prePlayBoard);
-      final teamId = _getTeamOfPlayer(playerId);
-      
-      if (!harvest.containsKey(teamId)) {
-        harvest[teamId] = [];
-      }
-
-      int pointsEarned = 0;
-      int nextTurn = (currentState.currentTurnIndex + 1) % 4;
-      List<game_card.Card> finalBoard = List.from(prePlayBoard);
-
-      if (capturedCards.isEmpty) {
-        finalBoard.add(card);
-        ownership[card.firebaseKey] = playerId;
-
         await _publishState(currentState.copyWith(
-          board: finalBoard,
-          handCards: hands,
-          skippedMatches: skipped,
-          playHistory: history,
-          cardOwnership: ownership,
-          currentTurnIndex: nextTurn,
-          turnStartTime: DateTime.now(),
-        ));
-      } else {
-        pointsEarned = 1; 
-        
-        // 1. Enter Capturing Phase (Visually hold cards on board)
-        finalBoard.add(card); // Add the card that triggered the capture
-        ownership[card.firebaseKey] = playerId;
-
-        await _publishState(currentState.copyWith(
-          board: finalBoard,
-          handCards: hands,
+          board: intermediateBoard,
+          handCards: intermediateHands,
           phase: GamePhase.capturing,
-          capturingCards: List.from(capturedCards),
-          capturingTeam: teamId,
-          capturingStage: 0, // Merge stage
-          cardOwnership: ownership,
-          playerEmojis: emojis,
+          capturingCards: result.capturedCards,
+          capturingTeam: result.capturingTeam,
+          capturingStage: 0,
         ));
 
         _multimedia.playSfx('sfx/capture.mp3');
-        _multimedia.vibrate();
+        await Future.delayed(const Duration(milliseconds: 600));
 
-        // Stage 1: Symmetric Merge (0.8s)
-        await Future.delayed(const Duration(milliseconds: 800));
+        await _publishState(state!.copyWith(capturingStage: 1));
+        await Future.delayed(const Duration(milliseconds: 600));
 
-        // Stage 2: Fly to Box (0.8s)
-        final s = state;
-        if (s != null) {
-          await _publishState(s.copyWith(capturingStage: 1));
-        }
-        await Future.delayed(const Duration(milliseconds: 800));
-
-        // 3. Finalize Harvest
-        bool isTafweetMode = currentState.mode == GameMode.tafweet;
-        if (isTafweetMode) {
-          final playerSkips = List<String>.from(skipped[playerId] ?? []);
-          final previousPlayerId = currentState.playerIds[(currentState.currentTurnIndex + 3) % 4];
-          
-          bool isFashaTafweet = playerSkips.contains('${card.rank.name}:fasha');
-          int rankSkipCount = playerSkips.where((s) => s.startsWith('${card.rank.name}:')).length;
-          bool isDoubleTafweet = rankSkipCount >= 2 && playerSkips.contains('${card.rank.name}:$previousPlayerId');
-          bool isStandardTafweet = playerSkips.contains('${card.rank.name}:$previousPlayerId');
-
-          if (isFashaTafweet) {
-            pointsEarned += 5;
-            emojis[playerId] = '😎';
-            playerSkips.remove('${card.rank.name}:fasha');
-          } else if (isDoubleTafweet) {
-            pointsEarned += 10;
-            emojis[playerId] = '🔥';
-            playerSkips.removeWhere((s) => s.startsWith('${card.rank.name}:'));
-          } else if (isStandardTafweet) {
-            pointsEarned += 5;
-            emojis[playerId] = '😂';
-            playerSkips.removeWhere((s) => s.startsWith('${card.rank.name}:'));
-          }
-          skipped[playerId] = playerSkips;
-          
-          if (emojis.containsKey(playerId)) {
-            Future.delayed(const Duration(seconds: 3), () => clearEmoji(playerId));
-          }
-        }
-
-        final harvestedBoardCards = List<game_card.Card>.from(capturedCards)..removeWhere((c) => c.firebaseKey == card.firebaseKey);
-        final keysToRemove = capturedCards.map((c) => c.firebaseKey).toSet();
-        finalBoard.removeWhere((c) => keysToRemove.contains(c.firebaseKey));
-        
-        harvest[teamId]?.add(Capture(
-          leadingCard: card,
-          capturedCards: harvestedBoardCards,
-        ));
-
-        await _publishState(currentState.copyWith(
-          board: finalBoard,
-          handCards: hands,
-          harvestStacks: harvest,
-          skippedMatches: skipped,
-          playHistory: history,
-          cardOwnership: ownership,
-          playerEmojis: emojis,
-          phase: GamePhase.playing, // Back to playing
-          capturingCards: [],
-          capturingTeam: null,
-          currentTurnIndex: nextTurn,
-          teamAScore: currentState.teamAScore + (teamId == 'teamA' ? pointsEarned : 0),
-          teamBScore: currentState.teamBScore + (teamId == 'teamB' ? pointsEarned : 0),
-          lastCaptureTeam: teamId,
-          turnStartTime: DateTime.now(),
-        ));
+        await _publishState(newState);
+      } else {
+        await _publishState(newState);
+        _multimedia.playSfx('sfx/play.mp3');
       }
 
-      if (allHandsEmpty && currentState.phase != GamePhase.capturing) {
-        await dealSubsequentCards();
-      } else if (allHandsEmpty) {
-        // If we captured and it was the last card, wait a bit more for the final cleanup
-        await Future.delayed(const Duration(milliseconds: 500));
+      bool allHandsEmpty = newState.handCards.values.every((h) => h.isEmpty);
+      if (allHandsEmpty) {
         await dealSubsequentCards();
       }
-    } catch (e, stack) {
+    } catch (e) {
       debugPrint('ERROR in playCard: $e');
-      debugPrint('Stack: $stack');
     }
   }
 
@@ -1084,12 +757,12 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
       // Last Capture Rule
       if (board.isNotEmpty && currentState.lastCaptureTeam != null) {
          harvest[currentState.lastCaptureTeam!]?.add(Capture(
-           leadingCard: board.first, // Placeholder for rules consistency
+           leadingCard: board.first, 
            capturedCards: board.skip(1).toList(),
          ));
       }
 
-      // Al-Ard (Majority capture points logic)
+      // Al-Ard logic
       int pointsA = currentState.teamAScore;
       int pointsB = currentState.teamBScore;
       
@@ -1109,21 +782,9 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
          phase: GamePhase.roundScoring,
       );
       
-      // Check Match Win Condition
      if (pointsA >= endPhase.maxPoints || pointsB >= endPhase.maxPoints) {
           final winnerTeam = pointsA >= endPhase.maxPoints ? 'teamA' : 'teamB';
           _updateUserStatsAfterMatch(winnerTeam, pointsA, pointsB);
-
-          // Play End Match SFX
-          final currentUser = ref.read(currentUserProvider);
-          if (currentUser != null) {
-            final myTeam = _getTeamOfPlayer(currentUser.uid);
-            if (myTeam == winnerTeam) {
-              _multimedia.playSfx('sfx/win.mp3');
-            } else {
-              _multimedia.playSfx('sfx/lose.mp3');
-            }
-          }
 
           await _publishState(endPhase.copyWith(
              phase: GamePhase.rematchVoting,
@@ -1131,16 +792,9 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
              playHistory: [],
           ));
       } else {
-         // SHUFFLE LOGIC REFINEMENT:
-         // 1. If we reached 6 rounds without shuffle (roundsSinceLastShuffle >= 5), FORCE SHUFFLE.
-         // 2. If we reached 3 rounds (roundsSinceLastShuffle >= 2), ASK FOR SHUFFLE.
-         // 3. Otherwise, just deal next round.
-         
          if (endPhase.roundsSinceLastShuffle >= 5) {
-// debugPrint('SHUFFLE: Forced shuffle triggered (6th round).');
             await startNewRound(forceShuffle: true);
          } else if (endPhase.roundsSinceLastShuffle >= 2) {
-            // Rotate dealer, trigger UI prompt for Shuffle/No-Shuffle
             await _publishState(endPhase.copyWith(
                dealerIndex: (endPhase.dealerIndex + 1) % 4,
                phase: GamePhase.shuffleVoting,
@@ -1148,107 +802,41 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
                playHistory: [],
             ));
          } else {
-// debugPrint('SHUFFLE: Skipping vote, moving to round ${endPhase.roundCount + 1}');
             await startNewRound(forceShuffle: false);
          }
       }
-    } catch (e, stack) {
+    } catch (e) {
       debugPrint('ERROR in _handleRoundEnd: $e');
-      debugPrint('Stack: $stack');
     }
   }
 
   Future<void> voteShuffle(String playerId, bool wantsShuffle) async {
-     final currentState = state;
-     if (currentState == null || currentState.phase != GamePhase.shuffleVoting) return;
-     
-     final votes = Map<String, bool>.from(currentState.shuffleVotes);
-     votes[playerId] = wantsShuffle;
-     
-     MatchState newState = currentState.copyWith(shuffleVotes: votes);
-     
-     // ALWAYS publish vote for others to see
-     await _publishState(newState);
-
-     final isHost = _amIHost(currentState);
-
-      // VETO RULE: If anyone votes "No", the shuffle is cancelled immediately.
-      // Otherwise, we wait for all 4 players to vote "Yes".
-      if (isHost) {
-         if (wantsShuffle == false) {
-            // Unilateral Veto
-            await startNewRound(forceShuffle: false);
-         } else if (votes.length == 4) {
-            // All voted, check if all are Yes
-            bool allYes = votes.values.every((v) => v == true);
-            await startNewRound(forceShuffle: allYes);
-         }
-      }
+    final currentState = state;
+    if (currentState == null) return;
+    final result = GameEngine.apply(currentState, VoteAction(playerId, wantsShuffle, isRematch: false));
+    await _publishState(result.newState);
   }
 
   Future<void> voteRematch(String playerId, bool wantsRematch) async {
-     final currentState = state;
-     if (currentState == null || currentState.phase != GamePhase.rematchVoting) return;
-     
-     final votes = Map<String, bool>.from(currentState.rematchVotes);
-     votes[playerId] = wantsRematch;
-     
-     MatchState newState = currentState.copyWith(rematchVotes: votes);
-     
-     if (votes.length == 4) {
-        bool unanimous = votes.values.every((v) => v == true);
-        if (unanimous) {
-           // Reset Match Completely
-           await _publishState(newState.copyWith(
-              teamAScore: 0,
-              teamBScore: 0,
-              roundCount: 1,
-              roundsSinceLastShuffle: 0,
-              consecutiveTafweetCount: 0,
-              rematchVotes: {},
-              shuffleVotes: {},
-           ));
-           await startNewRound(isFirstRound: true);
-        } else {
-           // End Match completely
-           await _publishState(newState.copyWith(phase: GamePhase.matchOver));
-        }
-     } else {
-        await _publishState(newState);
-     }
-  }
-
-  void _startTafweetExpiry(String playerId, String skipKey, Duration duration) {
-    final subKey = '$playerId:$skipKey';
-    _tafweetSubscriptions[subKey]?.cancel();
-    
-    final timer = CountdownTimer(duration, const Duration(seconds: 5));
-    _tafweetSubscriptions[subKey] = timer.listen(null, onDone: () {
-      _handleTafweetExpiry(playerId, skipKey);
-    });
-  }
-
-  void _handleTafweetExpiry(String playerId, String skipKey) {
     final currentState = state;
     if (currentState == null) return;
+    final result = GameEngine.apply(currentState, VoteAction(playerId, wantsRematch, isRematch: true));
     
-    final skipped = Map<String, List<String>>.from(
-      currentState.skippedMatches.map((k, v) => MapEntry(k, List<String>.from(v)))
-    );
-    
-    if (skipped[playerId]?.contains(skipKey) == true) {
-      skipped[playerId]?.remove(skipKey);
-      _publishState(currentState.copyWith(skippedMatches: skipped));
-// debugPrint('TAFWEET: Skip $skipKey for $playerId expired.');
+    if (result.newState.rematchVotes.length == 4) {
+      bool unanimous = result.newState.rematchVotes.values.every((v) => v == true);
+      if (unanimous) {
+        await _publishState(result.newState.copyWith(
+          teamAScore: 0, teamBScore: 0, roundCount: 1, roundsSinceLastShuffle: 0, rematchVotes: {},
+        ));
+        startNewRound(isFirstRound: true);
+      } else {
+        await _publishState(result.newState.copyWith(phase: GamePhase.matchOver));
+      }
+    } else {
+      await _publishState(result.newState);
     }
   }
 
-  String _getTeamOfPlayer(String playerId) {
-    final currentState = state;
-    if (currentState == null) return 'teamA';
-    int index = currentState.playerIds.indexOf(playerId);
-    return (index == 0 || index == 2) ? 'teamA' : 'teamB';
-  }
 
   Future<void> _updateUserStatsAfterMatch(String winnerTeam, int scoreA, int scoreB) async {
     final currentState = state;

@@ -56,6 +56,12 @@ class MultiplayerSyncService {
   /// Remove presence for a player manually
   Future<void> removePresence(String matchId, String playerId) async {
     await matchRef.child(matchId).child('presence').child(playerId).remove();
+    await matchRef.child(matchId).child('playerLastActive').child(playerId).remove();
+  }
+
+  /// Update heartbeat timestamp for AFK detection
+  Future<void> heartbeat(String matchId, String playerId) async {
+    await matchRef.child(matchId).child('playerLastActive').child(playerId).set(DateTime.now().toIso8601String());
   }
 
   /// Watch presence changes for all players in a match
@@ -129,21 +135,28 @@ class MultiplayerSyncService {
 
   /// Search for users by display name (basic prefix search)
   Future<List<AppUser>> searchUsers(String query) async {
-    final usersRef = _db.ref('users');
-    final lowercaseQuery = query.toLowerCase();
-    final snapshot = await usersRef.orderByChild('searchName')
-        .startAt(lowercaseQuery)
-        .endAt('$lowercaseQuery\uf8ff')
-        .limitToFirst(20)
-        .get();
-    
-    if (snapshot.value is! Map) return [];
-    
-    final Map<dynamic, dynamic> users = snapshot.value as Map<dynamic, dynamic>;
-    return users.entries.map((entry) {
-      if (entry.value is! Map) return null;
-      return AppUser.fromJson(Map<String, dynamic>.from(entry.value as Map), entry.key as String);
-    }).whereType<AppUser>().toList();
+    try {
+      final lowercaseQuery = query.toLowerCase();
+      final firestore = FirebaseFirestore.instance;
+      
+      final snapshot = await firestore.collection('users')
+          .where('searchName', isGreaterThanOrEqualTo: lowercaseQuery)
+          .where('searchName', isLessThanOrEqualTo: '$lowercaseQuery\uf8ff')
+          .limit(20)
+          .get();
+      
+      return snapshot.docs.map((doc) {
+        try {
+          return AppUser.fromJson(doc.data(), doc.id);
+        } catch (e) {
+          debugPrint('Error parsing user ${doc.id}: $e');
+          return null;
+        }
+      }).whereType<AppUser>().toList();
+    } catch (e) {
+      debugPrint('Error searching users: $e');
+      return [];
+    }
   }
 
   /// Send a friend request

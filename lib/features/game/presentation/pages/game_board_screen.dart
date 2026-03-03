@@ -137,6 +137,27 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
     );
   }
 
+  Widget _buildFloatingMatchStatusSmall(MatchState matchState) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white10),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _buildMatchStatusRow(Icons.refresh, matchState.roundCount.toString()),
+          const SizedBox(width: 10),
+          _buildMatchStatusRow(Icons.layers_outlined, '${matchState.handInRound}/3'),
+          const SizedBox(width: 10),
+          _buildMatchStatusRow(Icons.style_outlined, matchState.handCards[matchState.playerIds[matchState.currentTurnIndex % matchState.playerIds.length]]?.length.toString() ?? '0'),
+        ],
+      ),
+    );
+  }
+
   Widget _buildMatchStatusRow(IconData icon, String text) {
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -317,7 +338,16 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
             ],
           ),
         ),
-        title: _buildScoreBadge(matchState),
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildScoreBadge(matchState),
+            if (matchState.phase != GamePhase.waitingForPlayers) ...[
+              const SizedBox(width: 12),
+              _buildFloatingMatchStatusSmall(matchState),
+            ],
+          ],
+        ),
         actions: [
           if (matchState.spectatorCount > 0) ...[
             _buildSpectatorCountBadge(matchState.spectatorCount),
@@ -367,7 +397,7 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
                 Align(
                   alignment: Alignment.topCenter,
                   child: Padding(
-                    padding: const EdgeInsets.only(top: 8.0),
+                    padding: const EdgeInsets.only(top: 0.0), // Moved up from 8.0
                     child: GestureDetector(
                       onTap: () => _showPlayerProfile(context, ref, matchState, myUid, 2),
                       child: PlayerAvatar(
@@ -423,17 +453,10 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
 
                 Center(child: _buildBoardCenter(context, ref, matchState, myUid)),
 
-                // Match Status (Round/Hand) - Floating near Top Avatar
-                if (matchState.phase != GamePhase.waitingForPlayers)
-                  Positioned(
-                    top: 80, 
-                    right: 16,
-                    child: _buildFloatingMatchStatus(matchState),
-                  ),
 
                 // Local Player (Bottom Center - shifted left)
                 Align(
-                  alignment: const Alignment(-0.4, 1.0),
+                  alignment: const Alignment(-0.5, 1.0), // Moved left from -0.4
                   child: _buildLocalPlayerArea(context, ref, matchState, myUid),
                 ),
 
@@ -460,7 +483,7 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
                       GestureDetector(
                         onTap: () => setState(() => _isMenuExpanded = !_isMenuExpanded),
                         child: Container(
-                          padding: const EdgeInsets.all(12),
+                          padding: const EdgeInsets.all(14), // Restored to a larger size
                           decoration: BoxDecoration(
                             color: _isMenuExpanded ? ThemeConfig.primaryTeal : Colors.black45,
                             shape: BoxShape.circle,
@@ -472,7 +495,7 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
                           child: Icon(
                             _isMenuExpanded ? Icons.close : Icons.grid_view_rounded,
                             color: Colors.white,
-                            size: 20,
+                            size: 24, // Restored to a larger size
                           ),
                         ),
                       ),

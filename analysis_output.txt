@@ -1,6 +1,0 @@
-Analyzing game_board_screen.dart...                             
-
-  error - Target of URI doesn't exist: 'package:halabessa/features/game/presentation/widgets/settings_overlay.dart' - lib\features\game\presentation\pages\game_board_screen.dart:16:8 - uri_does_not_exist
-  error - The name 'SettingsOverlay' isn't a class - lib\features\game\presentation\pages\game_board_screen.dart:355:35 - creation_with_non_type
-
-2 issues found. (ran in 3.0s)

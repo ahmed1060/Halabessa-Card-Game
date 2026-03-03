@@ -124,6 +124,14 @@ class _ChatOverlayState extends ConsumerState<ChatOverlay> {
                           curve: Curves.easeOut,
                         );
                       }
+                      
+                      // If open, immediately mark everything as seen
+                      if (chatState.isOverlayOpen && messages.isNotEmpty) {
+                        final latest = messages.last.timestamp;
+                        if (latest.isAfter(chatState.lastSeenTimestamp)) {
+                          ref.read(chatStateProvider.notifier).markAllSeen();
+                        }
+                      }
                     });
 
                     return ListView.builder(
