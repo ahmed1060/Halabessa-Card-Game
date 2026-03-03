@@ -39,6 +39,8 @@ class PlayerProfilePreview extends ConsumerWidget {
               final displayUser = fullUser ?? user;
               final isMe = currentUser?.uid == displayUser.uid;
               final isFriend = currentUser?.friends.contains(displayUser.uid) ?? false;
+              final isIncoming = currentUser?.pendingFriendRequests.contains(displayUser.uid) ?? false;
+              final isHandled = isFriend || isIncoming;
 
               return Column(
                 mainAxisSize: MainAxisSize.min,
@@ -115,15 +117,15 @@ class PlayerProfilePreview extends ConsumerWidget {
                       width: double.infinity,
                       child: ElevatedButton.icon(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: isFriend ? Colors.white10 : ThemeConfig.primaryTeal,
-                          foregroundColor: isFriend ? Colors.white54 : Colors.white,
+                          backgroundColor: isHandled ? Colors.white10 : ThemeConfig.primaryTeal,
+                          foregroundColor: isHandled ? Colors.white54 : Colors.white,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                           padding: const EdgeInsets.symmetric(vertical: 14),
                         ),
-                        onPressed: isFriend 
+                        onPressed: isHandled 
                             ? null 
                             : () async {
-                              await ref.read(multiplayerSyncServiceProvider).addFriend(currentUser.uid, displayUser.uid);
+                              await ref.read(multiplayerSyncServiceProvider).sendFriendRequest(currentUser.uid, displayUser.uid);
                               if (context.mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(content: Text('friend_request_sent'.tr())),
@@ -131,9 +133,9 @@ class PlayerProfilePreview extends ConsumerWidget {
                                 Navigator.pop(context);
                               }
                             },
-                        icon: Icon(isFriend ? Icons.check : Icons.person_add_alt_1_rounded),
+                        icon: Icon(isFriend ? Icons.check : (isIncoming ? Icons.mail : Icons.person_add_alt_1_rounded)),
                         label: Text(
-                          isFriend ? 'Friend' : 'add_friend'.tr(),
+                          isFriend ? 'Friend' : (isIncoming ? 'requests_tab'.tr() : 'add_friend'.tr()),
                           style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
                       ),

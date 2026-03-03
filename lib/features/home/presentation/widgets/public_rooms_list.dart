@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:halabessa/features/game/domain/models/match_state.dart';
 import 'package:halabessa/features/game/domain/providers/game_providers.dart';
+import 'package:halabessa/features/game/data/repositories/multiplayer_sync_service.dart';
 import 'package:halabessa/features/auth/presentation/providers/auth_providers.dart';
 import 'package:halabessa/core/theme/theme_config.dart';
 
@@ -67,7 +68,8 @@ class PublicRoomsList extends ConsumerWidget {
                       tooltip: 'spectate'.tr(),
                     ),
                     const SizedBox(width: 8),
-                      builder: (context, ref, child) {
+                    Builder(
+                      builder: (context) {
                         final bool isFull = !match.playerIds.any((id) => id.startsWith('waiting_'));
                         return Row(
                           mainAxisSize: MainAxisSize.min,
@@ -81,7 +83,6 @@ class PublicRoomsList extends ConsumerWidget {
                             if (currentUser?.isAdmin == true) const SizedBox(width: 8),
                             ElevatedButton(
                               onPressed: isFull ? null : () {
-                                final currentUser = ref.read(currentUserProvider);
                                 if (currentUser != null) {
                                   ref.read(matchStateProvider.notifier).joinMatch(
                                     match.id, 
@@ -98,7 +99,8 @@ class PublicRoomsList extends ConsumerWidget {
                             ),
                           ],
                         );
-                      },
+                      }
+                    ),
                   ],
                 ),
               ),

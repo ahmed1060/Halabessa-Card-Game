@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easy_localization/easy_localization.dart';
 
 import 'package:halabessa/features/auth/presentation/providers/auth_providers.dart';
+import 'package:halabessa/features/game/domain/providers/game_providers.dart';
 import 'package:halabessa/features/home/presentation/widgets/public_rooms_list.dart';
 import 'package:halabessa/features/auth/presentation/widgets/social_overlay.dart' as social_ui;
 import 'package:halabessa/core/widgets/settings_overlay.dart';
