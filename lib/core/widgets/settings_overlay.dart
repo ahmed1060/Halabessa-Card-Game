@@ -202,15 +202,84 @@ class SettingsOverlay extends ConsumerWidget {
   Widget _buildLanguageCard(BuildContext context, String label, Locale locale, Locale currentLocale) {
     final isSelected = currentLocale == locale;
     return GestureDetector(
-      onTap: () {
-        context.setLocale(locale);
+      onTap: () => context.setLocale(locale),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: isSelected ? ThemeConfig.goldAccent.withOpacity(0.1) : Colors.white.withOpacity(0.03),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected ? ThemeConfig.goldAccent.withOpacity(0.5) : Colors.white10,
+            width: isSelected ? 1.5 : 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (isSelected) 
+              const Icon(Icons.check_circle_rounded, color: ThemeConfig.goldAccent, size: 14),
+            if (isSelected) const SizedBox(width: 8),
+            Text(
+              label,
+              style: TextStyle(
+                color: isSelected ? Colors.white : Colors.white70,
+                fontSize: 14,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildThemeSelector(ThemeMode currentMode, SettingsNotifier notifier, MultimediaService multimedia) {
+    return Row(
+      children: [
+        _buildThemeOption(Icons.light_mode_rounded, ThemeMode.light, currentMode, () => notifier.setThemeMode(ThemeMode.light)),
+        const SizedBox(width: 12),
+        _buildThemeOption(Icons.dark_mode_rounded, ThemeMode.dark, currentMode, () => notifier.setThemeMode(ThemeMode.dark)),
+        const SizedBox(width: 12),
+        _buildThemeOption(Icons.settings_brightness_rounded, ThemeMode.system, currentMode, () => notifier.setThemeMode(ThemeMode.system)),
+      ],
+    );
+  }
+
+  Widget _buildThemeOption(IconData icon, ThemeMode mode, ThemeMode currentMode, VoidCallback onTap) {
+    final isSelected = currentMode == mode;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: isSelected ? ThemeConfig.goldAccent.withOpacity(0.1) : Colors.white.withOpacity(0.03),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? ThemeConfig.goldAccent.withOpacity(0.5) : Colors.white10,
+          ),
+        ),
+        child: Icon(icon, color: isSelected ? Colors.white : Colors.white38, size: 20),
+      ),
+    );
+  }
+
+  Widget _buildAdminButton(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [ThemeConfig.goldAccent.withOpacity(0.2), Colors.transparent],
+        ),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: ThemeConfig.goldAccent.withOpacity(0.3)),
       ),
       child: ListTile(
-        leading: Icon(icon, color: ThemeConfig.goldAccent),
-        title: Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        onTap: () {
+           // Navigate to admin management if needed, or show admin status
+        },
+        leading: const Icon(Icons.admin_panel_settings_rounded, color: ThemeConfig.goldAccent),
+        title: Text('admin_label'.tr(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         trailing: const Icon(Icons.chevron_right, color: ThemeConfig.goldAccent),
-        onTap: onTap,
       ),
     );
   }

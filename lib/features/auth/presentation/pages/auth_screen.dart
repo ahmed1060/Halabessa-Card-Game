@@ -152,7 +152,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with TickerProviderStat
         filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
         child: AlertDialog(
           backgroundColor: const Color(0xFF1A1A2E).withOpacity(0.9),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24), border: Border.all(color: ThemeConfig.goldAccent.withOpacity(0.3))),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24), side: BorderSide(color: ThemeConfig.goldAccent.withOpacity(0.3))),
           title: Text('reset_password'.tr(), style: const TextStyle(color: Colors.white, fontFamily: ThemeConfig.fontHeading)),
           content: TextField(
             controller: resetEmailController,
@@ -483,7 +483,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with TickerProviderStat
       ),
       offset: const Offset(0, 45),
       color: const Color(0xFF1A1A2E),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.white10)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: Colors.white10)),
       onSelected: (locale) => context.setLocale(locale),
       itemBuilder: (context) => [
         PopupMenuItem(value: const Locale('en', 'US'), child: Text('english'.tr(), style: const TextStyle(color: Colors.white70))),

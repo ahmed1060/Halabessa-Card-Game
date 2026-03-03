@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../domain/models/chat_message.dart';
 import '../../domain/providers/game_providers.dart';
 import 'dart:async';
+import '../../../auth/presentation/providers/auth_providers.dart';
 
 final chatMessagesProvider = StreamProvider.autoDispose<List<ChatMessage>>((ref) {
   // Use select to only watch the ID, preventing stream recreation on every score/state change
