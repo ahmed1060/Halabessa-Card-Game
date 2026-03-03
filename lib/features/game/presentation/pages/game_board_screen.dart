@@ -474,7 +474,7 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
                   
                 Positioned(
                   left: 12,
-                  top: 80,
+                  top: 40,
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 8),
                     decoration: BoxDecoration(
