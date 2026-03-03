@@ -8,6 +8,7 @@ import 'package:halabessa/core/providers/settings_provider.dart';
 import 'package:halabessa/features/auth/presentation/providers/auth_providers.dart';
 import 'package:halabessa/core/theme/theme_config.dart';
 import 'package:halabessa/core/services/multimedia_service.dart';
+import 'package:halabessa/core/routes/app_routes.dart';
 
 class SettingsOverlay extends ConsumerWidget {
   const SettingsOverlay({super.key});
@@ -94,7 +95,10 @@ class SettingsOverlay extends ConsumerWidget {
 
                           if (user?.isAdmin == true) ...[
                             const SizedBox(height: 32),
-                            _buildAdminButton(context),
+                            _buildSectionTitle('admin_actions'.tr()),
+                            _buildAdminTile('manage_users'.tr(), Icons.people_alt_rounded, () => Navigator.pushNamed(context, AppRoutes.adminUsers)),
+                            _buildAdminTile('manage_music'.tr(), Icons.library_music_rounded, () => Navigator.pushNamed(context, AppRoutes.adminMusic)),
+                            _buildAdminTile('manage_sfx'.tr(), Icons.graphic_eq_rounded, () => Navigator.pushNamed(context, AppRoutes.adminSfx)),
                           ],
                         ],
                       ),
@@ -263,23 +267,23 @@ class SettingsOverlay extends ConsumerWidget {
     );
   }
 
-  Widget _buildAdminButton(BuildContext context) {
+  Widget _buildAdminTile(String label, IconData icon, VoidCallback onTap) {
     return Container(
-      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [ThemeConfig.goldAccent.withOpacity(0.2), Colors.transparent],
-        ),
+        color: ThemeConfig.goldAccent.withOpacity(0.05),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: ThemeConfig.goldAccent.withOpacity(0.3)),
+        border: Border.all(color: ThemeConfig.goldAccent.withOpacity(0.2)),
       ),
       child: ListTile(
-        onTap: () {
-           // Navigate to admin management if needed, or show admin status
-        },
-        leading: const Icon(Icons.admin_panel_settings_rounded, color: ThemeConfig.goldAccent),
-        title: Text('admin_label'.tr(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        trailing: const Icon(Icons.chevron_right, color: ThemeConfig.goldAccent),
+        onTap: onTap,
+        leading: Icon(icon, color: ThemeConfig.goldAccent, size: 20),
+        title: Text(
+          label,
+          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+        ),
+        trailing: const Icon(Icons.chevron_right, color: ThemeConfig.goldAccent, size: 18),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       ),
     );
   }
