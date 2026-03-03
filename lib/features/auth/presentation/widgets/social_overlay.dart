@@ -38,105 +38,310 @@ class _SocialOverlayState extends ConsumerState<SocialOverlay> {
     final currentUser = ref.watch(currentUserProvider);
     if (currentUser == null) return const SizedBox.shrink();
 
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.9),
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.group, color: Colors.teal),
-              const SizedBox(width: 12),
-              Text('friends_list'.tr(), style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-              const Spacer(),
-              IconButton(
-                icon: const Icon(Icons.close, color: Colors.white70),
-                onPressed: () => Navigator.pop(context),
+    return DefaultTabController(
+      length: 3,
+      child: Container(
+        height: MediaQuery.of(context).size.height * 0.75,
+        decoration: BoxDecoration(
+          color: Colors.black.withOpacity(0.95),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+          border: Border.all(color: Colors.white10),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 20, spreadRadius: 5),
+          ],
+        ),
+        child: Column(
+          children: [
+            // Drag Handle
+            Container(
+              margin: const EdgeInsets.only(top: 12),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.white24,
+                borderRadius: BorderRadius.circular(2),
               ),
-            ],
+            ),
+            const SizedBox(height: 8),
+            // Header
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+              child: Row(
+                children: [
+                  const Icon(Icons.group_rounded, color: Colors.tealAccent, size: 28),
+                  const SizedBox(width: 12),
+                  Text(
+                    'friends_list'.tr(), 
+                    style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded, color: Colors.white38),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+            ),
+            // TabBar
+            TabBar(
+              indicatorColor: Colors.tealAccent,
+              labelColor: Colors.tealAccent,
+              unselectedLabelColor: Colors.white38,
+              indicatorWeight: 3,
+              indicatorSize: TabBarIndicatorSize.label,
+              labelStyle: const TextStyle(fontWeight: FontWeight.bold),
+              tabs: [
+                Tab(text: 'friends_tab'.tr()),
+                Tab(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text('requests_tab'.tr()),
+                      if (currentUser.pendingFriendRequests.isNotEmpty) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(color: Colors.redAccent, borderRadius: BorderRadius.circular(10)),
+                          child: Text(
+                            '${currentUser.pendingFriendRequests.length}',
+                            style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                Tab(text: 'search_tab'.tr()),
+              ],
+            ),
+            const Divider(color: Colors.white10, height: 1),
+            // TabView
+            Expanded(
+              child: TabBarView(
+                children: [
+                  _buildFriendsTab(currentUser),
+                  _buildRequestsTab(currentUser),
+                  _buildSearchTab(currentUser),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFriendsTab(AppUser currentUser) {
+    if (currentUser.friends.isEmpty && currentUser.friendInvites.isEmpty) {
+      return _buildEmptyState(Icons.person_outline, 'no_friends_yet'.tr());
+    }
+
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        // Game Invitations Section
+        if (currentUser.friendInvites.isNotEmpty) ...[
+          Padding(
+            padding: const EdgeInsets.only(left: 8, bottom: 12, top: 4),
+            child: Row(
+              children: [
+                const Icon(Icons.sports_esports, color: Colors.orangeAccent, size: 18),
+                const SizedBox(width: 8),
+                Text('invitations'.tr().toUpperCase(), style: const TextStyle(color: Colors.orangeAccent, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1.1)),
+              ],
+            ),
           ),
+          ...currentUser.friendInvites.entries.map((invite) => Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(colors: [Colors.orangeAccent.withOpacity(0.1), Colors.transparent]),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.orangeAccent.withOpacity(0.2)),
+            ),
+            child: ListTile(
+              leading: const CircleAvatar(backgroundColor: Colors.orangeAccent, child: Icon(Icons.mail, color: Colors.black87)),
+              title: Text('invite_from'.tr(args: [invite.value]), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              trailing: ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.orangeAccent, foregroundColor: Colors.black, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                child: Text('join'.tr(), style: const TextStyle(fontWeight: FontWeight.bold)),
+                onPressed: () {
+                   ref.read(matchStateProvider.notifier).joinMatch(invite.key, currentUser.uid, currentUser.displayName);
+                   Navigator.pop(context);
+                   Navigator.pushNamed(context, '/game');
+                },
+              ),
+            ),
+          )),
           const SizedBox(height: 16),
-          TextField(
+          const Divider(color: Colors.white10),
+          const SizedBox(height: 16),
+        ],
+
+        // Friends List Section
+        if (currentUser.friends.isNotEmpty)
+          ...currentUser.friends.map((friendUid) => ref.watch(userProfileProvider(friendUid)).when(
+            data: (user) {
+              if (user == null) return const SizedBox.shrink();
+              return _buildUserTile(user, isFriend: true);
+            },
+            loading: () => const SizedBox(height: 72, child: Center(child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2)))),
+            error: (_, __) => const SizedBox.shrink(),
+          )),
+      ],
+    );
+  }
+
+  Widget _buildRequestsTab(AppUser currentUser) {
+    if (currentUser.pendingFriendRequests.isEmpty) {
+        return _buildEmptyState(Icons.mail_outline_rounded, 'no_friend_requests'.tr());
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: currentUser.pendingFriendRequests.length,
+      itemBuilder: (context, index) {
+        final reqUid = currentUser.pendingFriendRequests[index];
+        return ref.watch(userProfileProvider(reqUid)).when(
+          data: (user) {
+            if (user == null) return const SizedBox.shrink();
+            return _buildUserTile(user, isRequest: true, myUid: currentUser.uid);
+          },
+          loading: () => const SizedBox(height: 72, child: Center(child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2)))),
+          error: (_, __) => const SizedBox.shrink(),
+        );
+      },
+    );
+  }
+
+  Widget _buildSearchTab(AppUser currentUser) {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: TextField(
             controller: _searchController,
             style: const TextStyle(color: Colors.white),
             decoration: InputDecoration(
               hintText: 'search_users'.tr(),
               hintStyle: const TextStyle(color: Colors.white38),
-              prefixIcon: const Icon(Icons.search, color: Colors.white70),
-              suffixIcon: IconButton(
-                icon: const Icon(Icons.clear, color: Colors.white70),
-                onPressed: () {
-                  _searchController.clear();
-                  _performSearch('');
-                },
-              ),
+              prefixIcon: const Icon(Icons.search_rounded, color: Colors.tealAccent),
               filled: true,
               fillColor: Colors.white.withOpacity(0.05),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+              contentPadding: const EdgeInsets.symmetric(vertical: 16),
             ),
             onChanged: _performSearch,
           ),
-          const SizedBox(height: 16),
-          if (_isSearching)
-            const Center(child: CircularProgressIndicator())
-          else if (_searchResults.isNotEmpty)
-            SizedBox(
-              height: 200,
-              child: ListView.builder(
-                itemCount: _searchResults.length,
-                itemBuilder: (context, index) {
-                  final user = _searchResults[index];
-                  if (user.uid == currentUser.uid) return const SizedBox.shrink();
-                  
-                  final isFriend = currentUser.friends.contains(user.uid);
-                  
-                  return ListTile(
-                    leading: CircleAvatar(
-                      backgroundImage: user.avatarUrl != null
-                          ? (user.avatarUrl!.startsWith('assets/')
-                              ? AssetImage(user.avatarUrl!) as ImageProvider
-                              : NetworkImage(user.avatarUrl!))
-                          : null,
-                      child: user.avatarUrl == null ? const Icon(Icons.person) : null,
-                    ),
-                    title: Text(user.displayName, style: const TextStyle(color: Colors.white)),
-                    trailing: isFriend 
-                      ? const Icon(Icons.check_circle, color: Colors.green)
-                      : IconButton(
-                          icon: const Icon(Icons.person_add, color: Colors.teal),
-                          onPressed: () {
-                            ref.read(multiplayerSyncServiceProvider).addFriend(currentUser.uid, user.uid);
-                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('friend_added'.tr())));
-                          },
-                        ),
-                  );
-                },
-              ),
+        ),
+        if (_isSearching)
+          const Padding(padding: EdgeInsets.only(top: 32), child: CircularProgressIndicator(color: Colors.tealAccent))
+        else if (_searchResults.isEmpty && _searchController.text.isNotEmpty)
+           _buildEmptyState(Icons.search_off_rounded, 'no_results'.tr())
+        else
+          Expanded(
+            child: ListView.builder(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              itemCount: _searchResults.length,
+              itemBuilder: (context, index) {
+                final user = _searchResults[index];
+                if (user.uid == currentUser.uid) return const SizedBox.shrink();
+                
+                final isFriend = currentUser.friends.contains(user.uid);
+                // Note: isPending (outgoing) isn't strictly tracked yet, 
+                // but we can at least avoid showing "Add Friend" for incoming pending too.
+                final isIncoming = currentUser.pendingFriendRequests.contains(user.uid);
+                
+                return _buildUserTile(user, isFriend: isFriend, isPending: isIncoming, isSearch: true, myUid: currentUser.uid);
+              },
             ),
-          const Divider(color: Colors.white24, height: 32),
-          // Placeholder for Friends list / Invites
-          if (currentUser.friendInvites.isNotEmpty) ...[
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Text('invitations'.tr(), style: const TextStyle(color: Colors.orangeAccent, fontSize: 14)),
-            ),
-            const SizedBox(height: 8),
-            ...currentUser.friendInvites.entries.map((invite) => ListTile(
-              title: Text('invite_from'.tr(args: [invite.value]), style: const TextStyle(color: Colors.white)),
-              trailing: ElevatedButton(
-                child: Text('join'.tr()),
-                onPressed: () {
-                   ref.read(matchStateProvider.notifier).joinMatch(invite.key, currentUser.uid, currentUser.displayName);
-                   Navigator.pop(context); // Close overlay
-                   Navigator.pushNamed(context, '/game');
-                },
-              ),
-            )),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildUserTile(AppUser user, {bool isFriend = false, bool isRequest = false, bool isPending = false, bool isSearch = false, String? myUid}) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withOpacity(0.05)),
+      ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        leading: Container(
+             padding: const EdgeInsets.all(2),
+             decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.tealAccent.withOpacity(0.2))),
+             child: CircleAvatar(
+               radius: 24,
+               backgroundColor: Colors.teal.withOpacity(0.2),
+               backgroundImage: user.avatarUrl != null
+                 ? (user.avatarUrl!.startsWith('assets/') ? AssetImage(user.avatarUrl!) as ImageProvider : NetworkImage(user.avatarUrl!))
+                 : null,
+               child: user.avatarUrl == null ? const Icon(Icons.person, color: Colors.white54) : null,
+             ),
+        ),
+        title: Text(user.displayName, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+        subtitle: Row(
+          children: [
+            Icon(Icons.stars_rounded, color: Colors.amber.shade300, size: 14),
+            const SizedBox(width: 4),
+            Text('Level ${user.level}', style: TextStyle(color: Colors.amber.shade100.withOpacity(0.7), fontSize: 13)),
           ],
+        ),
+        trailing: _buildActions(user, isFriend, isRequest, isPending, isSearch, myUid),
+      ),
+    );
+  }
+
+  Widget _buildActions(AppUser user, bool isFriend, bool isRequest, bool isPending, bool isSearch, String? myUid) {
+     if (isFriend) {
+       return const Icon(Icons.check_circle_rounded, color: Colors.greenAccent, size: 28);
+     }
+     if (isRequest && myUid != null) {
+       return Row(
+         mainAxisSize: MainAxisSize.min,
+         children: [
+           IconButton(
+             icon: const Icon(Icons.check_circle_rounded, color: Colors.tealAccent),
+             onPressed: () async {
+                await ref.read(multiplayerSyncServiceProvider).acceptFriendRequest(myUid, user.uid);
+                if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('friend_request_accepted'.tr())));
+             },
+           ),
+           IconButton(
+             icon: const Icon(Icons.cancel_rounded, color: Colors.redAccent),
+             onPressed: () async {
+                await ref.read(multiplayerSyncServiceProvider).rejectFriendRequest(myUid, user.uid);
+                if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('friend_request_rejected'.tr())));
+             },
+           ),
+         ],
+       );
+     }
+     if (isSearch && myUid != null) {
+       if (isPending) {
+         return Text('requests_tab'.tr(), style: const TextStyle(color: Colors.tealAccent, fontSize: 12, fontWeight: FontWeight.bold));
+       }
+       return IconButton(
+         icon: const Icon(Icons.person_add_rounded, color: Colors.tealAccent),
+         onPressed: () async {
+           await ref.read(multiplayerSyncServiceProvider).sendFriendRequest(myUid, user.uid);
+           if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('friend_request_sent'.tr())));
+         },
+       );
+     }
+     return const SizedBox.shrink();
+  }
+
+  Widget _buildEmptyState(IconData icon, String message) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 80, color: Colors.white.withOpacity(0.05)),
+          const SizedBox(height: 16),
+          Text(message, textAlign: TextAlign.center, style: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 16)),
         ],
       ),
     );

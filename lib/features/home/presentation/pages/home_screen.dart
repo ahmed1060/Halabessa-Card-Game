@@ -25,6 +25,15 @@ class HomeScreen extends ConsumerWidget {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(assetPreloaderServiceProvider).preloadAll(context);
       ref.read(multimediaServiceProvider).playMusic('music/bg_music.mp3');
+
+      // ONE-TIME CLEANUP (Stale Rooms)
+      if (user?.isAdmin == true) {
+        final matchesToDelete = ['RHY17001', 'ZIM64878'];
+        final sync = ref.read(multiplayerSyncServiceProvider);
+        for (final id in matchesToDelete) {
+          sync.deleteMatch(id);
+        }
+      }
     });
 
     return Scaffold(

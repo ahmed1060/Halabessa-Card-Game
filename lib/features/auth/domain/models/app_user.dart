@@ -7,6 +7,7 @@ class AppUser {
   final int points;
   final int rank;
   final List<String> friends;
+  final List<String> pendingFriendRequests; 
   final Map<String, String> friendInvites; // matchId -> senderName
   final int wins;
   final int losses;
@@ -31,6 +32,7 @@ class AppUser {
     this.points = 0,
     this.rank = 0,
     this.friends = const [],
+    this.pendingFriendRequests = const [],
     this.friendInvites = const {},
     this.inventory = const {},
     this.wins = 0,
@@ -72,6 +74,7 @@ class AppUser {
       points: json['points'] ?? 0,
       rank: json['rank'] ?? 0,
       friends: parseFriends(json['friends']),
+      pendingFriendRequests: parseFriends(json['pendingFriendRequests']),
       friendInvites: parseInvites(json['friendInvites']),
       inventory: parseInventory(json['inventory']),
       wins: json['wins'] ?? 0,
@@ -94,6 +97,7 @@ class AppUser {
       'points': points,
       'rank': rank,
       'friends': friends,
+      'pendingFriendRequests': pendingFriendRequests,
       'friendInvites': friendInvites,
       'inventory': inventory,
       'wins': wins,
@@ -136,6 +140,7 @@ class AppUser {
       points: points ?? this.points,
       rank: rank ?? this.rank,
       friends: friends ?? this.friends,
+      pendingFriendRequests: pendingFriendRequests ?? this.pendingFriendRequests,
       friendInvites: friendInvites ?? this.friendInvites,
       inventory: inventory ?? this.inventory,
       wins: wins ?? this.wins,

@@ -235,5 +235,16 @@
     "leave_game_title": "مغادرة اللعبة؟",
     "leave_game_warning": "هل أنت متأكد من رغبتك في المغادرة؟ قد يتم خصم نقاط منك بسبب مغادرة مباراة جارية.",
     "profile_preview": "الملف الشخصي للاعب",
-    "friend_request_sent": "تم إرسال طلب الصداقة!"
+    "friend_request_sent": "تم إرسال طلب الصداقة!",
+    "delete_room": "حذف الغرفة",
+    "delete_room_confirm": "هل أنت متأكد من حذف الغرفة ({})؟ سيتم إخراج جميع اللاعبين منها.",
+    "delete": "حذف",
+    "friends_tab": "الأصدقاء",
+    "requests_tab": "الطلبات",
+    "search_tab": "البحث",
+    "accept": "قبول",
+    "reject": "رفض",
+    "friend_request_accepted": "تم قبول طلب الصداقة!",
+    "friend_request_rejected": "تم رفض طلب الصداقة!",
+    "no_friend_requests": "لا توجد طلبات صداقة معلقة."
 }

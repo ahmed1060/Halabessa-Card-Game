@@ -12,7 +12,7 @@ class PublicRoomsList extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final syncService = ref.watch(multiplayerSyncServiceProvider);
-    
+    final currentUser = ref.watch(currentUserProvider);
     return StreamBuilder<List<MatchState>>(
       stream: syncService.watchPublicMatches(),
       builder: (context, snapshot) {
@@ -67,28 +67,38 @@ class PublicRoomsList extends ConsumerWidget {
                       tooltip: 'spectate'.tr(),
                     ),
                     const SizedBox(width: 8),
-                    Consumer(
                       builder: (context, ref, child) {
                         final bool isFull = !match.playerIds.any((id) => id.startsWith('waiting_'));
-                        return ElevatedButton(
-                          onPressed: isFull ? null : () {
-                            final currentUser = ref.read(currentUserProvider);
-                            if (currentUser != null) {
-                              ref.read(matchStateProvider.notifier).joinMatch(
-                                match.id, 
-                                currentUser.uid, 
-                                currentUser.displayName
-                              );
-                              Navigator.pushNamed(context, '/game');
-                            }
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: isFull ? Colors.grey.withOpacity(0.3) : Colors.teal,
-                          ),
-                          child: Text(isFull ? 'full'.tr() : 'join'.tr()),
+                        return Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (currentUser?.isAdmin == true)
+                              IconButton(
+                                icon: const Icon(Icons.delete_forever, color: Colors.redAccent),
+                                onPressed: () => _confirmDelete(context, syncService, match.id),
+                                tooltip: 'delete_room'.tr(),
+                              ),
+                            if (currentUser?.isAdmin == true) const SizedBox(width: 8),
+                            ElevatedButton(
+                              onPressed: isFull ? null : () {
+                                final currentUser = ref.read(currentUserProvider);
+                                if (currentUser != null) {
+                                  ref.read(matchStateProvider.notifier).joinMatch(
+                                    match.id, 
+                                    currentUser.uid, 
+                                    currentUser.displayName
+                                  );
+                                  Navigator.pushNamed(context, '/game');
+                                }
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: isFull ? Colors.grey.withOpacity(0.3) : Colors.teal,
+                              ),
+                              child: Text(isFull ? 'full'.tr() : 'join'.tr()),
+                            ),
+                          ],
                         );
                       },
-                    ),
                   ],
                 ),
               ),
@@ -96,6 +106,31 @@ class PublicRoomsList extends ConsumerWidget {
           },
         );
       },
+    );
+  }
+
+  void _confirmDelete(BuildContext context, MultiplayerSyncService syncService, String matchId) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1B263B),
+        title: Text('delete_room'.tr(), style: const TextStyle(color: Colors.white)),
+        content: Text('delete_room_confirm'.tr(args: [matchId]), style: const TextStyle(color: Colors.white70)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('cancel'.tr(), style: const TextStyle(color: Colors.white60)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              syncService.deleteMatch(matchId);
+              Navigator.pop(context);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+            child: Text('delete'.tr()),
+          ),
+        ],
+      ),
     );
   }
 }

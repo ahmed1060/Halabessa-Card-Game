@@ -76,6 +76,12 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
   }
 
   void leaveMatch() {
+    if (lastBoundMatchId != null) {
+      final currentUser = ref.read(currentUserProvider);
+      if (currentUser != null) {
+        ref.read(multiplayerSyncServiceProvider).removePresence(lastBoundMatchId!, currentUser.uid);
+      }
+    }
     _matchListener?.cancel();
     _presenceListener?.cancel();
     _heartbeatTimer?.cancel();
@@ -141,6 +147,9 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
             debugPrint('ERROR in match listener callback: $e');
             debugPrint('Stack: $stack');
           }
+        } else if (lastBoundMatchId != null) {
+          debugPrint('LISTENER: Match $lastBoundMatchId was deleted. Leaving.');
+          leaveMatch();
         }
       },
       onError: (error) {
@@ -824,23 +833,25 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
         return;
       }
 
-        bool anyCardDealt = false;
-        for (var playerId in state!.playerIds) {
-          final playerHand = <game_card.Card>[];
-          for (int i = 0; i < 4; i++) {
-            final c = _secretDeck?.draw();
-            if (c == null) break;
-            playerHand.add(c);
-            anyCardDealt = true;
-          }
-          hands[playerId] = List.from(playerHand);
+      final hands = Map<String, List<game_card.Card>>.from(state!.handCards);
+      bool anyCardDealt = false;
+      
+      for (var playerId in state!.playerIds) {
+        final playerHand = List<game_card.Card>.from(hands[playerId] ?? []);
+        for (int i = 0; i < 4; i++) {
+          final c = _secretDeck?.draw();
+          if (c == null) break;
+          playerHand.add(c);
+          anyCardDealt = true;
         }
+        hands[playerId] = playerHand;
+      }
 
-        if (!anyCardDealt) {
-          debugPrint('CLEANUP: Failed to deal any cards, forcing round end.');
-          await _handleRoundEnd();
-          return;
-        }
+      if (!anyCardDealt) {
+        debugPrint('CLEANUP: Failed to deal any cards, forcing round end.');
+        await _handleRoundEnd();
+        return;
+      }
         
         // Update each player's hand in one go or incrementally
         await _publishState(state!.copyWith(

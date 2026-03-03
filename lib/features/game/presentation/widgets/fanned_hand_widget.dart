@@ -93,11 +93,11 @@ class _FannedHandWidgetState extends State<FannedHandWidget> {
         final bool isMobile = screenWidth < 500;
         
         // Configuration for the fan effect
-        final double cardWidth = isMobile ? 84.0 : 100.0;
-        final double cardHeight = isMobile ? 120.0 : 150.0;
+        final double cardWidth = isMobile ? 70.0 : 85.0;
+        final double cardHeight = isMobile ? 100.0 : 125.0;
         
         // Calculate dynamic spacing to ensure overlap
-        final double preferredSpacing = isMobile ? 22.0 : 30.0;
+        final double preferredSpacing = isMobile ? 18.0 : 25.0;
         final double fanWidth = (cardCount - 1) * preferredSpacing;
         
         // Arc configuration
@@ -173,7 +173,7 @@ class _FannedHandWidgetState extends State<FannedHandWidget> {
 
                 final bool isHovered = hoveredIndex == index;
                 final bool isPreSelected = preSelectedIndex == index;
-                final double elevationY = (isHovered || isPreSelected) ? -45.0 : 0.0;
+                final double elevationY = (isHovered || isPreSelected) ? -40.0 : 0.0;
                 final double scale = (isHovered || isPreSelected) ? 1.25 : 1.0;
 
                 return Positioned(

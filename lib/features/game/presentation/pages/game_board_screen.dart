@@ -367,7 +367,7 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
                 Align(
                   alignment: Alignment.topCenter,
                   child: Padding(
-                    padding: const EdgeInsets.only(top: 16.0),
+                    padding: const EdgeInsets.only(top: 8.0),
                     child: GestureDetector(
                       onTap: () => _showPlayerProfile(context, ref, matchState, myUid, 2),
                       child: PlayerAvatar(
@@ -431,9 +431,9 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
                     child: _buildFloatingMatchStatus(matchState),
                   ),
 
-                // Local Player (Bottom Center)
+                // Local Player (Bottom Center - shifted left)
                 Align(
-                  alignment: Alignment.bottomCenter,
+                  alignment: const Alignment(-0.4, 1.0),
                   child: _buildLocalPlayerArea(context, ref, matchState, myUid),
                 ),
 
@@ -861,7 +861,7 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
               scale = 0.5; // Shrink as it goes to the box
             }
           } else if (matchState.phase == GamePhase.dealingCards) {
-            targetX = (index - 1.5) * 70; 
+            targetX = (index - 1.5) * 58; 
             targetY = 0;
             rotation = 0;
           }
@@ -894,8 +894,8 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
                 final customOrigin = localOrigins[card.firebaseKey];
                 if (customOrigin != null) {
                   // Coordinate translation: Hand is shifted relative to avatar.
-                  startX = customOrigin.dx + 48; // Dynamic hand offset
-                  startY = customOrigin.dy + 280; // Distance to hand
+                  startX = customOrigin.dx + 40; // Dynamic hand offset
+                  startY = customOrigin.dy + 250; // Distance to hand
                 } else {
                   startX = 0; 
                   startY = 350; // Standard bottom fly-in

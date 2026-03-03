@@ -258,5 +258,16 @@
     "leave_game_title": "عايز تخرج؟",
     "leave_game_warning": "متأكد إنك عايز تخرج؟ لو خرجت دلوقتي ممكن يتخصم منك نقط عشان اللعب لسه شغال.",
     "profile_preview": "حساب اللاعب",
-    "friend_request_sent": "تم إرسال طلب الصداقة!"
+    "friend_request_sent": "تم إرسال طلب الصداقة!",
+    "delete_room": "حذف الغرفة",
+    "delete_room_confirm": "متأكد إنك عايز تحذف الغرفة ({})؟ كل اللعيبة هيطلعوا منها.",
+    "delete": "حذف",
+    "friends_tab": "الصحاب",
+    "requests_tab": "الطلبات",
+    "search_tab": "تدوير",
+    "accept": "قبول",
+    "reject": "رفض",
+    "friend_request_accepted": "قُبل طلب الصداقة!",
+    "friend_request_rejected": "رُفض طلب الصداقة!",
+    "no_friend_requests": "مفيش طلبات صداقة معلقة."
 }

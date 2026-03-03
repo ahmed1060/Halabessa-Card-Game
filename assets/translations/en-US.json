@@ -256,5 +256,16 @@
     "leave_game_title": "Leave Game?",
     "leave_game_warning": "Are you sure you want to leave the game? You might lose points for abandoning an active match.",
     "profile_preview": "Player Profile",
-    "friend_request_sent": "Friend request sent!"
+    "friend_request_sent": "Friend request sent!",
+    "delete_room": "Delete Room",
+    "delete_room_confirm": "Are you sure you want to delete room ({})? All players will be removed.",
+    "delete": "Delete",
+    "friends_tab": "Friends",
+    "requests_tab": "Requests",
+    "search_tab": "Search",
+    "accept": "Accept",
+    "reject": "Reject",
+    "friend_request_accepted": "Friend request accepted!",
+    "friend_request_rejected": "Friend request rejected!",
+    "no_friend_requests": "No pending friend requests."
 }

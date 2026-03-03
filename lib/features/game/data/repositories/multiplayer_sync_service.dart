@@ -1,4 +1,5 @@
 import 'package:firebase_database/firebase_database.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import '../../domain/models/match_state.dart';
 import '../../domain/models/chat_message.dart';
@@ -50,6 +51,11 @@ class MultiplayerSyncService {
     await presenceRef.set(true);
     // Set onDisconnect behavior
     await presenceRef.onDisconnect().remove();
+  }
+
+  /// Remove presence for a player manually
+  Future<void> removePresence(String matchId, String playerId) async {
+    await matchRef.child(matchId).child('presence').child(playerId).remove();
   }
 
   /// Watch presence changes for all players in a match
@@ -140,20 +146,95 @@ class MultiplayerSyncService {
     }).whereType<AppUser>().toList();
   }
 
-  /// Accept a friend request / Add a friend
+  /// Send a friend request
+  Future<void> sendFriendRequest(String fromUid, String toUid) async {
+    // 1. Update RTDB for immediate UI lookup if needed
+    final toUserRequestsRef = _db.ref('users').child(toUid).child('pendingFriendRequests');
+    final snap = await toUserRequestsRef.get();
+    final requests = List<String>.from((snap.value as List?) ?? []);
+    if (!requests.contains(fromUid)) {
+      requests.add(fromUid);
+      await toUserRequestsRef.set(requests);
+    }
+
+    // 2. Update Firestore (Source of Truth)
+    try {
+      final firestore = FirebaseFirestore.instance;
+      await firestore.collection('users').doc(toUid).update({
+        'pendingFriendRequests': FieldValue.arrayUnion([fromUid]),
+      });
+    } catch (e) {
+      debugPrint("Firestore Friend Request Update failed: $e");
+    }
+  }
+
+  /// Accept a friend request
+  Future<void> acceptFriendRequest(String myUid, String friendUid) async {
+    // 1. Remove from pending requests
+    final myRequestsRef = _db.ref('users').child(myUid).child('pendingFriendRequests');
+    final snap = await myRequestsRef.get();
+    final requests = List<String>.from((snap.value as List?) ?? [])..remove(friendUid);
+    await myRequestsRef.set(requests);
+
+    // 2. Add to both friends lists
+    await addFriend(myUid, friendUid);
+
+    // 3. Update Firestore
+    try {
+      final firestore = FirebaseFirestore.instance;
+      final batch = firestore.batch();
+      batch.update(firestore.collection('users').doc(myUid), {
+        'pendingFriendRequests': FieldValue.arrayRemove([friendUid]),
+        'friends': FieldValue.arrayUnion([friendUid]),
+      });
+      batch.update(firestore.collection('users').doc(friendUid), {
+        'friends': FieldValue.arrayUnion([myUid]),
+      });
+      await batch.commit();
+    } catch (e) {
+      debugPrint("Firestore Accept Friend failed: $e");
+    }
+  }
+
+  /// Reject a friend request
+  Future<void> rejectFriendRequest(String myUid, String friendUid) async {
+    // 1. RTDB
+    final myRequestsRef = _db.ref('users').child(myUid).child('pendingFriendRequests');
+    final snap = await myRequestsRef.get();
+    final requests = List<String>.from((snap.value as List?) ?? [])..remove(friendUid);
+    await myRequestsRef.set(requests);
+
+    // 2. Firestore
+    try {
+      final firestore = FirebaseFirestore.instance;
+      await firestore.collection('users').doc(myUid).update({
+        'pendingFriendRequests': FieldValue.arrayRemove([friendUid]),
+      });
+    } catch (e) {
+      debugPrint("Firestore Reject Friend failed: $e");
+    }
+  }
+
+  /// Accept a friend request / Add a friend (Internal helper for mutual add)
   Future<void> addFriend(String myUid, String friendUid) async {
     final myFriendsRef = _db.ref('users').child(myUid).child('friends');
     final friendFriendsRef = _db.ref('users').child(friendUid).child('friends');
     
     // Add to my list
     final mySnap = await myFriendsRef.get();
-    final myFriends = List<String>.from((mySnap.value as List?) ?? [])..add(friendUid);
-    await myFriendsRef.set(myFriends);
+    final myFriends = List<String>.from((mySnap.value as List?) ?? []);
+    if (!myFriends.contains(friendUid)) {
+      myFriends.add(friendUid);
+      await myFriendsRef.set(myFriends);
+    }
     
     // Add to friend's list (mutual)
     final friendSnap = await friendFriendsRef.get();
-    final friendFriends = List<String>.from((friendSnap.value as List?) ?? [])..add(myUid);
-    await friendFriendsRef.set(friendFriends);
+    final friendFriends = List<String>.from((friendSnap.value as List?) ?? []);
+    if (!friendFriends.contains(myUid)) {
+      friendFriends.add(myUid);
+      await friendFriendsRef.set(friendFriends);
+    }
   }
 
   /// CHAT: Send a message to the match chat
