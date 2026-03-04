@@ -107,7 +107,7 @@ class StoreScreen extends ConsumerWidget {
                 ? store.activeCardBackId == item.id 
                 : (type == ShopItemType.tableSkin ? store.activeTableSkinId == item.id : false);
 
-            return _buildStoreItem(context, item, isOwned, isActive, user, () async {
+            return _buildStoreItem(context, ref, item, isOwned, isActive, user, () async {
               try {
                 if (item.type == ShopItemType.consumable) {
                   await notifier.purchaseItem(item);
@@ -118,7 +118,7 @@ class StoreScreen extends ConsumerWidget {
                     );
                   }
                 } else if (isOwned) {
-                  notifier.setActiveSkin(item.id, type);
+                  notifier.setActiveSkin(item.id, item.type);
                 } else {
                   await notifier.purchaseItem(item);
                   if (context.mounted) {
@@ -128,7 +128,10 @@ class StoreScreen extends ConsumerWidget {
                     );
                   }
                 }
-              }, onDelete: () => notifier.deleteItem(item.id));
+              } catch (e) {
+                debugPrint('Purchase error: $e');
+              }
+            }, onDelete: () => notifier.deleteItem(item.id));
           },
           childCount: items.length,
         ),
@@ -136,7 +139,7 @@ class StoreScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildStoreItem(BuildContext context, ShopItem item, bool isOwned, bool isActive, AppUser? user, VoidCallback onTap, {required VoidCallback onDelete}) {
+  Widget _buildStoreItem(BuildContext context, WidgetRef ref, ShopItem item, bool isOwned, bool isActive, AppUser? user, VoidCallback onTap, {required VoidCallback onDelete}) {
     String statusText = item.price > 0 ? '${item.price} 🪙' : 'status_free'.tr();
     final isDiamonds = item.diamondPrice > 0;
     final priceStr = isDiamonds ? '${item.diamondPrice} 💎' : '${item.price} 🪙';

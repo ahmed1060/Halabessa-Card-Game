@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:math' as math;
-import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/theme_config.dart';
 import '../../domain/models/match_state.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
 
@@ -118,7 +118,7 @@ class _MatchSummaryDialogState extends ConsumerState<MatchSummaryDialog> with Si
                 isWinner ? 'VICTORY' : 'DEFEAT',
                 style: TextStyle(
                   fontSize: 32,
-                  fontWeight: FontWeight.black,
+                  fontWeight: FontWeight.w900,
                   color: isWinner ? Colors.amber : Colors.white70,
                   letterSpacing: 4,
                 ),

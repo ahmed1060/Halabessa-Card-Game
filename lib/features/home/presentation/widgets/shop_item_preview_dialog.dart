@@ -166,7 +166,7 @@ class _ShopItemPreviewDialogState extends State<ShopItemPreviewDialog> {
 
   Widget _buildFrontPreview() {
     // Show a King or Ace as the front preview
-    final previewCard = game_models.Card(suit: game_models.Suit.hearts, rank: game_models.Rank.king);
+    final previewCard = game_models.Card(game_models.Suit.hearts, game_models.Rank.king);
     return Center(
       child: CardWidget(
         card: previewCard,

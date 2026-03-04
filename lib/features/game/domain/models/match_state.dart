@@ -334,12 +334,14 @@ class MatchState {
         }).whereType<Capture>().toList();
       }
       return [];
+    }
+
     Map<String, int> parseIntMap(dynamic map) {
       if (map == null || map is! Map) return {};
       return map.map((k, v) => MapEntry(k.toString(), (v as num).toInt()));
     }
 
-    Map<dynamic, dynamic>? parseSkipMap(dynamic map) {
+    Map<String, List<String>> parseSkipMap(dynamic map) {
       if (map == null || map is! Map) return {};
       final result = <String, List<String>>{};
       map.forEach((key, value) {
