@@ -115,69 +115,66 @@ class _ShopItemPreviewDialogState extends State<ShopItemPreviewDialog> {
   }
 
   Widget _buildCardPreview() {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _buildPreviewCard(game_models.Suit.spades, game_models.Rank.ace, 'A'),
+          const SizedBox(width: 12),
+          _buildPreviewCard(game_models.Suit.hearts, game_models.Rank.king, 'K'),
+          const SizedBox(width: 12),
+          _buildBackPreview(),
+          const SizedBox(width: 12),
+          _buildPreviewCard(game_models.Suit.diamonds, game_models.Rank.queen, 'Q'),
+          const SizedBox(width: 12),
+          _buildPreviewCard(game_models.Suit.clubs, game_models.Rank.jack, 'J'),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPreviewCard(game_models.Suit suit, game_models.Rank rank, String label) {
     return Column(
       children: [
-        Text('tap_to_flip'.tr(), style: const TextStyle(color: Colors.white38, fontSize: 12)),
-        const SizedBox(height: 12),
-        GestureDetector(
-          onTap: () => setState(() => _isFlipped = !_isFlipped),
-          child: TweenAnimationBuilder(
-            duration: const Duration(milliseconds: 500),
-            curve: Curves.easeOutBack,
-            tween: Tween<double>(begin: 0, end: _isFlipped ? 180 : 0),
-            builder: (context, double value, child) {
-              return Transform(
-                transform: Matrix4.identity()
-                  ..setEntry(3, 2, 0.001)
-                  ..rotateY(value * 0.0174533),
-                alignment: Alignment.center,
-                child: value >= 90
-                    ? RotatedBox(
-                        quarterTurns: 2,
-                        child: _buildFrontPreview(),
-                      )
-                    : _buildBackPreview(),
-              );
-            },
-          ),
+        CardWidget(
+          card: game_models.Card(suit, rank),
+          width: 80,
+          height: 120,
+          isFaceUp: true,
+          customFrontPath: widget.item.frontSkinPath,
+          faceIllustrations: widget.item.faceIllustrations,
         ),
+        const SizedBox(height: 8),
+        Text(label, style: const TextStyle(color: Colors.white38, fontSize: 10, fontWeight: FontWeight.bold)),
       ],
     );
   }
 
   Widget _buildBackPreview() {
-    return Center(
-      child: Container(
-        width: 180,
-        height: 260,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [BoxShadow(color: Colors.black54, blurRadius: 20, spreadRadius: 5)],
+    return Column(
+      children: [
+        Container(
+          width: 80,
+          height: 120,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            boxShadow: [BoxShadow(color: Colors.black38, blurRadius: 10, offset: const Offset(0, 4))],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: widget.item.assetPath.startsWith('http')
+                ? Image.network(widget.item.assetPath, fit: BoxFit.cover)
+                : Image.asset(widget.item.assetPath, fit: BoxFit.cover),
+          ),
         ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(16),
-          child: widget.item.assetPath.startsWith('http')
-              ? Image.network(widget.item.assetPath, fit: BoxFit.cover)
-              : Image.asset(widget.item.assetPath, fit: BoxFit.cover),
-        ),
-      ),
+        const SizedBox(height: 8),
+        Text('Back'.tr(), style: const TextStyle(color: Colors.white38, fontSize: 10, fontWeight: FontWeight.bold)),
+      ],
     );
   }
 
-  Widget _buildFrontPreview() {
-    // Show a King or Ace as the front preview
-    final previewCard = game_models.Card(game_models.Suit.hearts, game_models.Rank.king);
-    return Center(
-      child: CardWidget(
-        card: previewCard,
-        width: 180,
-        height: 260,
-        isFaceUp: true,
-        customFrontPath: widget.item.frontSkinPath,
-        faceIllustrations: widget.item.faceIllustrations,
-      ),
-    );
-  }
 
   Widget _buildSuitShowcase() {
     final suits = widget.item.suitIcons!;
@@ -195,7 +192,9 @@ class _ShopItemPreviewDialogState extends State<ShopItemPreviewDialog> {
                 children: [
                   ClipRRect(
                     borderRadius: BorderRadius.circular(8),
-                    child: Image.network(e.value, width: 40, height: 40, fit: BoxFit.contain),
+                    child: e.value.startsWith('http')
+                      ? Image.network(e.value, width: 40, height: 40, fit: BoxFit.contain)
+                      : Image.asset(e.value, width: 40, height: 40, fit: BoxFit.contain),
                   ),
                   const SizedBox(height: 4),
                   Text(e.key.toUpperCase(), style: const TextStyle(color: Colors.white30, fontSize: 10)),

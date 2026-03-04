@@ -277,7 +277,9 @@ class _AdminAddItemDialogState extends State<AdminAddItemDialog> {
                     const SizedBox(width: 8),
                     ClipRRect(
                       borderRadius: BorderRadius.circular(8),
-                      child: Image.network(url, height: mini ? 24 : 44, width: mini ? 24 : 44, fit: BoxFit.cover),
+                      child: url.startsWith('http')
+                        ? Image.network(url, height: mini ? 24 : 44, width: mini ? 24 : 44, fit: BoxFit.cover)
+                        : Image.asset(url, height: mini ? 24 : 44, width: mini ? 24 : 44, fit: BoxFit.cover),
                     ),
                     if (!mini) ...[
                       const SizedBox(width: 12),
