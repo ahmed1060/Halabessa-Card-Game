@@ -154,7 +154,12 @@ class CardWidget extends ConsumerWidget {
     
     Widget suitWidget;
     if (customSuitIcons != null) {
-      final suitKey = card.suit.name;
+      String suitKey = card.suit.name;
+      // Handle "Trifle" naming convention for Clubs in some themes
+      if (card.suit == game_card.Suit.clubs && customSuitIcons.containsKey('trifle')) {
+        suitKey = 'trifle';
+      }
+      
       final suitPath = customSuitIcons[suitKey];
       if (suitPath != null) {
         suitWidget = suitPath.startsWith('http') 
@@ -190,11 +195,22 @@ class CardWidget extends ConsumerWidget {
                 child: SizedBox(
                   width: 40,
                   height: 40,
-                  child: customSuitIcons != null && customSuitIcons[card.suit.name] != null
-                    ? (customSuitIcons[card.suit.name]!.startsWith('http')
-                        ? Image.network(customSuitIcons[card.suit.name]!, color: color, fit: BoxFit.contain)
-                        : Image.asset(customSuitIcons[card.suit.name]!, color: color, fit: BoxFit.contain))
-                    : Icon(_getSuitIcon(), color: color, size: 40),
+                  child: Builder(
+                    builder: (context) {
+                      String suitKey = card.suit.name;
+                      if (card.suit == game_card.Suit.clubs && customSuitIcons?.containsKey('trifle') == true) {
+                        suitKey = 'trifle';
+                      }
+                      
+                      final suitPath = customSuitIcons?[suitKey];
+                      if (suitPath != null) {
+                        return suitPath.startsWith('http')
+                          ? Image.network(suitPath, color: color, fit: BoxFit.contain)
+                          : Image.asset(suitPath, color: color, fit: BoxFit.contain);
+                      }
+                      return Icon(_getSuitIcon(), color: color, size: 40);
+                    },
+                  ),
                 ),
               ),
             ),

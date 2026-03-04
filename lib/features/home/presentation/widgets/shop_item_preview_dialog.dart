@@ -64,22 +64,25 @@ class _ShopItemPreviewDialogState extends State<ShopItemPreviewDialog> {
             ),
 
             Expanded(
-              child: SingleChildScrollView(
-                child: Column(
-                  children: [
-                    // Main Preview (Card or Table)
-                    if (isSkin)
-                      _buildCardPreview()
-                    else if (item.type == ShopItemType.tableSkin)
-                      _buildTablePreview()
-                    else
-                      _buildGenericPreview(),
-
-                    const SizedBox(height: 30),
-
-                    // Suit Showcase (if applicable) - REMOVED AS PER USER REQUEST
-                    // if (isSkin && item.suitIcons != null) _buildSuitShowcase(),
-                  ],
+              child: Center(
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      // Main Preview (Card or Table)
+                      if (isSkin)
+                        _buildCardPreview()
+                      else if (item.type == ShopItemType.tableSkin)
+                        _buildTablePreview()
+                      else
+                        _buildGenericPreview(),
+  
+                      const SizedBox(height: 30),
+  
+                      // Suit Showcase (if applicable)
+                      if (isSkin && item.suitIcons != null) _buildSuitShowcase(),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -122,14 +125,14 @@ class _ShopItemPreviewDialogState extends State<ShopItemPreviewDialog> {
         mainAxisSize: MainAxisSize.min,
         children: [
           _buildFlippableCard(0, game_models.Suit.spades, game_models.Rank.ace),
-          const SizedBox(width: 12),
+          const SizedBox(width: 16),
           _buildFlippableCard(1, game_models.Suit.hearts, game_models.Rank.king),
-          const SizedBox(width: 12),
+          const SizedBox(width: 16),
           _buildFlippableCard(2, null, null, isMiddle: true),
-          const SizedBox(width: 12),
-          _buildFlippableCard(3, game_models.Suit.diamonds, game_models.Rank.queen),
-          const SizedBox(width: 12),
-          _buildFlippableCard(4, game_models.Suit.clubs, game_models.Rank.jack),
+          const SizedBox(width: 16),
+          _buildFlippableCard(3, game_models.Suit.clubs, game_models.Rank.queen),
+          const SizedBox(width: 16),
+          _buildFlippableCard(4, game_models.Suit.diamonds, game_models.Rank.jack),
         ],
       ),
     );
@@ -149,10 +152,12 @@ class _ShopItemPreviewDialogState extends State<ShopItemPreviewDialog> {
               ..setEntry(3, 2, 0.001)
               ..rotateY(value * 0.0174533),
             alignment: Alignment.center,
-            child: RotatedBox(
-              quarterTurns: isBackVisible ? 2 : 0,
-              child: _buildFaceOrBack(index, suit, rank, isMiddle, isBackVisible),
-            ),
+            child: isBackVisible 
+              ? Transform.scale(
+                  scaleX: -1, 
+                  child: _buildFaceOrBack(index, suit, rank, isMiddle, true),
+                )
+              : _buildFaceOrBack(index, suit, rank, isMiddle, false),
           );
         },
       ),
@@ -177,8 +182,8 @@ class _ShopItemPreviewDialogState extends State<ShopItemPreviewDialog> {
   Widget _buildPreviewCard(game_models.Suit suit, game_models.Rank rank) {
     return CardWidget(
       card: game_models.Card(suit, rank),
-      width: 80,
-      height: 120,
+      width: 100,
+      height: 150,
       isFaceUp: true,
       customFrontPath: widget.item.frontSkinPath,
       customAceSkinPath: widget.item.aceSkinPath,
@@ -189,14 +194,14 @@ class _ShopItemPreviewDialogState extends State<ShopItemPreviewDialog> {
 
   Widget _buildBackPreviewOnly() {
     return Container(
-      width: 80,
-      height: 120,
+      width: 100,
+      height: 150,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(8),
-        boxShadow: [BoxShadow(color: Colors.black38, blurRadius: 10, offset: const Offset(0, 4))],
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [BoxShadow(color: Colors.black38, blurRadius: 15, offset: const Offset(0, 6))],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(12),
         child: widget.item.assetPath.startsWith('http')
             ? Image.network(widget.item.assetPath, fit: BoxFit.cover)
             : Image.asset(widget.item.assetPath, fit: BoxFit.cover),
@@ -218,16 +223,19 @@ class _ShopItemPreviewDialogState extends State<ShopItemPreviewDialog> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: suits.entries.map((e) {
+              String label = e.key.toUpperCase();
+              String iconPath = e.value;
+              
               return Column(
                 children: [
                   ClipRRect(
                     borderRadius: BorderRadius.circular(8),
-                    child: e.value.startsWith('http')
-                      ? Image.network(e.value, width: 40, height: 40, fit: BoxFit.contain)
-                      : Image.asset(e.value, width: 40, height: 40, fit: BoxFit.contain),
+                    child: iconPath.startsWith('http')
+                      ? Image.network(iconPath, width: 40, height: 40, fit: BoxFit.contain)
+                      : Image.asset(iconPath, width: 40, height: 40, fit: BoxFit.contain),
                   ),
                   const SizedBox(height: 4),
-                  Text(e.key.toUpperCase(), style: const TextStyle(color: Colors.white30, fontSize: 10)),
+                  Text(label, style: const TextStyle(color: Colors.white30, fontSize: 10)),
                 ],
               );
             }).toList(),
