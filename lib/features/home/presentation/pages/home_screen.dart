@@ -38,6 +38,7 @@ class HomeScreen extends ConsumerWidget {
     });
 
     return Scaffold(
+      backgroundColor: const Color(0xFF0D1B2A),
       extendBodyBehindAppBar: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
@@ -70,8 +71,10 @@ class HomeScreen extends ConsumerWidget {
           const SizedBox(width: 8),
         ],
       ),
-      body: Container(
-        decoration: const BoxDecoration(
+      body: ConstrainedBox(
+        constraints: BoxConstraints(minHeight: MediaQuery.sizeOf(context).height),
+        child: Container(
+          decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
@@ -167,8 +170,9 @@ class HomeScreen extends ConsumerWidget {
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildMainButton(BuildContext context, {required String label, required IconData icon, required Color color, required VoidCallback onTap}) {
     return GestureDetector(

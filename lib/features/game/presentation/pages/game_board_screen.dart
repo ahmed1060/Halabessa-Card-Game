@@ -33,6 +33,7 @@ class GameBoardScreen extends ConsumerStatefulWidget {
 
 class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
   late ConfettiController _confettiController;
+  final GlobalKey _boardKey = GlobalKey();
 
   @override
   void initState() {
@@ -410,9 +411,9 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
               children: [
                 // Partner / Opposite Player (Offset 2 in Anticlockwise)
                 Align(
-                  alignment: const Alignment(0.0, -1.0),
+                  alignment: Alignment.topCenter,
                   child: Padding(
-                    padding: const EdgeInsets.only(top: -50.0), // Aggressively moved up
+                    padding: const EdgeInsets.only(top: 10.0), // Safe positive padding
                     child: GestureDetector(
                       onTap: () => _showPlayerProfile(context, ref, matchState, myUid, 2),
                       child: PlayerAvatar(
@@ -430,7 +431,7 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
 
                 // Left Player (Offset 3 in Anticlockwise)
                 Align(
-                  alignment: const Alignment(-0.95, -0.1),
+                  alignment: const Alignment(-0.9, -0.1), // Balanced alignment
                   child: GestureDetector(
                     onTap: () => _showPlayerProfile(context, ref, matchState, myUid, 3),
                     child: PlayerAvatar(
@@ -447,7 +448,7 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
 
                 // Right Player (Offset 1 in Anticlockwise)
                 Align(
-                  alignment: const Alignment(0.95, -0.1),
+                  alignment: const Alignment(0.9, -0.1), // Balanced alignment
                   child: GestureDetector(
                     onTap: () => _showPlayerProfile(context, ref, matchState, myUid, 1),
                     child: PlayerAvatar(
@@ -472,10 +473,9 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
                 ),
 
 
-                // Local Player (Bottom Center - shifted left)
-                Positioned(
-                  left: -20, // Negative offset to push it further left on smaller screens
-                  bottom: 10,
+                // Local Player (Bottom Left - more robust alignment)
+                Align(
+                  alignment: const Alignment(-0.85, 0.95),
                   child: _buildLocalPlayerArea(context, ref, matchState, myUid),
                 ),
 
@@ -832,16 +832,20 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
           matchState.playerIds.isNotEmpty && 
           matchState.currentTurnIndex == _getAbsoluteIndex(matchState, myUid, 0),
       onAcceptWithDetails: (details) {
-        final Offset localOffset = (context.findRenderObject() as RenderBox).globalToLocal(details.offset);
-        // Center of the DragTarget is at (100, 100) since width/height are 200
-        // We want the origin relative to the center
-        final Offset relativeOrigin = Offset(localOffset.dx - 100, localOffset.dy - 100);
+        final RenderBox? boardBox = _boardKey.currentContext?.findRenderObject() as RenderBox?;
+        Offset relativeOrigin = Offset.zero;
+        if (boardBox != null) {
+          final localOffset = boardBox.globalToLocal(details.offset);
+          // Calculate origin relative to board center (100, 100)
+          relativeOrigin = Offset(localOffset.dx - 100, localOffset.dy - 100);
+        }
         
         ref.read(matchStateProvider.notifier).playCard(myUid, details.data, origin: relativeOrigin);
         HapticFeedback.mediumImpact();
       },
       builder: (context, candidateData, rejectedData) {
         return SizedBox(
+          key: _boardKey,
           width: 200,
           height: 200,
           child: Stack(
@@ -999,25 +1003,15 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
                   onCardTap: (card, globalOrigin) {
                     HapticFeedback.lightImpact();
                     
-                    // Translate global origin to board-relative origin
-                    // The board center is where _buildBoardCenter is rendered.
-                    // We can find its render box or approximate if we know the layout.
-                    // Better: use the same logic as DragTarget if possible.
-                    
+                    final RenderBox? boardBox = _boardKey.currentContext?.findRenderObject() as RenderBox?;
                     Offset relativeOrigin = Offset.zero;
-                    final boardBox = context.findRenderObject() as RenderBox?;
+                    
                     if (boardBox != null && globalOrigin != Offset.zero) {
                       final localOffset = boardBox.globalToLocal(globalOrigin);
-                      // Board center is roughly at MediaQuery.of(context).size.width / 2, size.height / 2
-                      // But the _buildBoardCenter itself is 200x200.
-                      // Let's use a simpler approach: calculate relative to screen center
-                      final screenSize = MediaQuery.sizeOf(context);
-                      relativeOrigin = Offset(
-                        globalOrigin.dx - screenSize.width / 2,
-                        globalOrigin.dy - screenSize.height / 2,
-                      );
+                      // Board center is (100, 100)
+                      relativeOrigin = Offset(localOffset.dx - 100, localOffset.dy - 100);
                     }
-
+                    
                     ref.read(matchStateProvider.notifier).playCard(myUid, card, origin: relativeOrigin);
                   },
                 ),
