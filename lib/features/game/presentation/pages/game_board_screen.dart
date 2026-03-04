@@ -451,14 +451,15 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
                 _buildTeamHarvestPiles(matchState, 'teamB', isMyTeam: _getTeamOfPlayer(myUid, matchState.playerIds) == 'teamB'),
 
                 Align(
-                  alignment: const Alignment(0, -0.2), // Shifted up to clear space for the hand
+                  alignment: const Alignment(0, -0.45), // Raised even further to clear hand space on mobile (was -0.2)
                   child: _buildBoardCenter(context, ref, matchState, myUid),
                 ),
 
 
                 // Local Player (Bottom Center - shifted left)
-                Align(
-                  alignment: const Alignment(-1.5, 1.0), // Shifted further left as requested
+                Positioned(
+                  left: -20, // Negative offset to push it further left on smaller screens
+                  bottom: 10,
                   child: _buildLocalPlayerArea(context, ref, matchState, myUid),
                 ),
 
@@ -930,7 +931,7 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisAlignment: MainAxisAlignment.start, // Align to start (left) for better control with Positioned
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               // Avatar & Reactions

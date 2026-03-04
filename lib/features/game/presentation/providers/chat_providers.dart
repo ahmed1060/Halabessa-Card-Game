@@ -56,31 +56,72 @@ final chatStateProvider = StateNotifierProvider.autoDispose<ChatNotifier, ChatSt
   return ChatNotifier();
 });
 
-// Provider to get the latest message for a specific user to show in a bubble
-final lastMessageForUserProvider = Provider.family<ChatMessage?, String>((ref, userId) {
-  final messagesAsync = ref.watch(chatMessagesProvider);
-  return messagesAsync.when(
-    data: (messages) {
-      if (messages.isEmpty) return null;
-      // Filter for user and get most recent within a reasonable time window (e.g. 5 seconds)
-      try {
-        final userMessages = messages.where((m) => m.senderId == userId).toList();
-        if (userMessages.isEmpty) return null;
+// Map of userId -> latest ChatMessage that should be shown in a bubble
+class ChatBubblesState {
+  final Map<String, ChatMessage> bubbles;
+  ChatBubblesState({this.bubbles = const {}});
+
+  ChatBubblesState copyWith({Map<String, ChatMessage>? bubbles}) {
+    return ChatBubblesState(bubbles: bubbles ?? this.bubbles);
+  }
+}
+
+class ChatBubblesNotifier extends StateNotifier<ChatBubblesState> {
+  final Ref ref;
+  final Map<String, Timer> _timers = {};
+
+  ChatBubblesNotifier(this.ref) : super(ChatBubblesState()) {
+    // Listen to new messages and update bubbles
+    ref.listen<AsyncValue<List<ChatMessage>>>(chatMessagesProvider, (prev, next) {
+      next.whenData((messages) {
+        if (messages.isEmpty) return;
+        final latest = messages.last;
         
-        final latest = userMessages.last;
-        final now = DateTime.now();
-        // Allow a small buffer for server/client clock drift
-        if (now.difference(latest.timestamp).inSeconds.abs() < 5) {
-          return latest;
+        // Only show bubbles for messages sent in the last 2 seconds to avoid old messages popping up on load
+        if (DateTime.now().difference(latest.timestamp).inSeconds.abs() < 2) {
+          _updateBubble(latest);
         }
-      } catch (e) {
-        return null;
-      }
-      return null;
-    },
-    loading: () => null,
-    error: (_, __) => null,
-  );
+      });
+    });
+  }
+
+  void _updateBubble(ChatMessage message) {
+    final userId = message.senderId;
+    
+    // Cancel existing timer for this user
+    _timers[userId]?.cancel();
+    
+    // Update state
+    final newBubbles = Map<String, ChatMessage>.from(state.bubbles);
+    newBubbles[userId] = message;
+    state = state.copyWith(bubbles: newBubbles);
+    
+    // Set new timer to clear
+    _timers[userId] = Timer(const Duration(seconds: 5), () {
+      final updatedBubbles = Map<String, ChatMessage>.from(state.bubbles);
+      updatedBubbles.remove(userId);
+      state = state.copyWith(bubbles: updatedBubbles);
+      _timers.remove(userId);
+    });
+  }
+
+  @override
+  void dispose() {
+    for (var timer in _timers.values) {
+      timer.cancel();
+    }
+    super.dispose();
+  }
+}
+
+final chatBubblesProvider = StateNotifierProvider.autoDispose<ChatBubblesNotifier, ChatBubblesState>((ref) {
+  return ChatBubblesNotifier(ref);
+});
+
+// Deprecated: keeping for compatibility but redirects to chatBubblesProvider
+final lastMessageForUserProvider = Provider.family<ChatMessage?, String>((ref, userId) {
+  final bubbles = ref.watch(chatBubblesProvider).bubbles;
+  return bubbles[userId];
 });
 
 // Robust unread count based on lastSeenTimestamp and current user filtering

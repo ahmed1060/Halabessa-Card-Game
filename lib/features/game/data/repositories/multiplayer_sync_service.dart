@@ -161,21 +161,35 @@ class MultiplayerSyncService {
 
   /// Send a friend request
   Future<void> sendFriendRequest(String fromUid, String toUid) async {
-    // 1. Update RTDB for immediate UI lookup if needed
+    // 1. Update RTDB for receiver (Pending)
     final toUserRequestsRef = _db.ref('users').child(toUid).child('pendingFriendRequests');
-    final snap = await toUserRequestsRef.get();
-    final requests = List<String>.from((snap.value as List?) ?? []);
-    if (!requests.contains(fromUid)) {
-      requests.add(fromUid);
-      await toUserRequestsRef.set(requests);
+    final snapTo = await toUserRequestsRef.get();
+    final requestsTo = List<String>.from((snapTo.value as List?) ?? []);
+    if (!requestsTo.contains(fromUid)) {
+      requestsTo.add(fromUid);
+      await toUserRequestsRef.set(requestsTo);
     }
 
-    // 2. Update Firestore (Source of Truth)
+    // 2. Update RTDB for sender (Sent)
+    final fromUserSentRef = _db.ref('users').child(fromUid).child('sentFriendRequests');
+    final snapFrom = await fromUserSentRef.get();
+    final requestsFrom = List<String>.from((snapFrom.value as List?) ?? []);
+    if (!requestsFrom.contains(toUid)) {
+      requestsFrom.add(toUid);
+      await fromUserSentRef.set(requestsFrom);
+    }
+
+    // 3. Update Firestore (Source of Truth)
     try {
       final firestore = FirebaseFirestore.instance;
-      await firestore.collection('users').doc(toUid).update({
+      final batch = firestore.batch();
+      batch.update(firestore.collection('users').doc(toUid), {
         'pendingFriendRequests': FieldValue.arrayUnion([fromUid]),
       });
+      batch.update(firestore.collection('users').doc(fromUid), {
+        'sentFriendRequests': FieldValue.arrayUnion([toUid]),
+      });
+      await batch.commit();
     } catch (e) {
       debugPrint("Firestore Friend Request Update failed: $e");
     }
@@ -183,11 +197,16 @@ class MultiplayerSyncService {
 
   /// Accept a friend request
   Future<void> acceptFriendRequest(String myUid, String friendUid) async {
-    // 1. Remove from pending requests
+    // 1. RTDB: Remove from both pending (mine) and sent (theirs)
     final myRequestsRef = _db.ref('users').child(myUid).child('pendingFriendRequests');
-    final snap = await myRequestsRef.get();
-    final requests = List<String>.from((snap.value as List?) ?? [])..remove(friendUid);
-    await myRequestsRef.set(requests);
+    final snapMy = await myRequestsRef.get();
+    final requestsMy = List<String>.from((snapMy.value as List?) ?? [])..remove(friendUid);
+    await myRequestsRef.set(requestsMy);
+
+    final friendSentRef = _db.ref('users').child(friendUid).child('sentFriendRequests');
+    final snapFriend = await friendSentRef.get();
+    final requestsFriend = List<String>.from((snapFriend.value as List?) ?? [])..remove(myUid);
+    await friendSentRef.set(requestsFriend);
 
     // 2. Add to both friends lists
     await addFriend(myUid, friendUid);
@@ -201,6 +220,7 @@ class MultiplayerSyncService {
         'friends': FieldValue.arrayUnion([friendUid]),
       });
       batch.update(firestore.collection('users').doc(friendUid), {
+        'sentFriendRequests': FieldValue.arrayRemove([myUid]),
         'friends': FieldValue.arrayUnion([myUid]),
       });
       await batch.commit();
@@ -211,18 +231,28 @@ class MultiplayerSyncService {
 
   /// Reject a friend request
   Future<void> rejectFriendRequest(String myUid, String friendUid) async {
-    // 1. RTDB
+    // 1. RTDB: Remove from both lists
     final myRequestsRef = _db.ref('users').child(myUid).child('pendingFriendRequests');
-    final snap = await myRequestsRef.get();
-    final requests = List<String>.from((snap.value as List?) ?? [])..remove(friendUid);
-    await myRequestsRef.set(requests);
+    final snapMy = await myRequestsRef.get();
+    final requestsMy = List<String>.from((snapMy.value as List?) ?? [])..remove(friendUid);
+    await myRequestsRef.set(requestsMy);
+
+    final friendSentRef = _db.ref('users').child(friendUid).child('sentFriendRequests');
+    final snapFriend = await friendSentRef.get();
+    final requestsFriend = List<String>.from((snapFriend.value as List?) ?? [])..remove(myUid);
+    await friendSentRef.set(requestsFriend);
 
     // 2. Firestore
     try {
       final firestore = FirebaseFirestore.instance;
-      await firestore.collection('users').doc(myUid).update({
+      final batch = firestore.batch();
+      batch.update(firestore.collection('users').doc(myUid), {
         'pendingFriendRequests': FieldValue.arrayRemove([friendUid]),
       });
+      batch.update(firestore.collection('users').doc(friendUid), {
+        'sentFriendRequests': FieldValue.arrayRemove([myUid]),
+      });
+      await batch.commit();
     } catch (e) {
       debugPrint("Firestore Reject Friend failed: $e");
     }

@@ -8,6 +8,7 @@ class AppUser {
   final int rank;
   final List<String> friends;
   final List<String> pendingFriendRequests; 
+  final List<String> sentFriendRequests;
   final Map<String, String> friendInvites; // matchId -> senderName
   final int wins;
   final int losses;
@@ -33,6 +34,7 @@ class AppUser {
     this.rank = 0,
     this.friends = const [],
     this.pendingFriendRequests = const [],
+    this.sentFriendRequests = const [],
     this.friendInvites = const {},
     this.inventory = const {},
     this.wins = 0,
@@ -75,6 +77,7 @@ class AppUser {
       rank: json['rank'] ?? 0,
       friends: parseFriends(json['friends']),
       pendingFriendRequests: parseFriends(json['pendingFriendRequests']),
+      sentFriendRequests: parseFriends(json['sentFriendRequests']),
       friendInvites: parseInvites(json['friendInvites']),
       inventory: parseInventory(json['inventory']),
       wins: json['wins'] ?? 0,
@@ -98,6 +101,7 @@ class AppUser {
       'rank': rank,
       'friends': friends,
       'pendingFriendRequests': pendingFriendRequests,
+      'sentFriendRequests': sentFriendRequests,
       'friendInvites': friendInvites,
       'inventory': inventory,
       'wins': wins,
@@ -120,6 +124,8 @@ class AppUser {
     int? points,
     int? rank,
     List<String>? friends,
+    List<String>? pendingFriendRequests,
+    List<String>? sentFriendRequests,
     Map<String, String>? friendInvites,
     Map<String, int>? inventory,
     int? wins,
@@ -141,6 +147,7 @@ class AppUser {
       rank: rank ?? this.rank,
       friends: friends ?? this.friends,
       pendingFriendRequests: pendingFriendRequests ?? this.pendingFriendRequests,
+      sentFriendRequests: sentFriendRequests ?? this.sentFriendRequests,
       friendInvites: friendInvites ?? this.friendInvites,
       inventory: inventory ?? this.inventory,
       wins: wins ?? this.wins,

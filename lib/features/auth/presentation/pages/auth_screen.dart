@@ -7,6 +7,7 @@ import 'package:easy_localization/easy_localization.dart';
 import '../providers/auth_providers.dart';
 import '../../../../core/utils/error_handler.dart';
 import '../../../../core/theme/theme_config.dart';
+import '../../../../core/services/web_platform_service.dart';
 
 class AuthScreen extends ConsumerStatefulWidget {
   const AuthScreen({super.key});
@@ -36,6 +37,9 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with TickerProviderStat
       vsync: this,
       duration: const Duration(seconds: 3),
     )..repeat(reverse: true);
+
+    // Set up immersive mode trigger for mobile browsers
+    WebPlatformService.setupOneTimeFullscreenTrigger();
 
     _particleController = AnimationController(
       vsync: this,

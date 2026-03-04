@@ -16,6 +16,7 @@ class _SocialOverlayState extends ConsumerState<SocialOverlay> {
   final TextEditingController _searchController = TextEditingController();
   List<AppUser> _searchResults = [];
   bool _isSearching = false;
+  final Set<String> _actionLoadingUserIds = {}; // Tracks loading for Add/Accept/Reject
 
   void _performSearch(String query) async {
     if (query.isEmpty) {
@@ -48,10 +49,12 @@ class _SocialOverlayState extends ConsumerState<SocialOverlay> {
     final currentUser = ref.watch(currentUserProvider);
     if (currentUser == null) return const SizedBox.shrink();
 
-    return DefaultTabController(
-      length: 3,
-      child: Container(
-        height: MediaQuery.of(context).size.height * 0.75,
+    return DraggableScrollableSheet(
+      initialChildSize: 0.75,
+      minChildSize: 0.5,
+      maxChildSize: 0.95,
+      expand: false,
+      builder: (context, scrollController) => Container(
         decoration: BoxDecoration(
           color: Colors.black.withOpacity(0.95),
           borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
@@ -129,9 +132,9 @@ class _SocialOverlayState extends ConsumerState<SocialOverlay> {
             Expanded(
               child: TabBarView(
                 children: [
-                  _buildFriendsTab(currentUser),
-                  _buildRequestsTab(currentUser),
-                  _buildSearchTab(currentUser),
+                  _buildFriendsTab(currentUser, scrollController),
+                  _buildRequestsTab(currentUser, scrollController),
+                  _buildSearchTab(currentUser, scrollController),
                 ],
               ),
             ),
@@ -141,12 +144,13 @@ class _SocialOverlayState extends ConsumerState<SocialOverlay> {
     );
   }
 
-  Widget _buildFriendsTab(AppUser currentUser) {
+  Widget _buildFriendsTab(AppUser currentUser, ScrollController scrollController) {
     if (currentUser.friends.isEmpty && currentUser.friendInvites.isEmpty) {
       return _buildEmptyState(Icons.person_outline, 'no_friends_yet'.tr());
     }
 
     return ListView(
+      controller: scrollController,
       padding: const EdgeInsets.all(16),
       children: [
         // Game Invitations Section
@@ -201,12 +205,13 @@ class _SocialOverlayState extends ConsumerState<SocialOverlay> {
     );
   }
 
-  Widget _buildRequestsTab(AppUser currentUser) {
+  Widget _buildRequestsTab(AppUser currentUser, ScrollController scrollController) {
     if (currentUser.pendingFriendRequests.isEmpty) {
         return _buildEmptyState(Icons.mail_outline_rounded, 'no_friend_requests'.tr());
     }
 
     return ListView.builder(
+      controller: scrollController,
       padding: const EdgeInsets.all(16),
       itemCount: currentUser.pendingFriendRequests.length,
       itemBuilder: (context, index) {
@@ -223,7 +228,7 @@ class _SocialOverlayState extends ConsumerState<SocialOverlay> {
     );
   }
 
-  Widget _buildSearchTab(AppUser currentUser) {
+  Widget _buildSearchTab(AppUser currentUser, ScrollController scrollController) {
     return Column(
       children: [
         Padding(
@@ -250,6 +255,7 @@ class _SocialOverlayState extends ConsumerState<SocialOverlay> {
         else
           Expanded(
             child: ListView.builder(
+              controller: scrollController,
               padding: const EdgeInsets.symmetric(horizontal: 16),
               itemCount: _searchResults.length,
               itemBuilder: (context, index) {
@@ -257,11 +263,10 @@ class _SocialOverlayState extends ConsumerState<SocialOverlay> {
                 if (user.uid == currentUser.uid) return const SizedBox.shrink();
                 
                 final isFriend = currentUser.friends.contains(user.uid);
-                // Note: isPending (outgoing) isn't strictly tracked yet, 
-                // but we can at least avoid showing "Add Friend" for incoming pending too.
                 final isIncoming = currentUser.pendingFriendRequests.contains(user.uid);
+                final isOutgoing = currentUser.sentFriendRequests.contains(user.uid);
                 
-                return _buildUserTile(user, isFriend: isFriend, isPending: isIncoming, isSearch: true, myUid: currentUser.uid);
+                return _buildUserTile(user, isFriend: isFriend, isPending: isIncoming || isOutgoing, isSearch: true, myUid: currentUser.uid);
               },
             ),
           ),
@@ -305,6 +310,14 @@ class _SocialOverlayState extends ConsumerState<SocialOverlay> {
   }
 
   Widget _buildActions(AppUser user, bool isFriend, bool isRequest, bool isPending, bool isSearch, String? myUid) {
+     if (_actionLoadingUserIds.contains(user.uid)) {
+       return const SizedBox(
+         width: 24,
+         height: 24,
+         child: CircularProgressIndicator(strokeWidth: 2, color: Colors.tealAccent),
+       );
+     }
+
      if (isFriend) {
        return const Icon(Icons.check_circle_rounded, color: Colors.greenAccent, size: 28);
      }
@@ -315,15 +328,25 @@ class _SocialOverlayState extends ConsumerState<SocialOverlay> {
            IconButton(
              icon: const Icon(Icons.check_circle_rounded, color: Colors.tealAccent),
              onPressed: () async {
-                await ref.read(multiplayerSyncServiceProvider).acceptFriendRequest(myUid, user.uid);
-                if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('friend_request_accepted'.tr())));
+                setState(() => _actionLoadingUserIds.add(user.uid));
+                try {
+                  await ref.read(multiplayerSyncServiceProvider).acceptFriendRequest(myUid, user.uid);
+                  if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('friend_request_accepted'.tr())));
+                } finally {
+                  if (mounted) setState(() => _actionLoadingUserIds.remove(user.uid));
+                }
              },
            ),
            IconButton(
              icon: const Icon(Icons.cancel_rounded, color: Colors.redAccent),
              onPressed: () async {
-                await ref.read(multiplayerSyncServiceProvider).rejectFriendRequest(myUid, user.uid);
-                if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('friend_request_rejected'.tr())));
+                setState(() => _actionLoadingUserIds.add(user.uid));
+                try {
+                  await ref.read(multiplayerSyncServiceProvider).rejectFriendRequest(myUid, user.uid);
+                  if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('friend_request_rejected'.tr())));
+                } finally {
+                  if (mounted) setState(() => _actionLoadingUserIds.remove(user.uid));
+                }
              },
            ),
          ],
@@ -336,8 +359,13 @@ class _SocialOverlayState extends ConsumerState<SocialOverlay> {
        return IconButton(
          icon: const Icon(Icons.person_add_rounded, color: Colors.tealAccent),
          onPressed: () async {
-           await ref.read(multiplayerSyncServiceProvider).sendFriendRequest(myUid, user.uid);
-           if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('friend_request_sent'.tr())));
+           setState(() => _actionLoadingUserIds.add(user.uid));
+           try {
+             await ref.read(multiplayerSyncServiceProvider).sendFriendRequest(myUid, user.uid);
+             if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('friend_request_sent'.tr())));
+           } finally {
+             if (mounted) setState(() => _actionLoadingUserIds.remove(user.uid));
+           }
          },
        );
      }
