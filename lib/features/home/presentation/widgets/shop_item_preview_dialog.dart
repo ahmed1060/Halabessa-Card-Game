@@ -189,6 +189,7 @@ class _ShopItemPreviewDialogState extends State<ShopItemPreviewDialog> {
       customAceSkinPath: widget.item.aceSkinPath,
       customSevenDiamondSkinPath: widget.item.sevenDiamondSkinPath,
       faceIllustrations: widget.item.faceIllustrations,
+      customSuitIcons: widget.item.suitIcons,
     );
   }
 

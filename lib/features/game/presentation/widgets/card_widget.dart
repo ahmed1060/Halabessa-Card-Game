@@ -16,6 +16,7 @@ class CardWidget extends ConsumerWidget {
   final String? customAceSkinPath;
   final String? customSevenDiamondSkinPath;
   final Map<String, String>? faceIllustrations;
+  final Map<String, String>? customSuitIcons;
 
   const CardWidget({
     super.key,
@@ -29,6 +30,7 @@ class CardWidget extends ConsumerWidget {
     this.customAceSkinPath,
     this.customSevenDiamondSkinPath,
     this.faceIllustrations,
+    this.customSuitIcons,
   });
 
   @override
@@ -52,7 +54,7 @@ class CardWidget extends ConsumerWidget {
     final effectiveFrontPath = customFrontPath ?? frontPath;
 
     final effectiveIllustrations = faceIllustrations ?? activeCard.faceIllustrations;
-    final effectiveSuitIcons = activeCard.suitIcons;
+    final effectiveSuitIcons = customSuitIcons ?? activeCard.suitIcons;
 
     if (!isFaceUp) {
       return GestureDetector(
@@ -163,8 +165,8 @@ class CardWidget extends ConsumerWidget {
       final suitPath = customSuitIcons[suitKey];
       if (suitPath != null) {
         suitWidget = suitPath.startsWith('http') 
-          ? Image.network(suitPath, color: color, width: 12, height: 12) 
-          : Image.asset(suitPath, color: color, width: 12, height: 12);
+          ? Image.network(suitPath, width: 12, height: 12) 
+          : Image.asset(suitPath, width: 12, height: 12);
       } else {
         suitWidget = Icon(_getSuitIcon(), color: color, size: 12);
       }
@@ -205,8 +207,8 @@ class CardWidget extends ConsumerWidget {
                       final suitPath = customSuitIcons?[suitKey];
                       if (suitPath != null) {
                         return suitPath.startsWith('http')
-                          ? Image.network(suitPath, color: color, fit: BoxFit.contain)
-                          : Image.asset(suitPath, color: color, fit: BoxFit.contain);
+                          ? Image.network(suitPath, fit: BoxFit.contain)
+                          : Image.asset(suitPath, fit: BoxFit.contain);
                       }
                       return Icon(_getSuitIcon(), color: color, size: 40);
                     },
