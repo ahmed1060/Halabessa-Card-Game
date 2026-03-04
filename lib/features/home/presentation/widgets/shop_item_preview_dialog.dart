@@ -23,7 +23,7 @@ class ShopItemPreviewDialog extends StatefulWidget {
 }
 
 class _ShopItemPreviewDialogState extends State<ShopItemPreviewDialog> {
-  bool _isFlipped = false;
+  final List<bool> _flipStates = [false, false, false, false, false]; // Ace, King, Back, Queen, Jack
 
   @override
   Widget build(BuildContext context) {
@@ -77,8 +77,8 @@ class _ShopItemPreviewDialogState extends State<ShopItemPreviewDialog> {
 
                     const SizedBox(height: 30),
 
-                    // Suit Showcase (if applicable)
-                    if (isSkin && item.suitIcons != null) _buildSuitShowcase(),
+                    // Suit Showcase (if applicable) - REMOVED AS PER USER REQUEST
+                    // if (isSkin && item.suitIcons != null) _buildSuitShowcase(),
                   ],
                 ),
               ),
@@ -102,7 +102,7 @@ class _ShopItemPreviewDialogState extends State<ShopItemPreviewDialog> {
                     widget.onAction();
                   },
                   child: Text(
-                    widget.isOwned ? 'status_active'.tr() : (item.diamondPrice > 0 ? 'Buy for'.tr() + ' ${item.diamondPrice} 💎' : 'Buy for'.tr() + ' ${item.price} ⭐'),
+                    widget.isOwned ? 'status_active'.tr() : (item.diamondPrice > 0 ? 'buy_for'.tr() + ' ${item.diamondPrice} 💎' : 'buy_for'.tr() + ' ${item.price} ⭐'),
                     style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                   ),
                 ),
@@ -117,93 +117,93 @@ class _ShopItemPreviewDialogState extends State<ShopItemPreviewDialog> {
   Widget _buildCardPreview() {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _buildPreviewCard(game_models.Suit.spades, game_models.Rank.ace, 'A'),
+          _buildFlippableCard(0, game_models.Suit.spades, game_models.Rank.ace),
           const SizedBox(width: 12),
-          _buildPreviewCard(game_models.Suit.hearts, game_models.Rank.king, 'K'),
+          _buildFlippableCard(1, game_models.Suit.hearts, game_models.Rank.king),
           const SizedBox(width: 12),
-          
-          // Flipping Middle Card (Back -> 7 Diamonds)
-          GestureDetector(
-            onTap: () => setState(() => _isFlipped = !_isFlipped),
-            child: TweenAnimationBuilder(
-              duration: const Duration(milliseconds: 500),
-              curve: Curves.easeOutBack,
-              tween: Tween<double>(begin: 0, end: _isFlipped ? 180 : 0),
-              builder: (context, double value, child) {
-                return Transform(
-                  transform: Matrix4.identity()
-                    ..setEntry(3, 2, 0.001)
-                    ..rotateY(value * 0.0174533),
-                  alignment: Alignment.center,
-                  child: value >= 90
-                      ? RotatedBox(
-                          quarterTurns: 2,
-                          child: _buildPreviewCard(
-                            game_models.Suit.diamonds, 
-                            game_models.Rank.seven, 
-                            '7-Diamond',
-                          ),
-                        )
-                      : _buildBackPreview(),
-                );
-              },
-            ),
-          ),
-          
+          _buildFlippableCard(2, null, null, isMiddle: true),
           const SizedBox(width: 12),
-          _buildPreviewCard(game_models.Suit.diamonds, game_models.Rank.queen, 'Q'),
+          _buildFlippableCard(3, game_models.Suit.diamonds, game_models.Rank.queen),
           const SizedBox(width: 12),
-          _buildPreviewCard(game_models.Suit.clubs, game_models.Rank.jack, 'J'),
+          _buildFlippableCard(4, game_models.Suit.clubs, game_models.Rank.jack),
         ],
       ),
     );
   }
 
-  Widget _buildPreviewCard(game_models.Suit suit, game_models.Rank rank, String label) {
-    return Column(
-      children: [
-        CardWidget(
-          card: game_models.Card(suit, rank),
-          width: 80,
-          height: 120,
-          isFaceUp: true,
-          customFrontPath: widget.item.frontSkinPath,
-          customAceSkinPath: widget.item.aceSkinPath,
-          customSevenDiamondSkinPath: widget.item.sevenDiamondSkinPath,
-          faceIllustrations: widget.item.faceIllustrations,
-        ),
-        const SizedBox(height: 8),
-        Text(label, style: const TextStyle(color: Colors.white38, fontSize: 10, fontWeight: FontWeight.bold)),
-      ],
+  Widget _buildFlippableCard(int index, game_models.Suit? suit, game_models.Rank? rank, {bool isMiddle = false}) {
+    return GestureDetector(
+      onTap: () => setState(() => _flipStates[index] = !_flipStates[index]),
+      child: TweenAnimationBuilder(
+        duration: const Duration(milliseconds: 500),
+        curve: Curves.easeOutBack,
+        tween: Tween<double>(begin: 0, end: _flipStates[index] ? 180 : 0),
+        builder: (context, double value, child) {
+          final isBackVisible = value >= 90;
+          return Transform(
+            transform: Matrix4.identity()
+              ..setEntry(3, 2, 0.001)
+              ..rotateY(value * 0.0174533),
+            alignment: Alignment.center,
+            child: RotatedBox(
+              quarterTurns: isBackVisible ? 2 : 0,
+              child: _buildFaceOrBack(index, suit, rank, isMiddle, isBackVisible),
+            ),
+          );
+        },
+      ),
     );
   }
 
-  Widget _buildBackPreview() {
-    return Column(
-      children: [
-        Container(
-          width: 80,
-          height: 120,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
-            boxShadow: [BoxShadow(color: Colors.black38, blurRadius: 10, offset: const Offset(0, 4))],
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: widget.item.assetPath.startsWith('http')
-                ? Image.network(widget.item.assetPath, fit: BoxFit.cover)
-                : Image.asset(widget.item.assetPath, fit: BoxFit.cover),
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text('Back'.tr(), style: const TextStyle(color: Colors.white38, fontSize: 10, fontWeight: FontWeight.bold)),
-      ],
+  Widget _buildFaceOrBack(int index, game_models.Suit? suit, game_models.Rank? rank, bool isMiddle, bool isBackVisible) {
+    // Determine what to show on each side
+    if (isMiddle) {
+      // Middle Card: Back -> 7 Diamonds
+      return isBackVisible 
+        ? _buildPreviewCard(game_models.Suit.diamonds, game_models.Rank.seven) 
+        : _buildBackPreviewOnly();
+    } else {
+      // Side Cards: Front -> Back
+      return isBackVisible 
+        ? _buildBackPreviewOnly()
+        : _buildPreviewCard(suit!, rank!);
+    }
+  }
+
+  Widget _buildPreviewCard(game_models.Suit suit, game_models.Rank rank) {
+    return CardWidget(
+      card: game_models.Card(suit, rank),
+      width: 80,
+      height: 120,
+      isFaceUp: true,
+      customFrontPath: widget.item.frontSkinPath,
+      customAceSkinPath: widget.item.aceSkinPath,
+      customSevenDiamondSkinPath: widget.item.sevenDiamondSkinPath,
+      faceIllustrations: widget.item.faceIllustrations,
     );
   }
+
+  Widget _buildBackPreviewOnly() {
+    return Container(
+      width: 80,
+      height: 120,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(8),
+        boxShadow: [BoxShadow(color: Colors.black38, blurRadius: 10, offset: const Offset(0, 4))],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: widget.item.assetPath.startsWith('http')
+            ? Image.network(widget.item.assetPath, fit: BoxFit.cover)
+            : Image.asset(widget.item.assetPath, fit: BoxFit.cover),
+      ),
+    );
+  }
+
 
 
   Widget _buildSuitShowcase() {
