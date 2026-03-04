@@ -25,6 +25,7 @@ class _AdminAddItemDialogState extends State<AdminAddItemDialog> {
   
   String? _mainAssetUrl;
   String? _frontSkinUrl;
+  String? _kingIllustUrl;
   String? _queenIllustUrl;
   String? _jackIllustUrl;
   String? _aceSkinUrl;
@@ -209,13 +210,13 @@ class _AdminAddItemDialogState extends State<AdminAddItemDialog> {
 
             final item = ShopItem(
               id: id,
-              name: name,
+              name: _nameController.text.trim(),
               assetPath: _mainAssetUrl!,
               frontSkinPath: _frontSkinUrl,
               faceIllustrations: faceIllusts,
               type: widget.type,
-              price: price,
-              diamondPrice: diamondPrice,
+              price: int.tryParse(_starPriceController.text) ?? 0,
+              diamondPrice: int.tryParse(_diamondPriceController.text) ?? 0,
               aceSkinPath: _aceSkinUrl,
               sevenDiamondSkinPath: _sevenDiamondSkinUrl,
               suitIcons: _suitIcons.isEmpty ? null : _suitIcons,
