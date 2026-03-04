@@ -95,9 +95,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                               color: Colors.redAccent,
                               borderRadius: BorderRadius.circular(8),
                             ),
-                            child: const Text(
+                            child: Text(
                               'admin_badge'.tr(),
-                              style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                              style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
                             ),
                           ),
                       ],

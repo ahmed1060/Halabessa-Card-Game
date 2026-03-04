@@ -155,7 +155,7 @@ class _AdminAddItemDialogState extends State<AdminAddItemDialog> {
                 const SizedBox(height: 12),
                 _buildUploadSection('7-Diamond Skin (Opt)', _sevenDiamondSkinUrl, () => _pickAndUpload('seven')),
                 const SizedBox(height: 20),
-                child: Text('suit_icons'.tr(), style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)),
+                Text('suit_icons'.tr(), style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
                 Row(
                   children: [
