@@ -100,7 +100,7 @@ class _AdminAddItemDialogState extends State<AdminAddItemDialog> {
       debugPrint("Upload failed: $e");
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Upload failed: $e'))
+          SnackBar(content: Text('upload_failed'.tr(args: [e.toString()])))
         );
       }
       setState(() => _isUploading = false);
@@ -115,7 +115,7 @@ class _AdminAddItemDialogState extends State<AdminAddItemDialog> {
       backgroundColor: ThemeConfig.darkBg,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       title: Text(
-        widget.initialItem != null ? 'Edit Item' : 'add_new_title'.tr(args: [widget.type.name]), 
+        widget.initialItem != null ? 'edit_item'.tr() : 'add_new_title'.tr(args: [widget.type.name]), 
         style: const TextStyle(color: Colors.white, fontFamily: ThemeConfig.fontHeading, fontSize: 18)
       ),
       content: SizedBox(
@@ -132,14 +132,14 @@ class _AdminAddItemDialogState extends State<AdminAddItemDialog> {
               const SizedBox(height: 12),
               Row(
                 children: [
-                  Expanded(child: _buildTextField(_starPriceController, 'Coins 🪙', Icons.monetization_on, keyboardType: TextInputType.number)),
+                  Expanded(child: _buildTextField(_starPriceController, 'coins'.tr(), Icons.monetization_on, keyboardType: TextInputType.number)),
                   const SizedBox(width: 12),
-                  Expanded(child: _buildTextField(_diamondPriceController, 'Diamonds 💎', Icons.diamond, keyboardType: TextInputType.number)),
+                  Expanded(child: _buildTextField(_diamondPriceController, 'diamonds'.tr(), Icons.diamond, keyboardType: TextInputType.number)),
                 ],
               ),
               const SizedBox(height: 20),
               
-              _buildUploadSection('Main Asset', _mainAssetUrl, () => _pickAndUpload('main')),
+              _buildUploadSection('display_name_label'.tr(), _mainAssetUrl, () => _pickAndUpload('main')),
               
               if (isSkin) ...[
                 const SizedBox(height: 12),
@@ -155,7 +155,7 @@ class _AdminAddItemDialogState extends State<AdminAddItemDialog> {
                 const SizedBox(height: 12),
                 _buildUploadSection('7-Diamond Skin (Opt)', _sevenDiamondSkinUrl, () => _pickAndUpload('seven')),
                 const SizedBox(height: 20),
-                const Text('Suit Icons', style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)),
+                child: Text('suit_icons'.tr(), style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
                 Row(
                   children: [
@@ -224,7 +224,7 @@ class _AdminAddItemDialogState extends State<AdminAddItemDialog> {
 
             Navigator.pop(context, item);
           },
-          child: Text(widget.initialItem != null ? 'Update' : 'add'.tr()),
+          child: Text(widget.initialItem != null ? 'update_item'.tr() : 'add'.tr()),
         ),
       ],
     );
@@ -281,7 +281,7 @@ class _AdminAddItemDialogState extends State<AdminAddItemDialog> {
                     ),
                     if (!mini) ...[
                       const SizedBox(width: 12),
-                      const Expanded(child: Text('Image Uploaded', style: TextStyle(color: Colors.white70, fontSize: 12))),
+                      Expanded(child: Text('image_uploaded'.tr(), style: const TextStyle(color: Colors.white70, fontSize: 12))),
                       const Icon(Icons.check_circle, color: ThemeConfig.primaryTeal, size: 20),
                       const SizedBox(width: 12),
                     ] else
@@ -293,7 +293,7 @@ class _AdminAddItemDialogState extends State<AdminAddItemDialog> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(Icons.add_photo_alternate_outlined, color: Colors.white.withOpacity(0.3), size: mini ? 18 : 24),
-                      if (!mini) Text('Pick Image', style: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 10)),
+                      if (!mini) Text('pick_image'.tr(), style: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 10)),
                     ],
                   ),
                 ),

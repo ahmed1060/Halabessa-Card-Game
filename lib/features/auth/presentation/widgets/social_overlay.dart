@@ -309,7 +309,7 @@ class _SocialOverlayState extends ConsumerState<SocialOverlay> {
           children: [
             Icon(Icons.stars_rounded, color: Colors.amber.shade300, size: 14),
             const SizedBox(width: 4),
-            Text('Level ${user.level}', style: TextStyle(color: Colors.amber.shade100.withOpacity(0.7), fontSize: 13)),
+            Text('level_label'.tr(args: [user.level.toString()]), style: TextStyle(color: Colors.amber.shade100.withOpacity(0.7), fontSize: 13)),
           ],
         ),
         trailing: _buildActions(user, isFriend, isRequest, isPending, isSearch, myUid),

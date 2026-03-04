@@ -239,7 +239,19 @@ class StoreNotifier extends StateNotifier<StoreState> {
       name: 'skin_premium'.tr(), 
       assetPath: 'assets/images/cards/premium/card_back_premium.png', 
       frontSkinPath: 'assets/images/cards/premium/card_front_premium_bg.png', 
-      faceIllustrations: {'king': 'assets/images/cards/premium/card_face_premium.png'},
+      faceIllustrations: {
+        'king': 'assets/images/cards/premium/card_face_premium.png',
+        'queen': 'assets/images/cards/premium/card_face_premium_queen.png',
+        'jack': 'assets/images/cards/premium/card_face_premium_jack.png',
+      },
+      aceSkinPath: 'assets/images/cards/premium/card_ace_premium.png',
+      sevenDiamondSkinPath: 'assets/images/cards/premium/card_seven_premium.png',
+      suitIcons: {
+        'hearts': 'assets/images/cards/premium/suit_hearts.png',
+        'diamonds': 'assets/images/cards/premium/suit_diamonds.png',
+        'trifle': 'assets/images/cards/premium/suit_trifle.png',
+        'spades': 'assets/images/cards/premium/suit_spades.png',
+      },
       type: ShopItemType.cardBack,
       price: 0,
     ),
@@ -248,7 +260,19 @@ class StoreNotifier extends StateNotifier<StoreState> {
       name: 'skin_neon'.tr(), 
       assetPath: 'assets/images/cards/neon/card_back_neon.png', 
       frontSkinPath: 'assets/images/cards/neon/card_front_neon_bg.png', 
-      faceIllustrations: {'king': 'assets/images/cards/neon/card_face_neon.png'},
+      faceIllustrations: {
+        'king': 'assets/images/cards/neon/card_face_neon.png',
+        'queen': 'assets/images/cards/neon/card_face_neon_queen.png',
+        'jack': 'assets/images/cards/neon/card_face_neon_jack.png',
+      },
+      aceSkinPath: 'assets/images/cards/neon/card_ace_neon.png',
+      sevenDiamondSkinPath: 'assets/images/cards/neon/card_seven_neon.png',
+      suitIcons: {
+        'hearts': 'assets/images/cards/neon/suit_hearts.png',
+        'diamonds': 'assets/images/cards/neon/suit_diamonds.png',
+        'trifle': 'assets/images/cards/neon/suit_trifle.png',
+        'spades': 'assets/images/cards/neon/suit_spades.png',
+      },
       type: ShopItemType.cardBack,
       price: 0,
     ),
@@ -260,7 +284,14 @@ class StoreNotifier extends StateNotifier<StoreState> {
       faceIllustrations: {
         'king': 'assets/images/cards/royal/card_face_royal.png',
         'queen': 'assets/images/cards/royal/card_face_royal_queen.png',
-        'jack': 'assets/images/cards/royal/card_face_royal.png', // Fallback to king for now
+        'jack': 'assets/images/cards/royal/card_face_royal.png', // Fallback
+      },
+      sevenDiamondSkinPath: 'assets/images/cards/royal/card_seven_royal.png',
+      suitIcons: {
+        'hearts': 'assets/images/cards/royal/suit_hearts.png',
+        'diamonds': 'assets/images/cards/royal/suit_diamonds.png',
+        'trifle': 'assets/images/cards/royal/suit_trifle.png',
+        'spades': 'assets/images/cards/royal/suit_spades.png',
       },
       type: ShopItemType.cardBack,
       price: 0,
@@ -268,6 +299,11 @@ class StoreNotifier extends StateNotifier<StoreState> {
     
     ShopItem(id: 'default_table', name: 'skin_casino'.tr(), assetPath: 'assets/images/tables/table_skin_emerald.png', type: ShopItemType.tableSkin, price: 0),
     ShopItem(id: 'galaxy_table', name: 'skin_galaxy'.tr(), assetPath: 'assets/images/tables/table_skin_galaxy.png', type: ShopItemType.tableSkin, price: 0),
+    ShopItem(id: 'midnight_table', name: 'skin_midnight_cyber'.tr(), assetPath: 'assets/images/tables/table_skin_midnight_cyber.png', type: ShopItemType.tableSkin, price: 500),
+    ShopItem(id: 'royal_velvet_table', name: 'skin_royal_velvet'.tr(), assetPath: 'assets/images/tables/table_skin_royal_velvet.png', type: ShopItemType.tableSkin, price: 1500, diamondPrice: 50),
+    ShopItem(id: 'golden_oasis_table', name: 'skin_golden_oasis'.tr(), assetPath: 'assets/images/tables/table_skin_golden_oasis.png', type: ShopItemType.tableSkin, price: 1000, diamondPrice: 20),
+    ShopItem(id: 'oceanic_depths_table', name: 'skin_oceanic_depths'.tr(), assetPath: 'assets/images/tables/table_skin_oceanic_depths.png', type: ShopItemType.tableSkin, price: 1200, diamondPrice: 25),
+    ShopItem(id: 'ancient_marble_table', name: 'skin_ancient_marble'.tr(), assetPath: 'assets/images/tables/table_skin_ancient_marble.png', type: ShopItemType.tableSkin, price: 2000, diamondPrice: 60),
     
     ShopItem(
       id: 'name_change_ticket', 

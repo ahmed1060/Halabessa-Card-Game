@@ -115,7 +115,7 @@ class _MatchSummaryDialogState extends ConsumerState<MatchSummaryDialog> with Si
             children: [
               // Result Title
               Text(
-                isWinner ? 'VICTORY' : 'DEFEAT',
+                isWinner ? 'victory'.tr().toUpperCase() : 'defeat'.tr().toUpperCase(),
                 style: TextStyle(
                   fontSize: 32,
                   fontWeight: FontWeight.w900,
@@ -125,7 +125,7 @@ class _MatchSummaryDialogState extends ConsumerState<MatchSummaryDialog> with Si
               ),
               const SizedBox(height: 8),
               Text(
-                isWinner ? 'Great play!' : 'Better luck next time',
+                isWinner ? 'great_play'.tr() : 'better_luck'.tr(),
                 style: TextStyle(color: Colors.white60, fontSize: 14),
               ),
               const SizedBox(height: 32),
@@ -135,14 +135,14 @@ class _MatchSummaryDialogState extends ConsumerState<MatchSummaryDialog> with Si
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
                   _RewardItem(
-                    label: 'STARS',
+                    label: 'stars_label'.tr(),
                     value: _starsDisplay,
                     icon: Icons.star_rounded,
                     color: Colors.amber,
                     isPositive: earnedStars >= 0,
                   ),
                   _RewardItem(
-                    label: 'COINS',
+                    label: 'coins_label'.tr(),
                     value: _coinsDisplay,
                     icon: Icons.monetization_on_rounded,
                     color: Colors.orange,
@@ -161,7 +161,7 @@ class _MatchSummaryDialogState extends ConsumerState<MatchSummaryDialog> with Si
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        'Level ${currentUser.level}',
+                        'level_label'.tr(args: [currentUser.level.toString()]),
                         style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                       ),
                       Text(
@@ -215,7 +215,7 @@ class _MatchSummaryDialogState extends ConsumerState<MatchSummaryDialog> with Si
                 width: double.infinity,
                 child: ElevatorButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('CONTINUE'),
+                  child: Text('continue'.tr()),
                 ),
               ),
             ],

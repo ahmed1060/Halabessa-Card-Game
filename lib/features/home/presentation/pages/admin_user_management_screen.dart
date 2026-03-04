@@ -71,12 +71,12 @@ class AdminUserManagementScreen extends ConsumerWidget {
                 margin: const EdgeInsets.only(left: 8),
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(color: ThemeConfig.goldAccent, borderRadius: BorderRadius.circular(4)),
-                child: const Text('ADMIN', style: TextStyle(color: Colors.black, fontSize: 8, fontWeight: FontWeight.bold)),
+                child: Text('admin_badge'.tr(), style: const TextStyle(color: Colors.black, fontSize: 8, fontWeight: FontWeight.bold)),
               ),
           ],
         ),
         subtitle: Text(
-          '${user.points} Stars • Rank ${user.rank}', 
+          '${user.points} ${'stars'.tr()} • ${'rank_label'.tr(args: [user.rank.toString()])}', 
           style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 11),
         ),
         trailing: PopupMenuButton<String>(
@@ -127,7 +127,7 @@ class AdminUserManagementScreen extends ConsumerWidget {
           keyboardType: TextInputType.number,
           style: const TextStyle(color: Colors.white),
           decoration: InputDecoration(
-            labelText: 'Stars',
+            labelText: 'stars'.tr(),
             labelStyle: TextStyle(color: Colors.white.withOpacity(0.5)),
             enabledBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Colors.white24)),
           ),

@@ -275,7 +275,7 @@ class _CreateRoomOverlayState extends ConsumerState<CreateRoomOverlay> {
       debugPrint('Match init error: $e');
       if (mounted) {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error initializing match: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('error_initializing_match'.tr(args: [e.toString()]))));
       }
     }
   }

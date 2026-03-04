@@ -102,7 +102,7 @@ class _ShopItemPreviewDialogState extends State<ShopItemPreviewDialog> {
                     widget.onAction();
                   },
                   child: Text(
-                    widget.isOwned ? 'Equip Now' : (item.diamondPrice > 0 ? 'Buy for ${item.diamondPrice} 💎' : 'Buy for ${item.price} ⭐'),
+                    widget.isOwned ? 'status_active'.tr() : (item.diamondPrice > 0 ? 'Buy for'.tr() + ' ${item.diamondPrice} 💎' : 'Buy for'.tr() + ' ${item.price} ⭐'),
                     style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                   ),
                 ),
@@ -117,7 +117,7 @@ class _ShopItemPreviewDialogState extends State<ShopItemPreviewDialog> {
   Widget _buildCardPreview() {
     return Column(
       children: [
-        const Text('Tap to Flip', style: TextStyle(color: Colors.white38, fontSize: 12)),
+        Text('tap_to_flip'.tr(), style: const TextStyle(color: Colors.white38, fontSize: 12)),
         const SizedBox(height: 12),
         GestureDetector(
           onTap: () => setState(() => _isFlipped = !_isFlipped),
@@ -186,7 +186,7 @@ class _ShopItemPreviewDialogState extends State<ShopItemPreviewDialog> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Custom Suit Set', style: TextStyle(color: ThemeConfig.goldAccent, fontWeight: FontWeight.bold)),
+          Text('custom_suit_set'.tr(), style: const TextStyle(color: ThemeConfig.goldAccent, fontWeight: FontWeight.bold)),
           const SizedBox(height: 16),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,

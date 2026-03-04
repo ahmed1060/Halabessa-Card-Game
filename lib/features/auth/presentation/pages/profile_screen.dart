@@ -96,7 +96,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: const Text(
-                              'ADMIN',
+                              'admin_badge'.tr(),
                               style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
                             ),
                           ),
@@ -123,7 +123,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         border: Border.all(color: ThemeConfig.goldAccent.withOpacity(0.3)),
                       ),
                       child: Text(
-                        user.isAdmin ? 'ADMIN' : 'level'.tr(args: [level.toString()]),
+                        user.isAdmin ? 'admin_badge'.tr() : 'level_label'.tr(args: [level.toString()]),
                         style: const TextStyle(color: ThemeConfig.goldAccent, fontWeight: FontWeight.bold),
                       ),
                     ),
@@ -155,13 +155,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 children: [
                    Expanded(child: _buildStatCard(context, 'stars'.tr(), user.isAdmin ? '∞' : user.points.toString(), Icons.stars, ThemeConfig.goldAccent)),
                    const SizedBox(width: 16),
-                   Expanded(child: _buildStatCard(context, 'Coins', user.isAdmin ? '∞' : user.coins.toString(), Icons.monetization_on, Colors.orange)),
+                   Expanded(child: _buildStatCard(context, 'coins'.tr(), user.isAdmin ? '∞' : user.coins.toString(), Icons.monetization_on, Colors.orange)),
                 ],
               ),
               const SizedBox(height: 16),
               Row(
                 children: [
-                   Expanded(child: _buildStatCard(context, 'Diamonds', user.isAdmin ? '∞' : user.diamonds.toString(), Icons.diamond, ThemeConfig.primaryTeal)),
+                   Expanded(child: _buildStatCard(context, 'diamonds'.tr(), user.isAdmin ? '∞' : user.diamonds.toString(), Icons.diamond, ThemeConfig.primaryTeal)),
                 ],
               ),
               const SizedBox(height: 40),
