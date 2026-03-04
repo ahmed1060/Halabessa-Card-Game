@@ -90,6 +90,15 @@ class PlayerProfilePreview extends ConsumerWidget {
                       fontFamily: ThemeConfig.fontHeading,
                     ),
                   ),
+                  if (displayUser.username != null)
+                    Text(
+                      '@${displayUser.username}',
+                      style: TextStyle(
+                        color: ThemeConfig.primaryTeal.withOpacity(0.9),
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
                   Text(
                     isMe ? 'you'.tr() : (displayUser.isAdmin ? 'Admin' : 'Player'),
                     style: TextStyle(color: ThemeConfig.primaryTeal.withOpacity(0.7), fontSize: 12),

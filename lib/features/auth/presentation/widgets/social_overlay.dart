@@ -237,7 +237,7 @@ class _SocialOverlayState extends ConsumerState<SocialOverlay> {
             controller: _searchController,
             style: const TextStyle(color: Colors.white),
             decoration: InputDecoration(
-              hintText: 'search_users'.tr(),
+              hintText: 'search_users_hint'.tr(), // Example: "Search by @username"
               hintStyle: const TextStyle(color: Colors.white38),
               prefixIcon: const Icon(Icons.search_rounded, color: Colors.tealAccent),
               filled: true,
@@ -296,7 +296,15 @@ class _SocialOverlayState extends ConsumerState<SocialOverlay> {
                child: user.avatarUrl == null ? const Icon(Icons.person, color: Colors.white54) : null,
              ),
         ),
-        title: Text(user.displayName, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+        title: Row(
+          children: [
+            Text(user.displayName, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+            if (user.username != null) ...[
+              const SizedBox(width: 8),
+              Text('@${user.username}', style: const TextStyle(color: Colors.tealAccent, fontSize: 13, fontWeight: FontWeight.w400)),
+            ],
+          ],
+        ),
         subtitle: Row(
           children: [
             Icon(Icons.stars_rounded, color: Colors.amber.shade300, size: 14),

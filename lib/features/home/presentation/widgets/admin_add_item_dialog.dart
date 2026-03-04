@@ -25,7 +25,8 @@ class _AdminAddItemDialogState extends State<AdminAddItemDialog> {
   
   String? _mainAssetUrl;
   String? _frontSkinUrl;
-  String? _kingIllustUrl;
+  String? _queenIllustUrl;
+  String? _jackIllustUrl;
   String? _aceSkinUrl;
   String? _sevenDiamondSkinUrl;
   
@@ -46,6 +47,8 @@ class _AdminAddItemDialogState extends State<AdminAddItemDialog> {
       _mainAssetUrl = item.assetPath;
       _frontSkinUrl = item.frontSkinPath;
       _kingIllustUrl = item.faceIllustrations?['king'];
+      _queenIllustUrl = item.faceIllustrations?['queen'];
+      _jackIllustUrl = item.faceIllustrations?['jack'];
       _aceSkinUrl = item.aceSkinPath;
       _sevenDiamondSkinUrl = item.sevenDiamondSkinPath;
       _suitIcons = Map.from(item.suitIcons ?? {});
@@ -79,6 +82,10 @@ class _AdminAddItemDialogState extends State<AdminAddItemDialog> {
           _frontSkinUrl = downloadUrl;
         } else if (fieldType == 'king') {
           _kingIllustUrl = downloadUrl;
+        } else if (fieldType == 'queen') {
+          _queenIllustUrl = downloadUrl;
+        } else if (fieldType == 'jack') {
+          _jackIllustUrl = downloadUrl;
         } else if (fieldType == 'ace') {
           _aceSkinUrl = downloadUrl;
         } else if (fieldType == 'seven') {
@@ -116,7 +123,9 @@ class _AdminAddItemDialogState extends State<AdminAddItemDialog> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _buildTextField(_idController, 'item_id_label'.tr(), Icons.fingerprint, enabled: widget.initialItem == null),
+              if (widget.initialItem != null)
+                _buildTextField(_idController, 'item_id_label'.tr(), Icons.fingerprint, enabled: false),
+              if (widget.initialItem != null) const SizedBox(height: 12),
               const SizedBox(height: 12),
               _buildTextField(_nameController, 'display_name_label'.tr(), Icons.title),
               const SizedBox(height: 12),
@@ -136,6 +145,10 @@ class _AdminAddItemDialogState extends State<AdminAddItemDialog> {
                 _buildUploadSection('Front Skin (Opt)', _frontSkinUrl, () => _pickAndUpload('front')),
                 const SizedBox(height: 12),
                 _buildUploadSection('King Illust (Opt)', _kingIllustUrl, () => _pickAndUpload('king')),
+                const SizedBox(height: 12),
+                _buildUploadSection('Queen Illust (Opt)', _queenIllustUrl, () => _pickAndUpload('queen')),
+                const SizedBox(height: 12),
+                _buildUploadSection('Jack Illust (Opt)', _jackIllustUrl, () => _pickAndUpload('jack')),
                 const SizedBox(height: 12),
                 _buildUploadSection('Ace Skin (Opt)', _aceSkinUrl, () => _pickAndUpload('ace')),
                 const SizedBox(height: 12),
@@ -181,16 +194,17 @@ class _AdminAddItemDialogState extends State<AdminAddItemDialog> {
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
           onPressed: _isUploading || _mainAssetUrl == null ? null : () {
-            final id = _idController.text.trim();
-            final name = _nameController.text.trim();
-            final price = int.tryParse(_starPriceController.text) ?? 0;
-            final diamondPrice = int.tryParse(_diamondPriceController.text) ?? 0;
-
-            if (id.isEmpty || name.isEmpty) return;
-
             Map<String, String>? faceIllusts;
-            if (_kingIllustUrl != null) {
-              faceIllusts = {'king': _kingIllustUrl!};
+            if (_kingIllustUrl != null || _queenIllustUrl != null || _jackIllustUrl != null) {
+              faceIllusts = {};
+              if (_kingIllustUrl != null) faceIllusts['king'] = _kingIllustUrl!;
+              if (_queenIllustUrl != null) faceIllusts['queen'] = _queenIllustUrl!;
+              if (_jackIllustUrl != null) faceIllusts['jack'] = _jackIllustUrl!;
+            }
+
+            String id = widget.initialItem?.id ?? _idController.text.trim();
+            if (id.isEmpty) {
+              id = 'item_${DateTime.now().millisecondsSinceEpoch}';
             }
 
             final item = ShopItem(

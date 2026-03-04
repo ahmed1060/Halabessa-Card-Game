@@ -26,10 +26,11 @@ class FirebaseAuthRepository implements AuthRepository {
           // Only update basic profile info, preserving scores/stats
         await docRef.update({
           'displayName': user.displayName,
+          'username': user.username,
           'email': user.email,
           'avatarUrl': user.avatarUrl,
           'inventory': user.inventory,
-          'searchName': user.displayName.toLowerCase(),
+          'searchName': (user.username ?? user.displayName).toLowerCase(),
           // 'isAdmin' is preserved in Firestore
         });
       }
@@ -39,10 +40,11 @@ class FirebaseAuthRepository implements AuthRepository {
       final rtdbRef = FirebaseDatabase.instance.ref('users').child(user.uid);
       await rtdbRef.update({
         'displayName': user.displayName,
+        'username': user.username,
         'email': user.email,
         'avatarUrl': user.avatarUrl,
         'inventory': user.inventory,
-        'searchName': user.displayName.toLowerCase(),
+        'searchName': (user.username ?? user.displayName).toLowerCase(),
         // 'isAdmin' is preserved
       });
     } catch (e) {
@@ -313,7 +315,7 @@ class FirebaseAuthRepository implements AuthRepository {
   }
 
   @override
-  Future<void> updateProfile({String? displayName, String? avatarUrl}) async {
+  Future<void> updateProfile({String? displayName, String? username, String? avatarUrl}) async {
     final user = _firebaseAuth.currentUser;
     if (user != null) {
       if (displayName != null) await user.updateDisplayName(displayName);
@@ -329,9 +331,41 @@ class FirebaseAuthRepository implements AuthRepository {
         final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
         if (doc.exists && doc.data() != null) {
           final fullUser = AppUser.fromJson(doc.data()!, user.uid);
+          
+          String? finalUsername = username ?? fullUser.username;
+          Map<String, int> finalInventory = Map.from(fullUser.inventory);
+
+          // Logic for changing username
+          if (username != null && username != fullUser.username) {
+            // 1. Check uniqueness (double check)
+            if (!await isUsernameAvailable(username)) {
+              throw Exception('Username already taken');
+            }
+
+            // 2. Consume ticket if not admin
+            if (!fullUser.isAdmin) {
+              final ticketCount = fullUser.inventory['name_change_ticket'] ?? 0;
+              if (ticketCount <= 0) {
+                throw Exception('You need a Name Change Ticket to change your username');
+              }
+              finalInventory['name_change_ticket'] = ticketCount - 1;
+            }
+
+            // 3. Update usernames collection (swap)
+            final batch = FirebaseFirestore.instance.batch();
+            if (fullUser.username != null) {
+              batch.delete(FirebaseFirestore.instance.collection('usernames').doc(fullUser.username!.toLowerCase()));
+            }
+            batch.set(FirebaseFirestore.instance.collection('usernames').doc(username.toLowerCase()), {'uid': user.uid});
+            await batch.commit();
+          }
+
           final mergedUser = fullUser.copyWith(
             displayName: displayName ?? fullUser.displayName,
             avatarUrl: avatarUrl ?? fullUser.avatarUrl,
+            username: finalUsername,
+            inventory: finalInventory,
+            searchName: (finalUsername ?? displayName ?? fullUser.displayName).toLowerCase(),
           );
           await _syncUserToDatabase(mergedUser);
         } else {
@@ -339,5 +373,14 @@ class FirebaseAuthRepository implements AuthRepository {
         }
       }
     }
+  }
+
+  @override
+  Future<bool> isUsernameAvailable(String username) async {
+    final doc = await FirebaseFirestore.instance
+        .collection('usernames')
+        .doc(username.toLowerCase())
+        .get();
+    return !doc.exists;
   }
 }

@@ -3,6 +3,7 @@ class AppUser {
   final String email;
   final bool isEmailVerified;
   final String displayName;
+  final String? username; // Unique identifier (e.g., @ahmed)
   final String? avatarUrl;
   final int points;
   final int diamonds;
@@ -52,6 +53,7 @@ class AppUser {
     this.isAdmin = false,
     this.ownedSkins = const [],
     this.searchName = '',
+    this.username,
   });
 
   factory AppUser.fromJson(Map<String, dynamic> json, String uid) {
@@ -96,7 +98,8 @@ class AppUser {
       achievements: parseFriends(json['achievements']),
       isAdmin: (json['isAdmin'] ?? false) || json['email'] == 'ahmed.hossam1060@gmail.com',
       ownedSkins: parseFriends(json['owned_skins']),
-      searchName: json['searchName'] ?? (json['displayName'] ?? '').toString().toLowerCase(),
+      username: json['username'],
+      searchName: json['searchName'] ?? (json['username'] ?? json['displayName'] ?? '').toString().toLowerCase(),
     );
   }
 
@@ -122,7 +125,8 @@ class AppUser {
       'achievements': achievements,
       'isAdmin': isAdmin,
       'owned_skins': ownedSkins,
-      'searchName': searchName.isEmpty ? displayName.toLowerCase() : searchName,
+      'username': username,
+      'searchName': searchName.isEmpty ? (username ?? displayName).toLowerCase() : searchName,
     };
   }
 
@@ -149,6 +153,7 @@ class AppUser {
     bool? isAdmin,
     List<String>? ownedSkins,
     String? searchName,
+    String? username,
   }) {
     return AppUser(
       uid: uid ?? this.uid,
@@ -173,6 +178,7 @@ class AppUser {
       isAdmin: isAdmin ?? this.isAdmin,
       ownedSkins: ownedSkins ?? this.ownedSkins,
       searchName: searchName ?? this.searchName,
+      username: username ?? this.username,
     );
   }
 }

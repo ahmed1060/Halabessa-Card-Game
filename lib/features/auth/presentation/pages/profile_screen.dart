@@ -102,6 +102,18 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           ),
                       ],
                     ),
+                    if (user.username != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(
+                          '@${user.username}',
+                          style: TextStyle(
+                            color: ThemeConfig.primaryTeal.withOpacity(0.9),
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
                     const SizedBox(height: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -180,20 +192,28 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 onTap: () => _showChangePasswordDialog(context),
               ),
               ListTile(
-                leading: const Icon(Icons.edit, color: ThemeConfig.goldAccent),
-                title: Text('update_profile_btn'.tr()),
+                leading: const Icon(Icons.edit, color: Colors.blueAccent),
+                title: Text('edit_display_name'.tr()),
+                subtitle: Text('free_anytime'.tr(), style: const TextStyle(color: Colors.white24, fontSize: 11)),
+                onTap: () => _handleDisplayNameChange(context, user),
+              ),
+              ListTile(
+                leading: const Icon(Icons.alternate_email, color: ThemeConfig.goldAccent),
+                title: Text('change_username_btn'.tr()),
                 subtitle: Text(
-                  (user.inventory['name_change_ticket'] ?? 0) > 0 
-                    ? 'use_ticket_btn'.tr() 
-                    : 'no_tickets_message'.tr(),
+                  user.isAdmin 
+                    ? 'free_for_admin'.tr()
+                    : ((user.inventory['name_change_ticket'] ?? 0) > 0 
+                      ? 'use_ticket_btn'.tr() 
+                      : 'no_tickets_message'.tr()),
                   style: TextStyle(
-                    color: (user.inventory['name_change_ticket'] ?? 0) > 0 
+                    color: (user.isAdmin || (user.inventory['name_change_ticket'] ?? 0) > 0) 
                       ? ThemeConfig.goldAccent 
                       : Colors.white30,
                     fontSize: 12,
                   ),
                 ),
-                onTap: () => _handleNameChange(context, user),
+                onTap: () => _handleUsernameChange(context, user),
               ),
               ListTile(
                 leading: const Icon(Icons.logout, color: Colors.redAccent),
@@ -274,40 +294,16 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 
-  Future<void> _handleNameChange(BuildContext context, AppUser user) async {
-    final hasTicket = (user.inventory['name_change_ticket'] ?? 0) > 0;
-    
-    if (!hasTicket) {
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          backgroundColor: ThemeConfig.darkBg,
-          title: Text('name_change_ticket'.tr(), style: const TextStyle(color: Colors.white)),
-          content: Text('no_tickets_message'.tr(), style: const TextStyle(color: Colors.white70)),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: Text('cancel'.tr())),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                Navigator.pushNamed(context, '/store');
-              },
-              child: Text('buy_ticket_btn'.tr()),
-            ),
-          ],
-        ),
-      );
-      return;
-    }
-
+  Future<void> _handleDisplayNameChange(BuildContext context, AppUser user) async {
     final nameController = TextEditingController(text: user.displayName);
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: ThemeConfig.darkBg,
-        title: Text('use_ticket_btn'.tr(), style: const TextStyle(color: Colors.white)),
+        title: Text('edit_display_name'.tr(), style: const TextStyle(color: Colors.white)),
         content: TextField(
           controller: nameController,
-          decoration: InputDecoration(labelText: 'edit_name_hint'.tr()),
+          decoration: InputDecoration(labelText: 'display_name_label'.tr()),
           style: const TextStyle(color: Colors.white),
         ),
         actions: [
@@ -316,17 +312,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             onPressed: () async {
               final newName = nameController.text.trim();
               if (newName.isEmpty || newName == user.displayName) return;
-
               try {
-                // Consume ticket
-                final newInventory = Map<String, int>.from(user.inventory);
-                newInventory['name_change_ticket'] = newInventory['name_change_ticket']! - 1;
-                
-                await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
-                   'displayName': newName,
-                   'inventory': newInventory,
-                });
-                
+                await ref.read(authRepositoryProvider).updateProfile(displayName: newName);
                 if (context.mounted) {
                   Navigator.pop(context);
                   ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('profile_updated_success'.tr())));
@@ -338,6 +325,100 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               }
             },
             child: Text('update'.tr()),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _handleUsernameChange(BuildContext context, AppUser user) async {
+    final hasTicket = user.isAdmin || (user.inventory['name_change_ticket'] ?? 0) > 0;
+    
+    if (!hasTicket) {
+      _showTicketRequiredDialog(context);
+      return;
+    }
+
+    final usernameController = TextEditingController(text: user.username);
+    String? errorText;
+
+    showDialog(
+      context: context,
+      builder: (c) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          backgroundColor: ThemeConfig.darkBg,
+          title: Text('change_username_btn'.tr(), style: const TextStyle(color: Colors.white)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: usernameController,
+                decoration: InputDecoration(
+                  labelText: 'username_label'.tr(),
+                  hintText: 'e.g. ahmed123',
+                  prefixText: '@',
+                  errorText: errorText,
+                ),
+                style: const TextStyle(color: Colors.white),
+                onChanged: (val) async {
+                  if (val.length < 3) {
+                    setDialogState(() => errorText = 'min_3_chars'.tr());
+                    return;
+                  }
+                  if (!RegExp(r'^[a-zA-Z0-9_.]+$').hasMatch(val)) {
+                    setDialogState(() => errorText = 'invalid_chars'.tr());
+                    return;
+                  }
+                  final available = await ref.read(authRepositoryProvider).isUsernameAvailable(val);
+                  setDialogState(() => errorText = available ? null : 'username_taken'.tr());
+                },
+              ),
+              const SizedBox(height: 12),
+              Text(
+                user.isAdmin ? 'free_for_admin'.tr() : 'consumes_ticket_warning'.tr(),
+                style: const TextStyle(color: Colors.white30, fontSize: 11),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: Text('cancel'.tr())),
+            ElevatedButton(
+              onPressed: errorText != null || usernameController.text.trim() == user.username ? null : () async {
+                try {
+                  await ref.read(authRepositoryProvider).updateProfile(username: usernameController.text.trim());
+                  if (context.mounted) {
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('username_updated_success'.tr())));
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+                  }
+                }
+              },
+              child: Text('update'.tr()),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showTicketRequiredDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: ThemeConfig.darkBg,
+        title: Text('name_change_ticket'.tr(), style: const TextStyle(color: Colors.white)),
+        content: Text('no_tickets_message'.tr(), style: const TextStyle(color: Colors.white70)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: Text('cancel'.tr())),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              Navigator.pushNamed(context, '/store');
+            },
+            child: Text('buy_ticket_btn'.tr()),
           ),
         ],
       ),
