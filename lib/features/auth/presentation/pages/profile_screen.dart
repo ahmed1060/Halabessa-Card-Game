@@ -136,8 +136,20 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               Row(
                 children: [
                    Expanded(child: _buildStatCard(context, 'best_score'.tr(), user.bestScore.toString(), Icons.emoji_events, Colors.orange)),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                   Expanded(child: _buildStatCard(context, 'stars'.tr(), user.isAdmin ? '∞' : user.points.toString(), Icons.stars, ThemeConfig.goldAccent)),
                    const SizedBox(width: 16),
-                   Expanded(child: _buildStatCard(context, 'points'.tr(), user.isAdmin ? '∞' : user.points.toString(), Icons.stars, Colors.amber)),
+                   Expanded(child: _buildStatCard(context, 'Coins', user.isAdmin ? '∞' : user.coins.toString(), Icons.monetization_on, Colors.orange)),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                   Expanded(child: _buildStatCard(context, 'Diamonds', user.isAdmin ? '∞' : user.diamonds.toString(), Icons.diamond, ThemeConfig.primaryTeal)),
                 ],
               ),
               const SizedBox(height: 40),

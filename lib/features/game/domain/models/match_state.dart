@@ -64,6 +64,8 @@ class MatchState {
   final int capturingStage; // 0: merge, 1: fly
   final DateTime? expireAt;
   final int spectatorCount;
+  final Map<String, int> earnedStars;
+  final Map<String, int> earnedCoins;
 
   
     MatchState({
@@ -106,6 +108,8 @@ class MatchState {
       this.capturingStage = 0,
       this.spectatorCount = 0,
       this.expireAt,
+      this.earnedStars = const {},
+      this.earnedCoins = const {},
     });
 
   MatchState copyWith({
@@ -148,6 +152,8 @@ class MatchState {
     game_card.Card? lastCardRevealed,
     int? spectatorCount,
     DateTime? expireAt,
+    Map<String, int>? earnedStars,
+    Map<String, int>? earnedCoins,
   }) {
     return MatchState(
       id: id ?? this.id,
@@ -189,6 +195,8 @@ class MatchState {
       lastCardRevealed: lastCardRevealed ?? this.lastCardRevealed,
       spectatorCount: spectatorCount ?? this.spectatorCount,
       expireAt: expireAt ?? this.expireAt,
+      earnedStars: earnedStars ?? this.earnedStars,
+      earnedCoins: earnedCoins ?? this.earnedCoins,
     );
   }
 
@@ -233,6 +241,8 @@ class MatchState {
       'capturingStage': capturingStage,
       'spectatorCount': spectatorCount,
       'expireAt': expireAt?.toIso8601String(),
+      'earnedStars': earnedStars,
+      'earnedCoins': earnedCoins,
     };
   }
 
@@ -324,9 +334,12 @@ class MatchState {
         }).whereType<Capture>().toList();
       }
       return [];
+    Map<String, int> parseIntMap(dynamic map) {
+      if (map == null || map is! Map) return {};
+      return map.map((k, v) => MapEntry(k.toString(), (v as num).toInt()));
     }
 
-    Map<String, List<String>> parseSkipMap(dynamic map) {
+    Map<dynamic, dynamic>? parseSkipMap(dynamic map) {
       if (map == null || map is! Map) return {};
       final result = <String, List<String>>{};
       map.forEach((key, value) {
@@ -434,6 +447,8 @@ class MatchState {
         lastCardRevealed: json['lastCardRevealed'] != null ? game_card.Card.fromJson(Map<String, dynamic>.from(json['lastCardRevealed'])) : null,
         spectatorCount: json['spectatorCount'] is int ? json['spectatorCount'] as int : 0,
         expireAt: json['expireAt'] != null ? DateTime.tryParse(json['expireAt'].toString()) : null,
+        earnedStars: parseIntMap(json['earnedStars']),
+        earnedCoins: parseIntMap(json['earnedCoins']),
       );
     } catch (e, stack) {
       debugPrint('RECOVERED MatchState.fromJson failure: $e');

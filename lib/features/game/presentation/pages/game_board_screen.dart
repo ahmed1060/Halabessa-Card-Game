@@ -20,6 +20,7 @@ import 'package:halabessa/features/game/presentation/widgets/chat_overlay.dart';
 import 'package:confetti/confetti.dart';
 import '../widgets/player_profile_preview.dart';
 import '../widgets/harvest_piles_widget.dart';
+import '../widgets/match_summary_dialog.dart';
 import 'package:flutter/services.dart';
 import 'package:halabessa/core/services/multimedia_service.dart';
 
@@ -215,6 +216,21 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
     if (currentUser != null) {
       _checkWinner(matchState, currentUser.uid);
     }
+
+    // Match Over Rewards Popup
+    ref.listen<MatchState?>(matchStateProvider, (previous, next) {
+      if (next?.phase == GamePhase.matchOver && previous?.phase != GamePhase.matchOver) {
+        final winnerTeam = next!.teamAScore >= next.teamBScore ? 'teamA' : 'teamB';
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => MatchSummaryDialog(
+            matchState: next,
+            winnerTeam: winnerTeam,
+          ),
+        );
+      }
+    });
 
     // Room Expiry Check (Hibernation Timeout)
     if (matchState != null && matchState.expireAt != null && DateTime.now().isAfter(matchState.expireAt!)) {
@@ -810,117 +826,136 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
     final size = MediaQuery.sizeOf(context);
     final isCapturing = matchState.phase == GamePhase.capturing;
 
-    return SizedBox(
-      width: 200,
-      height: 200,
-      child: Stack(
-        alignment: Alignment.center,
-        children: matchState.board.asMap().entries.map((entry) {
-          final index = entry.key;
-          final card = entry.value;
-          
-          final seed = card.suit.index * 13 + card.rank.index + index;
-          final random = Random(seed);
-          
-          double targetX = (random.nextDouble() - 0.5) * 45;
-          double targetY = (random.nextDouble() - 0.5) * 45;
-          double rotation = (random.nextDouble() - 0.5) * 0.4;
-          double scale = 1.0;
-
-          // Animation Logic for Capturing
-          if (isCapturing && matchState.capturingCards.any((c) => c.firebaseKey == card.firebaseKey)) {
-            if (matchState.capturingStage == 0) {
-              // stage 0: Symmetric Merge
-              targetX = 0;
-              targetY = 0;
-              rotation = 0;
-              scale = 1.25;
-            } else {
-              // stage 1: Fly to Harvest Box
-              final teamId = matchState.capturingTeam;
-              if (teamId == 'teamA') {
-                targetX = -size.width * 0.35;
-                targetY = -size.height * 0.3; // Fly to Top Left
-              } else {
-                targetX = size.width * 0.4;
-                targetY = -size.height * 0.1; // Fly to Mid Right
-              }
-              rotation = 1.5; // Tumble while flying
-              scale = 0.5; // Shrink as it goes to the box
-            }
-          } else if (matchState.phase == GamePhase.dealingCards) {
-            targetX = (index - 1.5) * 58; 
-            targetY = 0;
-            rotation = 0;
-          }
-          
-          String? ownerId = matchState.cardOwnership[card.firebaseKey];
-          final effectiveOwnerId = ownerId ?? ((matchState.phase == GamePhase.dealingFasha || matchState.phase == GamePhase.dealingCards) && matchState.playerIds.isNotEmpty
-              ? matchState.playerIds[matchState.dealerIndex % matchState.playerIds.length] 
-              : null);
-
-          // Default fallback: Fly from bottom
-          double startX = 0;
-          double startY = 350;
-
-          if (effectiveOwnerId != null) {
-            final myIdx = matchState.playerIds.indexOf(myUid);
-            final pivotIdx = myIdx == -1 ? 0 : myIdx; // Spectators see from Host viewpoint
-            final ownerIdx = matchState.playerIds.indexOf(effectiveOwnerId);
-
-            if (ownerIdx >= 0) {
-              final relativeIdx = (ownerIdx - pivotIdx + 4) % 4;
-              if (relativeIdx == 1) { 
-                startX = 320; startY = 0; // Right Avatar
-              } else if (relativeIdx == 2) { 
-                startX = 0; startY = -320; // Top Avatar (Opposite/Partner)
-              } else if (relativeIdx == 3) { 
-                startX = -320; startY = 0; // Left Avatar
-              } else if (relativeIdx == 0) { 
-                // Local player (or Host in spectator view): Check for specific click origin
-                final localOrigins = ref.read(localPlayOriginsProvider);
-                final customOrigin = localOrigins[card.firebaseKey];
-                if (customOrigin != null) {
-                  // Coordinate translation: Hand is shifted relative to avatar.
-                  startX = customOrigin.dx + 40; // Dynamic hand offset
-                  startY = customOrigin.dy + 250; // Distance to hand
-                } else {
-                  startX = 0; 
-                  startY = 350; // Standard bottom fly-in
-                }
-              }
-            }
-          }
-
-          return TweenAnimationBuilder<double>(
-            key: ValueKey(card.firebaseKey),
-            duration: Duration(milliseconds: isCapturing ? 800 : 500),
-            curve: isCapturing ? Curves.easeInOutBack : Curves.easeOutCubic,
-            tween: Tween(begin: 0.0, end: 1.0),
-            builder: (context, value, child) {
-              final currentX = startX * (1 - value) + targetX * value;
-              final currentY = startY * (1 - value) + targetY * value;
-              
-              // Smoother transition: If from hand (origin != null), start slightly larger (1.1).
-              // Otherwise (dealing/opponents), standard scaling.
-              final startScale = (startX != 0 || startY != 350) ? 1.1 : 1.0;
-              final currentScale = (startScale - (startScale - 1.0) * value) * (isCapturing ? scale : 1.0);
-
-              return Transform.translate(
-                offset: Offset(currentX, currentY),
-                child: Transform.rotate(
-                  angle: rotation * value,
-                  child: Transform.scale(
-                    scale: currentScale,
-                    child: child,
-                  ),
+    return DragTarget<game_card.Card>(
+      onWillAccept: (data) => 
+          matchState.phase == GamePhase.playing && 
+          matchState.playerIds.isNotEmpty && 
+          matchState.currentTurnIndex == _getAbsoluteIndex(matchState, myUid, 0),
+      onAcceptWithDetails: (details) {
+        final Offset localOffset = (context.findRenderObject() as RenderBox).globalToLocal(details.offset);
+        // Center of the DragTarget is at (100, 100) since width/height are 200
+        // We want the origin relative to the center
+        final Offset relativeOrigin = Offset(localOffset.dx - 100, localOffset.dy - 100);
+        
+        ref.read(matchStateProvider.notifier).playCard(myUid, details.data, origin: relativeOrigin);
+        HapticFeedback.mediumImpact();
+      },
+      builder: (context, candidateData, rejectedData) {
+        return SizedBox(
+          width: 200,
+          height: 200,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              // Ghost preview if dragging over
+              if (candidateData.isNotEmpty)
+                Opacity(
+                  opacity: 0.3,
+                  child: CardWidget(card: candidateData.first!),
                 ),
-              );
-            },
-            child: CardWidget(card: card),
-          );
-        }).toList(),
-      ),
+              ...matchState.board.asMap().entries.map((entry) {
+                final index = entry.key;
+                final card = entry.value;
+                
+                final seed = card.suit.index * 13 + card.rank.index + index;
+                final random = Random(seed);
+                
+                double targetX = (random.nextDouble() - 0.5) * 45;
+                double targetY = (random.nextDouble() - 0.5) * 45;
+                double rotation = (random.nextDouble() - 0.5) * 0.4;
+                double scale = 1.0;
+
+                // Animation Logic for Capturing
+                if (isCapturing && matchState.capturingCards.any((c) => c.firebaseKey == card.firebaseKey)) {
+                  if (matchState.capturingStage == 0) {
+                    targetX = 0;
+                    targetY = 0;
+                    rotation = 0;
+                    scale = 1.25;
+                  } else {
+                    final teamId = matchState.capturingTeam;
+                    if (teamId == 'teamA') {
+                      targetX = -size.width * 0.35;
+                      targetY = -size.height * 0.3;
+                    } else {
+                      targetX = size.width * 0.4;
+                      targetY = -size.height * 0.1;
+                    }
+                    rotation = 1.5;
+                    scale = 0.5;
+                  }
+                } else if (matchState.phase == GamePhase.dealingCards) {
+                  targetX = (index - 1.5) * 58; 
+                  targetY = 0;
+                  rotation = 0;
+                }
+                
+                String? ownerId = matchState.cardOwnership[card.firebaseKey];
+                final effectiveOwnerId = ownerId ?? ((matchState.phase == GamePhase.dealingFasha || matchState.phase == GamePhase.dealingCards) && matchState.playerIds.isNotEmpty
+                    ? matchState.playerIds[matchState.dealerIndex % matchState.playerIds.length] 
+                    : null);
+
+                // Default fallback: Fly from bottom
+                double startX = 0;
+                double startY = 350;
+
+                if (effectiveOwnerId != null) {
+                  final myIdx = matchState.playerIds.indexOf(myUid);
+                  final pivotIdx = myIdx == -1 ? 0 : myIdx;
+                  final ownerIdx = matchState.playerIds.indexOf(effectiveOwnerId);
+
+                  if (ownerIdx >= 0) {
+                    final relativeIdx = (ownerIdx - pivotIdx + 4) % 4;
+                    if (relativeIdx == 1) { 
+                      startX = 320; startY = 0; 
+                    } else if (relativeIdx == 2) { 
+                      startX = 0; startY = -320; 
+                    } else if (relativeIdx == 3) { 
+                      startX = -320; startY = 0; 
+                    } else if (relativeIdx == 0) { 
+                      final localOrigins = ref.read(localPlayOriginsProvider);
+                      final customOrigin = localOrigins[card.firebaseKey];
+                      if (customOrigin != null) {
+                        startX = customOrigin.dx;
+                        startY = customOrigin.dy;
+                      } else {
+                        startX = 0; 
+                        startY = 350;
+                      }
+                    }
+                  }
+                }
+
+                return TweenAnimationBuilder<double>(
+                  key: ValueKey(card.firebaseKey),
+                  duration: Duration(milliseconds: isCapturing ? 800 : 500),
+                  curve: isCapturing ? Curves.easeInOutBack : Curves.easeOutCubic,
+                  tween: Tween(begin: 0.0, end: 1.0),
+                  builder: (context, value, child) {
+                    final currentX = startX * (1 - value) + targetX * value;
+                    final currentY = startY * (1 - value) + targetY * value;
+                    
+                    final startScale = (startX != 0 || startY != 350) ? 1.1 : 1.0;
+                    final currentScale = (startScale - (startScale - 1.0) * value) * (isCapturing ? scale : 1.0);
+
+                    return Transform.translate(
+                      offset: Offset(currentX, currentY),
+                      child: Transform.rotate(
+                        angle: rotation * value,
+                        child: Transform.scale(
+                          scale: currentScale,
+                          child: child,
+                        ),
+                      ),
+                    );
+                  },
+                  child: CardWidget(card: card),
+                );
+              }).toList(),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -961,9 +996,29 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
                   cards: matchState.handCards[myUid] ?? [],
                   isMyTurn: matchState.playerIds.isNotEmpty && 
                            matchState.currentTurnIndex == _getAbsoluteIndex(matchState, myUid, 0),
-                  onCardTap: (card, origin) {
+                  onCardTap: (card, globalOrigin) {
                     HapticFeedback.lightImpact();
-                    ref.read(matchStateProvider.notifier).playCard(myUid, card, origin: origin);
+                    
+                    // Translate global origin to board-relative origin
+                    // The board center is where _buildBoardCenter is rendered.
+                    // We can find its render box or approximate if we know the layout.
+                    // Better: use the same logic as DragTarget if possible.
+                    
+                    Offset relativeOrigin = Offset.zero;
+                    final boardBox = context.findRenderObject() as RenderBox?;
+                    if (boardBox != null && globalOrigin != Offset.zero) {
+                      final localOffset = boardBox.globalToLocal(globalOrigin);
+                      // Board center is roughly at MediaQuery.of(context).size.width / 2, size.height / 2
+                      // But the _buildBoardCenter itself is 200x200.
+                      // Let's use a simpler approach: calculate relative to screen center
+                      final screenSize = MediaQuery.sizeOf(context);
+                      relativeOrigin = Offset(
+                        globalOrigin.dx - screenSize.width / 2,
+                        globalOrigin.dy - screenSize.height / 2,
+                      );
+                    }
+
+                    ref.read(matchStateProvider.notifier).playCard(myUid, card, origin: relativeOrigin);
                   },
                 ),
             ],

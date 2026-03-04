@@ -117,22 +117,27 @@ class _FannedHandWidgetState extends State<FannedHandWidget> {
           onPanUpdate: (details) => _handleHoverUpdate(details.localPosition, fanWidth, preferredSpacing, cardCount),
           onPanEnd: (_) {
             if (hoveredIndex != null) {
-              // Calculate the center of the card in local coordinates
-              final double normalizedPos = cardCount > 1 
-                  ? (hoveredIndex! / (cardCount - 1)) * 2 - 1 
-                  : 0.0;
-              final double xPos = (hoveredIndex! * preferredSpacing) + (cardWidth / 2);
-              final double yPos = arcHeight * (normalizedPos * normalizedPos);
-              final double yFromBottom = 20 + (arcHeight - yPos) + (cardHeight / 2);
+              // Get the global position of the card element
+              // We'll approximate based on the widget's global position + local card offset
+              final RenderBox? box = context.findRenderObject() as RenderBox?;
+              Offset globalOrigin = Offset.zero;
               
-              final double widgetWidth = fanWidth + cardWidth;
-              final double finalX = xPos - (widgetWidth / 2);
-              final double finalY = -(yFromBottom - 20);
-              final Offset origin = Offset(finalX, finalY);
+              if (box != null) {
+                final double normalizedPos = cardCount > 1 
+                    ? (hoveredIndex! / (cardCount - 1)) * 2 - 1 
+                    : 0.0;
+                final double xPos = (hoveredIndex! * preferredSpacing) + (cardWidth / 2);
+                final double yPos = arcHeight * (normalizedPos * normalizedPos);
+                final double yFromBottom = 20 + (arcHeight - yPos) + (cardHeight / 2);
+                
+                final double localX = xPos;
+                final double localY = box.size.height - yFromBottom;
+                globalOrigin = box.localToGlobal(Offset(localX, localY));
+              }
 
               if (widget.isMyTurn) {
                 HapticFeedback.mediumImpact();
-                widget.onCardTap(widget.cards[hoveredIndex!], origin);
+                widget.onCardTap(widget.cards[hoveredIndex!], globalOrigin);
                 setState(() {
                   preSelectedIndex = null;
                   preSelectedOrigin = null;
@@ -141,13 +146,12 @@ class _FannedHandWidgetState extends State<FannedHandWidget> {
                 // Pre-selection mode
                 HapticFeedback.lightImpact();
                 setState(() {
-                  // Toggle logic: If tapping the same card, deselect it
                   if (preSelectedIndex == hoveredIndex) {
                     preSelectedIndex = null;
                     preSelectedOrigin = null;
                   } else {
                     preSelectedIndex = hoveredIndex;
-                    preSelectedOrigin = origin;
+                    preSelectedOrigin = globalOrigin;
                   }
                 });
               }
@@ -179,42 +183,61 @@ class _FannedHandWidgetState extends State<FannedHandWidget> {
                 return Positioned(
                   left: xPos,
                   bottom: 20 + (arcHeight - yPos),
-                  child: MouseRegion( // Still works for Desktop
-                    onEnter: (_) => setState(() => hoveredIndex = index),
-                    onExit: (_) => setState(() => hoveredIndex = null),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      curve: Curves.easeOutBack,
-                      transform: Matrix4.identity()
-                        ..translate(0.0, elevationY)
-                        ..rotateZ(rotation)
-                        ..scale(scale),
-                      transformAlignment: Alignment.bottomCenter,
-                      child: IgnorePointer( // Let the GestureDetector above handle the logic
-                        child: Stack(
-                          children: [
-                            CardWidget(
-                              card: widget.cards[index],
-                              width: cardWidth,
-                              height: cardHeight,
-                              onTap: null, // Handled by GestureDetector
-                            ),
-                            if (isPreSelected && !isHovered)
-                              Positioned.fill(
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(8),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.tealAccent.withOpacity(0.35),
-                                        blurRadius: 15,
-                                        spreadRadius: 2,
-                                      ),
-                                    ],
+                  child: Draggable<game_card.Card>(
+                    data: widget.cards[index],
+                    maxSimultaneousDrags: (widget.isMyTurn && hoveredIndex == index) ? 1 : 0,
+                    feedback: Material(
+                      color: Colors.transparent,
+                      child: CardWidget(
+                        card: widget.cards[index],
+                        width: cardWidth * 1.3,
+                        height: cardHeight * 1.3,
+                      ),
+                    ),
+                    childWhenDragging: const SizedBox.shrink(),
+                    onDragUpdate: (details) {
+                      // Optional: provide haptic feedback when crossing certain areas
+                    },
+                    onDragStarted: () {
+                       HapticFeedback.lightImpact();
+                    },
+                    child: MouseRegion( // Still works for Desktop
+                      onEnter: (_) => setState(() => hoveredIndex = index),
+                      onExit: (_) => setState(() => hoveredIndex = null),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        curve: Curves.easeOutBack,
+                        transform: Matrix4.identity()
+                          ..translate(0.0, elevationY)
+                          ..rotateZ(rotation)
+                          ..scale(scale),
+                        transformAlignment: Alignment.bottomCenter,
+                        child: IgnorePointer( // Let the GestureDetector above handle the logic
+                          child: Stack(
+                            children: [
+                              CardWidget(
+                                card: widget.cards[index],
+                                width: cardWidth,
+                                height: cardHeight,
+                                onTap: null, // Handled by GestureDetector
+                              ),
+                              if (isPreSelected && !isHovered)
+                                Positioned.fill(
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(8),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.tealAccent.withOpacity(0.35),
+                                          blurRadius: 15,
+                                          spreadRadius: 2,
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
-                              ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     ),

@@ -5,6 +5,8 @@ class AppUser {
   final String displayName;
   final String? avatarUrl;
   final int points;
+  final int diamonds;
+  final int coins;
   final int rank;
   final List<String> friends;
   final List<String> pendingFriendRequests; 
@@ -24,7 +26,8 @@ class AppUser {
   double get winRate => gamesPlayed == 0 ? 0 : wins / gamesPlayed;
   int get level => isAdmin ? 999 : (points / 1000).floor() + 1;
 
-  bool canAfford(int price) => isAdmin || points >= price;
+  bool canAfford(int price, {bool isDiamonds = false}) => 
+    isAdmin || (isDiamonds ? diamonds >= price : coins >= price);
 
   AppUser({
     required this.uid,
@@ -33,6 +36,8 @@ class AppUser {
     required this.displayName,
     this.avatarUrl,
     this.points = 0,
+    this.diamonds = 0,
+    this.coins = 0,
     this.rank = 0,
     this.friends = const [],
     this.pendingFriendRequests = const [],
@@ -76,6 +81,8 @@ class AppUser {
       displayName: json['displayName'] ?? 'Player',
       avatarUrl: json['avatarUrl'],
       points: json['points'] ?? 0,
+      diamonds: json['diamonds'] ?? 0,
+      coins: json['coins'] ?? 0,
       rank: json['rank'] ?? 0,
       friends: parseFriends(json['friends']),
       pendingFriendRequests: parseFriends(json['pendingFriendRequests']),
@@ -100,6 +107,8 @@ class AppUser {
       'displayName': displayName,
       'avatarUrl': avatarUrl,
       'points': points,
+      'diamonds': diamonds,
+      'coins': coins,
       'rank': rank,
       'friends': friends,
       'pendingFriendRequests': pendingFriendRequests,
@@ -124,6 +133,8 @@ class AppUser {
     String? displayName,
     String? avatarUrl,
     int? points,
+    int? diamonds,
+    int? coins,
     int? rank,
     List<String>? friends,
     List<String>? pendingFriendRequests,
@@ -146,6 +157,8 @@ class AppUser {
       displayName: displayName ?? this.displayName,
       avatarUrl: avatarUrl ?? this.avatarUrl,
       points: points ?? this.points,
+      diamonds: diamonds ?? this.diamonds,
+      coins: coins ?? this.coins,
       rank: rank ?? this.rank,
       friends: friends ?? this.friends,
       pendingFriendRequests: pendingFriendRequests ?? this.pendingFriendRequests,

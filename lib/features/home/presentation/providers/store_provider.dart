@@ -16,6 +16,10 @@ class ShopItem {
   final Map<String, String>? faceIllustrations; 
   final ShopItemType type;
   final int price;
+  final int diamondPrice;
+  final String? aceSkinPath;
+  final String? sevenDiamondSkinPath;
+  final Map<String, String>? suitIcons; 
 
   ShopItem({
     required this.id,
@@ -25,6 +29,10 @@ class ShopItem {
     this.faceIllustrations,
     required this.type,
     this.price = 0,
+    this.diamondPrice = 0,
+    this.aceSkinPath,
+    this.sevenDiamondSkinPath,
+    this.suitIcons,
   });
 
   Map<String, dynamic> toJson() => {
@@ -35,6 +43,10 @@ class ShopItem {
     'faceIllustrations': faceIllustrations,
     'type': type.name,
     'price': price,
+    'diamondPrice': diamondPrice,
+    'aceSkinPath': aceSkinPath,
+    'sevenDiamondSkinPath': sevenDiamondSkinPath,
+    'suitIcons': suitIcons,
   };
 
   factory ShopItem.fromJson(Map<String, dynamic> json) => ShopItem(
@@ -45,6 +57,10 @@ class ShopItem {
     faceIllustrations: json['faceIllustrations'] != null ? Map<String, String>.from(json['faceIllustrations']) : null,
     type: ShopItemType.values.firstWhere((e) => e.name == json['type'], orElse: () => ShopItemType.cardBack),
     price: json['price'] ?? 0,
+    diamondPrice: json['diamondPrice'] ?? 0,
+    aceSkinPath: json['aceSkinPath'],
+    sevenDiamondSkinPath: json['sevenDiamondSkinPath'],
+    suitIcons: json['suitIcons'] != null ? Map<String, String>.from(json['suitIcons']) : null,
   );
 }
 
@@ -127,8 +143,11 @@ class StoreNotifier extends StateNotifier<StoreState> {
     final user = _ref.read(currentUserProvider);
     if (user == null) return;
 
-    if (!user.canAfford(item.price)) {
-      throw Exception('Not enough points');
+    final isDiamonds = item.diamondPrice > 0;
+    final price = isDiamonds ? item.diamondPrice : item.price;
+
+    if (!user.canAfford(price, isDiamonds: isDiamonds)) {
+      throw Exception(isDiamonds ? 'Not enough diamonds' : 'Not enough coins');
     }
 
     if (item.type == ShopItemType.consumable) {
@@ -136,10 +155,10 @@ class StoreNotifier extends StateNotifier<StoreState> {
        final newInventory = Map<String, int>.from(user.inventory);
        newInventory[item.id] = currentCount + 1;
        
-       final pointsToDeduct = user.isAdmin ? 0 : item.price; 
+       final cost = user.isAdmin ? 0 : price; 
        
        await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
-         'points': user.points - pointsToDeduct,
+         isDiamonds ? 'diamonds' : 'coins': (isDiamonds ? user.diamonds : user.coins) - cost,
          'inventory': newInventory,
        });
     } else {
@@ -148,15 +167,33 @@ class StoreNotifier extends StateNotifier<StoreState> {
         state = state.copyWith(ownedIds: newOwned);
         _prefs.setStringList(_kOwnedIds, newOwned);
         
-        final pointsToDeduct = user.isAdmin ? 0 : item.price;
+        final cost = user.isAdmin ? 0 : price;
         
         // Persist to Firestore
         await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
-          'points': user.points - pointsToDeduct,
+          isDiamonds ? 'diamonds' : 'coins': (isDiamonds ? user.diamonds : user.coins) - cost,
           'owned_skins': newOwned, 
         });
       }
     }
+  }
+
+  Future<void> updateItem(ShopItem updatedItem) async {
+    final user = _ref.read(currentUserProvider);
+    if (user == null || !user.isAdmin) return;
+
+    final List<ShopItem> currentExtra = List.from(state.extraItems);
+    final index = currentExtra.indexWhere((i) => i.id == updatedItem.id);
+    
+    if (index != -1) {
+      currentExtra[index] = updatedItem;
+    } else {
+      currentExtra.add(updatedItem);
+    }
+
+    await FirebaseFirestore.instance.collection('settings').doc('store').set({
+      'items': currentExtra.map((e) => e.toJson()).toList()
+    });
   }
 
   Future<void> addItem(ShopItem item) async {

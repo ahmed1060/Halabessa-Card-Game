@@ -9,8 +9,9 @@ import '../providers/store_provider.dart';
 
 class AdminAddItemDialog extends StatefulWidget {
   final ShopItemType type;
+  final ShopItem? initialItem;
 
-  const AdminAddItemDialog({super.key, required this.type});
+  const AdminAddItemDialog({super.key, required this.type, this.initialItem});
 
   @override
   State<AdminAddItemDialog> createState() => _AdminAddItemDialogState();
@@ -19,14 +20,37 @@ class AdminAddItemDialog extends StatefulWidget {
 class _AdminAddItemDialogState extends State<AdminAddItemDialog> {
   final _idController = TextEditingController();
   final _nameController = TextEditingController();
-  final _priceController = TextEditingController(text: '0');
+  final _starPriceController = TextEditingController(text: '0');
+  final _diamondPriceController = TextEditingController(text: '0');
   
   String? _mainAssetUrl;
   String? _frontSkinUrl;
   String? _kingIllustUrl;
+  String? _aceSkinUrl;
+  String? _sevenDiamondSkinUrl;
+  
+  Map<String, String> _suitIcons = {};
   
   bool _isUploading = false;
   final ImagePicker _picker = ImagePicker();
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialItem != null) {
+      final item = widget.initialItem!;
+      _idController.text = item.id;
+      _nameController.text = item.name;
+      _starPriceController.text = item.price.toString();
+      _diamondPriceController.text = item.diamondPrice.toString();
+      _mainAssetUrl = item.assetPath;
+      _frontSkinUrl = item.frontSkinPath;
+      _kingIllustUrl = item.faceIllustrations?['king'];
+      _aceSkinUrl = item.aceSkinPath;
+      _sevenDiamondSkinUrl = item.sevenDiamondSkinPath;
+      _suitIcons = Map.from(item.suitIcons ?? {});
+    }
+  }
 
   Future<void> _pickAndUpload(String fieldType) async {
     try {
@@ -55,6 +79,12 @@ class _AdminAddItemDialogState extends State<AdminAddItemDialog> {
           _frontSkinUrl = downloadUrl;
         } else if (fieldType == 'king') {
           _kingIllustUrl = downloadUrl;
+        } else if (fieldType == 'ace') {
+          _aceSkinUrl = downloadUrl;
+        } else if (fieldType == 'seven') {
+          _sevenDiamondSkinUrl = downloadUrl;
+        } else if (fieldType.startsWith('suit_')) {
+          _suitIcons[fieldType.replaceFirst('suit_', '')] = downloadUrl;
         }
         _isUploading = false;
       });
@@ -76,7 +106,8 @@ class _AdminAddItemDialogState extends State<AdminAddItemDialog> {
     return AlertDialog(
       backgroundColor: ThemeConfig.darkBg,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      title: Text('add_new_title'.tr(args: [widget.type.name]), 
+      title: Text(
+        widget.initialItem != null ? 'Edit Item' : 'add_new_title'.tr(args: [widget.type.name]), 
         style: const TextStyle(color: Colors.white, fontFamily: ThemeConfig.fontHeading, fontSize: 18)
       ),
       content: SizedBox(
@@ -85,11 +116,17 @@ class _AdminAddItemDialogState extends State<AdminAddItemDialog> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _buildTextField(_idController, 'item_id_label'.tr(), Icons.fingerprint),
+              _buildTextField(_idController, 'item_id_label'.tr(), Icons.fingerprint, enabled: widget.initialItem == null),
               const SizedBox(height: 12),
               _buildTextField(_nameController, 'display_name_label'.tr(), Icons.title),
               const SizedBox(height: 12),
-              _buildTextField(_priceController, 'price_label'.tr(), Icons.stars, keyboardType: TextInputType.number),
+              Row(
+                children: [
+                  Expanded(child: _buildTextField(_starPriceController, 'Coins 🪙', Icons.monetization_on, keyboardType: TextInputType.number)),
+                  const SizedBox(width: 12),
+                  Expanded(child: _buildTextField(_diamondPriceController, 'Diamonds 💎', Icons.diamond, keyboardType: TextInputType.number)),
+                ],
+              ),
               const SizedBox(height: 20),
               
               _buildUploadSection('Main Asset', _mainAssetUrl, () => _pickAndUpload('main')),
@@ -99,6 +136,28 @@ class _AdminAddItemDialogState extends State<AdminAddItemDialog> {
                 _buildUploadSection('Front Skin (Opt)', _frontSkinUrl, () => _pickAndUpload('front')),
                 const SizedBox(height: 12),
                 _buildUploadSection('King Illust (Opt)', _kingIllustUrl, () => _pickAndUpload('king')),
+                const SizedBox(height: 12),
+                _buildUploadSection('Ace Skin (Opt)', _aceSkinUrl, () => _pickAndUpload('ace')),
+                const SizedBox(height: 12),
+                _buildUploadSection('7-Diamond Skin (Opt)', _sevenDiamondSkinUrl, () => _pickAndUpload('seven')),
+                const SizedBox(height: 20),
+                const Text('Suit Icons', style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(child: _buildUploadSection('Hearts', _suitIcons['hearts'], () => _pickAndUpload('suit_hearts'), mini: true)),
+                    const SizedBox(width: 8),
+                    Expanded(child: _buildUploadSection('Diamonds', _suitIcons['diamonds'], () => _pickAndUpload('suit_diamonds'), mini: true)),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(child: _buildUploadSection('Trifle', _suitIcons['trifle'], () => _pickAndUpload('suit_trifle'), mini: true)),
+                    const SizedBox(width: 8),
+                    Expanded(child: _buildUploadSection('Spades', _suitIcons['spades'], () => _pickAndUpload('suit_spades'), mini: true)),
+                  ],
+                ),
               ],
               
               if (_isUploading)
@@ -124,7 +183,8 @@ class _AdminAddItemDialogState extends State<AdminAddItemDialog> {
           onPressed: _isUploading || _mainAssetUrl == null ? null : () {
             final id = _idController.text.trim();
             final name = _nameController.text.trim();
-            final price = int.tryParse(_priceController.text) ?? 0;
+            final price = int.tryParse(_starPriceController.text) ?? 0;
+            final diamondPrice = int.tryParse(_diamondPriceController.text) ?? 0;
 
             if (id.isEmpty || name.isEmpty) return;
 
@@ -141,21 +201,26 @@ class _AdminAddItemDialogState extends State<AdminAddItemDialog> {
               faceIllustrations: faceIllusts,
               type: widget.type,
               price: price,
+              diamondPrice: diamondPrice,
+              aceSkinPath: _aceSkinUrl,
+              sevenDiamondSkinPath: _sevenDiamondSkinUrl,
+              suitIcons: _suitIcons.isEmpty ? null : _suitIcons,
             );
 
             Navigator.pop(context, item);
           },
-          child: Text('add'.tr()),
+          child: Text(widget.initialItem != null ? 'Update' : 'add'.tr()),
         ),
       ],
     );
   }
 
-  Widget _buildTextField(TextEditingController controller, String label, IconData icon, {TextInputType keyboardType = TextInputType.text}) {
+  Widget _buildTextField(TextEditingController controller, String label, IconData icon, {TextInputType keyboardType = TextInputType.text, bool enabled = true}) {
     return TextField(
       controller: controller,
+      enabled: enabled,
       keyboardType: keyboardType,
-      style: const TextStyle(color: Colors.white, fontSize: 14),
+      style: TextStyle(color: enabled ? Colors.white : Colors.white30, fontSize: 14),
       decoration: InputDecoration(
         labelText: label,
         labelStyle: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12),
@@ -172,7 +237,7 @@ class _AdminAddItemDialogState extends State<AdminAddItemDialog> {
     );
   }
 
-  Widget _buildUploadSection(String label, String? url, VoidCallback onPick) {
+  Widget _buildUploadSection(String label, String? url, VoidCallback onPick, {bool mini = false}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -182,7 +247,7 @@ class _AdminAddItemDialogState extends State<AdminAddItemDialog> {
           onTap: _isUploading ? null : onPick,
           borderRadius: BorderRadius.circular(12),
           child: Container(
-            height: 60,
+            height: mini ? 40 : 60,
             decoration: BoxDecoration(
               color: Colors.white.withOpacity(0.05),
               borderRadius: BorderRadius.circular(12),
@@ -197,20 +262,23 @@ class _AdminAddItemDialogState extends State<AdminAddItemDialog> {
                     const SizedBox(width: 8),
                     ClipRRect(
                       borderRadius: BorderRadius.circular(8),
-                      child: Image.network(url, height: 44, width: 44, fit: BoxFit.cover),
+                      child: Image.network(url, height: mini ? 24 : 44, width: mini ? 24 : 44, fit: BoxFit.cover),
                     ),
-                    const SizedBox(width: 12),
-                    const Expanded(child: Text('Image Uploaded', style: TextStyle(color: Colors.white70, fontSize: 12))),
-                    const Icon(Icons.check_circle, color: ThemeConfig.primaryTeal, size: 20),
-                    const SizedBox(width: 12),
+                    if (!mini) ...[
+                      const SizedBox(width: 12),
+                      const Expanded(child: Text('Image Uploaded', style: TextStyle(color: Colors.white70, fontSize: 12))),
+                      const Icon(Icons.check_circle, color: ThemeConfig.primaryTeal, size: 20),
+                      const SizedBox(width: 12),
+                    ] else
+                      const Expanded(child: Center(child: Icon(Icons.check_circle, color: ThemeConfig.primaryTeal, size: 16))),
                   ],
                 )
               : Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.add_photo_alternate_outlined, color: Colors.white.withOpacity(0.3), size: 24),
-                      Text('Pick Image', style: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 10)),
+                      Icon(Icons.add_photo_alternate_outlined, color: Colors.white.withOpacity(0.3), size: mini ? 18 : 24),
+                      if (!mini) Text('Pick Image', style: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 10)),
                     ],
                   ),
                 ),

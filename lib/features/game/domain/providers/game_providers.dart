@@ -138,6 +138,15 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     if (lastBoundMatchId != null) {
       final currentUser = ref.read(currentUserProvider);
       if (currentUser != null) {
+        // Apply forfeit penalty if leaving during active play
+        final s = state;
+        if (s != null && 
+            s.phase != GamePhase.waitingForPlayers && 
+            s.phase != GamePhase.matchOver &&
+            s.phase != GamePhase.rematchVoting) {
+          _applyForfeitPenalty(currentUser.uid);
+        }
+        
         ref.read(multiplayerSyncServiceProvider).removePresence(lastBoundMatchId!, currentUser.uid);
       }
     }
@@ -713,6 +722,10 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
       MatchState? currentState = state;
       if (currentState == null || currentState.phase != GamePhase.playing) return;
 
+      if (origin != null) {
+        ref.read(localPlayOriginsProvider.notifier).update((m) => {...m, card.firebaseKey: origin});
+      }
+
       final result = GameEngine.apply(currentState, PlayCardAction(playerId, card));
       final newState = result.newState;
 
@@ -859,11 +872,10 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     if (currentState == null) return;
 
     final isHost = _amIHost(currentState);
-    
-    // Only Host records stats in Firestore to prevent duplicate writes
     if (!isHost) return;
 
-// debugPrint('FIRESTORE: Recording match stats for winner $winnerTeam');
+    final Map<String, int> matchStars = {};
+    final Map<String, int> matchCoins = {};
 
     for (int i = 0; i < currentState.playerIds.length; i++) {
       final playerId = currentState.playerIds[i];
@@ -873,21 +885,30 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
       final isWinner = playerTeam == winnerTeam;
       final myTeamScore = playerTeam == 'teamA' ? scoreA : scoreB;
 
+      final int starsDelta = isWinner ? 50 : -30;
+      final int coinsDelta = isWinner ? 100 : 20;
+
+      matchStars[playerId] = starsDelta;
+      matchCoins[playerId] = coinsDelta;
+
       try {
         final userRef = FirebaseFirestore.instance.collection('users').doc(playerId);
-        
         await FirebaseFirestore.instance.runTransaction((transaction) async {
           final snapshot = await transaction.get(userRef);
           if (snapshot.exists) {
             final data = snapshot.data()!;
-            final currentPoints = data['points'] ?? 0;
+            final currentPoints = data['points'] ?? 0; // Points are now Stars
+            final currentCoins = data['coins'] ?? 0;
             final currentWins = data['wins'] ?? 0;
             final currentLosses = data['losses'] ?? 0;
             final currentGames = data['gamesPlayed'] ?? 0;
             final currentBest = data['bestScore'] ?? 0;
 
+            final newPoints = (currentPoints + starsDelta).clamp(0, 999999).toInt();
+
             transaction.update(userRef, {
-              'points': currentPoints + (isWinner ? 100 : 20), // 100 for win, 20 for loss
+              'points': newPoints,
+              'coins': currentCoins + coinsDelta,
               'wins': currentWins + (isWinner ? 1 : 0),
               'losses': currentLosses + (isWinner ? 0 : 1),
               'gamesPlayed': currentGames + 1,
@@ -898,6 +919,30 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
       } catch (e) {
         debugPrint('ERROR updating stats for $playerId: $e');
       }
+    }
+
+    // Update state one last time with rewards for everyone to see
+    _publishState(currentState.copyWith(
+      earnedStars: matchStars,
+      earnedCoins: matchCoins,
+    ));
+  }
+
+  Future<void> _applyForfeitPenalty(String playerId) async {
+    try {
+      final userRef = FirebaseFirestore.instance.collection('users').doc(playerId);
+      await FirebaseFirestore.instance.runTransaction((transaction) async {
+        final snapshot = await transaction.get(userRef);
+        if (snapshot.exists) {
+          final currentPoints = snapshot.data()!['points'] ?? 0;
+          transaction.update(userRef, {
+            'points': (currentPoints - 50).clamp(0, 999999).toInt(),
+          });
+        }
+      });
+      debugPrint('FORFEIT: Deducted 50 stars from $playerId');
+    } catch (e) {
+      debugPrint('ERROR in forfeit penalty: $e');
     }
   }
 }

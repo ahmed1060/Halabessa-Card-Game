@@ -7,6 +7,7 @@ import '../../../../core/services/multimedia_service.dart';
 import '../../../../core/theme/theme_config.dart';
 import '../providers/store_provider.dart';
 import '../widgets/admin_add_item_dialog.dart';
+import '../widgets/shop_item_preview_dialog.dart';
 
 class StoreScreen extends ConsumerWidget {
   const StoreScreen({super.key});
@@ -28,27 +29,14 @@ class StoreScreen extends ConsumerWidget {
           if (user != null)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                decoration: BoxDecoration(
-                  color: ThemeConfig.goldAccent.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: ThemeConfig.goldAccent.withOpacity(0.3)),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.stars, color: ThemeConfig.goldAccent, size: 16),
-                    const SizedBox(width: 4),
-                    Text(
-                      user.isAdmin ? '∞' : user.points.toString(),
-                      style: TextStyle(
-                        color: ThemeConfig.goldAccent, 
-                        fontWeight: FontWeight.bold,
-                        fontSize: user.isAdmin ? 20 : 14,
-                      ),
-                    ),
-                  ],
-                ),
+              child: Row(
+                children: [
+                  _buildCurrencyChip(context, user.points, '⭐', ThemeConfig.goldAccent, isAdmin: user.isAdmin),
+                  const SizedBox(width: 8),
+                  _buildCurrencyChip(context, user.coins, '🪙', Colors.orange),
+                  const SizedBox(width: 8),
+                  _buildCurrencyChip(context, user.diamonds, '💎', ThemeConfig.primaryTeal),
+                ],
               ),
             ),
         ],
@@ -106,10 +94,10 @@ class StoreScreen extends ConsumerWidget {
       padding: const EdgeInsets.symmetric(horizontal: 20),
       sliver: SliverGrid(
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 3,
-          mainAxisSpacing: 12,
-          crossAxisSpacing: 12,
-          childAspectRatio: 0.75,
+          crossAxisCount: 4,
+          mainAxisSpacing: 10,
+          crossAxisSpacing: 10,
+          childAspectRatio: 0.65,
         ),
         delegate: SliverChildBuilderDelegate(
           (context, index) {
@@ -140,12 +128,7 @@ class StoreScreen extends ConsumerWidget {
                     );
                   }
                 }
-              } catch (e) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
-                }
-              }
-            }, onDelete: () => notifier.deleteItem(item.id));
+              }, onDelete: () => notifier.deleteItem(item.id));
           },
           childCount: items.length,
         ),
@@ -154,7 +137,10 @@ class StoreScreen extends ConsumerWidget {
   }
 
   Widget _buildStoreItem(BuildContext context, ShopItem item, bool isOwned, bool isActive, AppUser? user, VoidCallback onTap, {required VoidCallback onDelete}) {
-    String statusText = item.price > 0 ? '${item.price} ⭐' : 'status_free'.tr();
+    String statusText = item.price > 0 ? '${item.price} 🪙' : 'status_free'.tr();
+    final isDiamonds = item.diamondPrice > 0;
+    final priceStr = isDiamonds ? '${item.diamondPrice} 💎' : '${item.price} 🪙';
+
     if (isActive) {
       statusText = 'status_active'.tr();
     } else if (isOwned) {
@@ -162,7 +148,9 @@ class StoreScreen extends ConsumerWidget {
     } else if (user?.isAdmin == true) {
       statusText = 'GRANT';
     } else if (item.type == ShopItemType.consumable) {
-      statusText = '${item.price} ⭐';
+      statusText = priceStr;
+    } else {
+      statusText = priceStr;
     }
 
     return GestureDetector(
@@ -240,23 +228,83 @@ class StoreScreen extends ConsumerWidget {
               ],
             ),
           ),
-          if (user?.isAdmin == true)
-            Positioned(
-              top: 8,
-              right: 8,
-              child: GestureDetector(
-                onTap: onDelete,
-                child: Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(
-                    color: Colors.red.withOpacity(0.8),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.delete, color: Colors.white, size: 16),
-                ),
-              ),
+          // Overlay Actions (Admin Edit/Delete & Preview)
+          Positioned(
+            top: 4,
+            right: 4,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (user?.isAdmin == true) ...[
+                  _buildMiniAction(Icons.edit, () async {
+                    final updated = await showDialog<ShopItem>(
+                      context: context,
+                      builder: (c) => AdminAddItemDialog(type: item.type, initialItem: item),
+                    );
+                    if (updated != null) {
+                      ref.read(storeProvider.notifier).updateItem(updated);
+                    }
+                  }),
+                  const SizedBox(width: 4),
+                  _buildMiniAction(Icons.delete_outline, onDelete, isDelete: true),
+                ],
+                if (item.type == ShopItemType.cardBack || item.type == ShopItemType.tableSkin) ...[
+                  const SizedBox(width: 4),
+                  _buildMiniAction(Icons.visibility_outlined, () {
+                    showDialog(
+                      context: context,
+                      builder: (c) => ShopItemPreviewDialog(
+                        item: item, 
+                        isOwned: isOwned, 
+                        onAction: onTap,
+                      ),
+                    );
+                  }),
+                ],
+              ],
             ),
+          ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildCurrencyChip(BuildContext context, int amount, String symbol, Color color, {bool isAdmin = false}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(symbol, style: TextStyle(color: color, fontSize: 12)),
+          const SizedBox(width: 4),
+          Text(
+            isAdmin ? '∞' : amount.toString(),
+            style: TextStyle(
+              color: color, 
+              fontWeight: FontWeight.bold,
+              fontSize: isAdmin ? 18 : 12,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMiniAction(IconData icon, VoidCallback onTap, {bool isDelete = false}) {
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(
+          color: (isDelete ? Colors.red : Colors.black).withOpacity(0.6),
+          shape: BoxShape.circle,
+        ),
+        child: Icon(icon, color: Colors.white, size: 12),
       ),
     );
   }

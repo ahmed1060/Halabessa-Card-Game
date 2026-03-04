@@ -37,8 +37,18 @@ class CardWidget extends ConsumerWidget {
     );
 
     final effectiveBackPath = customBackPath ?? activeCard.assetPath;
-    final effectiveFrontPath = customFrontPath ?? activeCard.frontSkinPath ?? 'assets/images/cards/premium/card_front_premium_bg.png';
+    
+    // Check for special card backgrounds
+    String frontPath = activeCard.frontSkinPath ?? 'assets/images/cards/premium/card_front_premium_bg.png';
+    if (card.rank == game_card.Rank.ace && activeCard.aceSkinPath != null) {
+      frontPath = activeCard.aceSkinPath!;
+    } else if (card.rank == game_card.Rank.seven && card.suit == game_card.Suit.diamonds && activeCard.sevenDiamondSkinPath != null) {
+      frontPath = activeCard.sevenDiamondSkinPath!;
+    }
+    final effectiveFrontPath = customFrontPath ?? frontPath;
+
     final effectiveIllustrations = faceIllustrations ?? activeCard.faceIllustrations;
+    final effectiveSuitIcons = activeCard.suitIcons;
 
     if (!isFaceUp) {
       return GestureDetector(
@@ -113,7 +123,12 @@ class CardWidget extends ConsumerWidget {
                     );
                   },
                 ),
-              _buildFrontOverlay(context, isFaceItem: _getIllustrationPath(effectiveIllustrations) != null, customFrontPath: effectiveFrontPath),
+              _buildFrontOverlay(
+                context, 
+                isFaceItem: _getIllustrationPath(effectiveIllustrations) != null, 
+                customFrontPath: effectiveFrontPath,
+                customSuitIcons: effectiveSuitIcons,
+              ),
             ],
           ),
         ),
@@ -129,10 +144,24 @@ class CardWidget extends ConsumerWidget {
     return null;
   }
 
-  Widget _buildFrontOverlay(BuildContext context, {required bool isFaceItem, required String customFrontPath}) {
+  Widget _buildFrontOverlay(BuildContext context, {required bool isFaceItem, required String customFrontPath, Map<String, String>? customSuitIcons}) {
     final color = _getCardColor(customFrontPath);
     final rankText = _getRankText();
-    final suitIcon = _getSuitIcon();
+    
+    Widget suitWidget;
+    if (customSuitIcons != null) {
+      final suitKey = card.suit.name;
+      final suitPath = customSuitIcons[suitKey];
+      if (suitPath != null) {
+        suitWidget = suitPath.startsWith('http') 
+          ? Image.network(suitPath, color: color, width: 12, height: 12) 
+          : Image.asset(suitPath, color: color, width: 12, height: 12);
+      } else {
+        suitWidget = Icon(_getSuitIcon(), color: color, size: 12);
+      }
+    } else {
+      suitWidget = Icon(_getSuitIcon(), color: color, size: 12);
+    }
 
     return Padding(
       padding: const EdgeInsets.all(6.0),
@@ -144,15 +173,26 @@ class CardWidget extends ConsumerWidget {
             left: 0,
             child: Column(
               children: [
-                Text(rankText, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 14)),
-                Icon(suitIcon, color: color, size: 12),
+                Text(rankText, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 13)),
+                suitWidget,
               ],
             ),
           ),
           // Center Large Suit (Only if not a face item with illustration)
           if (!isFaceItem)
             Center(
-              child: Icon(suitIcon, color: color.withOpacity(0.4), size: 40),
+              child: Opacity(
+                opacity: 0.35,
+                child: SizedBox(
+                  width: 40,
+                  height: 40,
+                  child: customSuitIcons != null && customSuitIcons[card.suit.name] != null
+                    ? (customSuitIcons[card.suit.name]!.startsWith('http')
+                        ? Image.network(customSuitIcons[card.suit.name]!, color: color, fit: BoxFit.contain)
+                        : Image.asset(customSuitIcons[card.suit.name]!, color: color, fit: BoxFit.contain))
+                    : Icon(_getSuitIcon(), color: color, size: 40),
+                ),
+              ),
             ),
           // Bottom Right Rank (inverted)
           Positioned(
@@ -162,8 +202,8 @@ class CardWidget extends ConsumerWidget {
               quarterTurns: 2,
               child: Column(
                 children: [
-                  Text(rankText, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 14)),
-                  Icon(suitIcon, color: color, size: 12),
+                  Text(rankText, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 13)),
+                  suitWidget,
                 ],
               ),
             ),
