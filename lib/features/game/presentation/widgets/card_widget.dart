@@ -13,6 +13,8 @@ class CardWidget extends ConsumerWidget {
   final VoidCallback? onTap;
   final String? customBackPath;
   final String? customFrontPath;
+  final String? customAceSkinPath;
+  final String? customSevenDiamondSkinPath;
   final Map<String, String>? faceIllustrations;
 
   const CardWidget({
@@ -24,6 +26,8 @@ class CardWidget extends ConsumerWidget {
     this.onTap,
     this.customBackPath,
     this.customFrontPath,
+    this.customAceSkinPath,
+    this.customSevenDiamondSkinPath,
     this.faceIllustrations,
   });
 
@@ -40,10 +44,10 @@ class CardWidget extends ConsumerWidget {
     
     // Check for special card backgrounds
     String frontPath = activeCard.frontSkinPath ?? 'assets/images/cards/premium/card_front_premium_bg.png';
-    if (card.rank == game_card.Rank.ace && activeCard.aceSkinPath != null) {
-      frontPath = activeCard.aceSkinPath!;
-    } else if (card.rank == game_card.Rank.seven && card.suit == game_card.Suit.diamonds && activeCard.sevenDiamondSkinPath != null) {
-      frontPath = activeCard.sevenDiamondSkinPath!;
+    if (card.rank == game_card.Rank.ace) {
+      frontPath = customAceSkinPath ?? activeCard.aceSkinPath ?? frontPath;
+    } else if (card.rank == game_card.Rank.seven && card.suit == game_card.Suit.diamonds) {
+      frontPath = customSevenDiamondSkinPath ?? activeCard.sevenDiamondSkinPath ?? frontPath;
     }
     final effectiveFrontPath = customFrontPath ?? frontPath;
 

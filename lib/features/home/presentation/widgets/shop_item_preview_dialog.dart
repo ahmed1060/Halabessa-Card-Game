@@ -125,7 +125,35 @@ class _ShopItemPreviewDialogState extends State<ShopItemPreviewDialog> {
           const SizedBox(width: 12),
           _buildPreviewCard(game_models.Suit.hearts, game_models.Rank.king, 'K'),
           const SizedBox(width: 12),
-          _buildBackPreview(),
+          
+          // Flipping Middle Card (Back -> 7 Diamonds)
+          GestureDetector(
+            onTap: () => setState(() => _isFlipped = !_isFlipped),
+            child: TweenAnimationBuilder(
+              duration: const Duration(milliseconds: 500),
+              curve: Curves.easeOutBack,
+              tween: Tween<double>(begin: 0, end: _isFlipped ? 180 : 0),
+              builder: (context, double value, child) {
+                return Transform(
+                  transform: Matrix4.identity()
+                    ..setEntry(3, 2, 0.001)
+                    ..rotateY(value * 0.0174533),
+                  alignment: Alignment.center,
+                  child: value >= 90
+                      ? RotatedBox(
+                          quarterTurns: 2,
+                          child: _buildPreviewCard(
+                            game_models.Suit.diamonds, 
+                            game_models.Rank.seven, 
+                            '7-Diamond',
+                          ),
+                        )
+                      : _buildBackPreview(),
+                );
+              },
+            ),
+          ),
+          
           const SizedBox(width: 12),
           _buildPreviewCard(game_models.Suit.diamonds, game_models.Rank.queen, 'Q'),
           const SizedBox(width: 12),
@@ -144,6 +172,8 @@ class _ShopItemPreviewDialogState extends State<ShopItemPreviewDialog> {
           height: 120,
           isFaceUp: true,
           customFrontPath: widget.item.frontSkinPath,
+          customAceSkinPath: widget.item.aceSkinPath,
+          customSevenDiamondSkinPath: widget.item.sevenDiamondSkinPath,
           faceIllustrations: widget.item.faceIllustrations,
         ),
         const SizedBox(height: 8),
