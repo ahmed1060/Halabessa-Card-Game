@@ -127,7 +127,7 @@ class StoreNotifier extends StateNotifier<StoreState> {
     final user = _ref.read(currentUserProvider);
     if (user == null) return;
 
-    if (!user.isAdmin && item.price > 0 && user.points < item.price) {
+    if (!user.canAfford(item.price)) {
       throw Exception('Not enough points');
     }
 
@@ -136,8 +136,7 @@ class StoreNotifier extends StateNotifier<StoreState> {
        final newInventory = Map<String, int>.from(user.inventory);
        newInventory[item.id] = currentCount + 1;
        
-       // EVERYTHING IS FREE FOR NOW: pointsToDeduct is effectively 0
-       const pointsToDeduct = 0; 
+       final pointsToDeduct = user.isAdmin ? 0 : item.price; 
        
        await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
          'points': user.points - pointsToDeduct,
@@ -149,9 +148,11 @@ class StoreNotifier extends StateNotifier<StoreState> {
         state = state.copyWith(ownedIds: newOwned);
         _prefs.setStringList(_kOwnedIds, newOwned);
         
+        final pointsToDeduct = user.isAdmin ? 0 : item.price;
+        
         // Persist to Firestore
         await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
-          'points': user.points, // No points deducted for now
+          'points': user.points - pointsToDeduct,
           'owned_skins': newOwned, 
         });
       }

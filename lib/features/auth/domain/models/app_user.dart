@@ -22,7 +22,9 @@ class AppUser {
   final Map<String, int> inventory;
   
   double get winRate => gamesPlayed == 0 ? 0 : wins / gamesPlayed;
-  int get level => (points / 1000).floor() + 1;
+  int get level => isAdmin ? 999 : (points / 1000).floor() + 1;
+
+  bool canAfford(int price) => isAdmin || points >= price;
 
   AppUser({
     required this.uid,
