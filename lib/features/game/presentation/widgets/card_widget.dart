@@ -31,14 +31,19 @@ class CardWidget extends ConsumerWidget {
     this.customSevenDiamondSkinPath,
     this.faceIllustrations,
     this.customSuitIcons,
+    this.skinId,
   });
+
+  final String? skinId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final store = ref.watch(storeProvider);
     final notifier = ref.watch(storeProvider.notifier);
+    
+    final targetSkinId = skinId ?? store.activeCardBackId;
     final activeCard = notifier.allItems.firstWhere(
-      (i) => i.id == store.activeCardBackId, 
+      (i) => i.id == targetSkinId, 
       orElse: () => notifier.allItems[0]
     );
 

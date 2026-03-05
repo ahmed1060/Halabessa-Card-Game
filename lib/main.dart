@@ -9,10 +9,19 @@ import 'core/theme/theme_config.dart';
 import 'core/providers/settings_provider.dart';
 import 'core/services/multimedia_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/services.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await EasyLocalization.ensureInitialized();
+
+  // Mobile Immersion & Orientation
+  await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+  await SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.landscapeLeft,
+    DeviceOrientation.landscapeRight,
+  ]);
 
   final sharedPrefs = await SharedPreferences.getInstance();
   

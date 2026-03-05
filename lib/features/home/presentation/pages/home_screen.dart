@@ -15,6 +15,8 @@ import 'package:halabessa/features/home/presentation/widgets/overlays/join_room_
 import 'package:halabessa/core/services/multimedia_service.dart';
 import 'package:halabessa/core/services/asset_preloader_service.dart';
 
+import 'package:halabessa/features/auth/presentation/widgets/username_onboarding_overlay.dart';
+
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
@@ -26,6 +28,18 @@ class HomeScreen extends ConsumerWidget {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(assetPreloaderServiceProvider).preloadAll(context);
       ref.read(multimediaServiceProvider).playMusic('music/bg_music.mp3');
+
+      // Username Onboarding Check
+      if (user != null && user.username == null) {
+        showModalBottomSheet(
+          context: context,
+          isScrollControlled: true,
+          isDismissible: false,
+          enableDrag: false,
+          backgroundColor: Colors.transparent,
+          builder: (context) => const UsernameOnboardingOverlay(),
+        );
+      }
 
       // ONE-TIME CLEANUP (Stale Rooms)
       if (user?.isAdmin == true) {
@@ -104,8 +118,10 @@ class HomeScreen extends ConsumerWidget {
                               style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
                             ),
                             Text(
-                              'points_and_rank'.tr(args: [user.points.toString(), user.rank.toString()]),
-                              style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 12),
+                              user.isAdmin 
+                                ? 'status_admin'.tr()
+                                : 'points_and_rank'.tr(args: [user.points.toString(), user.rank.toString()]),
+                              style: TextStyle(color: ThemeConfig.goldAccent.withOpacity(0.9), fontSize: 12, fontWeight: user.isAdmin ? FontWeight.bold : FontWeight.normal),
                             ),
                           ],
                         ),

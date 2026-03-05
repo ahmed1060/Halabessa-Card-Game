@@ -5,6 +5,7 @@ import 'dart:math' as math;
 import '../../../../core/theme/theme_config.dart';
 import '../../domain/models/match_state.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
+import '../../../../core/services/multimedia_service.dart';
 
 class MatchSummaryDialog extends ConsumerStatefulWidget {
   final MatchState matchState;
@@ -65,6 +66,21 @@ class _MatchSummaryDialogState extends ConsumerState<MatchSummaryDialog> with Si
     });
 
     _controller.forward();
+
+    // Trigger Victory/Defeat SFX
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final currentUser = ref.read(currentUserProvider);
+      if (currentUser == null) return;
+      final myIndex = widget.matchState.playerIds.indexOf(currentUser.uid);
+      final myTeam = (myIndex == 0 || myIndex == 2) ? 'teamA' : 'teamB';
+      final isWinner = myTeam == widget.winnerTeam;
+      
+      if (isWinner) {
+        ref.read(multimediaServiceProvider).playSfx('sfx/win.mp3');
+      } else {
+        ref.read(multimediaServiceProvider).playSfx('sfx/lose.mp3');
+      }
+    });
   }
 
   @override

@@ -6,6 +6,7 @@ import 'package:halabessa/core/theme/theme_config.dart';
 import 'package:halabessa/core/widgets/user_avatar.dart';
 import '../providers/auth_providers.dart';
 import '../widgets/avatar_picker.dart';
+import '../widgets/username_onboarding_overlay.dart';
 import '../../domain/models/app_user.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
@@ -31,6 +32,20 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     const nextLevelXP = 100; // Simplified for now
     final currentXP = user.points % 100;
     final level = (user.points / 100).floor() + 1;
+
+    // Mandatory Username Check
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (user.username == null) {
+        showModalBottomSheet(
+          context: context,
+          isScrollControlled: true,
+          isDismissible: false,
+          enableDrag: false,
+          backgroundColor: Colors.transparent,
+          builder: (context) => const UsernameOnboardingOverlay(),
+        );
+      }
+    });
 
     return Scaffold(
       backgroundColor: ThemeConfig.darkBg,
@@ -153,15 +168,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               const SizedBox(height: 16),
               Row(
                 children: [
-                   Expanded(child: _buildStatCard(context, 'stars'.tr(), user.isAdmin ? '∞' : user.points.toString(), Icons.stars, ThemeConfig.goldAccent)),
+                   Expanded(child: _buildStatCard(context, 'stars'.tr(), user.isAdmin ? 'status_infinity'.tr() : user.points.toString(), Icons.stars, ThemeConfig.goldAccent)),
                    const SizedBox(width: 16),
-                   Expanded(child: _buildStatCard(context, 'coins'.tr(), user.isAdmin ? '∞' : user.coins.toString(), Icons.monetization_on, Colors.orange)),
+                   Expanded(child: _buildStatCard(context, 'coins'.tr(), user.isAdmin ? 'status_infinity'.tr() : user.coins.toString(), Icons.monetization_on, Colors.orange)),
                 ],
               ),
               const SizedBox(height: 16),
               Row(
                 children: [
-                   Expanded(child: _buildStatCard(context, 'diamonds'.tr(), user.isAdmin ? '∞' : user.diamonds.toString(), Icons.diamond, ThemeConfig.primaryTeal)),
+                   Expanded(child: _buildStatCard(context, 'diamonds'.tr(), user.isAdmin ? 'status_infinity'.tr() : user.diamonds.toString(), Icons.diamond, ThemeConfig.primaryTeal)),
                 ],
               ),
               const SizedBox(height: 40),
@@ -203,11 +218,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 subtitle: Text(
                   user.isAdmin 
                     ? 'free_for_admin'.tr()
-                    : ((user.inventory['name_change_ticket'] ?? 0) > 0 
-                      ? 'use_ticket_btn'.tr() 
-                      : 'no_tickets_message'.tr()),
+                    : (user.username == null 
+                      ? 'first_time_free'.tr()
+                      : ((user.inventory['username_change_ticket'] ?? 0) > 0 
+                        ? 'use_ticket_btn'.tr() 
+                        : 'no_tickets_message'.tr())),
                   style: TextStyle(
-                    color: (user.isAdmin || (user.inventory['name_change_ticket'] ?? 0) > 0) 
+                    color: (user.isAdmin || user.username == null || (user.inventory['username_change_ticket'] ?? 0) > 0) 
                       ? ThemeConfig.goldAccent 
                       : Colors.white30,
                     fontSize: 12,
@@ -303,7 +320,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         title: Text('edit_display_name'.tr(), style: const TextStyle(color: Colors.white)),
         content: TextField(
           controller: nameController,
-          decoration: InputDecoration(labelText: 'display_name_label'.tr()),
+          maxLength: 20,
+          decoration: InputDecoration(
+            labelText: 'display_name_label'.tr(),
+            counterText: "", // Hide counter for cleaner feel if preferred, or keep it.
+          ),
           style: const TextStyle(color: Colors.white),
         ),
         actions: [
@@ -332,7 +353,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   Future<void> _handleUsernameChange(BuildContext context, AppUser user) async {
-    final hasTicket = user.isAdmin || (user.inventory['name_change_ticket'] ?? 0) > 0;
+    final hasTicket = user.isAdmin || user.username == null || (user.inventory['username_change_ticket'] ?? 0) > 0;
     
     if (!hasTicket) {
       _showTicketRequiredDialog(context);
@@ -353,11 +374,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             children: [
               TextField(
                 controller: usernameController,
+                maxLength: 20,
                 decoration: InputDecoration(
                   labelText: 'username_label'.tr(),
                   hintText: 'e.g. ahmed123',
                   prefixText: '@',
                   errorText: errorText,
+                  counterText: "",
                 ),
                 style: const TextStyle(color: Colors.white),
                 onChanged: (val) async {
@@ -409,7 +432,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: ThemeConfig.darkBg,
-        title: Text('name_change_ticket'.tr(), style: const TextStyle(color: Colors.white)),
+        title: Text('username_change_ticket'.tr(), style: const TextStyle(color: Colors.white)),
         content: Text('no_tickets_message'.tr(), style: const TextStyle(color: Colors.white70)),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: Text('cancel'.tr())),

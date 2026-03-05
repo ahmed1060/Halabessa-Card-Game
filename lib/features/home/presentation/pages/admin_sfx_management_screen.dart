@@ -22,6 +22,9 @@ class _AdminSfxManagementScreenState extends ConsumerState<AdminSfxManagementScr
   final List<Map<String, String>> _audioItems = [
     {'label': 'capture_sfx', 'path': 'sfx/capture.mp3', 'type': 'sfx'},
     {'label': 'deal_sfx', 'path': 'sfx/deal.mp3', 'type': 'sfx'},
+    {'label': 'play_sfx', 'path': 'sfx/play.mp3', 'type': 'sfx'},
+    {'label': 'shuffle_sfx', 'path': 'sfx/shuffle.mp3', 'type': 'sfx'},
+    {'label': 'cut_sfx', 'path': 'sfx/cut.mp3', 'type': 'sfx'},
     {'label': 'win_sfx', 'path': 'sfx/win.mp3', 'type': 'sfx'},
     {'label': 'lose_sfx', 'path': 'sfx/lose.mp3', 'type': 'sfx'},
     {'label': 'purchase_sfx', 'path': 'sfx/purchase.mp3', 'type': 'sfx'},

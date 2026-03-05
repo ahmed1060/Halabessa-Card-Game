@@ -49,21 +49,23 @@ class _SocialOverlayState extends ConsumerState<SocialOverlay> {
     final currentUser = ref.watch(currentUserProvider);
     if (currentUser == null) return const SizedBox.shrink();
 
-    return DraggableScrollableSheet(
-      initialChildSize: 0.75,
-      minChildSize: 0.5,
-      maxChildSize: 0.95,
-      expand: false,
-      builder: (context, scrollController) => Container(
-        decoration: BoxDecoration(
-          color: Colors.black.withOpacity(0.95),
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-          border: Border.all(color: Colors.white10),
-          boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 20, spreadRadius: 5),
-          ],
-        ),
-        child: Column(
+    return DefaultTabController(
+      length: 3,
+      child: DraggableScrollableSheet(
+        initialChildSize: 0.75,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        expand: false,
+        builder: (context, scrollController) => Container(
+          decoration: BoxDecoration(
+            color: Colors.black.withOpacity(0.95),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+            border: Border.all(color: Colors.white10),
+            boxShadow: [
+              BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 20, spreadRadius: 5),
+            ],
+          ),
+          child: Column(
           children: [
             // Drag Handle
             Container(
@@ -195,13 +197,30 @@ class _SocialOverlayState extends ConsumerState<SocialOverlay> {
         if (currentUser.friends.isNotEmpty)
           ...currentUser.friends.map((friendUid) => ref.watch(userProfileProvider(friendUid)).when(
             data: (user) {
-              if (user == null) return const SizedBox.shrink();
+              if (user == null) {
+                return _buildErrorState('User not found');
+              }
               return _buildUserTile(user, isFriend: true);
             },
-            loading: () => const SizedBox(height: 72, child: Center(child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2)))),
-            error: (_, __) => const SizedBox.shrink(),
+            loading: () => const SizedBox(height: 72, child: Center(child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.tealAccent)))),
+            error: (e, __) => _buildErrorState(e.toString()),
           )),
       ],
+    );
+  }
+
+  Widget _buildErrorState(String error) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(color: Colors.redAccent.withOpacity(0.05), borderRadius: BorderRadius.circular(16)),
+      child: Row(
+        children: [
+          const Icon(Icons.error_outline, color: Colors.redAccent, size: 20),
+          const SizedBox(width: 12),
+          Expanded(child: Text('error_prefix'.tr(args: [error]), style: const TextStyle(color: Colors.redAccent, fontSize: 12))),
+        ],
+      ),
     );
   }
 

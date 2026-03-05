@@ -66,6 +66,7 @@ class MultimediaService extends ChangeNotifier {
 
   // Audio - Background Music
   String? _currentMusicPath;
+  String? _lastPlayedUrl;
   String? get currentMusicPath => _currentMusicPath;
   PlayerState get musicState => _musicPlayer.state;
   PlayerState get sfxState => _sfxPlayer.state;
@@ -90,18 +91,18 @@ class MultimediaService extends ChangeNotifier {
       final overrideUrl = globalSettings.musicOverrideUrl;
 
       if (overrideUrl == null || overrideUrl.isEmpty) {
-        debugPrint('MultimediaService: No override URL found for $assetPath yet. Queueing.');
+        debugPrint('MultimediaService: No override URL for $assetPath. Queueing.');
         _pendingMusic = assetPath;
         return;
       }
 
-      // If already playing this source, don't restart
-      if (_musicPlayer.state == PlayerState.playing && _pendingMusic == null) {
-        // We assume the current source matches the overrideUrl
+      // Force restart if different URL even if playing
+      if (_musicPlayer.state == PlayerState.playing && _lastPlayedUrl == overrideUrl) {
         return;
       }
 
       debugPrint('MultimediaService: Playing music from $overrideUrl');
+      _lastPlayedUrl = overrideUrl;
       await _musicPlayer.setReleaseMode(loop ? ReleaseMode.loop : ReleaseMode.release);
       await _musicPlayer.play(UrlSource(overrideUrl)).then((_) {
         _pendingMusic = null;
@@ -137,6 +138,12 @@ class MultimediaService extends ChangeNotifier {
         return;
       }
 
+      // Force restart if different URL even if playing
+      if (_musicPlayer.state == PlayerState.playing && _lastPlayedUrl == overrideUrl) {
+        return;
+      }
+
+      _lastPlayedUrl = overrideUrl;
       await _musicPlayer.setReleaseMode(loop ? ReleaseMode.loop : ReleaseMode.release);
       await _musicPlayer.play(UrlSource(overrideUrl)).then((_) {
         _pendingMusic = null;
@@ -155,6 +162,7 @@ class MultimediaService extends ChangeNotifier {
     try {
       await _musicPlayer.stop();
       _pendingMusic = null; // Clear pending on manual stop
+      _lastPlayedUrl = null;
       notifyListeners();
     } catch (e) {
       debugPrint('MultimediaService: Failed to stop music: $e');

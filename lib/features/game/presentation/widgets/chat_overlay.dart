@@ -19,7 +19,9 @@ class _ChatOverlayState extends ConsumerState<ChatOverlay> {
   final ScrollController _scrollController = ScrollController();
 
   void _sendMessage(String text, {bool isQuickChat = false}) {
-    if (text.trim().isEmpty) return;
+    final safeText = text.trim();
+    if (safeText.isEmpty) return;
+    final limitedText = safeText.length > 60 ? safeText.substring(0, 60) : safeText;
 
     final matchState = ref.read(matchStateProvider);
     final currentUser = ref.read(currentUserProvider);
@@ -30,7 +32,7 @@ class _ChatOverlayState extends ConsumerState<ChatOverlay> {
       id: '', // Will be set by Firebase push()
       senderId: currentUser.uid,
       senderName: currentUser.displayName,
-      text: text.trim(),
+      text: limitedText,
       timestamp: DateTime.now(),
       isQuickChat: isQuickChat,
     );
@@ -191,11 +193,13 @@ class _ChatOverlayState extends ConsumerState<ChatOverlay> {
                         ),
                         child: TextField(
                           controller: _controller,
+                          maxLength: 60,
                           style: const TextStyle(color: Colors.white),
                           decoration: InputDecoration(
                             hintText: 'tap_to_type'.tr(),
                             hintStyle: const TextStyle(color: Colors.white30),
                             border: InputBorder.none,
+                            counterText: "",
                           ),
                           onSubmitted: (val) => _sendMessage(val),
                         ),

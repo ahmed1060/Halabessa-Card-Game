@@ -31,11 +31,9 @@ class StoreScreen extends ConsumerWidget {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: Row(
                 children: [
-                  _buildCurrencyChip(context, user.points, '⭐', ThemeConfig.goldAccent, isAdmin: user.isAdmin),
+                  _buildCurrencyChip(context, user.coins, '🪙', Colors.orange, isAdmin: user.isAdmin),
                   const SizedBox(width: 8),
-                  _buildCurrencyChip(context, user.coins, '🪙', Colors.orange),
-                  const SizedBox(width: 8),
-                  _buildCurrencyChip(context, user.diamonds, '💎', ThemeConfig.primaryTeal),
+                  _buildCurrencyChip(context, user.diamonds, '💎', ThemeConfig.primaryTeal, isAdmin: user.isAdmin),
                 ],
               ),
             ),

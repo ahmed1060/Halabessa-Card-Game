@@ -306,11 +306,11 @@ class StoreNotifier extends StateNotifier<StoreState> {
     ShopItem(id: 'ancient_marble_table', name: 'skin_ancient_marble'.tr(), assetPath: 'assets/images/tables/table_skin_ancient_marble.png', type: ShopItemType.tableSkin, price: 2000, diamondPrice: 60),
     
     ShopItem(
-      id: 'name_change_ticket', 
-      name: 'name_change_ticket'.tr(), 
+      id: 'username_change_ticket', 
+      name: 'username_change_ticket'.tr(), 
       assetPath: 'assets/images/items/ticket.png', 
       type: ShopItemType.consumable,
-      price: 0,
+      price: 500,
     ),
     
     // Default Avatars

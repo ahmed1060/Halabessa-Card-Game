@@ -56,12 +56,16 @@ class FirebaseAuthRepository implements AuthRepository {
     if (user == null) {
       return null;
     }
+    
+    // Hardcoded check + potential existing role in Firestore (handled in authStateChanges)
+    final bool isAdminEmail = user.email == 'ahmed.hossam1060@gmail.com';
+    
     return AppUser(
       uid: user.uid,
       email: user.email ?? '',
       displayName: (user.displayName != null && user.displayName!.trim().isNotEmpty) ? user.displayName! : 'Player',
       avatarUrl: user.photoURL,
-      isAdmin: user.email == 'ahmed.hossam1060@gmail.com',
+      isAdmin: isAdminEmail,
     );
   }
 
@@ -242,7 +246,9 @@ class FirebaseAuthRepository implements AuthRepository {
        );
        
        final userCredential = await _firebaseAuth.signInWithCredential(oAuthCredential);
-       return _userFromFirebase(userCredential.user);
+       final user = _userFromFirebase(userCredential.user);
+       if (user != null) await _syncUserToDatabase(user);
+       return user;
     } catch (e) {
        debugPrint("Apple Sign In failed: $e");
        rethrow;
@@ -342,13 +348,13 @@ class FirebaseAuthRepository implements AuthRepository {
               throw Exception('Username already taken');
             }
 
-            // 2. Consume ticket if not admin
-            if (!fullUser.isAdmin) {
-              final ticketCount = fullUser.inventory['name_change_ticket'] ?? 0;
+            // 2. Consume ticket if not admin and NOT first-time change
+            if (!fullUser.isAdmin && fullUser.username != null) {
+              final ticketCount = fullUser.inventory['username_change_ticket'] ?? 0;
               if (ticketCount <= 0) {
-                throw Exception('You need a Name Change Ticket to change your username');
+                throw Exception('You need a Username Change Ticket to change your username');
               }
-              finalInventory['name_change_ticket'] = ticketCount - 1;
+              finalInventory['username_change_ticket'] = ticketCount - 1;
             }
 
             // 3. Update usernames collection (swap)

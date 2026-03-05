@@ -136,7 +136,7 @@ class MultiplayerSyncService {
   /// Search for users by display name (basic prefix search)
   Future<List<AppUser>> searchUsers(String query) async {
     try {
-      final lowercaseQuery = query.toLowerCase();
+      final lowercaseQuery = query.toLowerCase().replaceAll('@', '').trim();
       final firestore = FirebaseFirestore.instance;
       
       final snapshot = await firestore.collection('users')

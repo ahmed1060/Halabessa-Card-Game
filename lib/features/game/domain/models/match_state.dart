@@ -64,8 +64,10 @@ class MatchState {
   final int capturingStage; // 0: merge, 1: fly
   final DateTime? expireAt;
   final int spectatorCount;
+  final Map<String, String> playerSkins;
   final Map<String, int> earnedStars;
   final Map<String, int> earnedCoins;
+  final Map<String, String> playerAvatars;
 
   
     MatchState({
@@ -108,6 +110,8 @@ class MatchState {
       this.capturingStage = 0,
       this.spectatorCount = 0,
       this.expireAt,
+      this.playerSkins = const {},
+      this.playerAvatars = const {},
       this.earnedStars = const {},
       this.earnedCoins = const {},
     });
@@ -152,6 +156,7 @@ class MatchState {
     game_card.Card? lastCardRevealed,
     int? spectatorCount,
     DateTime? expireAt,
+    Map<String, String>? playerAvatars,
     Map<String, int>? earnedStars,
     Map<String, int>? earnedCoins,
   }) {
@@ -195,6 +200,8 @@ class MatchState {
       lastCardRevealed: lastCardRevealed ?? this.lastCardRevealed,
       spectatorCount: spectatorCount ?? this.spectatorCount,
       expireAt: expireAt ?? this.expireAt,
+      playerSkins: playerSkins ?? this.playerSkins,
+      playerAvatars: playerAvatars ?? this.playerAvatars,
       earnedStars: earnedStars ?? this.earnedStars,
       earnedCoins: earnedCoins ?? this.earnedCoins,
     );
@@ -241,6 +248,8 @@ class MatchState {
       'capturingStage': capturingStage,
       'spectatorCount': spectatorCount,
       'expireAt': expireAt?.toIso8601String(),
+      'playerSkins': playerSkins,
+      'playerAvatars': playerAvatars,
       'earnedStars': earnedStars,
       'earnedCoins': earnedCoins,
     };
@@ -405,6 +414,8 @@ class MatchState {
       final cardOwnership = parseStringMap(json['cardOwnership']);
       final playerOnlineStatus = parseBoolMap(json['playerOnlineStatus']);
       final playerLastActive = parseDateTimeMap(json['playerLastActive']);
+      final playerSkins = parseStringMap(json['playerSkins']);
+      final playerAvatars = parseStringMap(json['playerAvatars']);
 
       return MatchState(
         id: id,
@@ -449,6 +460,8 @@ class MatchState {
         lastCardRevealed: json['lastCardRevealed'] != null ? game_card.Card.fromJson(Map<String, dynamic>.from(json['lastCardRevealed'])) : null,
         spectatorCount: json['spectatorCount'] is int ? json['spectatorCount'] as int : 0,
         expireAt: json['expireAt'] != null ? DateTime.tryParse(json['expireAt'].toString()) : null,
+        playerSkins: playerSkins,
+        playerAvatars: playerAvatars,
         earnedStars: parseIntMap(json['earnedStars']),
         earnedCoins: parseIntMap(json['earnedCoins']),
       );

@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
@@ -41,7 +40,7 @@ class _AvatarPickerState extends ConsumerState<AvatarPicker> {
           .child('avatars')
           .child('${user.uid}.jpg');
 
-      await storageRef.putFile(File(image.path));
+      await storageRef.putData(await image.readAsBytes());
       final downloadUrl = await storageRef.getDownloadURL();
 
       await ref.read(authRepositoryProvider).updateProfile(avatarUrl: downloadUrl);

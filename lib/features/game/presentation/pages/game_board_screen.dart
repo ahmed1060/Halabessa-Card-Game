@@ -90,7 +90,9 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
        targetName = rawName.tr();
      }
      
-     return AppUser(uid: targetUid, email: '', displayName: targetName);
+     String avatarUrl = matchState.playerAvatars[targetUid] ?? "";
+     
+     return AppUser(uid: targetUid, email: '', displayName: targetName, avatarUrl: avatarUrl.isEmpty ? null : avatarUrl);
   }
 
   Widget _buildTeamHarvestPiles(MatchState matchState, String teamId, {required bool isMyTeam}) {
@@ -330,235 +332,223 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
     final bool isSpectator = matchState.playerIds.indexOf(myUid) == -1;
 
 
-    return Scaffold(
-      extendBodyBehindAppBar: true,
-      appBar: AppBar(
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) {
+        if (didPop) return;
+        _confirmLeave(context, ref);
+      },
+      child: Scaffold(
         backgroundColor: Colors.transparent,
-        elevation: 0,
-        centerTitle: true,
-        leadingWidth: 120,
-        leading: Padding(
-          padding: const EdgeInsets.only(left: 16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text('app_title'.tr(), 
-                style: const TextStyle(fontFamily: ThemeConfig.fontHeading, fontWeight: FontWeight.bold, fontSize: 14, letterSpacing: 1.2, color: Colors.white)
-              ),
-              Text(
-                'room_id_label'.tr(args: [matchState.id]),
-                style: TextStyle(fontSize: 9, color: Colors.white.withOpacity(0.5)),
-              ),
-            ],
-          ),
-        ),
-        title: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _buildScoreBadge(matchState),
-            if (matchState.phase != GamePhase.waitingForPlayers) ...[
-              const SizedBox(width: 12),
-              _buildFloatingMatchStatusSmall(matchState),
-            ],
-          ],
-        ),
-        actions: [
-          if (matchState.spectatorCount > 0) ...[
-            _buildSpectatorCountBadge(matchState.spectatorCount),
-            const SizedBox(width: 16),
-          ],
-        ],
-      ),
-      body: Stack(
-        children: [
-          // Table Top Background (Premium Skin)
-          Positioned.fill(
-            child: Consumer(
-              builder: (context, ref, child) {
-                final store = ref.watch(storeProvider);
-                final notifier = ref.watch(storeProvider.notifier);
-                final activeTable = notifier.allItems.firstWhere((i) => i.id == store.activeTableSkinId, orElse: () => notifier.allItems[3]);
-                return activeTable.assetPath.startsWith('http')
-                  ? Image.network(
-                      activeTable.assetPath,
-                      fit: BoxFit.cover,
-                    )
-                  : Image.asset(
-                      activeTable.assetPath,
-                      fit: BoxFit.cover,
-                    );
-              },
-            ),
-          ),
-          // Additional Radial Overlay for Depth
-          Container(
-            decoration: BoxDecoration(
-              gradient: RadialGradient(
-                colors: [
-                  Colors.transparent,
-                  Colors.black.withOpacity(0.3),
-                  Colors.black.withOpacity(0.7),
-                ],
-                radius: 1.2,
-              ),
-            ),
-          ),
-          
-          SafeArea(
-            child: Stack(
+        body: OrientationBuilder(
+          builder: (context, orientation) {
+            final isLandscape = orientation == Orientation.landscape;
+            
+            // Auto-trigger confetti on match over win
+            if (matchState.phase == GamePhase.matchOver) {
+              final myIndex = matchState.playerIds.indexOf(myUid);
+              if (myIndex != -1) {
+                final myTeam = (myIndex == 0 || myIndex == 2) ? 'teamA' : 'teamB';
+                final aWins = matchState.teamAScore >= matchState.teamBScore;
+                final winnerTeam = aWins ? 'teamA' : 'teamB';
+                if (myTeam == winnerTeam && !_confettiController.state.isPlaying) {
+                  _confettiController.play();
+                }
+              }
+            }
+
+            return Stack(
               children: [
-                // Partner / Opposite Player (Offset 2 in Anticlockwise)
-                Align(
-                  alignment: Alignment.topCenter,
-                  child: Padding(
-                    padding: const EdgeInsets.only(top: 10.0), // Safe positive padding
-                    child: GestureDetector(
-                      onTap: () => _showPlayerProfile(context, ref, matchState, myUid, 2),
-                      child: PlayerAvatar(
-                        user: _getAvatarUser(ref, matchState, myUid, 2),
-                        isCurrentTurn: matchState.currentTurnIndex == _getAbsoluteIndex(matchState, myUid, 2),
-                        turnStartTime: matchState.turnStartTime,
-                        timerDurationSeconds: matchState.timerDurationSeconds,
-                        activeEmoji: _getPlayerEmoji(matchState, myUid, 2),
-                        activeMessage: ref.watch(lastMessageForUserProvider(matchState.playerIds.isEmpty ? '' : matchState.playerIds[(_getAbsoluteIndex(matchState, myUid, 2)) % matchState.playerIds.length]))?.text,
-                        teamColor: _getTeamColorForOffset(matchState, myUid, 2),
+                // Background Table (Skin)
+                Positioned.fill(
+                  child: Consumer(
+                    builder: (context, ref, child) {
+                      final activeTable = ref.watch(activeTableSkinProvider);
+                      return activeTable.assetPath.startsWith('http')
+                        ? Image.network(activeTable.assetPath, fit: BoxFit.cover)
+                        : Image.asset(activeTable.assetPath, fit: BoxFit.cover);
+                    },
+                  ),
+                ),
+                Container(
+                  decoration: BoxDecoration(
+                    gradient: RadialGradient(
+                      colors: [
+                        Colors.transparent,
+                        Colors.black.withOpacity(0.3),
+                        Colors.black.withOpacity(0.7),
+                      ],
+                      radius: 1.2,
+                    ),
+                  ),
+                ),
+                
+                SafeArea(
+                  child: Stack(
+                    children: [
+                      // New Top Bar (Persistent)
+                      _buildTopBar(context, ref, matchState, isLandscape),
+                    
+                    // ... Players and Board Center next ...
+                    // Partner / Opposite Player (Offset 2 in Anticlockwise)
+                    Align(
+                      alignment: isLandscape ? const Alignment(0, -0.9) : Alignment.topCenter,
+                      child: Padding(
+                        padding: EdgeInsets.only(top: isLandscape ? 0 : 10.0), 
+                        child: GestureDetector(
+                          onTap: () => _showPlayerProfile(context, ref, matchState, myUid, 2),
+                          child: PlayerAvatar(
+                            user: _getAvatarUser(ref, matchState, myUid, 2),
+                            isCurrentTurn: matchState.currentTurnIndex == _getAbsoluteIndex(matchState, myUid, 2),
+                            turnStartTime: matchState.turnStartTime,
+                            timerDurationSeconds: matchState.timerDurationSeconds,
+                            activeEmoji: _getPlayerEmoji(matchState, myUid, 2),
+                            activeMessage: ref.watch(lastMessageForUserProvider(matchState.playerIds.isEmpty ? '' : matchState.playerIds[(_getAbsoluteIndex(matchState, myUid, 2)) % matchState.playerIds.length]))?.text,
+                            teamColor: _getTeamColorForOffset(matchState, myUid, 2),
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-                ),
 
-                // Left Player (Offset 3 in Anticlockwise)
-                Align(
-                  alignment: const Alignment(-0.9, -0.1), // Balanced alignment
-                  child: GestureDetector(
-                    onTap: () => _showPlayerProfile(context, ref, matchState, myUid, 3),
-                    child: PlayerAvatar(
-                      user: _getAvatarUser(ref, matchState, myUid, 3),
-                      isCurrentTurn: matchState.currentTurnIndex == _getAbsoluteIndex(matchState, myUid, 3),
-                      turnStartTime: matchState.turnStartTime,
-                      timerDurationSeconds: matchState.timerDurationSeconds,
-                      activeEmoji: _getPlayerEmoji(matchState, myUid, 3),
-                      activeMessage: ref.watch(lastMessageForUserProvider(matchState.playerIds.isEmpty ? '' : matchState.playerIds[(_getAbsoluteIndex(matchState, myUid, 3)) % matchState.playerIds.length]))?.text,
-                      teamColor: _getTeamColorForOffset(matchState, myUid, 3),
-                    ),
-                  ),
-                ),
-
-                // Right Player (Offset 1 in Anticlockwise)
-                Align(
-                  alignment: const Alignment(0.9, -0.1), // Balanced alignment
-                  child: GestureDetector(
-                    onTap: () => _showPlayerProfile(context, ref, matchState, myUid, 1),
-                    child: PlayerAvatar(
-                      user: _getAvatarUser(ref, matchState, myUid, 1),
-                      isCurrentTurn: matchState.currentTurnIndex == _getAbsoluteIndex(matchState, myUid, 1),
-                      turnStartTime: matchState.turnStartTime,
-                      timerDurationSeconds: matchState.timerDurationSeconds,
-                      activeEmoji: _getPlayerEmoji(matchState, myUid, 1),
-                      activeMessage: ref.watch(lastMessageForUserProvider(matchState.playerIds.isEmpty ? '' : matchState.playerIds[(_getAbsoluteIndex(matchState, myUid, 1)) % matchState.playerIds.length]))?.text,
-                      teamColor: _getTeamColorForOffset(matchState, myUid, 1),
-                    ),
-                  ),
-                ),
-
-                // Harvest Piles
-                _buildTeamHarvestPiles(matchState, 'teamA', isMyTeam: _getTeamOfPlayer(myUid, matchState.playerIds) == 'teamA'),
-                _buildTeamHarvestPiles(matchState, 'teamB', isMyTeam: _getTeamOfPlayer(myUid, matchState.playerIds) == 'teamB'),
-
-                Align(
-                  alignment: const Alignment(0, -0.45), // Raised even further to clear hand space on mobile (was -0.2)
-                  child: _buildBoardCenter(context, ref, matchState, myUid),
-                ),
-
-
-                // Local Player (Bottom Left - more robust alignment)
-                Align(
-                  alignment: const Alignment(-0.85, 0.95),
-                  child: _buildLocalPlayerArea(context, ref, matchState, myUid),
-                ),
-
-                // Overlays
-                if (matchState.phase == GamePhase.waitingForPlayers) _buildLobbyOverlay(context, ref, matchState, myUid),
-                if (isSpectator && matchState.phase != GamePhase.waitingForPlayers) _buildSpectatorIndicator(),
-                if (matchState.phase == GamePhase.preRoundCut) _buildCutOverlay(context, ref, matchState, myUid),
-                if (matchState.phase == GamePhase.dealingFasha && matchState.cutLastCard != null) 
-                   _buildLastCardReveal(matchState.cutLastCard!),
-                if (matchState.phase == GamePhase.dealingFasha && matchState.cutLastCard == null) _buildPhaseOverlay('dealing_cards'.tr()),
-                if (matchState.phase == GamePhase.dealingCards) _buildPhaseOverlay('memorize_fasha'.tr(args: ['5']), alignment: const Alignment(0, -0.4)),
-                if (matchState.phase == GamePhase.shuffleVoting) _buildShuffleVoteOverlay(context, ref, matchState, myUid),
-                if (matchState.phase == GamePhase.roundScoring) _buildContextualScoringOverlay(matchState, myUid),
-                if (matchState.phase == GamePhase.rematchVoting) _buildRematchVoteOverlay(context, ref, matchState, myUid),
-                if (matchState.phase == GamePhase.matchOver) _buildContextualGameOverOverlay(matchState, myUid),
-                  
-                Positioned(
-                  left: 12,
-                  top: 10, // Absolute top of SafeArea
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 8),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.4),
-                      borderRadius: BorderRadius.circular(30),
-                      border: Border.all(color: Colors.white10),
-                      boxShadow: [
-                        BoxShadow(color: Colors.black26, blurRadius: 10, offset: const Offset(0, 4)),
-                      ],
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _buildSideButton(
-                          ref: ref,
-                          icon: Icons.chat_bubble_outline,
-                          onTap: () {
-                            ref.read(chatStateProvider.notifier).toggleOverlay();
-                          },
-                          showBadge: true,
+                    // Left Player (Offset 3 in Anticlockwise)
+                    Align(
+                      alignment: isLandscape ? const Alignment(-0.95, 0.2) : const Alignment(-0.95, -0.15),
+                      child: GestureDetector(
+                        onTap: () => _showPlayerProfile(context, ref, matchState, myUid, 3),
+                        child: PlayerAvatar(
+                          user: _getAvatarUser(ref, matchState, myUid, 3),
+                          isCurrentTurn: matchState.currentTurnIndex == _getAbsoluteIndex(matchState, myUid, 3),
+                          turnStartTime: matchState.turnStartTime,
+                          timerDurationSeconds: matchState.timerDurationSeconds,
+                          activeEmoji: _getPlayerEmoji(matchState, myUid, 3),
+                          activeMessage: ref.watch(lastMessageForUserProvider(matchState.playerIds.isEmpty ? '' : matchState.playerIds[(_getAbsoluteIndex(matchState, myUid, 3)) % matchState.playerIds.length]))?.text,
+                          teamColor: _getTeamColorForOffset(matchState, myUid, 3),
                         ),
-                        const SizedBox(height: 16),
-                        _buildSideButton(
-                          ref: ref,
-                          icon: Icons.settings_outlined,
-                          onTap: () {
-                            _showSettings(context);
-                          },
-                        ),
-                        const SizedBox(height: 16),
-                        _buildSideButton(
-                          ref: ref,
-                          icon: Icons.logout_rounded,
-                          onTap: () => _confirmLeave(context, ref),
-                          color: Colors.redAccent.withOpacity(0.8),
-                        ),
-                      ],
+                      ),
                     ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          
-          // Chat Panel
-          const ChatOverlay(),
 
-          // Confetti Celebration
-          Align(
-            alignment: Alignment.topCenter,
-            child: ConfettiWidget(
-              confettiController: _confettiController,
-              blastDirectionality: BlastDirectionality.explosive,
-              shouldLoop: false,
-              colors: const [
-                ThemeConfig.goldAccent,
-                ThemeConfig.primaryTeal,
-                Colors.white,
-                ThemeConfig.accentPink,
-              ],
-              createParticlePath: _drawStar,
-            ),
-          ),
-        ],
+                    // Right Player (Offset 1 in Anticlockwise)
+                    Align(
+                      alignment: isLandscape ? const Alignment(0.95, 0.2) : const Alignment(0.95, -0.15),
+                      child: GestureDetector(
+                        onTap: () => _showPlayerProfile(context, ref, matchState, myUid, 1),
+                        child: PlayerAvatar(
+                          user: _getAvatarUser(ref, matchState, myUid, 1),
+                          isCurrentTurn: matchState.currentTurnIndex == _getAbsoluteIndex(matchState, myUid, 1),
+                          turnStartTime: matchState.turnStartTime,
+                          timerDurationSeconds: matchState.timerDurationSeconds,
+                          activeEmoji: _getPlayerEmoji(matchState, myUid, 1),
+                          activeMessage: ref.watch(lastMessageForUserProvider(matchState.playerIds.isEmpty ? '' : matchState.playerIds[(_getAbsoluteIndex(matchState, myUid, 1)) % matchState.playerIds.length]))?.text,
+                          teamColor: _getTeamColorForOffset(matchState, myUid, 1),
+                        ),
+                      ),
+                    ),
+
+                    // Harvest Piles
+                    Positioned(
+                      left: isLandscape ? 120 : 16,
+                      top: isLandscape ? 70 : 160,
+                      child: _buildTeamHarvestPiles(matchState, 'teamA', isMyTeam: _getTeamOfPlayer(myUid, matchState.playerIds) == 'teamA'),
+                    ),
+                    Positioned(
+                      right: isLandscape ? 120 : 16,
+                      top: isLandscape ? 70 : 160,
+                      child: _buildTeamHarvestPiles(matchState, 'teamB', isMyTeam: _getTeamOfPlayer(myUid, matchState.playerIds) == 'teamB'),
+                    ),
+
+                    Align(
+                      alignment: const Alignment(0, -0.2), 
+                      child: _buildBoardCenter(context, ref, matchState, myUid),
+                    ),
+
+                    // Local Player (Bottom Left - more robust alignment)
+                    Align(
+                      alignment: isLandscape ? const Alignment(-0.85, 0.95) : const Alignment(-0.85, 0.95),
+                      child: _buildLocalPlayerArea(context, ref, matchState, myUid),
+                    ),
+
+                    // Overlays
+                    if (matchState.phase == GamePhase.waitingForPlayers) _buildLobbyOverlay(context, ref, matchState, myUid),
+                    if (isSpectator && matchState.phase != GamePhase.waitingForPlayers) _buildSpectatorIndicator(),
+                    if (matchState.phase == GamePhase.preRoundCut) _buildCutOverlay(context, ref, matchState, myUid),
+                    if (matchState.phase == GamePhase.dealingFasha && matchState.cutLastCard != null) 
+                       _buildLastCardReveal(matchState.cutLastCard!),
+                    if (matchState.phase == GamePhase.dealingFasha && matchState.cutLastCard == null) _buildPhaseOverlay('dealing_cards'.tr()),
+                    if (matchState.phase == GamePhase.dealingCards) _buildPhaseOverlay('memorize_fasha'.tr(args: ['5']), alignment: const Alignment(0, -0.4)),
+                    if (matchState.phase == GamePhase.shuffleVoting) _buildShuffleVoteOverlay(context, ref, matchState, myUid),
+                    if (matchState.phase == GamePhase.roundScoring) _buildContextualScoringOverlay(matchState, myUid),
+                    if (matchState.phase == GamePhase.rematchVoting) _buildRematchVoteOverlay(context, ref, matchState, myUid),
+                    if (matchState.phase == GamePhase.matchOver) _buildContextualGameOverOverlay(matchState, myUid),
+                      
+                    Positioned(
+                      left: 12,
+                      top: isLandscape ? 60 : 70, // Below top bar
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.4),
+                          borderRadius: BorderRadius.circular(30),
+                          border: Border.all(color: Colors.white10),
+                          boxShadow: [
+                            BoxShadow(color: Colors.black26, blurRadius: 10, offset: const Offset(0, 4)),
+                          ],
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _buildSideButton(
+                              ref: ref,
+                              icon: Icons.chat_bubble_outline,
+                              onTap: () {
+                                ref.read(chatStateProvider.notifier).toggleOverlay();
+                              },
+                              showBadge: true,
+                            ),
+                            const SizedBox(height: 16),
+                            _buildSideButton(
+                              ref: ref,
+                              icon: Icons.settings_outlined,
+                              onTap: () {
+                                _showSettings(context);
+                              },
+                            ),
+                            const SizedBox(height: 16),
+                            _buildSideButton(
+                              ref: ref,
+                              icon: Icons.logout_rounded,
+                              onTap: () => _confirmLeave(context, ref),
+                              color: Colors.redAccent.withOpacity(0.8),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              
+              // Chat Panel
+              const ChatOverlay(),
+
+              // Confetti Celebration
+              Align(
+                alignment: Alignment.topCenter,
+                child: ConfettiWidget(
+                  confettiController: _confettiController,
+                  blastDirectionality: BlastDirectionality.explosive,
+                  shouldLoop: false,
+                  colors: const [
+                    ThemeConfig.goldAccent,
+                    ThemeConfig.primaryTeal,
+                    Colors.white,
+                    ThemeConfig.accentPink,
+                  ],
+                  createParticlePath: _drawStar,
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -953,7 +943,10 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
                       ),
                     );
                   },
-                  child: CardWidget(card: card),
+                  child: CardWidget(
+                    card: card,
+                    skinId: effectiveOwnerId != null ? matchState.playerSkins[effectiveOwnerId] : null,
+                  ),
                 );
               }).toList(),
             ],
@@ -1352,6 +1345,42 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
     );
   }
 
+  Widget _buildContextualGameOverOverlay(MatchState state, String currentUid) {
+    final bool aWins = state.teamAScore >= state.teamBScore;
+    final winnerTeam = aWins ? 'teamA' : 'teamB';
+    
+    // We show a simple overlay that links to the MatchSummaryDialog if not already shown
+    return Container(
+      color: Colors.black54,
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('match_over'.tr(), style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold, letterSpacing: 2)),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: ThemeConfig.goldAccent,
+                foregroundColor: Colors.black,
+                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              onPressed: () {
+                showGeneralDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  barrierLabel: '',
+                  pageBuilder: (context, anim1, anim2) => MatchSummaryDialog(matchState: state, winnerTeam: winnerTeam),
+                );
+              },
+              child: Text('view_results'.tr().toUpperCase(), style: const TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildRematchVoteOverlay(BuildContext context, WidgetRef ref, MatchState state, String currentUid) {
     final hasVoted = state.rematchVotes.containsKey(currentUid);
     final bool aWins = state.teamAScore >= state.teamBScore;
@@ -1459,6 +1488,88 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
       ),
     );
   }
+  Widget _buildTopBar(BuildContext context, WidgetRef ref, MatchState matchState, bool isLandscape) {
+    return Positioned(
+      top: 0,
+      left: 0,
+      right: 0,
+      child: Container(
+        height: 60,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Colors.black.withOpacity(0.8), Colors.transparent],
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            // Left: App Name & Room ID
+            GestureDetector(
+              onTap: () {
+                Clipboard.setData(ClipboardData(text: matchState.id));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('room_id_copied'.tr()),
+                    backgroundColor: ThemeConfig.primaryTeal,
+                    duration: const Duration(seconds: 2),
+                  ),
+                );
+              },
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'app_title'.tr().toUpperCase(),
+                    style: const TextStyle(
+                      fontFamily: ThemeConfig.fontHeading,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                      letterSpacing: 2,
+                      color: ThemeConfig.primaryTeal,
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      Icon(Icons.hub_outlined, color: Colors.white.withOpacity(0.5), size: 10),
+                      const SizedBox(width: 4),
+                      Text(
+                        matchState.id,
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white.withOpacity(0.8),
+                          letterSpacing: 1,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            
+            // Center: Score & Status
+            _buildScoreBadge(matchState),
+            
+            // Right: Spectators & Match Status
+            Row(
+              children: [
+                if (matchState.spectatorCount > 0)
+                  _buildSpectatorCountBadge(matchState.spectatorCount),
+                const SizedBox(width: 12),
+                if (matchState.phase != GamePhase.waitingForPlayers)
+                  _buildFloatingMatchStatusSmall(matchState),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _showPlayerProfile(BuildContext context, WidgetRef ref, MatchState matchState, String myUid, int offset) {
     if (matchState.playerIds.isEmpty) return;
     

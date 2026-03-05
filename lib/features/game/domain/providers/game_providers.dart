@@ -201,6 +201,9 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
             _manageAFKWatchdog(serverState);
             _evaluateBotActions(serverState);
             _manageAutoplayTimer(serverState);
+            
+            // Sync local profile if needed (first join or update)
+            _syncProfileWithMatch(serverState);
           } catch (e) {
             debugPrint('ERROR in match listener callback: $e');
           }
@@ -214,11 +217,56 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
       cancelOnError: false,
     );
 
-    // Sync Presence
+    // Initial Sync
     final currentUser = ref.read(currentUserProvider);
     if (currentUser != null) {
       ref.read(multiplayerSyncServiceProvider).syncPresence(matchId, currentUser.uid);
     }
+    
+    // Listen for Store/Auth changes to sync profile real-time
+    ref.listen(storeProvider, (prev, next) {
+      final s = state;
+      if (s != null) _syncProfileWithMatch(s);
+    });
+    ref.listen(currentUserProvider, (prev, next) {
+      final s = state;
+      if (s != null) _syncProfileWithMatch(s);
+    });
+  }
+
+  void _syncProfileWithMatch(MatchState s) {
+    final user = ref.read(currentUserProvider);
+    if (user == null) return;
+    
+    final store = ref.read(storeProvider);
+    final myUid = user.uid;
+    
+    bool changed = false;
+    final skins = Map<String, String>.from(s.playerSkins);
+    final avatars = Map<String, String>.from(s.playerAvatars);
+    final names = Map<String, String>.from(s.playerNames);
+
+    if (skins[myUid] != store.activeCardBackId) {
+      skins[myUid] = store.activeCardBackId;
+      changed = true;
+    }
+    if (avatars[myUid] != user.avatarUrl) {
+      avatars[myUid] = user.avatarUrl ?? "";
+      changed = true;
+    }
+    if (names[myUid] != user.displayName) {
+      names[myUid] = user.displayName;
+      changed = true;
+    }
+
+    if (changed) {
+      _publishState(s.copyWith(
+        playerSkins: skins,
+        playerAvatars: avatars,
+        playerNames: names,
+      ));
+    }
+  }
 
     // Host Presence Watcher
     _presenceListener?.cancel();
@@ -419,15 +467,35 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
 
     if (isRematch) {
       if (latestState.rematchVotes.length == 4) {
-        if (latestState.rematchVotes.values.every((v) => v == true)) {
-          // Rematch handled in voteRematch currently
-        }
+        _checkVoteCompletion(latestState);
       }
     } else {
       final sVotes = latestState.shuffleVotes;
+      bool anyoneVotedNo = sVotes.values.any((v) => v == false);
+      if (anyoneVotedNo || sVotes.length == 4) {
+        startNewRound(forceShuffle: !anyoneVotedNo && sVotes.values.any((v) => v == true));
+      }
+    }
+  }
+
+  void _checkVoteCompletion(MatchState currentState) {
+    if (currentState.phase == GamePhase.shuffleVoting) {
+       final sVotes = currentState.shuffleVotes;
        bool anyoneVotedNo = sVotes.values.any((v) => v == false);
        if (anyoneVotedNo || sVotes.length == 4) {
          startNewRound(forceShuffle: !anyoneVotedNo && sVotes.values.any((v) => v == true));
+       }
+    } else if (currentState.phase == GamePhase.rematchVoting) {
+       if (currentState.rematchVotes.length == 4) {
+         bool unanimous = currentState.rematchVotes.values.every((v) => v == true);
+         if (unanimous) {
+           _publishState(currentState.copyWith(
+             teamAScore: 0, teamBScore: 0, roundCount: 1, roundsSinceLastShuffle: 0, rematchVotes: {},
+           ));
+           startNewRound(isFirstRound: true);
+         } else {
+           _publishState(currentState.copyWith(phase: GamePhase.matchOver));
+         }
        }
     }
   }
@@ -491,6 +559,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
   void initializeMatch(String playerId, String displayName, GameMode mode, {int maxPoints = 41, int timerDurationSeconds = 10, bool isPublic = false}) {
     final newId = _generateRoomId();
     // Initialize with only the host. The UI/Joining logic will handle seats.
+    final store = ref.read(storeProvider);
     final initial = MatchState(
       id: newId,
       mode: mode,
@@ -498,6 +567,8 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
       isPublic: isPublic,
       playerIds: [playerId, "waiting_1", "waiting_2", "waiting_3"],
       playerNames: {playerId: displayName},
+      playerSkins: {playerId: store.activeCardBackId},
+      playerAvatars: {playerId: ref.read(currentUserProvider)?.avatarUrl ?? ""},
       dealerIndex: 0,
       currentTurnIndex: 1, 
       phase: GamePhase.waitingForPlayers,
@@ -552,9 +623,18 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
       if (targetIdx != -1) {
         playerIds[targetIdx] = playerId;
         playerNames[playerId] = displayName;
+        
+        final skins = Map<String, String>.from(json['playerSkins'] ?? {});
+        skins[playerId] = ref.read(storeProvider).activeCardBackId;
+
+        final avatars = Map<String, String>.from(json['playerAvatars'] ?? {});
+        avatars[playerId] = ref.read(currentUserProvider)?.avatarUrl ?? "";
+
         await dbRef.update({
           'playerIds': playerIds,
           'playerNames': playerNames,
+          'playerSkins': skins,
+          'playerAvatars': avatars,
         });
         bindToMatch(matchId);
       }
@@ -576,6 +656,8 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
       // All present humans agreed, fill the rest with bots
       final newPlayerIds = List<String>.from(currentState.playerIds);
       final newPlayerNames = Map<String, String>.from(currentState.playerNames);
+      final newPlayerAvatars = Map<String, String>.from(currentState.playerAvatars);
+      final newPlayerSkins = Map<String, String>.from(currentState.playerSkins);
       
       int botCount = 0;
       for (int i = 0; i < newPlayerIds.length; i++) {
@@ -584,12 +666,16 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
           final botId = 'bot_${i + 1}'; // Keep ID tied to index for stability
           newPlayerIds[i] = botId;
           newPlayerNames[botId] = 'Bot $botCount';
+          newPlayerAvatars[botId] = ""; 
+          newPlayerSkins[botId] = "classic_blue"; // Default bot skin
         }
       }
       
       await _publishState(currentState.copyWith(
         playerIds: newPlayerIds,
         playerNames: newPlayerNames,
+        playerAvatars: newPlayerAvatars,
+        playerSkins: newPlayerSkins,
         botInjectionVotes: votes,
       ));
     } else {
@@ -614,6 +700,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     if (shouldShuffle) {
       _secretDeck = Deck.standard();
       _secretDeck?.shuffle();
+      ref.read(multimediaServiceProvider).playSfx('sfx/shuffle.mp3');
     } else {
       // RESTORE LOGIC: Pick up cards from last round
       _secretDeck = Deck.restoreFromHarvest(currentState.harvestStacks);
@@ -638,7 +725,6 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     );
 
     await _publishState(newState);
-    _multimedia.playSfx('sfx/shuffle.mp3');
   }
 
   Future<void> performCut(int index) async {
@@ -844,25 +930,18 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     if (currentState == null) return;
     final result = GameEngine.apply(currentState, VoteAction(playerId, wantsShuffle, isRematch: false));
     await _publishState(result.newState);
+    if (_amIHost(result.newState)) {
+       _checkVoteCompletion(result.newState);
+    }
   }
 
   Future<void> voteRematch(String playerId, bool wantsRematch) async {
     final currentState = state;
     if (currentState == null) return;
     final result = GameEngine.apply(currentState, VoteAction(playerId, wantsRematch, isRematch: true));
-    
-    if (result.newState.rematchVotes.length == 4) {
-      bool unanimous = result.newState.rematchVotes.values.every((v) => v == true);
-      if (unanimous) {
-        await _publishState(result.newState.copyWith(
-          teamAScore: 0, teamBScore: 0, roundCount: 1, roundsSinceLastShuffle: 0, rematchVotes: {},
-        ));
-        startNewRound(isFirstRound: true);
-      } else {
-        await _publishState(result.newState.copyWith(phase: GamePhase.matchOver));
-      }
-    } else {
-      await _publishState(result.newState);
+    await _publishState(result.newState);
+    if (_amIHost(result.newState)) {
+       _checkVoteCompletion(result.newState);
     }
   }
 
