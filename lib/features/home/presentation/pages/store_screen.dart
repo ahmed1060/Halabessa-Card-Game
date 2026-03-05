@@ -147,7 +147,7 @@ class StoreScreen extends ConsumerWidget {
     } else if (isOwned) {
       statusText = 'status_owned'.tr();
     } else if (user?.isAdmin == true) {
-      statusText = 'GRANT';
+      statusText = 'status_grant'.tr();
     } else if (item.type == ShopItemType.consumable) {
       statusText = priceStr;
     } else {

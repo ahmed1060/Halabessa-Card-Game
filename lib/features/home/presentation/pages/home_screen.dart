@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easy_localization/easy_localization.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:halabessa/features/auth/presentation/providers/auth_providers.dart';
 import 'package:halabessa/features/game/domain/providers/game_providers.dart';
@@ -42,18 +41,6 @@ class HomeScreen extends ConsumerWidget {
         );
       }
 
-      // SYSTEM MAINTENANCE: PURGE STALE USERNAMES (ONE-TIME CLEANUP)
-      if (user?.isAdmin == true) {
-        FirebaseFirestore.instance.collection('usernames').get().then((snapshot) {
-           if (snapshot.docs.isNotEmpty) {
-             final batch = FirebaseFirestore.instance.batch();
-             for (var doc in snapshot.docs) {
-               batch.delete(doc.reference);
-             }
-             batch.commit().then((_) => debugPrint(">>> SYSTEM: ALL USERNAMES PURGED SUCCESSFULLY"));
-           }
-        });
-      }
 
       // ONE-TIME CLEANUP (Stale Rooms)
       if (user?.isAdmin == true) {
