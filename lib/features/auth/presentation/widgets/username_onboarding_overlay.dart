@@ -70,7 +70,8 @@ class _UsernameOnboardingOverlayState extends ConsumerState<UsernameOnboardingOv
     });
 
     try {
-      final available = await ref.read(authRepositoryProvider).isUsernameAvailable(username);
+      final currentUid = ref.read(currentUserProvider)?.uid;
+      final available = await ref.read(authRepositoryProvider).isUsernameAvailable(username, currentUid: currentUid);
       setState(() {
         _isAvailable = available;
         _error = available ? null : 'username_taken'.tr();

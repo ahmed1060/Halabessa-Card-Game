@@ -385,11 +385,20 @@ class FirebaseAuthRepository implements AuthRepository {
   }
 
   @override
-  Future<bool> isUsernameAvailable(String username) async {
+  Future<bool> isUsernameAvailable(String username, {String? currentUid}) async {
     final doc = await FirebaseFirestore.instance
         .collection('usernames')
         .doc(username.toLowerCase())
         .get();
-    return !doc.exists;
+    
+    if (!doc.exists) return true;
+    
+    // Ownership Check: If it's taken, check if it's taken by ME
+    final data = doc.data();
+    if (data != null && currentUid != null && data['uid'] == currentUid) {
+      return true; // It's mine, I can re-claim it
+    }
+    
+    return false;
   }
 }

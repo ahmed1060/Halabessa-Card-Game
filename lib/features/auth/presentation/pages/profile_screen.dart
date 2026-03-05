@@ -392,7 +392,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     setDialogState(() => errorText = 'invalid_chars'.tr());
                     return;
                   }
-                  final available = await ref.read(authRepositoryProvider).isUsernameAvailable(val);
+                  final available = await ref.read(authRepositoryProvider).isUsernameAvailable(val, currentUid: user.uid);
                   setDialogState(() => errorText = available ? null : 'username_taken'.tr());
                 },
               ),

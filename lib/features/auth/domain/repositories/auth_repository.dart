@@ -17,5 +17,5 @@ abstract class AuthRepository {
   Future<void> updateEmail(String newEmail);
   Future<void> updatePassword(String newPassword);
   Future<void> updateProfile({String? displayName, String? username, String? avatarUrl});
-  Future<bool> isUsernameAvailable(String username);
+  Future<bool> isUsernameAvailable(String username, {String? currentUid});
 }
