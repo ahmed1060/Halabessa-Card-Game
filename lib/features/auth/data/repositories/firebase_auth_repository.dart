@@ -347,7 +347,7 @@ class FirebaseAuthRepository implements AuthRepository {
           // Logic for changing username
           if (username != null && username != fullUser.username) {
             // 1. Check uniqueness (double check)
-            if (!await isUsernameAvailable(username)) {
+            if (!await isUsernameAvailable(username, currentUid: user.uid)) {
               throw Exception('Username already taken');
             }
 
