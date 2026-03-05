@@ -14,7 +14,7 @@ class FirebaseAuthRepository implements AuthRepository {
 
   FirebaseAuthRepository(this._firebaseAuth);
 
-  Future<void> _syncUserToDatabase(AppUser user) async {
+  Future<void> _syncUserToDatabase(AppUser user, {bool isFullUpdate = false}) async {
     try {
       final docRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
       
@@ -23,30 +23,33 @@ class FirebaseAuthRepository implements AuthRepository {
       if (!doc.exists) {
         await docRef.set(user.toJson());
       } else {
-          // Only update basic profile info, preserving scores/stats
-        await docRef.update({
-          'displayName': user.displayName,
-          'username': user.username,
-          'email': user.email,
-          'avatarUrl': user.avatarUrl,
-          'inventory': user.inventory,
-          'searchName': (user.username ?? user.displayName).toLowerCase(),
-          // 'isAdmin' is preserved in Firestore
-        });
+        if (isFullUpdate) {
+          // Full sync (usually from profile edit or after loading full record)
+          await docRef.update(user.toJson());
+        } else {
+          // Targeted sync for Auth flows (preserving game-specific metadata)
+          await docRef.update({
+            'displayName': user.displayName,
+            'email': user.email,
+            'avatarUrl': user.avatarUrl,
+            // 'username', 'inventory', 'points', etc. are NOT updated here to avoid overwriting with defaults
+            'searchName': (user.username ?? user.displayName).toLowerCase(),
+          });
+        }
       }
 
-      // Legacy Sync: Keep RTDB for presence/lobby lookups if needed, 
-      // but only the bare minimum.
+      // Legacy Sync: Keep RTDB for presence/lobby lookups
       final rtdbRef = FirebaseDatabase.instance.ref('users').child(user.uid);
-      await rtdbRef.update({
-        'displayName': user.displayName,
-        'username': user.username,
-        'email': user.email,
-        'avatarUrl': user.avatarUrl,
-        'inventory': user.inventory,
-        'searchName': (user.username ?? user.displayName).toLowerCase(),
-        // 'isAdmin' is preserved
-      });
+      if (isFullUpdate) {
+        await rtdbRef.update(user.toJson());
+      } else {
+        await rtdbRef.update({
+          'displayName': user.displayName,
+          'email': user.email,
+          'avatarUrl': user.avatarUrl,
+          'searchName': (user.username ?? user.displayName).toLowerCase(),
+        });
+      }
     } catch (e) {
       debugPrint("User Sync failed: $e");
     }
@@ -373,9 +376,9 @@ class FirebaseAuthRepository implements AuthRepository {
             inventory: finalInventory,
             searchName: (finalUsername ?? displayName ?? fullUser.displayName).toLowerCase(),
           );
-          await _syncUserToDatabase(mergedUser);
+          await _syncUserToDatabase(mergedUser, isFullUpdate: true);
         } else {
-          await _syncUserToDatabase(appUser);
+          await _syncUserToDatabase(appUser, isFullUpdate: false);
         }
       }
     }
