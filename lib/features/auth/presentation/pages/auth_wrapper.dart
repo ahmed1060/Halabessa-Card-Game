@@ -5,12 +5,45 @@ import 'auth_screen.dart';
 import '../providers/auth_providers.dart';
 import '../../../home/presentation/pages/home_screen.dart';
 import '../../../../core/utils/error_handler.dart';
+import '../../../../core/services/asset_preloader_service.dart';
+import '../../../../core/widgets/loading_screen.dart';
 
-class AuthWrapper extends ConsumerWidget {
+class AuthWrapper extends ConsumerStatefulWidget {
   const AuthWrapper({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<AuthWrapper> createState() => _AuthWrapperState();
+}
+
+class _AuthWrapperState extends ConsumerState<AuthWrapper> {
+  bool _assetsPreloaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _initAssets();
+  }
+
+  Future<void> _initAssets() async {
+    final preloader = ref.read(assetPreloaderServiceProvider);
+    
+    // We wait for the first frame to ensure context is available for preloader
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await preloader.preloadAll(context);
+      if (mounted) {
+        setState(() => _assetsPreloaded = true);
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_assetsPreloaded) {
+      return LoadingScreen(
+        progressStream: ref.read(assetPreloaderServiceProvider).loadProgress,
+      );
+    }
+
     final authState = ref.watch(authStateChangesProvider);
 
     return authState.when(
@@ -20,10 +53,8 @@ class AuthWrapper extends ConsumerWidget {
         }
         return const AuthScreen();
       },
-      loading: () => const Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(),
-        ),
+      loading: () => LoadingScreen(
+        progressStream: ref.read(assetPreloaderServiceProvider).loadProgress,
       ),
       error: (error, stackTrace) => Scaffold(
         body: Center(

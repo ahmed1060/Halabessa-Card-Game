@@ -35,7 +35,7 @@ class AdminUserManagementScreen extends ConsumerWidget {
           },
         ),
         loading: () => const Center(child: CircularProgressIndicator(color: ThemeConfig.goldAccent)),
-        error: (err, stack) => Center(child: Text('Error: $err', style: const TextStyle(color: Colors.red))),
+        error: (err, stack) => Center(child: Text('error_prefix'.tr(args: [err.toString()]), style: const TextStyle(color: Colors.red))),
       ),
     );
   }

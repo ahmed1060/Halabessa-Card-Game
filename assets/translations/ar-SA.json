@@ -328,5 +328,9 @@
     "coins": "عملات",
     "diamonds": "ألماس",
     "no_results": "لا توجد نتائج.",
-    "rank_label": "المركز {}"
+    "rank_label": "المركز {}",
+    "user_not_found": "المستخدم غير موجود",
+    "error_label": "خطأ",
+    "log_out_confirm": "هل أنت متأكد من تسجيل الخروج؟",
+    "no_friends_found": "لم يتم العثور على أصدقاء"
 }

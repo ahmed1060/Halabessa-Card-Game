@@ -24,9 +24,8 @@ class HomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(currentUserProvider);
 
-    // Initiate Asset Preloading & Background Music
+    // Initiate Background Music
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(assetPreloaderServiceProvider).preloadAll(context);
       ref.read(multimediaServiceProvider).playMusic('music/bg_music.mp3');
 
       // Username Onboarding Check

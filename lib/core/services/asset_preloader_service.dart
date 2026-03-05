@@ -6,78 +6,93 @@ import '../../features/home/presentation/providers/store_provider.dart';
 
 class AssetPreloaderService {
   final Ref _ref;
-  final _audioCache = AudioPlayer(); // Used for pre-fetching audio
+  final _audioCache = AudioPlayer();
 
   AssetPreloaderService(this._ref);
 
+  final _loadProgressController = StreamController<double>.broadcast();
+  Stream<double> get loadProgress => _loadProgressController.stream;
+
   Future<void> preloadAll(BuildContext context) async {
     debugPrint('PRELOADER: Starting asset preloading...');
-    
     final startTime = DateTime.now();
+    _loadProgressController.add(0.0);
 
-    // 1. Precache Essential Images
-    if (!context.mounted) return;
-    await Future.wait([
-      precacheImage(const AssetImage('assets/images/logo.png'), context).catchError((_) => null),
-      precacheImage(const AssetImage('assets/images/items/ticket.png'), context).catchError((_) => null),
-    ]);
+    final List<String> imageAssets = [
+      // Essential
+      'assets/images/gaming/game_logo.png',
+      'assets/images/gaming/login_bg.png',
+      'assets/images/items/ticket.png',
+      
+      // Avatars
+      'assets/images/avatars/avatar1.png',
+      'assets/images/avatars/avatar2.png',
+      'assets/images/avatars/avatar3.png',
+      'assets/images/avatars/avatar4.png',
+      'assets/images/avatars/avatar5.png',
+      'assets/images/avatars/avatar6.png',
 
-    // 2. Precache Cards (Partial/High priority)
-    // We could loop through all but let's do critical ones
-    final cardPaths = [
+      // Tables
+      'assets/images/tables/table_skin_ancient_marble.png',
+      'assets/images/tables/table_skin_golden_oasis.png',
+      'assets/images/tables/table_skin_midnight_cyber.png',
+      'assets/images/tables/table_skin_oceanic_depths.png',
+      'assets/images/tables/table_skin_royal_velvet.png',
+
+      // Cards (Royal is default)
       'assets/images/cards/royal/card_back_royal.png',
       'assets/images/cards/royal/card_front_royal_bg.png',
-      // Add more as needed
+      'assets/images/cards/royal/card_seven_royal.png',
     ];
-    
-    for (var path in cardPaths) {
-      if (!context.mounted) return;
-      precacheImage(AssetImage(path), context);
-    }
 
-    // 3. Precache Store Items (Avatars, Skins)
+    // Collect Store Items
     try {
       final storeNotifier = _ref.read(storeProvider.notifier);
       final allItems = storeNotifier.allItems;
-      
       for (var item in allItems) {
-        if (!context.mounted) return;
-        
-        // Main Asset
-        precacheImage(AssetImage(item.assetPath), context);
-        
-        // Front Skin Asset (if applicable)
-        if (item.frontSkinPath != null) {
-          precacheImage(AssetImage(item.frontSkinPath!), context);
+        if (!imageAssets.contains(item.assetPath)) imageAssets.add(item.assetPath);
+        if (item.frontSkinPath != null && !imageAssets.contains(item.frontSkinPath!)) {
+          imageAssets.add(item.frontSkinPath!);
         }
-        
-        // Face Illustrations (if applicable)
         if (item.faceIllustrations != null) {
           for (var path in item.faceIllustrations!.values) {
-             precacheImage(AssetImage(path), context);
+             if (!imageAssets.contains(path)) imageAssets.add(path);
           }
         }
       }
     } catch (e) {
-      debugPrint('PRELOADER: Failed to precache some store items: $e');
+      debugPrint('PRELOADER: Store items collection failed: $e');
     }
 
-    // 4. Precache Remote Audio Overrides
-    final globalSettings = _ref.read(globalSettingsProvider);
-    if (globalSettings.musicOverrideUrl != null) {
-      await _audioCache.setSourceUrl(globalSettings.musicOverrideUrl!);
-    }
-    
-    for (var url in globalSettings.sfxOverrides.values) {
-      await _audioCache.setSourceUrl(url);
-    }
+    int loadedCount = 0;
+    final int total = imageAssets.length;
+
+    await Future.wait(imageAssets.map((path) async {
+      try {
+        if (context.mounted) {
+          await precacheImage(AssetImage(path), context).catchError((_) => null);
+        }
+      } catch (_) {}
+      loadedCount++;
+      _loadProgressController.add(loadedCount / total);
+    }));
+
+    // Audio Pre-caching (Simplified)
+    try {
+      final globalSettings = _ref.read(globalSettingsProvider);
+      if (globalSettings.musicOverrideUrl != null) {
+        await _audioCache.setSourceUrl(globalSettings.musicOverrideUrl!);
+      }
+    } catch (_) {}
 
     final duration = DateTime.now().difference(startTime);
     debugPrint('PRELOADER: Preloading finished in ${duration.inMilliseconds}ms');
+    _loadProgressController.add(1.0);
   }
 
   void dispose() {
     _audioCache.dispose();
+    _loadProgressController.close();
   }
 }
 

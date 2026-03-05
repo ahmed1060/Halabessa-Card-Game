@@ -199,7 +199,7 @@ class _SocialOverlayState extends ConsumerState<SocialOverlay> {
           ...currentUser.friends.map((friendUid) => ref.watch(userProfileProvider(friendUid)).when(
             data: (user) {
               if (user == null) {
-                return _buildErrorState('User not found');
+                return _buildErrorState('user_not_found'.tr());
               }
               return _buildUserTile(user, isFriend: true);
             },

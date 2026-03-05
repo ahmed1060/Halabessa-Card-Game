@@ -332,5 +332,12 @@
     "coins": "Coins",
     "diamonds": "Diamonds",
     "no_results": "No results found.",
-    "rank_label": "Rank {}"
+    "rank_label": "Rank {}",
+    "log_out_confirm": "Are you sure you want to log out?",
+    "no_friends_found": "No friends found.",
+    "your_team_wins": "Your Team Wins!",
+    "buy_ticket_btn": "Buy Ticket",
+    "winner": "Winner",
+    "user_not_found": "User not found",
+    "error_label": "Error"
 }

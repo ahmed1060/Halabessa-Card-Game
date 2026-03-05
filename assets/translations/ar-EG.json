@@ -333,5 +333,8 @@
     "coins": "فوس",
     "diamonds": "جواهر",
     "no_results": "مفيش نتائج.",
-    "rank_label": "ترتيبك {}"
+    "rank_label": "ترتيبك {}",
+    "your_team_wins": "فريقك كسب!",
+    "user_not_found": "المستخدم مش موجود",
+    "error_label": "خطأ"
 }

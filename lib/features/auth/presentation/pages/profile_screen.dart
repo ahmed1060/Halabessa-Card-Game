@@ -236,8 +236,26 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 leading: const Icon(Icons.logout, color: Colors.redAccent),
                 title: Text('log_out'.tr(), style: const TextStyle(color: Colors.redAccent)),
                 onTap: () {
-                  ref.read(authRepositoryProvider).signOut();
-                  Navigator.pop(context);
+                  showDialog(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      backgroundColor: ThemeConfig.darkBg,
+                      title: Text('log_out'.tr(), style: const TextStyle(color: Colors.white)),
+                      content: Text('log_out_confirm'.tr(), style: const TextStyle(color: Colors.white70)),
+                      actions: [
+                        TextButton(onPressed: () => Navigator.pop(ctx), child: Text('cancel'.tr())),
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
+                          onPressed: () {
+                            ref.read(authRepositoryProvider).signOut();
+                            Navigator.pop(ctx);
+                            Navigator.pop(context);
+                          },
+                          child: Text('log_out'.tr()),
+                        ),
+                      ],
+                    ),
+                  );
                 },
               ),
               const SizedBox(height: 40),
@@ -289,7 +307,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           ElevatedButton(
             onPressed: () async {
               if (passwordController.text != confirmController.text) {
-                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Passwords do not match')));
+                 ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('passwords_no_match'.tr())));
                  return;
               }
               try {
