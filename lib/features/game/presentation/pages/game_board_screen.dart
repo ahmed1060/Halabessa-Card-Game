@@ -351,7 +351,7 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
                 final myTeam = (myIndex == 0 || myIndex == 2) ? 'teamA' : 'teamB';
                 final aWins = matchState.teamAScore >= matchState.teamBScore;
                 final winnerTeam = aWins ? 'teamA' : 'teamB';
-                if (myTeam == winnerTeam && !_confettiController.state.isPlaying) {
+                if (myTeam == winnerTeam && _confettiController.state != ConfettiControllerState.playing) {
                   _confettiController.play();
                 }
               }
@@ -550,8 +550,9 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
           );
         },
       ),
-    );
-  }
+    ),
+  );
+}
 
   Path _drawStar(Size size) {
     double degToRad(double deg) => deg * (pi / 180.0);
@@ -1169,12 +1170,6 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
     );
   }
 
-  Widget _buildContextualGameOverOverlay(MatchState matchState, String myUid) {
-    final myTeamId = _getTeamOfPlayer(myUid, matchState.playerIds);
-    final myScore = myTeamId == 'teamA' ? matchState.teamAScore : matchState.teamBScore;
-    final oppScore = myTeamId == 'teamA' ? matchState.teamBScore : matchState.teamAScore;
-    return _buildPhaseOverlay('match_over'.tr(args: [myScore.toString(), oppScore.toString()]));
-  }
 
   Widget _buildCutOverlay(BuildContext context, WidgetRef ref, MatchState state, String currentUid) {
     int myIdx = state.playerIds.indexOf(currentUid);

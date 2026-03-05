@@ -13,7 +13,8 @@ import '../../domain/logic/deck.dart';
 import '../../domain/logic/game_engine.dart';
 import '../../domain/logic/bot_brain.dart';
 import '../../data/repositories/multiplayer_sync_service.dart';
-import '../../../../features/auth/presentation/providers/auth_providers.dart';
+import 'package:halabessa/features/auth/presentation/providers/auth_providers.dart';
+import 'package:halabessa/features/home/presentation/providers/store_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:halabessa/core/services/multimedia_service.dart';
 
@@ -232,41 +233,6 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
       final s = state;
       if (s != null) _syncProfileWithMatch(s);
     });
-  }
-
-  void _syncProfileWithMatch(MatchState s) {
-    final user = ref.read(currentUserProvider);
-    if (user == null) return;
-    
-    final store = ref.read(storeProvider);
-    final myUid = user.uid;
-    
-    bool changed = false;
-    final skins = Map<String, String>.from(s.playerSkins);
-    final avatars = Map<String, String>.from(s.playerAvatars);
-    final names = Map<String, String>.from(s.playerNames);
-
-    if (skins[myUid] != store.activeCardBackId) {
-      skins[myUid] = store.activeCardBackId;
-      changed = true;
-    }
-    if (avatars[myUid] != user.avatarUrl) {
-      avatars[myUid] = user.avatarUrl ?? "";
-      changed = true;
-    }
-    if (names[myUid] != user.displayName) {
-      names[myUid] = user.displayName;
-      changed = true;
-    }
-
-    if (changed) {
-      _publishState(s.copyWith(
-        playerSkins: skins,
-        playerAvatars: avatars,
-        playerNames: names,
-      ));
-    }
-  }
 
     // Host Presence Watcher
     _presenceListener?.cancel();
@@ -336,6 +302,40 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
          ));
        }
     });
+  }
+
+  void _syncProfileWithMatch(MatchState s) {
+    final user = ref.read(currentUserProvider);
+    if (user == null) return;
+    
+    final store = ref.read(storeProvider);
+    final myUid = user.uid;
+    
+    bool changed = false;
+    final skins = Map<String, String>.from(s.playerSkins);
+    final avatars = Map<String, String>.from(s.playerAvatars);
+    final names = Map<String, String>.from(s.playerNames);
+
+    if (skins[myUid] != store.activeCardBackId) {
+      skins[myUid] = store.activeCardBackId;
+      changed = true;
+    }
+    if (avatars[myUid] != user.avatarUrl) {
+      avatars[myUid] = user.avatarUrl ?? "";
+      changed = true;
+    }
+    if (names[myUid] != user.displayName) {
+      names[myUid] = user.displayName;
+      changed = true;
+    }
+
+    if (changed) {
+      _publishState(s.copyWith(
+        playerSkins: skins,
+        playerAvatars: avatars,
+        playerNames: names,
+      ));
+    }
   }
 
   void rebind(String matchId) {
@@ -560,6 +560,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     final newId = _generateRoomId();
     // Initialize with only the host. The UI/Joining logic will handle seats.
     final store = ref.read(storeProvider);
+    final avatarUrl = ref.read(currentUserProvider)?.avatarUrl ?? "";
     final initial = MatchState(
       id: newId,
       mode: mode,
@@ -568,7 +569,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
       playerIds: [playerId, "waiting_1", "waiting_2", "waiting_3"],
       playerNames: {playerId: displayName},
       playerSkins: {playerId: store.activeCardBackId},
-      playerAvatars: {playerId: ref.read(currentUserProvider)?.avatarUrl ?? ""},
+      playerAvatars: {playerId: avatarUrl},
       dealerIndex: 0,
       currentTurnIndex: 1, 
       phase: GamePhase.waitingForPlayers,

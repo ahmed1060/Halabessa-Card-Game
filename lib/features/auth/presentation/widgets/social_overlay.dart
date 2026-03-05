@@ -143,8 +143,9 @@ class _SocialOverlayState extends ConsumerState<SocialOverlay> {
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildFriendsTab(AppUser currentUser, ScrollController scrollController) {
     if (currentUser.friends.isEmpty && currentUser.friendInvites.isEmpty) {

@@ -159,6 +159,7 @@ class MatchState {
     Map<String, String>? playerAvatars,
     Map<String, int>? earnedStars,
     Map<String, int>? earnedCoins,
+    Map<String, String>? playerSkins,
   }) {
     return MatchState(
       id: id ?? this.id,

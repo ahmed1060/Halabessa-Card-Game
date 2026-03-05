@@ -327,3 +327,13 @@ final storeProvider = StateNotifierProvider<StoreNotifier, StoreState>((ref) {
   final prefs = ref.watch(sharedPreferencesProvider);
   return StoreNotifier(prefs, ref);
 });
+
+final activeTableSkinProvider = Provider<ShopItem>((ref) {
+  final store = ref.watch(storeProvider);
+  return ref.watch(storeProvider.notifier).allItems.firstWhere((i) => i.id == store.activeTableSkinId, orElse: () => ref.watch(storeProvider.notifier).allItems[3]);
+});
+
+final activeCardBackProvider = Provider<ShopItem>((ref) {
+  final store = ref.watch(storeProvider);
+  return ref.watch(storeProvider.notifier).allItems.firstWhere((i) => i.id == store.activeCardBackId, orElse: () => ref.watch(storeProvider.notifier).allItems[0]);
+});
