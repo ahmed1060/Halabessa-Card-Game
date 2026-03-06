@@ -16,6 +16,19 @@ subprojects {
     project.evaluationDependsOn(':app')
 }
 
+// Inject namespace for plugins that don't have it (required by AGP 8+)
+subprojects {
+    afterEvaluate { project ->
+        if (project.hasProperty('android')) {
+            project.android {
+                if (namespace == null) {
+                    namespace = "com.example.halabessa.${project.name.replaceAll(":", "").replaceAll("-", "_")}"
+                }
+            }
+        }
+    }
+}
+
 tasks.register("clean", Delete) {
     delete rootProject.buildDir
 }
