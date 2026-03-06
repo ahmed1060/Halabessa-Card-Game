@@ -3,7 +3,7 @@ allprojects {
         google()
         mavenCentral()
         flatDir {
-            dirs "${project(':unityExport').projectDir}/libs"
+            dirs "${project(':unityLibrary').projectDir}/libs"
         }
     }
 }
