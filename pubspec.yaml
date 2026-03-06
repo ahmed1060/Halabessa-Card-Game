@@ -51,6 +51,7 @@ dependencies:
   quiver: ^3.2.1
   file_picker: ^8.0.0+1
   confetti: ^0.8.0
+  flutter_unity_widget: ^2022.2.0
 
 dev_dependencies:
   flutter_test:
@@ -81,5 +82,6 @@ flutter:
     - assets/images/items/
     - assets/images/avatars/
     - assets/images/gaming/
+    - assets/unity/
 
   # Fonts are provided via Google Fonts CDN in web/index.html to ensure Safari compatibility and avoid duplication errors.

@@ -1,5 +1,6 @@
 import UIKit
 import Flutter
+import flutter_unity_widget
 
 @UIApplicationMain
 @objc class AppDelegate: FlutterAppDelegate {

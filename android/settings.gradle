@@ -24,3 +24,6 @@ plugins {
 }
 
 include ":app"
+
+include ":unityExport"
+project(":unityExport").projectDir = new File(settingsDir, "../androidBuild/unityExport")

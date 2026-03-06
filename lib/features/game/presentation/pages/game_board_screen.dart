@@ -23,6 +23,11 @@ import '../widgets/harvest_piles_widget.dart';
 import '../widgets/match_summary_dialog.dart';
 import 'package:flutter/services.dart';
 import 'package:halabessa/core/services/multimedia_service.dart';
+import '../widgets/unity_game_view.dart';
+import '../providers/unity_communication_service.dart';
+import '../../domain/providers/game_providers.dart';
+import 'package:flutter_unity_widget/flutter_unity_widget.dart';
+import 'dart:convert';
 
 class GameBoardScreen extends ConsumerStatefulWidget {
   const GameBoardScreen({super.key});
@@ -222,7 +227,16 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
 
     // Match Over Rewards Popup
     ref.listen<MatchState?>(matchStateProvider, (previous, next) {
-      if (next?.phase == GamePhase.matchOver && previous?.phase != GamePhase.matchOver) {
+      if (next == null) return;
+
+      // Sync turn timer to Unity when turn or phase changes
+      if (next.currentTurnIndex != previous?.currentTurnIndex || next.phase != previous?.phase) {
+        if (next.phase == GamePhase.playing) {
+          ref.read(unityCommunicationServiceProvider).startTimer(next.timerDurationSeconds);
+        }
+      }
+
+      if (next.phase == GamePhase.matchOver && previous?.phase != GamePhase.matchOver) {
         final winnerTeam = next!.teamAScore >= next.teamBScore ? 'teamA' : 'teamB';
         showDialog(
           context: context,
@@ -471,7 +485,7 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
                     if (matchState.phase == GamePhase.waitingForPlayers) _buildLobbyOverlay(context, ref, matchState, myUid),
                     if (isSpectator && matchState.phase != GamePhase.waitingForPlayers) _buildSpectatorIndicator(),
                     if (matchState.phase == GamePhase.preRoundCut) _buildCutOverlay(context, ref, matchState, myUid),
-                    if (matchState.phase == GamePhase.dealingFasha && matchState.cutLastCard != null) 
+                    if (matchState.phase == GamePhase.dealingFasha && matchState.cutLastCard != null)
                        _buildLastCardReveal(matchState.cutLastCard!),
                     if (matchState.phase == GamePhase.dealingFasha && matchState.cutLastCard == null) _buildPhaseOverlay('dealing_cards'.tr()),
                     if (matchState.phase == GamePhase.dealingCards) _buildPhaseOverlay('memorize_fasha'.tr(args: ['5']), alignment: const Alignment(0, -0.4)),
@@ -518,6 +532,19 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
                               icon: Icons.logout_rounded,
                               onTap: () => _confirmLeave(context, ref),
                               color: Colors.redAccent.withOpacity(0.8),
+                            ),
+                            const SizedBox(height: 16),
+                            _buildSideButton(
+                              ref: ref,
+                              icon: Icons.bug_report_outlined,
+                              onTap: () {
+                                ref.read(unityCommunicationServiceProvider).postMessage(
+                                  'UnityDebugConsole',
+                                  'ToggleVisibility',
+                                  '',
+                                );
+                              },
+                              color: Colors.white24,
                             ),
                           ],
                         ),
@@ -814,146 +841,10 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
   }
 
   Widget _buildBoardCenter(BuildContext context, WidgetRef ref, MatchState matchState, String myUid) {
-    final size = MediaQuery.sizeOf(context);
-    final isCapturing = matchState.phase == GamePhase.capturing;
-
-    return DragTarget<game_card.Card>(
-      onWillAccept: (data) => 
-          matchState.phase == GamePhase.playing && 
-          matchState.playerIds.isNotEmpty && 
-          matchState.currentTurnIndex == _getAbsoluteIndex(matchState, myUid, 0),
-      onAcceptWithDetails: (details) {
-        final RenderBox? boardBox = _boardKey.currentContext?.findRenderObject() as RenderBox?;
-        Offset relativeOrigin = Offset.zero;
-        if (boardBox != null) {
-          final localOffset = boardBox.globalToLocal(details.offset);
-          // Calculate origin relative to board center (100, 100)
-          relativeOrigin = Offset(localOffset.dx - 100, localOffset.dy - 100);
-        }
-        
-        ref.read(matchStateProvider.notifier).playCard(myUid, details.data, origin: relativeOrigin);
-        HapticFeedback.mediumImpact();
-      },
-      builder: (context, candidateData, rejectedData) {
-        return SizedBox(
-          key: _boardKey,
-          width: 200,
-          height: 200,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              // Ghost preview if dragging over
-              if (candidateData.isNotEmpty)
-                Opacity(
-                  opacity: 0.3,
-                  child: CardWidget(card: candidateData.first!),
-                ),
-              ...matchState.board.asMap().entries.map((entry) {
-                final index = entry.key;
-                final card = entry.value;
-                
-                final seed = card.suit.index * 13 + card.rank.index + index;
-                final random = Random(seed);
-                
-                double targetX = (random.nextDouble() - 0.5) * 45;
-                double targetY = (random.nextDouble() - 0.5) * 45;
-                double rotation = (random.nextDouble() - 0.5) * 0.4;
-                double scale = 1.0;
-
-                // Animation Logic for Capturing
-                if (isCapturing && matchState.capturingCards.any((c) => c.firebaseKey == card.firebaseKey)) {
-                  if (matchState.capturingStage == 0) {
-                    targetX = 0;
-                    targetY = 0;
-                    rotation = 0;
-                    scale = 1.25;
-                  } else {
-                    final teamId = matchState.capturingTeam;
-                    if (teamId == 'teamA') {
-                      targetX = -size.width * 0.35;
-                      targetY = -size.height * 0.3;
-                    } else {
-                      targetX = size.width * 0.4;
-                      targetY = -size.height * 0.1;
-                    }
-                    rotation = 1.5;
-                    scale = 0.5;
-                  }
-                } else if (matchState.phase == GamePhase.dealingCards) {
-                  targetX = (index - 1.5) * 58; 
-                  targetY = 0;
-                  rotation = 0;
-                }
-                
-                String? ownerId = matchState.cardOwnership[card.firebaseKey];
-                final effectiveOwnerId = ownerId ?? ((matchState.phase == GamePhase.dealingFasha || matchState.phase == GamePhase.dealingCards) && matchState.playerIds.isNotEmpty
-                    ? matchState.playerIds[matchState.dealerIndex % matchState.playerIds.length] 
-                    : null);
-
-                // Default fallback: Fly from bottom
-                double startX = 0;
-                double startY = 350;
-
-                if (effectiveOwnerId != null) {
-                  final myIdx = matchState.playerIds.indexOf(myUid);
-                  final pivotIdx = myIdx == -1 ? 0 : myIdx;
-                  final ownerIdx = matchState.playerIds.indexOf(effectiveOwnerId);
-
-                  if (ownerIdx >= 0) {
-                    final relativeIdx = (ownerIdx - pivotIdx + 4) % 4;
-                    if (relativeIdx == 1) { 
-                      startX = 320; startY = 0; 
-                    } else if (relativeIdx == 2) { 
-                      startX = 0; startY = -320; 
-                    } else if (relativeIdx == 3) { 
-                      startX = -320; startY = 0; 
-                    } else if (relativeIdx == 0) { 
-                      final localOrigins = ref.read(localPlayOriginsProvider);
-                      final customOrigin = localOrigins[card.firebaseKey];
-                      if (customOrigin != null) {
-                        startX = customOrigin.dx;
-                        startY = customOrigin.dy;
-                      } else {
-                        startX = 0; 
-                        startY = 350;
-                      }
-                    }
-                  }
-                }
-
-                return TweenAnimationBuilder<double>(
-                  key: ValueKey(card.firebaseKey),
-                  duration: Duration(milliseconds: isCapturing ? 800 : 500),
-                  curve: isCapturing ? Curves.easeInOutBack : Curves.easeOutCubic,
-                  tween: Tween(begin: 0.0, end: 1.0),
-                  builder: (context, value, child) {
-                    final currentX = startX * (1 - value) + targetX * value;
-                    final currentY = startY * (1 - value) + targetY * value;
-                    
-                    final startScale = (startX != 0 || startY != 350) ? 1.1 : 1.0;
-                    final currentScale = (startScale - (startScale - 1.0) * value) * (isCapturing ? scale : 1.0);
-
-                    return Transform.translate(
-                      offset: Offset(currentX, currentY),
-                      child: Transform.rotate(
-                        angle: rotation * value,
-                        child: Transform.scale(
-                          scale: currentScale,
-                          child: child,
-                        ),
-                      ),
-                    );
-                  },
-                  child: CardWidget(
-                    card: card,
-                    skinId: effectiveOwnerId != null ? matchState.playerSkins[effectiveOwnerId] : null,
-                  ),
-                );
-              }).toList(),
-            ],
-          ),
-        );
-      },
+    return const SizedBox(
+      width: 400,
+      height: 400,
+      child: UnityGameView(),
     );
   }
 
