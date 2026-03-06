@@ -1,3 +1,17 @@
 {
-    "java.configuration.updateBuildConfiguration": "automatic"
+    "java.configuration.updateBuildConfiguration": "automatic",
+    "files.exclude": {
+        "**/.gradle": true,
+        "**/unity/**/Temp": true,
+        "**/unity/**/Library": true,
+        "**/unity/**/Logs": true,
+        "**/unity/**/PlayServicesResolverGradle": true
+    },
+    "java.import.exclusions": [
+        "**/node_modules/**",
+        "**/.metadata/**",
+        "**/unity/**/Temp/**",
+        "**/unity/**/Library/**",
+        "**/unity/**/PlayServicesResolverGradle/**"
+    ]
 }
