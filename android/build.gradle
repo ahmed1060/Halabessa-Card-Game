@@ -18,14 +18,29 @@ subprojects {
 
 // Inject namespace for plugins that don't have it (required by AGP 8+)
 subprojects {
-    afterEvaluate { project ->
-        if (project.hasProperty('android')) {
-            project.android {
-                if (namespace == null) {
-                    namespace = "com.example.halabessa.${project.name.replaceAll(":", "").replaceAll("-", "_")}"
-                }
+    plugins.withId("com.android.application") {
+        configureNamespace(project)
+    }
+    plugins.withId("com.android.library") {
+        configureNamespace(project)
+    }
+}
+
+// Ensure consistent Java version across all subprojects (fixes Major Version 69 issues)
+subprojects {
+    plugins.withType(com.android.build.gradle.BasePlugin).configureEach {
+        project.android {
+            compileOptions {
+                sourceCompatibility JavaVersion.VERSION_17
+                targetCompatibility JavaVersion.VERSION_17
             }
         }
+    }
+}
+
+def configureNamespace(project) {
+    if (project.android.namespace == null) {
+        project.android.namespace = "com.example.halabessa.${project.name.replaceAll(":", "").replaceAll("-", "_")}"
     }
 }
 
