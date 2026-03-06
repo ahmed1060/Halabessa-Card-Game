@@ -23,3 +23,4 @@ project(":unityLibrary").projectDir = new File(settingsDir, "../androidBuild/uni
 
 plugins {
     id "dev.flutter.flutter-plugin-loader" version "1.0.0"
+}

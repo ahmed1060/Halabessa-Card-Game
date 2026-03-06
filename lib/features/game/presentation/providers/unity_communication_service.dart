@@ -1,11 +1,11 @@
 import 'dart:convert';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart';
 import 'dart:html' as html;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_unity_widget/flutter_unity_widget.dart';
 import '../../domain/models/match_state.dart';
-import '../providers/match_state_provider.dart';
+import '../../domain/providers/game_providers.dart';
 
 final unityCommunicationServiceProvider = Provider((ref) => UnityCommunicationService(ref)..init());
 
@@ -45,7 +45,7 @@ class UnityCommunicationService {
     _controller = controller;
   }
 
-  void _postToUnity(String objectName, String methodName, String message) {
+  void postMessage(String objectName, String methodName, String message) {
     if (kIsWeb) {
       // For WebGL: Dispatch to the IFrame via window.postMessage
       final data = jsonEncode({
@@ -58,6 +58,10 @@ class UnityCommunicationService {
       // For Native: Use the controller
       _controller?.postMessage(objectName, methodName, message);
     }
+  }
+
+  void _postToUnity(String objectName, String methodName, String message) {
+    postMessage(objectName, methodName, message);
   }
 
   void syncState(MatchState state) {
