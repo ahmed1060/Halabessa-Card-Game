@@ -38,7 +38,7 @@ android {
 android {
     namespace "com.unity3d.player"
     ndkPath System.getenv("ANDROID_NDK_HOME") ?: "C:/Program Files/Unity/Hub/Editor/6000.0.69f1/Editor/Data/PlaybackEngines/AndroidPlayer/NDK"
-    ndkVersion "27.2.12479018"
+    // ndkVersion auto-detected from ndkPath
 
     compileSdk 36
     buildToolsVersion = "36.0.0"
