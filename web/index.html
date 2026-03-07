@@ -44,10 +44,72 @@
   <link
     href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&family=Outfit:wght@400;700&family=Righteous&family=Noto+Sans+Arabic:wght@400;600;700&display=swap"
     rel="stylesheet">
+  <link rel="stylesheet" href="canvas.css">
 
 </head>
 
 <body>
+  <!-- Unity WebGL Canvas (Will be wrapped by Flutter) -->
+  <canvas id="unity-canvas"></canvas>
+
+  <!-- Unity WebGL Engine Loader -->
+  <script src="Build/Halabessa.loader.js"></script>
+  <script>
+    var unityInstance = null;
+
+    function createUnityInstanceIfAvailable() {
+      var canvas = document.querySelector("#unity-canvas");
+      if (!canvas) {
+        console.warn("Unity canvas not found yet.");
+        return;
+      }
+
+      console.log("Creating Unity Instance...");
+      createUnityInstance(canvas, {
+        dataUrl: "Build/Halabessa.data.unityweb",
+        frameworkUrl: "Build/Halabessa.framework.js.unityweb",
+        codeUrl: "Build/Halabessa.wasm.unityweb",
+        streamingAssetsUrl: "StreamingAssets",
+        companyName: "DefaultCompany",
+        productName: "Halabessa",
+        productVersion: "1.0",
+      }).then((instance) => {
+        unityInstance = instance;
+        console.log("Unity instance successfully created.");
+
+        // Expose Unity interface to Flutter
+        window.postMessageToUnity = function (message) {
+          if (unityInstance !== null) {
+            console.log("Sending to Unity: " + message);
+            unityInstance.SendMessage("GameController", "HandleFlutterMessage", message);
+          } else {
+            console.warn("Unity not ready, message dropped: " + message);
+          }
+        };
+      }).catch((message) => {
+        alert("Unity WebGL build failed to load: " + message);
+      });
+    }
+
+    // Attempt to load Unity right away or wait for DOM
+    document.addEventListener("DOMContentLoaded", createUnityInstanceIfAvailable);
+
+    // Fallback global trigger for Flutter to call when mounting UnityGameView wrapper
+    window.initUnityEngine = function () {
+      createUnityInstanceIfAvailable();
+    };
+
+    // Flutter to Unity communication bridge function
+    window.handleFlutterMessage = function (message) {
+      if (window.postMessageToUnity) {
+        window.postMessageToUnity(message);
+      } else {
+        console.warn("Unity bridge not established yet. Dropping: " + message);
+      }
+    };
+  </script>
+
+  <!-- Default Flutter bootstrap -->
   <script src="flutter_bootstrap.js" async></script>
 </body>
 

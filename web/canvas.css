@@ -1,0 +1,16 @@
+/* Unity WebGL Canvas Styling */
+#unity-canvas {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 10;
+  background: transparent;
+  pointer-events: auto; /* Ensure it receives clicks */
+}
+
+/* Hide default Unity progress bar to let Flutter handle loading UI */
+#unity-loading-bar {
+  display: none !important;
+}
