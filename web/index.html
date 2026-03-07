@@ -53,7 +53,7 @@
   <canvas id="unity-canvas"></canvas>
 
   <!-- Unity WebGL Engine Loader -->
-  <script src="Build/Halabessa.loader.js"></script>
+  <script src="Build/unity.loader.js"></script>
   <script>
     var unityInstance = null;
 
@@ -66,9 +66,9 @@
 
       console.log("Creating Unity Instance...");
       createUnityInstance(canvas, {
-        dataUrl: "Build/Halabessa.data.unityweb",
-        frameworkUrl: "Build/Halabessa.framework.js.unityweb",
-        codeUrl: "Build/Halabessa.wasm.unityweb",
+        dataUrl: "Build/unity.data.unityweb",
+        frameworkUrl: "Build/unity.framework.js.unityweb",
+        codeUrl: "Build/unity.wasm.unityweb",
         streamingAssetsUrl: "StreamingAssets",
         companyName: "DefaultCompany",
         productName: "Halabessa",
