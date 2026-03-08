@@ -1,4 +1,5 @@
 using UnityEditor;
+using UnityEditor.Build;
 using UnityEditor.Build.Reporting;
 using UnityEngine;
 using System.IO;
@@ -8,8 +9,8 @@ public class BuildScripts {
     public static void ExportAndroid() {
         string exportPath = Path.Combine(Application.dataPath, "../../../androidBuild/unityExport");
         
-        // Match Firebase configuration
-        PlayerSettings.SetApplicationIdentifier(BuildTargetGroup.Android, "com.example.halabessa");
+        // Match Firebase configuration (Fixing Obsolete Warning)
+        PlayerSettings.SetApplicationIdentifier(NamedBuildTarget.Android, "com.example.halabessa");
 
         // Ensure the target is a Gradle project for Flutter
         EditorUserBuildSettings.exportAsGoogleAndroidProject = true;
@@ -35,8 +36,8 @@ public class BuildScripts {
     public static void ExportIOS() {
         string exportPath = Path.Combine(Application.dataPath, "../../../iosBuild/UnityLibrary");
         
-        // Set iOS requirements for Firebase
-        PlayerSettings.SetApplicationIdentifier(BuildTargetGroup.iOS, "com.example.halabessa");
+        // Set iOS requirements for Firebase (Fixing Obsolete Warning)
+        PlayerSettings.SetApplicationIdentifier(NamedBuildTarget.iOS, "com.example.halabessa");
         PlayerSettings.iOS.targetOSVersionString = "15.0";
 
         // Clean the directory to avoid conflicts
