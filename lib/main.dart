@@ -10,9 +10,11 @@ import 'core/providers/settings_provider.dart';
 import 'core/services/multimedia_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/services.dart';
+import 'core/utils/web_registry.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  registerWebUnityView();
   await EasyLocalization.ensureInitialized();
 
   // Mobile Immersion & Orientation
