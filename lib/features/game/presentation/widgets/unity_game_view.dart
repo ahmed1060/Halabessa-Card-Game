@@ -50,11 +50,6 @@ class _UnityGameViewState extends ConsumerState<UnityGameView> {
     }
 
     return Container(
-      decoration: BoxDecoration(
-        border: Border.all(color: Colors.white10),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      clipBehavior: Clip.antiAlias,
       child: Stack(
         children: [
           unityWidget,

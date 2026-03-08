@@ -61,10 +61,12 @@
       }
 
       console.log("Creating Unity Instance...");
+      var buildUrl = "Build";
+      var cacheBuster = "?v=" + Date.now();
       createUnityInstance(canvasElement, {
-        dataUrl: "Build/unity.data.unityweb",
-        frameworkUrl: "Build/unity.framework.js.unityweb",
-        codeUrl: "Build/unity.wasm.unityweb",
+        dataUrl: buildUrl + "/unity.data.unityweb" + cacheBuster,
+        frameworkUrl: buildUrl + "/unity.framework.js.unityweb" + cacheBuster,
+        codeUrl: buildUrl + "/unity.wasm.unityweb" + cacheBuster,
         streamingAssetsUrl: "StreamingAssets",
         companyName: "DefaultCompany",
         productName: "Halabessa",

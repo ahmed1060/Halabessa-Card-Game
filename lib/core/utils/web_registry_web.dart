@@ -7,7 +7,8 @@ void registerWebUnityView() {
     final canvas = html.CanvasElement(id: 'unity-canvas-$viewId')
       ..style.width = '100%'
       ..style.height = '100%'
-      ..style.border = 'none'
+      ..style.border = '1px solid rgba(255, 255, 255, 0.1)'
+      ..style.borderRadius = '20px'
       ..style.background = 'transparent'
       ..style.backgroundColor = 'transparent'
       ..style.pointerEvents = 'auto'
