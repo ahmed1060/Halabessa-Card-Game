@@ -49,23 +49,19 @@
 </head>
 
 <body>
-  <!-- Unity WebGL Canvas (Will be wrapped by Flutter) -->
-  <canvas id="unity-canvas"></canvas>
-
-  <!-- Unity WebGL Engine Loader -->
+  <!-- Unity WebGL Engine Loader (Canvas is dynamically injected by Flutter) -->
   <script src="Build/unity.loader.js"></script>
   <script>
     var unityInstance = null;
 
-    function createUnityInstanceIfAvailable() {
-      var canvas = document.querySelector("#unity-canvas");
-      if (!canvas) {
-        console.warn("Unity canvas not found yet.");
+    function createUnityInstanceOnCanvas(canvasElement) {
+      if (!canvasElement) {
+        console.error("No canvas provided to Unity WebGL Loader!");
         return;
       }
 
       console.log("Creating Unity Instance...");
-      createUnityInstance(canvas, {
+      createUnityInstance(canvasElement, {
         dataUrl: "Build/unity.data.unityweb",
         frameworkUrl: "Build/unity.framework.js.unityweb",
         codeUrl: "Build/unity.wasm.unityweb",
@@ -92,12 +88,9 @@
       });
     }
 
-    // Attempt to load Unity right away or wait for DOM
-    document.addEventListener("DOMContentLoaded", createUnityInstanceIfAvailable);
-
     // Fallback global trigger for Flutter to call when mounting UnityGameView wrapper
-    window.initUnityEngine = function () {
-      createUnityInstanceIfAvailable();
+    window.initUnityEngine = function (canvasElement) {
+      createUnityInstanceOnCanvas(canvasElement);
     };
 
     // Flutter to Unity communication bridge function
