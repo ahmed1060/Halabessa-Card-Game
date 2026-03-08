@@ -24,7 +24,7 @@
         "headers": [
           {
             "key": "Content-Encoding",
-            "value": "gzip"
+            "value": "br"
           }
         ]
       },
