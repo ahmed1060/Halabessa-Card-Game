@@ -115,6 +115,21 @@
         console.warn("Unity bridge not established yet. Dropping: " + message);
       }
     };
+
+    // Listen for window.postMessage from Flutter and route to Unity
+    window.addEventListener('message', function (event) {
+      if (typeof event.data === 'string') {
+        try {
+          var data = JSON.parse(event.data);
+          // If it has objectName and methodName, it's a Unity-bound message from Flutter
+          if (data.objectName && data.methodName) {
+            window.handleFlutterMessage(event.data);
+          }
+        } catch (e) {
+          // Not a JSON message or not for Unity
+        }
+      }
+    });
   </script>
 
   <!-- Default Flutter bootstrap -->

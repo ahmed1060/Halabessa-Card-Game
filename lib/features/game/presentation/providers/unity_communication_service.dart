@@ -24,6 +24,10 @@ class UnityCommunicationService {
           final message = event.data;
           if (message is String) {
             final data = jsonDecode(message);
+            
+            // Ignore echoes (messages from Flutter to Unity)
+            if (data is Map && data.containsKey('objectName')) return;
+            
             if (data['event'] == 'UNITY_READY') {
               isReady.value = true;
               _ref.read(unityInitializedProvider.notifier).state = true;

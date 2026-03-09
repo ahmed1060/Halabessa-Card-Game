@@ -494,7 +494,7 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
                       Align(
                         alignment: Alignment.bottomCenter,
                         child: Padding(
-                          padding: const EdgeInsets.only(bottom: 20),
+                          padding: EdgeInsets.zero,
                           child: FannedHandWidget(
                             cards: matchState.handCards[myUid] ?? [],
                             isMyTurn: matchState.playerIds.isNotEmpty && 
