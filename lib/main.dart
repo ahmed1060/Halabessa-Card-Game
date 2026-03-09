@@ -72,13 +72,13 @@ class HalabessaApp extends ConsumerWidget {
       builder: (context, child) {
         return Stack(
           children: [
+            const UnityPersistentOverlay(), // Move to background
             if (child != null) 
               Listener(
                 behavior: HitTestBehavior.translucent,
                 onPointerDown: (_) => ref.read(multimediaServiceProvider).handleInteraction(),
                 child: child,
               ),
-            const UnityPersistentOverlay(),
           ],
         );
       },

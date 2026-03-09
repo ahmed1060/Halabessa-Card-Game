@@ -37,31 +37,24 @@ class LoadingScreen extends StatelessWidget {
                   );
                 },
                 onEnd: () {}, // Repeat logic usually handled by a controller, but this is simple pulse
+                onEnd: () {}, 
                 child: Image.asset(
-                  'assets/images/gaming/game_logo.png',
-                  width: 180,
-                  height: 180,
+                  'assets/images/logo.png', // Correct logo path
+                  width: 140,
+                  height: 140,
                   errorBuilder: (context, error, stackTrace) => const Icon(
                     Icons.grid_view_rounded,
-                    size: 100,
+                    size: 80,
                     color: ThemeConfig.goldAccent,
                   ),
                 ),
               ),
-              const SizedBox(height: 48),
+              const SizedBox(height: 40),
               
-              // Branded Loading Text
-              Text(
-                'loading'.tr().toUpperCase(),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 4,
-                  fontFamily: ThemeConfig.fontHeading,
-                ),
-              ),
-              const SizedBox(height: 24),
+              // Cycling Progress Steps
+              const _CyclingLoadingText(),
+              
+              const SizedBox(height: 32),
 
               // Progress Bar
               StreamBuilder<double>(
@@ -72,47 +65,99 @@ class LoadingScreen extends StatelessWidget {
                   return Column(
                     children: [
                       Container(
-                        width: 250,
-                        height: 6,
+                        width: 200,
+                        height: 4,
                         decoration: BoxDecoration(
                           color: Colors.white10,
-                          borderRadius: BorderRadius.circular(3),
+                          borderRadius: BorderRadius.circular(2),
                         ),
                         child: Stack(
                           children: [
                             AnimatedContainer(
                               duration: const Duration(milliseconds: 300),
-                              width: 250 * progress,
+                              width: 200 * progress,
                               decoration: BoxDecoration(
                                 gradient: const LinearGradient(
                                   colors: [ThemeConfig.primaryTeal, ThemeConfig.goldAccent],
                                 ),
-                                borderRadius: BorderRadius.circular(3),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: ThemeConfig.goldAccent.withOpacity(0.3),
-                                    blurRadius: 10,
-                                    spreadRadius: 2,
-                                  ),
-                                ],
+                                borderRadius: BorderRadius.circular(2),
                               ),
                             ),
                           ],
                         ),
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 8),
                       Text(
                         '${(progress * 100).toInt()}%',
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.5),
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
+                          color: Colors.white.withOpacity(0.3),
+                          fontSize: 10,
+                          fontWeight: FontWeight.w400,
                         ),
                       ),
                     ],
                   );
                 },
               ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CyclingLoadingText extends StatefulWidget {
+  const _CyclingLoadingText();
+
+  @override
+  State<_CyclingLoadingText> createState() => _CyclingLoadingTextState();
+}
+
+class _CyclingLoadingTextState extends State<_CyclingLoadingText> {
+  int _currentIndex = 0;
+  final List<String> _steps = [
+    "Warming up card physics...",
+    "Loading 3D assets...",
+    "Syncing with servers...",
+    "Preparing casino tables...",
+    "Readying Egyptian vibes...",
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _startCycle();
+  }
+
+  void _startCycle() {
+    Future.doWhile(() async {
+      await Future.delayed(const Duration(milliseconds: 1800));
+      if (!mounted) return false;
+      setState(() {
+        _currentIndex = (_currentIndex + 1) % _steps.length;
+      });
+      return true;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 500),
+      child: Text(
+        _steps[_currentIndex].toUpperCase(),
+        key: ValueKey(_currentIndex),
+        style: const TextStyle(
+          color: Colors.white70,
+          fontSize: 12,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 2,
+        ),
+      ),
+    );
+  }
+}
             ],
           ),
         ),
