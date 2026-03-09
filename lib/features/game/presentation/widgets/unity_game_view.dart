@@ -50,15 +50,17 @@ class _UnityGameViewState extends ConsumerState<UnityGameView> {
     }
 
     return Container(
+      width: double.infinity,
+      height: double.infinity,
       child: Stack(
         children: [
-          unityWidget,
+          Positioned.fill(child: unityWidget),
           ValueListenableBuilder<bool>(
             valueListenable: comms.isReady,
             builder: (context, isReady, child) {
               if (isReady) return const SizedBox.shrink();
               return Container(
-                color: Colors.transparent, // Fix: Ensure loading screen doesn't block the background
+                color: Colors.transparent, 
                 child: Center(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,

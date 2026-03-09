@@ -25,6 +25,12 @@ public class UnityBridge : MonoBehaviour {
     }
 
     void Start() {
+        // FORCE TRANSPARENCY AT RUNTIME (God Move)
+        if (Camera.main != null) {
+            Camera.main.clearFlags = CameraClearFlags.SolidColor;
+            Camera.main.backgroundColor = new Color(0, 0, 0, 0);
+            Debug.Log("UnityBridge: Forced Camera transparency (Alpha 0)");
+        }
         NotifyFlutter("UNITY_READY", "Unity initialized");
     }
     
