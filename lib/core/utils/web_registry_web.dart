@@ -18,8 +18,11 @@ void registerWebUnityView() {
       ..style.pointerEvents = 'auto'
       ..style.zIndex = '0';
 
-    // Wait 200ms to ensure the element is in the DOM before Unity tries to bind to it
-    Future.delayed(const Duration(milliseconds: 200), () {
+    // Minimal opacity ensures the browser assigns a WebGL context (0.0 can sometimes be de-optimized)
+    canvas.style.opacity = '0.01';
+
+    // Increased delay to 1500ms to ensure the DOM has fully settled and painted
+    Future.delayed(const Duration(milliseconds: 1500), () {
       try {
         js.context.callMethod('initUnityEngine', [canvas]);
       } catch (e) {

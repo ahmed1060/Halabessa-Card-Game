@@ -12,6 +12,16 @@ class UnityPersistentOverlay extends ConsumerWidget {
     final isVisible = ref.watch(unityLayerVisibilityProvider);
     final isInitialized = ref.watch(unityInitializedProvider);
     
+    // We need the canvas to be "visible" to the browser (opacity > 0) 
+    // for the WebGL context to be successfully created.
+    double opacity = 0.0;
+    if (isVisible) {
+      opacity = 1.0;
+    } else if (!isInitialized) {
+      // Keep it technically visible during boot to satisfy WebGL context requirements
+      opacity = 0.01;
+    }
+
     return Stack(
       children: [
         Positioned.fill(
@@ -19,7 +29,7 @@ class UnityPersistentOverlay extends ConsumerWidget {
             ignoring: !isVisible,
             child: AnimatedOpacity(
               duration: const Duration(milliseconds: 300),
-              opacity: isVisible ? 1.0 : 0.0,
+              opacity: opacity,
               child: const UnityGameView(),
             ),
           ),
