@@ -26,7 +26,13 @@ class _UnityGameViewState extends ConsumerState<UnityGameView> {
 
     Widget unityWidget;
     if (kIsWeb) {
-      unityWidget = const HtmlElementView(viewType: 'unity-web-view');
+      unityWidget = HtmlElementView(
+        viewType: 'unity-web-view',
+        onPlatformViewCreated: (id) {
+          // Fallback: If we don't get a UNITY_READY message soon, 
+          // we could mark as initialized here, but we prefer the bridge signal.
+        },
+      );
     } else {
       unityWidget = UnityWidget(
         onUnityCreated: (controller) {

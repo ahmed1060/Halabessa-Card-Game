@@ -10,18 +10,53 @@ class UnityPersistentOverlay extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isVisible = ref.watch(unityLayerVisibilityProvider);
+    final isInitialized = ref.watch(unityInitializedProvider);
     
-    // We only want to mount Unity once. Even if invisible, it stays in the DOM/Memory.
-    // However, we use Offstage or a transparent IgnorePointer when not needed.
-    return Positioned.fill(
-      child: IgnorePointer(
-        ignoring: !isVisible,
-        child: AnimatedOpacity(
-          duration: const Duration(milliseconds: 300),
-          opacity: isVisible ? 1.0 : 0.0,
-          child: const UnityGameView(),
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: IgnorePointer(
+            ignoring: !isVisible,
+            child: AnimatedOpacity(
+              duration: const Duration(milliseconds: 300),
+              opacity: isVisible ? 1.0 : 0.0,
+              child: const UnityGameView(),
+            ),
+          ),
         ),
-      ),
+        // Global Initialization Overlay (Shows only once)
+        if (!isInitialized && isVisible)
+          Positioned.fill(
+            child: Container(
+              color: Colors.black, // Dark background for the very first load
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Image.asset('assets/images/logo.png', height: 120),
+                    const SizedBox(height: 30),
+                    const CircularProgressIndicator(color: Colors.white70),
+                    const SizedBox(height: 16),
+                    const Text(
+                      "Warming up 3D Engine...",
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 14,
+                        letterSpacing: 1.2,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      "This will only happen once.",
+                      style: TextStyle(color: Colors.white38, fontSize: 10),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

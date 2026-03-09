@@ -4,6 +4,7 @@ import 'package:halabessa/core/utils/web_utils.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_unity_widget/flutter_unity_widget.dart';
+import '../providers/unity_layer_provider.dart';
 import '../../domain/models/match_state.dart';
 import '../../domain/providers/game_providers.dart';
 
@@ -25,6 +26,7 @@ class UnityCommunicationService {
             final data = jsonDecode(message);
             if (data['event'] == 'UNITY_READY') {
               isReady.value = true;
+              _ref.read(unityInitializedProvider.notifier).state = true;
               // Initial sync after Unity WebGL is loaded
               final matchState = _ref.read(matchStateProvider);
               if (matchState != null) {
@@ -108,6 +110,7 @@ class UnityCommunicationService {
 
   void handleUnityMessage(String message) {
     isReady.value = true; // Any message from Unity indicates it's alive
+    _ref.read(unityInitializedProvider.notifier).state = true;
     try {
       final data = jsonDecode(message);
       print("Unity Message Received: $data");
