@@ -49,38 +49,6 @@ class _UnityGameViewState extends ConsumerState<UnityGameView> {
       );
     }
 
-    return Container(
-      width: double.infinity,
-      height: double.infinity,
-      child: Stack(
-        children: [
-          Positioned.fill(child: unityWidget),
-          ValueListenableBuilder<bool>(
-            valueListenable: comms.isReady,
-            builder: (context, isReady, child) {
-              if (isReady) return const SizedBox.shrink();
-              return Container(
-                color: Colors.transparent, 
-                child: Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Image.asset('assets/images/logo.png', height: 100),
-                      const SizedBox(height: 20),
-                      const CircularProgressIndicator(color: Colors.white70),
-                      const SizedBox(height: 10),
-                      const Text(
-                        "Initializing Engine...",
-                        style: TextStyle(color: Colors.white70, fontSize: 12),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
-        ],
-      ),
-    );
+    return unityWidget;
   }
 }

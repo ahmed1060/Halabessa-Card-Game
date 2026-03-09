@@ -11,6 +11,7 @@ import 'core/services/multimedia_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/services.dart';
 import 'core/utils/web_registry.dart';
+import 'features/game/presentation/widgets/unity_persistent_overlay.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -69,10 +70,16 @@ class HalabessaApp extends ConsumerWidget {
       routes: AppRoutes.routes,
       debugShowCheckedModeBanner: false,
       builder: (context, child) {
-        return Listener(
-          behavior: HitTestBehavior.translucent,
-          onPointerDown: (_) => ref.read(multimediaServiceProvider).handleInteraction(),
-          child: child ?? const SizedBox.shrink(),
+        return Stack(
+          children: [
+            if (child != null) 
+              Listener(
+                behavior: HitTestBehavior.translucent,
+                onPointerDown: (_) => ref.read(multimediaServiceProvider).handleInteraction(),
+                child: child,
+              ),
+            const UnityPersistentOverlay(),
+          ],
         );
       },
     );

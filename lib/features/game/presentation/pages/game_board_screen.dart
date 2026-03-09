@@ -25,6 +25,7 @@ import 'package:flutter/services.dart';
 import 'package:halabessa/core/services/multimedia_service.dart';
 import '../widgets/unity_game_view.dart';
 import '../providers/unity_communication_service.dart';
+import '../providers/unity_layer_provider.dart';
 import '../../domain/providers/game_providers.dart';
 import 'package:flutter_unity_widget/flutter_unity_widget.dart';
 import 'dart:convert';
@@ -48,6 +49,7 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
     // Start Room Music
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(multimediaServiceProvider).playRoomMusic('music/room_music.mp3');
+      ref.read(unityLayerVisibilityProvider.notifier).state = true;
     });
   }
 
@@ -57,6 +59,7 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
     // Resume Background Music when leaving room
     Future.microtask(() {
       ref.read(multimediaServiceProvider).playMusic('music/bg_music.mp3');
+      ref.read(unityLayerVisibilityProvider.notifier).state = false;
     });
     super.dispose();
   }

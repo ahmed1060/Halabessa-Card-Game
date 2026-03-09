@@ -71,7 +71,14 @@
         companyName: "DefaultCompany",
         productName: "Halabessa",
         productVersion: "1.0",
-        webglContextAttributes: { "preserveDrawingBuffer": true, "alpha": true }
+        webglContextAttributes: {
+          "preserveDrawingBuffer": true,
+          "alpha": true,
+          "premultipliedAlpha": false, // CRITICAL FOR UNITY 6 TRANSPARENCY
+          "stencil": true,
+          "antialias": true,
+          "depth": true
+        }
       }).then((instance) => {
         unityInstance = instance;
         console.log("Unity instance successfully created.");
@@ -80,7 +87,7 @@
         window.postMessageToUnity = function (message) {
           if (unityInstance !== null) {
             console.log("Sending to Unity: " + message);
-            unityInstance.SendMessage("GameController", "HandleFlutterMessage", message);
+            unityInstance.SendMessage("UnityBridge", "OnFlutterMessage", message);
           } else {
             console.warn("Unity not ready, message dropped: " + message);
           }
