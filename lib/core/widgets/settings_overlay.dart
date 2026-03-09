@@ -66,6 +66,23 @@ class SettingsOverlay extends ConsumerWidget {
                               multimedia.vibrate();
                             },
                           ),
+                          if (settings.isMusicEnabled)
+                            Padding(
+                              padding: const EdgeInsets.only(left: 48, right: 16, bottom: 16),
+                              child: SliderTheme(
+                                data: SliderTheme.of(context).copyWith(
+                                  trackHeight: 2,
+                                  thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                                  overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
+                                ),
+                                child: Slider(
+                                  value: settings.musicVolume,
+                                  onChanged: (val) => notifier.setMusicVolume(val),
+                                  activeColor: ThemeConfig.goldAccent,
+                                  inactiveColor: Colors.white10,
+                                ),
+                              ),
+                            ),
                           _buildToggleTile(
                             'sound_effects'.tr(),
                             settings.isSoundEnabled,
@@ -75,6 +92,23 @@ class SettingsOverlay extends ConsumerWidget {
                               multimedia.vibrate();
                             },
                           ),
+                          if (settings.isSoundEnabled)
+                            Padding(
+                              padding: const EdgeInsets.only(left: 48, right: 16, bottom: 16),
+                              child: SliderTheme(
+                                data: SliderTheme.of(context).copyWith(
+                                  trackHeight: 2,
+                                  thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                                  overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
+                                ),
+                                child: Slider(
+                                  value: settings.soundVolume,
+                                  onChanged: (val) => notifier.setSoundVolume(val),
+                                  activeColor: ThemeConfig.goldAccent,
+                                  inactiveColor: Colors.white10,
+                                ),
+                              ),
+                            ),
                           _buildToggleTile(
                             'haptic_feedback'.tr(),
                             settings.isHapticsEnabled,

@@ -100,9 +100,9 @@ class _FannedHandWidgetState extends State<FannedHandWidget> {
         final double preferredSpacing = isMobile ? 18.0 : 25.0;
         final double fanWidth = (cardCount - 1) * preferredSpacing;
         
-        // Arc configuration
-        final double arcHeight = isMobile ? 30.0 : 40.0;
-        const double maxRotation = 0.18; // radians
+        // Arc configuration (Disabled for "beside each other" look)
+        final double arcHeight = 0.0;
+        const double maxRotation = 0.0; // radians
 
         // To ensure the hovered or preselected card is on top, we sort the indices
         final List<int> buildIndices = List.generate(cardCount, (i) => i);

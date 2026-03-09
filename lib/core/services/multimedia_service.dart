@@ -27,7 +27,7 @@ class MultimediaService extends ChangeNotifier {
       }
     });
 
-    // Stop music immediately if disabled in settings
+    // Stop music immediately if disabled in settings, or update volume
     _ref.listen(settingsProvider, (previous, next) {
       if (previous?.isMusicEnabled == true && next.isMusicEnabled == false) {
         stopMusic();
@@ -35,6 +35,12 @@ class MultimediaService extends ChangeNotifier {
         if (_currentMusicPath != null) {
           playMusic(_currentMusicPath!);
         }
+      } else if (previous?.musicVolume != next.musicVolume) {
+        _musicPlayer.setVolume(next.musicVolume);
+      }
+      
+      if (previous?.soundVolume != next.soundVolume) {
+        _sfxPlayer.setVolume(next.soundVolume);
       }
     });
   }
@@ -98,11 +104,13 @@ class MultimediaService extends ChangeNotifier {
 
       // Force restart if different URL even if playing
       if (_musicPlayer.state == PlayerState.playing && _lastPlayedUrl == overrideUrl) {
+        await _musicPlayer.setVolume(settings.musicVolume); // Still update volume
         return;
       }
 
       debugPrint('MultimediaService: Playing music from $overrideUrl');
       _lastPlayedUrl = overrideUrl;
+      await _musicPlayer.setVolume(settings.musicVolume);
       await _musicPlayer.setReleaseMode(loop ? ReleaseMode.loop : ReleaseMode.release);
       await _musicPlayer.play(UrlSource(overrideUrl)).then((_) {
         _pendingMusic = null;
@@ -191,6 +199,7 @@ class MultimediaService extends ChangeNotifier {
         }
 
         if (source != null) {
+          await _sfxPlayer.setVolume(settings.soundVolume);
           await _sfxPlayer.play(source).then((_) {
             handleInteraction(); // Success! Mark interaction and rescue music
           }).catchError((e) {

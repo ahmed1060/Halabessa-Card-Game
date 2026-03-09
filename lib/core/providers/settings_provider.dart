@@ -6,6 +6,8 @@ class SettingsState {
   final bool isSoundEnabled;
   final bool isMusicEnabled;
   final bool isHapticsEnabled;
+  final double musicVolume;
+  final double soundVolume;
   final String languageCode;
   final ThemeMode themeMode;
 
@@ -13,6 +15,8 @@ class SettingsState {
     this.isSoundEnabled = true,
     this.isMusicEnabled = true,
     this.isHapticsEnabled = true,
+    this.musicVolume = 1.0,
+    this.soundVolume = 1.0,
     this.languageCode = 'en',
     this.themeMode = ThemeMode.system,
   });
@@ -21,6 +25,8 @@ class SettingsState {
     bool? isSoundEnabled,
     bool? isMusicEnabled,
     bool? isHapticsEnabled,
+    double? musicVolume,
+    double? soundVolume,
     String? languageCode,
     ThemeMode? themeMode,
   }) {
@@ -28,6 +34,8 @@ class SettingsState {
       isSoundEnabled: isSoundEnabled ?? this.isSoundEnabled,
       isMusicEnabled: isMusicEnabled ?? this.isMusicEnabled,
       isHapticsEnabled: isHapticsEnabled ?? this.isHapticsEnabled,
+      musicVolume: musicVolume ?? this.musicVolume,
+      soundVolume: soundVolume ?? this.soundVolume,
       languageCode: languageCode ?? this.languageCode,
       themeMode: themeMode ?? this.themeMode,
     );
@@ -46,6 +54,8 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
       isSoundEnabled: _prefs.getBool('isSoundEnabled') ?? true,
       isMusicEnabled: _prefs.getBool('isMusicEnabled') ?? true,
       isHapticsEnabled: _prefs.getBool('isHapticsEnabled') ?? true,
+      musicVolume: _prefs.getDouble('musicVolume') ?? 1.0,
+      soundVolume: _prefs.getDouble('soundVolume') ?? 1.0,
       languageCode: _prefs.getString('languageCode') ?? 'en',
       themeMode: ThemeMode.values[_prefs.getInt('themeMode') ?? 0],
     );
@@ -59,6 +69,16 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
   Future<void> toggleMusic(bool value) async {
     state = state.copyWith(isMusicEnabled: value);
     await _prefs.setBool('isMusicEnabled', value);
+  }
+
+  Future<void> setMusicVolume(double value) async {
+    state = state.copyWith(musicVolume: value);
+    await _prefs.setDouble('musicVolume', value);
+  }
+
+  Future<void> setSoundVolume(double value) async {
+    state = state.copyWith(soundVolume: value);
+    await _prefs.setDouble('soundVolume', value);
   }
 
   Future<void> toggleHaptics(bool value) async {

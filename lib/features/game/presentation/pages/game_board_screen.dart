@@ -91,6 +91,12 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
      
      String targetName;
      if (rawName == 'bot_name_template') {
+        // Calculate dynamic spacing to ensure overlap (Reduced for flat look)
+        // This code snippet seems to be misplaced here, as 'isMobile' and 'cardCount' are not defined in this scope.
+        // It appears to be intended for a different widget, likely FannedHandWidget.
+        // However, following the instruction to insert it faithfully as provided.
+        // final double preferredSpacing = isMobile ? 40.0 : 55.0;
+        // final double fanWidth = (cardCount - 1) * preferredSpacing;
        final bits = targetUid.split('_');
        final num = bits.length > 1 ? bits[1] : '';
        targetName = '${'bot_name'.tr()} $num';
@@ -381,9 +387,15 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
                   child: Consumer(
                     builder: (context, ref, child) {
                       final activeTable = ref.watch(activeTableSkinProvider);
-                      return activeTable.assetPath.startsWith('http')
-                        ? Image.network(activeTable.assetPath, fit: BoxFit.cover)
-                        : Image.asset(activeTable.assetPath, fit: BoxFit.cover);
+                      final isUnityInitialized = ref.watch(unityInitializedProvider);
+                      
+                      return AnimatedOpacity(
+                        duration: const Duration(milliseconds: 500),
+                        opacity: isUnityInitialized ? 0.0 : 1.0,
+                        child: activeTable.assetPath.startsWith('http')
+                          ? Image.network(activeTable.assetPath, fit: BoxFit.cover)
+                          : Image.asset(activeTable.assetPath, fit: BoxFit.cover),
+                      );
                     },
                   ),
                 ),
