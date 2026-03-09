@@ -79,6 +79,14 @@
         companyName: "DefaultCompany",
         productName: "Halabessa",
         productVersion: "1.0",
+        // Transparency & Performance Fixes
+        premultipliedAlpha: false,
+        webglContextAttributes: {
+          preserveDrawingBuffer: true,
+          alpha: true,
+          antialias: true,
+          premultipliedAlpha: false,
+        },
       }).then((instance) => {
         unityInstance = instance;
         console.log("Unity instance successfully created.");

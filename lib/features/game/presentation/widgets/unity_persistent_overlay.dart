@@ -17,10 +17,41 @@ class UnityPersistentOverlay extends ConsumerWidget {
     // the GameBoardScreen is likely on top.
     
     return Positioned.fill(
-      child: AnimatedOpacity(
-        duration: const Duration(milliseconds: 300),
-        opacity: isVisible ? 1.0 : (isInitialized ? 0.0 : 0.01),
-        child: const UnityGameView(),
+      child: Stack(
+        children: [
+          // Background Unity view (partially visible while loading)
+          IgnorePointer(
+            ignoring: !isVisible,
+            child: AnimatedOpacity(
+              duration: const Duration(milliseconds: 300),
+              opacity: isVisible ? 1.0 : (isInitialized ? 0.0 : 0.01),
+              child: const UnityGameView(),
+            ),
+          ),
+          
+          // Background Loading Feedback (Old UI style)
+          if (!isInitialized)
+            Container(
+              color: Colors.black.withOpacity(0.4),
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white24,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    const _CyclingLoadingText(),
+                  ],
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
