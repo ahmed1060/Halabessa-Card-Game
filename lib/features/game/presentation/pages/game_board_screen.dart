@@ -90,16 +90,10 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
          (targetUid.startsWith('bot_') ? 'bot_name_template' : 'player_default_name');
      
      String targetName;
-     if (rawName == 'bot_name_template') {
-        // Calculate dynamic spacing to ensure overlap (Reduced for flat look)
-        // This code snippet seems to be misplaced here, as 'isMobile' and 'cardCount' are not defined in this scope.
-        // It appears to be intended for a different widget, likely FannedHandWidget.
-        // However, following the instruction to insert it faithfully as provided.
-        // final double preferredSpacing = isMobile ? 40.0 : 55.0;
-        // final double fanWidth = (cardCount - 1) * preferredSpacing;
-       final bits = targetUid.split('_');
-       final num = bits.length > 1 ? bits[1] : '';
-       targetName = '${'bot_name'.tr()} $num';
+      if (rawName == 'bot_name_template') {
+        final bits = targetUid.split('_');
+        final num = bits.length > 1 ? bits[1] : '';
+        targetName = '${'bot_name'.tr()} $num';
      } else {
        targetName = rawName.tr();
      }

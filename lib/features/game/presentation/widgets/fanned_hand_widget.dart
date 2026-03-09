@@ -96,8 +96,8 @@ class _FannedHandWidgetState extends State<FannedHandWidget> {
         final double cardWidth = isMobile ? 70.0 : 85.0;
         final double cardHeight = isMobile ? 100.0 : 125.0;
         
-        // Calculate dynamic spacing to ensure overlap
-        final double preferredSpacing = isMobile ? 18.0 : 25.0;
+        // Calculate dynamic spacing to ensure overlap (Reduced for flat look)
+        final double preferredSpacing = isMobile ? 40.0 : 55.0;
         final double fanWidth = (cardCount - 1) * preferredSpacing;
         
         // Arc configuration (Disabled for "beside each other" look)
