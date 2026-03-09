@@ -1,0 +1,29 @@
+fileFormatVersion: 2
+guid: 18546850a9bb5e844a575b9e2811804a
+TrueTypeFontImporter:
+  externalObjects: {}
+  serializedVersion: 4
+  fontSize: 16
+  forceTextureCase: -2
+  characterSpacing: 0
+  characterPadding: 1
+  includeFontData: 1
+  fontName: JetBrains Mono
+  fontNames:
+  - JetBrains Mono
+  fallbackFontReferences: []
+  customCharacters: 
+  fontRenderingMode: 0
+  ascentCalculationMode: 1
+  useLegacyBoundsCalculation: 0
+  shouldRoundAdvanceValue: 1
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 162894
+  packageName: Drag Me
+  packageVersion: 1.0
+  assetPath: Assets/DragMe/Demo/Fonts/JetBrainsMono-Regular.ttf
+  uploadId: 358744

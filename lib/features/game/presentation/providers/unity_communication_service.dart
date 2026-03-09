@@ -72,9 +72,13 @@ class UnityCommunicationService {
   }
 
   void syncState(MatchState state) {
+    final currentUserUid = _ref.read(currentUserProvider)?.uid;
+    final handCards = currentUserUid != null ? (state.handCards[currentUserUid] ?? []) : [];
+    
     final message = {
       'type': 'SYNC_STATE',
       'board': state.board.map((c) => c.toJson()).toList(),
+      'handCards': handCards.map((c) => c.toJson()).toList(),
       'phase': state.phase.name,
       'turnIndex': state.currentTurnIndex,
     };

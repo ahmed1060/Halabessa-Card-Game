@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 55106bfea72b3ee4a8d42a1a4bad9d86
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 162894
+  packageName: Drag Me
+  packageVersion: 1.0
+  assetPath: Assets/DragMe/Scripts/Components/Abstractions/IDragMe.cs
+  uploadId: 358744

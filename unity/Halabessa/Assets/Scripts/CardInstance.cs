@@ -1,5 +1,6 @@
 using UnityEngine;
 using DG.Tweening;
+using Studio.OverOne.DragMe.Data.Events;
 
 public class CardInstance : MonoBehaviour {
     public string cardId;
@@ -15,6 +16,50 @@ public class CardInstance : MonoBehaviour {
     void Awake() {
         if (cardRenderer == null) cardRenderer = GetComponent<MeshRenderer>();
         if (shadowTransform != null) shadowTransform.gameObject.SetActive(true);
+        
+        // Setup for 3D Dragging (God Move)
+        SetupDragging();
+    }
+
+    private void SetupDragging() {
+        // Ensure Rigidbody for physics interaction
+        Rigidbody rb = GetComponent<Rigidbody>();
+        if (rb == null) {
+            rb = gameObject.AddComponent<Rigidbody>();
+            rb.isKinematic = true; // Stay in place unless dragged
+            rb.useGravity = false;
+        }
+
+        // Ensure Collider
+        if (GetComponent<Collider>() == null) {
+            BoxCollider col = gameObject.AddComponent<BoxCollider>();
+            col.size = new Vector3(1f, 1f, 0.1f);
+        }
+
+        // Add DragMe component
+        Studio.OverOne.DragMe.Components.DragMe dragComp = GetComponent<Studio.OverOne.DragMe.Components.DragMe>();
+        if (dragComp == null) {
+            dragComp = gameObject.AddComponent<Studio.OverOne.DragMe.Components.DragMe>();
+            // Load the provided config
+            var config = Resources.Load<Studio.OverOne.DragMe.Data.DragMeConfig>("DragMe/DragMe Hold 3d Config");
+            if (config != null) dragComp.Config = config;
+
+            // Listen for release to trigger "Play Card" (God Move)
+            dragComp.e_Released.AddListener(OnCardReleased);
+        }
+    }
+
+    private void OnCardReleased(IReleasedEventData data) {
+        // If the card is released in the "Table Area" (e.g. y > -0.5f)
+        if (transform.position.z > -1.5f) { // Table is at Z=-1.0, Hand is at Z=-2.5
+             Debug.Log($"CardInstance: Card {cardId} played at {transform.position}");
+             if (UnityBridge.Instance != null) {
+                 UnityBridge.Instance.NotifyFlutter("PLAY_CARD", cardId);
+             }
+        } else {
+             // Snap back to original hand position (handled by UnityBridge.HandleSyncState on next update)
+             Debug.Log("CardInstance: Card released but not played. Snapping back.");
+        }
     }
     
     public void ApplySkin(DeckManager.CardSkin skin) {

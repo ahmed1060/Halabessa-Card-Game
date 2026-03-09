@@ -1,0 +1,35 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4ed271ebc1ef8854cb412d5b7a732c7c, type: 3}
+  m_Name: DragMe Hold 3d Config
+  m_EditorClassIdentifier: 
+  _inputSourcePrefab: {fileID: 6623717419711615729, guid: e27ae110636d00c44b85972a764d5e52,
+    type: 3}
+  _camera: {fileID: 0}
+  _fixedUpdate: 0
+  _collisionType: 1
+  _dragType: 0
+  _orientation: 6
+  _grabMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  _placementMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  _maxDistance: 100
+  _triggerInteraction: 2
+  _dragHistoryInterval: 3
+  _dragHistoryMaxLength: 5
+  _transformHistoryMaxLength: 5
+  _hideMouseOnDrag: 0
+  _debounceTime: 0.25
+  _distanceThreshold: 0

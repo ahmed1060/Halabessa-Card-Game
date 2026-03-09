@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 1f2c53a477da19e41b965b5af01b33b9
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 162894
+  packageName: Drag Me
+  packageVersion: 1.0
+  assetPath: Assets/DragMe/Resources/DragMe Toggle 2d Config.asset
+  uploadId: 358744

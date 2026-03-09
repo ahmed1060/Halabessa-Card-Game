@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 661f7ea18a1e8d644b39200e14c2683b
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 162894
+  packageName: Drag Me
+  packageVersion: 1.0
+  assetPath: Assets/DragMe/Scripts/Data/Abstractions/IGrabbedventData.cs
+  uploadId: 358744

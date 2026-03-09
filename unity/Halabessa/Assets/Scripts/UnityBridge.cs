@@ -51,7 +51,7 @@ public class UnityBridge : MonoBehaviour {
             MessageData data = JsonUtility.FromJson<MessageData>(messageJson);
             
             if (data.type == "SYNC_STATE") {
-                HandleSyncState(data.board);
+                HandleSyncState(data.board, data.handCards);
             } else if (data.type == "START_TIMER") {
                 if (TurnTimer.Instance != null) {
                     TurnTimer.Instance.StartTimer(data.duration);
@@ -64,7 +64,7 @@ public class UnityBridge : MonoBehaviour {
         }
     }
 
-    private void HandleSyncState(List<CardJson> boardCards) {
+    private void HandleSyncState(List<CardJson> boardCards, List<CardJson> handCards) {
         if (cardPrefab == null) {
             Debug.LogError("CardPrefab is missing from Resources folder! Cannot spawn cards.");
             return;
@@ -124,6 +124,43 @@ public class UnityBridge : MonoBehaviour {
                 Debug.Log($"UnityBridge: SUCCESS - Card {cardId} flying to {targetPos}");
             }
         }
+
+        // 3. Spawn and Position Hand Cards (Premium 3D Hand)
+        float handBaseZ = -2.5f; // Closer to camera
+        float handY = -1.5f; // Bottom of screen (adjusted for camera view)
+        float handSpacing = 0.6f;
+        float handStartX = -((handCards.Count - 1) * handSpacing) / 2f;
+
+        for (int i = 0; i < handCards.Count; i++) {
+            CardJson cardData = handCards[i];
+            string cardId = cardData.id ?? (cardData.suit + "_" + cardData.rank);
+            
+            if (!activeCards.ContainsKey(cardId)) {
+                GameObject newCard = Instantiate(cardPrefab);
+                newCard.name = "HandCard_" + cardId;
+                newCard.transform.localScale = Vector3.one * 1.5f;
+                newCard.transform.localRotation = Quaternion.Euler(60, 0, 0); 
+                
+                Vector3 targetPos = new Vector3(handStartX + (i * handSpacing), handY, handBaseZ);
+                newCard.transform.position = new Vector3(targetPos.x, targetPos.y - 2f, targetPos.z); 
+                
+                CardInstance cardScript = newCard.GetComponent<CardInstance>();
+                if (cardScript != null) {
+                    cardScript.cardId = cardId;
+                    cardScript.rank = cardData.rank;
+                    cardScript.suit = cardData.suit;
+                    cardScript.PlayAnimation(targetPos, 0.6f);
+                } else {
+                    newCard.transform.position = targetPos;
+                }
+                
+                activeCards.Add(cardId, newCard);
+            } else {
+                Vector3 targetPos = new Vector3(handStartX + (i * handSpacing), handY, handBaseZ);
+                GameObject existing = activeCards[cardId];
+                existing.transform.DOMove(targetPos, 0.3f);
+            }
+        }
     }
 
     public void NotifyFlutter(string eventName, string data = "") {
@@ -143,6 +180,7 @@ public class UnityBridge : MonoBehaviour {
         public float y;
         public string skinId;
         public List<CardJson> board;
+        public List<CardJson> handCards;
         public float duration;
         public string mode;
     }

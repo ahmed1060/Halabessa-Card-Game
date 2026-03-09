@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: e27ae110636d00c44b85972a764d5e52
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 162894
+  packageName: Drag Me
+  packageVersion: 1.0
+  assetPath: Assets/DragMe/Prefabs/Input Source.prefab
+  uploadId: 358744

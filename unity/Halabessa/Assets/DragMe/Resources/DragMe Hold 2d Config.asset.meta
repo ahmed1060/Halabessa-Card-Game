@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: eda81bb45719c8f499e402ff4f40f7a3
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 162894
+  packageName: Drag Me
+  packageVersion: 1.0
+  assetPath: Assets/DragMe/Resources/DragMe Hold 2d Config.asset
+  uploadId: 358744

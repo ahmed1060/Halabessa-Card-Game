@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 901c019ff4f0b054bb29f7a7f3ce1370
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 162894
+  packageName: Drag Me
+  packageVersion: 1.0
+  assetPath: Assets/DragMe/Scripts/Events/SelectedEvent.cs
+  uploadId: 358744

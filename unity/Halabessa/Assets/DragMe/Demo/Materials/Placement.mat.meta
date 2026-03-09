@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: e1db3e672ce73614384514994d12ea7a
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 162894
+  packageName: Drag Me
+  packageVersion: 1.0
+  assetPath: Assets/DragMe/Demo/Materials/Placement.mat
+  uploadId: 358744

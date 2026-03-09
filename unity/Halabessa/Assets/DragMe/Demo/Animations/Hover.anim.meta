@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 0ae2ebcf19e721a4ba46ead70ad4b0fe
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 7400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 162894
+  packageName: Drag Me
+  packageVersion: 1.0
+  assetPath: Assets/DragMe/Demo/Animations/Hover.anim
+  uploadId: 358744

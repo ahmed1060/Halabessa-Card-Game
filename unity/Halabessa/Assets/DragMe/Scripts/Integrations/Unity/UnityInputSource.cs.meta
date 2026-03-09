@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: faa1be77893f08d40ab0e7e97c35b941
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 162894
+  packageName: Drag Me
+  packageVersion: 1.0
+  assetPath: Assets/DragMe/Scripts/Integrations/Unity/UnityInputSource.cs
+  uploadId: 358744

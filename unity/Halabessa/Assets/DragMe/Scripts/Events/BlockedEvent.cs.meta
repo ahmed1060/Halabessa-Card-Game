@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: b8891f6201c8abc4cb654c5f85e12724
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 162894
+  packageName: Drag Me
+  packageVersion: 1.0
+  assetPath: Assets/DragMe/Scripts/Events/BlockedEvent.cs
+  uploadId: 358744

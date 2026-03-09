@@ -1,0 +1,33 @@
+fileFormatVersion: 2
+guid: 93d6d086503c0b941831f96194747e00
+TrueTypeFontImporter:
+  externalObjects: {}
+  serializedVersion: 4
+  fontSize: 16
+  forceTextureCase: -2
+  characterSpacing: 0
+  characterPadding: 1
+  includeFontData: 1
+  fontName: JetBrains Mono
+  fontNames:
+  - JetBrains Mono
+  fallbackFontReferences:
+  - {fileID: 12800000, guid: 18546850a9bb5e844a575b9e2811804a, type: 3}
+  - {fileID: 12800000, guid: 31dc85338db2cb04fbde100b40878a4b, type: 3}
+  - {fileID: 12800000, guid: 7b577bc63153a6d488e6bbda6ab6f94d, type: 3}
+  - {fileID: 12800000, guid: 938414cdf8087eb4089565b97781c75b, type: 3}
+  customCharacters: 
+  fontRenderingMode: 0
+  ascentCalculationMode: 1
+  useLegacyBoundsCalculation: 0
+  shouldRoundAdvanceValue: 1
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 162894
+  packageName: Drag Me
+  packageVersion: 1.0
+  assetPath: Assets/DragMe/Demo/Fonts/JetBrainsMono-Italic.ttf
+  uploadId: 358744
