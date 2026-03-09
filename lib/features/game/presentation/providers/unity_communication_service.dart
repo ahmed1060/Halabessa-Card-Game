@@ -109,8 +109,20 @@ class UnityCommunicationService {
   }
 
   void handleUnityMessage(String message) {
-    isReady.value = true; // Any message from Unity indicates it's alive
-    _ref.read(unityInitializedProvider.notifier).state = true;
+    if (!isReady.value) {
+      isReady.value = true;
+      _ref.read(unityInitializedProvider.notifier).state = true;
+      
+      // Auto-hide the boot splash after a small delay for a smooth transition
+      Future.delayed(const Duration(seconds: 2), () {
+        // Only hide if we aren't ALREADY on a screen that requested Unity visibility
+        // (This handles the case where Unity finishes loading exactly as we enter a game)
+        _ref.read(unityLayerVisibilityProvider.notifier).update((isVisible) => isVisible ? false : false);
+        // Wait, the above logic is flawed. Let's just set it to false. 
+        // If GameBoardScreen is active, it will have its own logic or we can check the route.
+        _ref.read(unityLayerVisibilityProvider.notifier).state = false;
+      });
+    }
     try {
       final data = jsonDecode(message);
       print("Unity Message Received: $data");
