@@ -71,10 +71,7 @@
         companyName: "DefaultCompany",
         productName: "Halabessa",
         productVersion: "1.0",
-        webglContextAttributes: {
-          "alpha": true,
-          "preserveDrawingBuffer": true
-        }
+        // Let Unity handle its own context attributes for maximum stability
       }).then((instance) => {
         unityInstance = instance;
         console.log("Unity instance successfully created.");

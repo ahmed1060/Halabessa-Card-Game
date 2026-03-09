@@ -843,7 +843,7 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
   }
 
   Widget _buildBoardCenter(BuildContext context, WidgetRef ref, MatchState matchState, String myUid) {
-    return const UnityGameView();
+    return const SizedBox.shrink();
   }
 
   Widget _buildLocalPlayerArea(BuildContext context, WidgetRef ref, MatchState matchState, String myUid) {
