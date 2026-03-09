@@ -76,44 +76,39 @@ public class UnityBridge : MonoBehaviour {
         foreach(var k in keysToRemove) activeCards.Remove(k);
 
         // 2. Spawn and Position new cards
-        float startX = -2f;
-        float spacing = 1.2f;
+        float startX = -1.5f; // Slightly more compact
+        float spacing = 1.0f;
         
         for (int i = 0; i < boardCards.Count; i++) {
             CardJson cardData = boardCards[i];
             string cardId = cardData.id ?? (cardData.suit + "_" + cardData.rank);
 
             if (!activeCards.ContainsKey(cardId)) {
+                Debug.Log($"UnityBridge: Attempting to spawn card {cardId}");
+                
                 // Spawn a new card
                 GameObject newCard = Instantiate(cardPrefab);
                 newCard.name = "Card_" + cardId;
                 
-                // Target position on the table
-                Vector3 targetPos = new Vector3(startX + (i * spacing), 0.1f, 0);
+                // Ensure scale is correct (important if prefab is tiny/huge)
+                newCard.transform.localScale = Vector3.one * 1.5f; 
+                
+                // Target position on the table (Moved Z closer to camera for visibility)
+                Vector3 targetPos = new Vector3(startX + (i * spacing), 0.1f, -1.0f); 
                 
                 CardInstance cardScript = newCard.GetComponent<CardInstance>();
                 if (cardScript != null) {
-                    // Start flying from off-screen (like being dealt by a dealer)
-                    newCard.transform.position = new Vector3(0, 5f, 6f); 
-                    cardScript.PlayAnimation(targetPos, 0.5f + (i * 0.1f)); // Stagger animations
+                    Debug.Log($"UnityBridge: Customizing card {cardId}");
+                    // Start flying from off-screen
+                    newCard.transform.position = new Vector3(0, 5f, 5f); 
+                    cardScript.PlayAnimation(targetPos, 0.5f + (i * 0.1f));
                 } else {
-                    newCard.transform.position = targetPos; // Fallback
+                    Debug.LogWarning($"UnityBridge: CardInstance script missing on {newCard.name}. Using static position.");
+                    newCard.transform.position = targetPos;
                 }
                 
-                // Color code the dummy prefab based on suit
-                Renderer r = newCard.GetComponent<Renderer>();
-                if (r != null) {
-                    if (cardData.suit == "hearts" || cardData.suit == "diamonds") {
-                        // Sleek Casino Red
-                        r.material.color = new Color(0.8f, 0.1f, 0.1f); 
-                    } else {
-                        // Deep Black
-                        r.material.color = new Color(0.1f, 0.1f, 0.1f);
-                    }
-                }
-
                 activeCards.Add(cardId, newCard);
-                Debug.Log($"Spawned animating card {cardId} flying to {targetPos}");
+                Debug.Log($"UnityBridge: SUCCESS - Card {cardId} flying to {targetPos}");
             }
         }
     }

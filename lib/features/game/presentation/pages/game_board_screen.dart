@@ -489,6 +489,34 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
                       child: _buildLocalPlayerArea(context, ref, matchState, myUid),
                     ),
 
+                    // Centered Hand Cards
+                    if (!isSpectator && (matchState.handCards[myUid]?.length ?? 0) > 0)
+                      Align(
+                        alignment: Alignment.bottomCenter,
+                        child: Padding(
+                          padding: const EdgeInsets.only(bottom: 20),
+                          child: FannedHandWidget(
+                            cards: matchState.handCards[myUid] ?? [],
+                            isMyTurn: matchState.playerIds.isNotEmpty && 
+                                     matchState.currentTurnIndex == _getAbsoluteIndex(matchState, myUid, 0),
+                            onCardTap: (card, globalOrigin) {
+                              HapticFeedback.lightImpact();
+                              
+                              final RenderBox? boardBox = _boardKey.currentContext?.findRenderObject() as RenderBox?;
+                              Offset relativeOrigin = Offset.zero;
+                              
+                              if (boardBox != null && globalOrigin != Offset.zero) {
+                                final localOffset = boardBox.globalToLocal(globalOrigin);
+                                // Board center is (100, 100)
+                                relativeOrigin = Offset(localOffset.dx - 100, localOffset.dy - 100);
+                              }
+                              
+                              ref.read(matchStateProvider.notifier).playCard(myUid, card, origin: relativeOrigin);
+                            },
+                          ),
+                        ),
+                      ),
+
                     // Overlays
                     if (matchState.phase == GamePhase.waitingForPlayers) _buildLobbyOverlay(context, ref, matchState, myUid),
                     if (isSpectator && matchState.phase != GamePhase.waitingForPlayers) _buildSpectatorIndicator(),
@@ -883,27 +911,7 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
                 ],
               ),
               const SizedBox(width: 24),
-              // Hand
-              if ((matchState.handCards[myUid]?.length ?? 0) > 0)
-                FannedHandWidget(
-                  cards: matchState.handCards[myUid] ?? [],
-                  isMyTurn: matchState.playerIds.isNotEmpty && 
-                           matchState.currentTurnIndex == _getAbsoluteIndex(matchState, myUid, 0),
-                  onCardTap: (card, globalOrigin) {
-                    HapticFeedback.lightImpact();
-                    
-                    final RenderBox? boardBox = _boardKey.currentContext?.findRenderObject() as RenderBox?;
-                    Offset relativeOrigin = Offset.zero;
-                    
-                    if (boardBox != null && globalOrigin != Offset.zero) {
-                      final localOffset = boardBox.globalToLocal(globalOrigin);
-                      // Board center is (100, 100)
-                      relativeOrigin = Offset(localOffset.dx - 100, localOffset.dy - 100);
-                    }
-                    
-                    ref.read(matchStateProvider.notifier).playCard(myUid, card, origin: relativeOrigin);
-                  },
-                ),
+              // Hand moved to bottom center of stack for better symmetry
             ],
           ),
         ],
