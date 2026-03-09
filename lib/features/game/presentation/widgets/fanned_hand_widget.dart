@@ -96,9 +96,12 @@ class _FannedHandWidgetState extends State<FannedHandWidget> {
         final double cardWidth = isMobile ? 70.0 : 85.0;
         final double cardHeight = isMobile ? 100.0 : 125.0;
         
-        // Calculate dynamic spacing to ensure "Zero Overlap" (beside each other)
-        final double preferredSpacing = isMobile ? 85.0 : 100.0;
+        // Calculate dynamic spacing to ensure cards are beside each other with a premium "holding" look
+        final double preferredSpacing = isMobile ? 75.0 : 90.0;
         final double fanWidth = (cardCount - 1) * preferredSpacing;
+        
+        // Stabilize width to prevent "twitching" layout shifts
+        final double totalWidth = fanWidth + cardWidth;
         
         // Arc configuration (Disabled for "beside each other" look)
         final double arcHeight = 0.0;
@@ -160,9 +163,9 @@ class _FannedHandWidgetState extends State<FannedHandWidget> {
           },
           onPanCancel: () => setState(() => hoveredIndex = null),
           child: Container(
-            width: fanWidth + cardWidth,
-            height: cardHeight + arcHeight + 40,
-            alignment: Alignment.center,
+            width: totalWidth,
+            height: cardHeight + arcHeight + 60, // Added buffer for hover scaling
+            alignment: Alignment.bottomCenter,
             decoration: const BoxDecoration(color: Colors.transparent), // Catch gestures
             child: Stack(
               clipBehavior: Clip.none,
@@ -182,7 +185,7 @@ class _FannedHandWidgetState extends State<FannedHandWidget> {
 
                 return Positioned(
                   left: xPos,
-                  bottom: -25 + (arcHeight - yPos),
+                  bottom: -45 + (arcHeight - yPos),
                   child: Draggable<game_card.Card>(
                     data: widget.cards[index],
                     maxSimultaneousDrags: (widget.isMyTurn && hoveredIndex == index) ? 1 : 0,

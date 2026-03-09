@@ -34,6 +34,16 @@ public class UnityBridge : MonoBehaviour {
         NotifyFlutter("UNITY_READY", "Unity initialized");
     }
     
+    // Proxy for console visibility to avoid "object not found" routing issues
+    public void ToggleConsole(string dummy) {
+        UnityDebugConsole console = FindObjectOfType<UnityDebugConsole>(true);
+        if (console != null) {
+            console.ToggleVisibility();
+        } else {
+            Debug.LogWarning("UnityBridge: UnityDebugConsole script not found in scene!");
+        }
+    }
+
     // Called from Flutter via _unityWidgetController.postMessage('UnityBridge', 'OnFlutterMessage', json)
     public void OnFlutterMessage(string messageJson) {
         Debug.Log("UnityBridge Received: " + messageJson);

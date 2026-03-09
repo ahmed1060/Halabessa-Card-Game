@@ -575,8 +575,8 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
                               icon: Icons.bug_report_outlined,
                               onTap: () {
                                 ref.read(unityCommunicationServiceProvider).postMessage(
-                                  'UnityDebugConsole',
-                                  'ToggleVisibility',
+                                  'UnityBridge',
+                                  'ToggleConsole',
                                   '',
                                 );
                               },
