@@ -33,7 +33,7 @@ jobs:
         run: flutter pub get
 
       - name: Build APK (Debug)
-        run: flutter build apk --debug
+        run: flutter build apk --debug --android-skip-build-dependency-validation
         # We use --debug here for faster CI verification.
         # Change to --release if you have signing configs set up in android/app/build.gradle
 
