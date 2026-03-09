@@ -93,6 +93,9 @@ public class UnityBridge : MonoBehaviour {
                 // Ensure scale is correct (important if prefab is tiny/huge)
                 newCard.transform.localScale = Vector3.one * 1.5f; 
                 
+                // FLATTEN ON TABLE (God Move)
+                newCard.transform.localRotation = Quaternion.Euler(90, 0, 0);
+                
                 // Target position on the table (Moved Z closer to camera for visibility)
                 Vector3 targetPos = new Vector3(startX + (i * spacing), 0.1f, -1.0f); 
                 

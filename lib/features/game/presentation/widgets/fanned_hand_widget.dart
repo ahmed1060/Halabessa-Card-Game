@@ -96,8 +96,8 @@ class _FannedHandWidgetState extends State<FannedHandWidget> {
         final double cardWidth = isMobile ? 70.0 : 85.0;
         final double cardHeight = isMobile ? 100.0 : 125.0;
         
-        // Calculate dynamic spacing to ensure cards are beside each other
-        final double preferredSpacing = isMobile ? 65.0 : 80.0;
+        // Calculate dynamic spacing to ensure "Zero Overlap" (beside each other)
+        final double preferredSpacing = isMobile ? 85.0 : 100.0;
         final double fanWidth = (cardCount - 1) * preferredSpacing;
         
         // Arc configuration (Disabled for "beside each other" look)
@@ -182,7 +182,7 @@ class _FannedHandWidgetState extends State<FannedHandWidget> {
 
                 return Positioned(
                   left: xPos,
-                  bottom: 5 + (arcHeight - yPos),
+                  bottom: -25 + (arcHeight - yPos),
                   child: Draggable<game_card.Card>(
                     data: widget.cards[index],
                     maxSimultaneousDrags: (widget.isMyTurn && hoveredIndex == index) ? 1 : 0,

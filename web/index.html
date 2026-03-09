@@ -121,9 +121,10 @@
       if (typeof event.data === 'string') {
         try {
           var data = JSON.parse(event.data);
-          // If it has objectName and methodName, it's a Unity-bound message from Flutter
-          if (data.objectName && data.methodName) {
-            window.handleFlutterMessage(event.data);
+          // If it has objectName and methodName, it's a specific Unity-bound message from Flutter
+          if (data.objectName && data.methodName && unityInstance) {
+            console.log("Direct Routine to Unity: " + data.objectName + "." + data.methodName);
+            unityInstance.SendMessage(data.objectName, data.methodName, data.message || "");
           }
         } catch (e) {
           // Not a JSON message or not for Unity
