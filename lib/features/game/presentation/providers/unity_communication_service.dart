@@ -135,10 +135,23 @@ class UnityCommunicationService {
       final data = jsonDecode(message);
       print("Unity Message Received: $data");
       
-      if (data['event'] == 'BASRA_EVENT') {
-        // Trigger Flutter-side celebratory logic or haptics
-        HapticFeedback.heavyImpact();
-      } else if (data['event'] == 'ANIMATION_COMPLETE') {
+        if (data['event'] == 'BASRA_EVENT') {
+          // Trigger Flutter-side celebratory logic or haptics
+          HapticFeedback.heavyImpact();
+        } else if (data['event'] == 'PLAY_CARD') {
+          final String cardId = data['data'];
+          // Find the card in the match state and play it
+          final matchState = _ref.read(matchStateProvider);
+          if (matchState != null) {
+            final currentUserUid = _ref.read(currentUserProvider)?.uid;
+            if (currentUserUid != null) {
+              final hand = matchState.handCards[currentUserUid] ?? [];
+              final card = hand.firstWhere((c) => c.suit + "_" + c.rank == cardId, orElse: () => hand.firstWhere((c) => c.id == cardId));
+              _ref.read(gameControllerProvider.notifier).playCard(card);
+              HapticFeedback.mediumImpact();
+            }
+          }
+        } else if (data['event'] == 'ANIMATION_COMPLETE') {
         // Handle synchronization points
       }
     } catch (e) {
