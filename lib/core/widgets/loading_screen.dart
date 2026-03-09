@@ -36,7 +36,6 @@ class LoadingScreen extends StatelessWidget {
                     child: child,
                   );
                 },
-                onEnd: () {}, // Repeat logic usually handled by a controller, but this is simple pulse
                 onEnd: () {}, 
                 child: Image.asset(
                   'assets/images/logo.png', // Correct logo path
@@ -153,13 +152,6 @@ class _CyclingLoadingTextState extends State<_CyclingLoadingText> {
           fontSize: 12,
           fontWeight: FontWeight.bold,
           letterSpacing: 2,
-        ),
-      ),
-    );
-  }
-}
-            ],
-          ),
         ),
       ),
     );
