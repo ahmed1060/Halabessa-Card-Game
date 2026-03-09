@@ -470,8 +470,7 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
                       child: _buildTeamHarvestPiles(matchState, 'teamB', isMyTeam: _getTeamOfPlayer(myUid, matchState.playerIds) == 'teamB'),
                     ),
 
-                    Align(
-                      alignment: const Alignment(0, -0.2), 
+                    Positioned.fill(
                       child: _buildBoardCenter(context, ref, matchState, myUid),
                     ),
 
@@ -841,11 +840,7 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
   }
 
   Widget _buildBoardCenter(BuildContext context, WidgetRef ref, MatchState matchState, String myUid) {
-    return const SizedBox(
-      width: 400,
-      height: 400,
-      child: UnityGameView(),
-    );
+    return const UnityGameView();
   }
 
   Widget _buildLocalPlayerArea(BuildContext context, WidgetRef ref, MatchState matchState, String myUid) {
