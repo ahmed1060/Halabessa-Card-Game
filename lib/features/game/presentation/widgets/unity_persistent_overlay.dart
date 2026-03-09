@@ -44,20 +44,67 @@ class UnityPersistentOverlay extends ConsumerWidget {
                         strokeWidth: 2,
                       ),
                       const SizedBox(height: 16),
-                      const Text(
-                        "Initializing Engine...",
-                        style: TextStyle(
-                          color: Colors.white70,
-                          fontSize: 12,
-                          letterSpacing: 1.1,
-                        ),
-                      ),
+                      const _CyclingLoadingText(),
                     ],
                   ),
                 ),
               ),
             ),
         ],
+      ),
+    );
+  }
+}
+
+class _CyclingLoadingText extends StatefulWidget {
+  const _CyclingLoadingText();
+
+  @override
+  State<_CyclingLoadingText> createState() => _CyclingLoadingTextState();
+}
+
+class _CyclingLoadingTextState extends State<_CyclingLoadingText> {
+  int _currentIndex = 0;
+  final List<String> _loadingSteps = [
+    "Initializing Engine...",
+    "Loading Card Assets...",
+    "Readying Casino Environment...",
+    "Configuring Card Physics...",
+    "Synchronizing With Server...",
+    "Finalizing Interface...",
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _startDisplayTimer();
+  }
+
+  void _startDisplayTimer() {
+    // Cycle every 1.5 seconds
+    Future.doWhile(() async {
+      await Future.delayed(const Duration(milliseconds: 1500));
+      if (!mounted) return false;
+      setState(() {
+        _currentIndex = (_currentIndex + 1) % _loadingSteps.length;
+      });
+      return true;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 500),
+      child: Text(
+        _loadingSteps[_currentIndex],
+        key: ValueKey(_currentIndex),
+        style: const TextStyle(
+          color: Colors.white70,
+          fontSize: 12,
+          letterSpacing: 1.1,
+          fontStyle: FontStyle.italic,
+        ),
       ),
     );
   }
