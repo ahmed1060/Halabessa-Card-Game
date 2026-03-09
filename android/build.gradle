@@ -2,6 +2,9 @@ allprojects {
     repositories {
         google()
         mavenCentral()
+        maven {
+            url "${project(':app').projectDir}/../../unity/Halabessa/Assets/GeneratedLocalRepo/Firebase/m2repository"
+        }
         flatDir {
             dirs "${project(':unityLibrary').projectDir}/libs"
         }
@@ -11,28 +14,47 @@ allprojects {
 rootProject.buildDir = '../build'
 subprojects {
     project.buildDir = "${rootProject.buildDir}/${project.name}"
-}
-subprojects {
-    project.evaluationDependsOn(':app')
-}
 
-// Inject namespace for plugins that don't have it (required by AGP 8+)
-subprojects {
-    plugins.withId("com.android.application") {
-        configureNamespace(project)
-    }
-    plugins.withId("com.android.library") {
-        configureNamespace(project)
-    }
-}
+    afterEvaluate { project ->
+        if (project.hasProperty('android')) {
+            project.android {
+                compileSdkVersion 35
+                buildToolsVersion "35.0.0"
+                compileOptions {
+                    sourceCompatibility JavaVersion.VERSION_17
+                    targetCompatibility JavaVersion.VERSION_17
+                }
+                
+                if (project.android.namespace == null) {
+                    project.android.namespace = "com.halabessa.game.${project.name.replaceAll("-", ".")}"
+                }
 
-// Ensure consistent Java version across all subprojects (fixes Major Version 69 issues)
-subprojects {
-    plugins.withType(com.android.build.gradle.BasePlugin).configureEach {
-        project.android {
-            compileOptions {
-                sourceCompatibility JavaVersion.VERSION_17
-                targetCompatibility JavaVersion.VERSION_17
+                // AGP 8+ hack: Strip package attribute from AndroidManifest.xml
+                project.android.sourceSets.all { sourceSet ->
+                    def manifestFile = sourceSet.manifest.srcFile
+                    if (manifestFile != null && manifestFile.exists() && !manifestFile.isDirectory()) {
+                        try {
+                            def content = manifestFile.text
+                            if (content.contains('package=')) {
+                                println "Sanitizing manifest for ${project.name} (${sourceSet.name}): ${manifestFile}"
+                                manifestFile.text = content.replaceAll(/package="[^"]*"/, '')
+                            }
+                        } catch (Exception e) {
+                            println "Warning: Could not sanitize ${manifestFile}: ${e.message}"
+                        }
+                    }
+                }
+            }
+        }
+
+        tasks.withType(JavaCompile).configureEach {
+            sourceCompatibility = '17'
+            targetCompatibility = '17'
+        }
+
+        tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
+            kotlinOptions {
+                jvmTarget = "17"
             }
         }
     }

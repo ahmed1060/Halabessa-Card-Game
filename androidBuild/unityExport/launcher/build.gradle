@@ -7,7 +7,7 @@ dependencies {
 }
 
 android {
-    namespace "com.DefaultCompany.Halabessa"
+    namespace "com.example.halabessa"
     ndkPath "C:/Program Files/Unity/Hub/Editor/6000.0.69f1/Editor/Data/PlaybackEngines/AndroidPlayer/NDK"
     ndkVersion "27.2.12479018"
     compileSdk 36
@@ -19,7 +19,7 @@ android {
     }
 
     defaultConfig {
-        applicationId "com.DefaultCompany.Halabessa"
+        applicationId "com.example.halabessa"
         versionName "1.0"
         minSdk 23
         targetSdk 36

@@ -51,7 +51,10 @@ dependencies:
   quiver: ^3.2.1
   file_picker: ^8.0.0+1
   confetti: ^0.8.0
-  flutter_unity_widget: ^2022.2.0
+  flutter_unity_widget:
+    git:
+      url: https://github.com/juicycleff/flutter-unity-view-widget.git
+      ref: experimental/unity_6000
 
 dev_dependencies:
   flutter_test:

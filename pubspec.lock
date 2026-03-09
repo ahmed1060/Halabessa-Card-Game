@@ -475,11 +475,12 @@ packages:
   flutter_unity_widget:
     dependency: "direct main"
     description:
-      name: flutter_unity_widget
-      sha256: "91ed7166754f8c35358dfc92b8812d9ec5fbf1f6d67276a2462fda8ac6eef7f3"
-      url: "https://pub.dev"
-    source: hosted
-    version: "2022.2.1"
+      path: "."
+      ref: "experimental/unity_6000"
+      resolved-ref: "19fa91aed815520d22395a245eff8c3b241b5e61"
+      url: "https://github.com/juicycleff/flutter-unity-view-widget.git"
+    source: git
+    version: "6000.1.0"
   flutter_web_plugins:
     dependency: transitive
     description: flutter
@@ -986,22 +987,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.5.1"
-  webview_flutter:
-    dependency: transitive
-    description:
-      name: webview_flutter
-      sha256: "6869c8786d179f929144b4a1f86e09ac0eddfe475984951ea6c634774c16b522"
-      url: "https://pub.dev"
-    source: hosted
-    version: "4.8.0"
-  webview_flutter_android:
-    dependency: transitive
-    description:
-      name: webview_flutter_android
-      sha256: "0d21cfc3bfdd2e30ab2ebeced66512b91134b39e72e97b43db2d47dda1c4e53a"
-      url: "https://pub.dev"
-    source: hosted
-    version: "3.16.3"
   webview_flutter_platform_interface:
     dependency: transitive
     description:
@@ -1018,14 +1003,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.2.3+2"
-  webview_flutter_wkwebview:
-    dependency: transitive
-    description:
-      name: webview_flutter_wkwebview
-      sha256: "9c62cc46fa4f2d41e10ab81014c1de470a6c6f26051a2de32111b2ee55287feb"
-      url: "https://pub.dev"
-    source: hosted
-    version: "3.14.0"
   win32:
     dependency: transitive
     description:

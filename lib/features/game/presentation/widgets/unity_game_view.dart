@@ -58,7 +58,7 @@ class _UnityGameViewState extends ConsumerState<UnityGameView> {
             builder: (context, isReady, child) {
               if (isReady) return const SizedBox.shrink();
               return Container(
-                color: const Color(0xFF0D1B2A), // Halabessa Dark Blue
+                color: Colors.transparent, // Fix: Ensure loading screen doesn't block the background
                 child: Center(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,

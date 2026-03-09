@@ -15,10 +15,7 @@ dependencies {
     implementation 'com.google.firebase:firebase-database:22.0.1' // Assets/Firebase/Editor/DatabaseDependencies.xml:16
     implementation 'com.google.firebase:firebase-database-unity:13.9.0' // Assets/Firebase/Editor/DatabaseDependencies.xml:25
 // Android Resolver Dependencies End
-    implementation 'androidx.appcompat:appcompat:1.6.1'
-    implementation 'androidx.core:core:1.9.0'
-    implementation 'androidx.games:games-activity:3.0.5'
-    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+    implementation project(':unityLibrary:FirebaseApp.androidlib')
     implementation 'androidx.games:games-frame-pacing:1.10.0'
 
 }
@@ -37,14 +34,8 @@ android {
 // Android Resolver Exclusions End
 android {
     namespace "com.unity3d.player"
-    def dynamicNdkPath = System.getenv("ANDROID_NDK_HOME")
-    if (dynamicNdkPath != null) {
-        ndkPath dynamicNdkPath
-        ndkVersion new File(dynamicNdkPath).name
-    } else {
-        ndkPath "C:/Program Files/Unity/Hub/Editor/6000.0.69f1/Editor/Data/PlaybackEngines/AndroidPlayer/NDK"
-        ndkVersion "27.2.12479018"
-    }
+    ndkPath "C:/Program Files/Unity/Hub/Editor/6000.0.69f1/Editor/Data/PlaybackEngines/AndroidPlayer/NDK"
+    ndkVersion "27.2.12479018"
 
     compileSdk 36
     buildToolsVersion = "36.0.0"
@@ -77,8 +68,7 @@ android {
     }
 
     androidResources {
-        def streamingAssets = project.hasProperty('unityStreamingAssets') ? project.property('unityStreamingAssets') : '.json'
-        noCompress = ['.unity3d', '.ress', '.resource', '.obb', '.bundle', '.unityexp'] + streamingAssets.tokenize(', ')
+        noCompress = ['.unity3d', '.ress', '.resource', '.obb', '.bundle', '.unityexp'] + unityStreamingAssets.tokenize(', ')
         ignoreAssetsPattern = "!.svn:!.git:!.ds_store:!*.scc:!CVS:!thumbs.db:!picasa.ini:!*~"
     }
 

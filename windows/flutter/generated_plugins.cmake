@@ -10,7 +10,6 @@ list(APPEND FLUTTER_PLUGIN_LIST
   firebase_core
   firebase_storage
   flutter_secure_storage_windows
-  flutter_unity_widget
 )
 
 list(APPEND FLUTTER_FFI_PLUGIN_LIST

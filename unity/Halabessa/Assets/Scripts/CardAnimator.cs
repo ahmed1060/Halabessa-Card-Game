@@ -14,8 +14,8 @@ public class CardAnimator : MonoBehaviour {
         card.transform.DOMove(worldPosition, 0.5f)
             .SetEase(Ease.OutQuad)
             .OnComplete(() => {
-                // Potential "bounce" or "thud" effect
-                card.transform.DOPunchScale(new Vector3(0.1f, 0.1f, 0.1f), 0.2f);
+                // Professional "thud" effect and shadow settling
+                card.transform.DOPunchScale(new Vector3(0.08f, 0.08f, 0.08f), 0.3f, 10, 1f);
             });
     }
     
@@ -23,8 +23,15 @@ public class CardAnimator : MonoBehaviour {
         Sequence captureSeq = DOTween.Sequence();
         
         foreach (var card in cards) {
-            captureSeq.Join(card.transform.DOMove(teamStackPosition, 0.6f).SetEase(Ease.InBack));
-            captureSeq.Join(card.transform.DORotate(new Vector3(0, 0, 180), 0.6f)); // Flip face down
+            CardInstance instance = card.GetComponent<CardInstance>();
+            captureSeq.Join(card.transform.DOMove(teamStackPosition + new Vector3(0, 0, -0.1f), 0.6f).SetEase(Ease.InBack));
+            
+            if (instance != null) {
+                // Use the new flip animation for a professional look
+                instance.PlayFlipAnimation(false, 0.6f);
+            } else {
+                captureSeq.Join(card.transform.DORotate(new Vector3(0, 0, 180), 0.6f));
+            }
         }
         
         captureSeq.OnComplete(() => {

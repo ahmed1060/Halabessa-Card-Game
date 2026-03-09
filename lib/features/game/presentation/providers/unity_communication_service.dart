@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'dart:html' as html;
+import 'package:halabessa/core/utils/web_utils.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_unity_widget/flutter_unity_widget.dart';
@@ -18,12 +18,13 @@ class UnityCommunicationService {
 
   void init() {
     if (kIsWeb) {
-      html.window.onMessage.listen((event) {
+      WebUtils.onMessage?.listen((event) {
         try {
           final message = event.data;
           if (message is String) {
             final data = jsonDecode(message);
             if (data['event'] == 'UNITY_READY') {
+              isReady.value = true;
               // Initial sync after Unity WebGL is loaded
               final matchState = _ref.read(matchStateProvider);
               if (matchState != null) {
@@ -53,7 +54,7 @@ class UnityCommunicationService {
         'methodName': methodName,
         'message': message,
       });
-      html.window.postMessage(data, '*');
+      WebUtils.postMessage(data, '*');
     } else {
       // For Native: Use the controller
       _controller?.postMessage(objectName, methodName, message);

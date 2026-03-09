@@ -1,11 +1,13 @@
 import 'dart:async';
-import 'dart:html' as html;
+import 'package:halabessa/core/utils/web_utils.dart';
 import 'package:flutter/foundation.dart';
 
 class WebPlatformService {
   static bool get isMobile {
     if (!kIsWeb) return false;
-    final userAgent = html.window.navigator.userAgent.toLowerCase();
+    final dynamic window = WebUtils.window;
+    if (window == null) return false;
+    final userAgent = window.navigator.userAgent.toLowerCase();
     return userAgent.contains('mobi') || 
            userAgent.contains('android') || 
            userAgent.contains('iphone') || 
@@ -17,9 +19,9 @@ class WebPlatformService {
     if (!isMobile) return;
     
     try {
-      final doc = html.document.documentElement;
+      final doc = WebUtils.document;
       if (doc != null) {
-        doc.requestFullscreen();
+        doc.documentElement?.requestFullscreen();
       }
     } catch (e) {
       debugPrint('Fullscreen request failed: $e');
@@ -30,14 +32,17 @@ class WebPlatformService {
   static void setupOneTimeFullscreenTrigger() {
     if (!isMobile) return;
 
+    final window = WebUtils.window;
+    if (window == null) return;
+
     StreamSubscription? sub;
-    sub = html.window.onClick.listen((event) {
+    sub = window.onClick.listen((event) {
       enterFullscreenIfMobile();
       sub?.cancel();
     });
     
     StreamSubscription? touchSub;
-    touchSub = html.window.onTouchStart.listen((event) {
+    touchSub = window.onTouchStart.listen((event) {
       enterFullscreenIfMobile();
       touchSub?.cancel();
     });
