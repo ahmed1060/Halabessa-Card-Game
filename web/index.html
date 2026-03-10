@@ -1,20 +1,7 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html>
 
 <head>
-  <!--
-    If you are serving your web app in a path other than the root, change the
-    href value below to reflect the base path you are serving from.
-
-    The path provided below has to start and end with a slash "/" in order for
-    it to work correctly.
-
-    For more details:
-    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
-
-    This is a placeholder for base href that will be replaced by the value of
-    the `--base-href` argument provided to `flutter build`.
-  -->
   <base href="$FLUTTER_BASE_HREF">
 
   <meta charset="UTF-8">
@@ -50,36 +37,24 @@
 
 <body>
   <!-- Unity WebGL Engine Loader (Canvas is dynamically injected by Flutter) -->
-  <script src="Build/unity.loader.js"></script>
+  <script src="Build/web.loader.js"></script>
   <script>
     var unityInstance = null;
 
     function createUnityInstanceOnCanvas(canvasElement) {
-      if (!canvasElement) {
-        console.error("No canvas provided to Unity WebGL Loader!");
-        return;
-      }
-
-      // console.log("Creating Unity Instance for canvas:", canvasElement.id);
-
-      // Ensure canvas has dimensions. If 0x0, WebGL context creation fails.
-      if (canvasElement.clientWidth === 0 || canvasElement.clientHeight === 0) {
-        canvasElement.style.width = "100%";
-        canvasElement.style.height = "100%";
-      }
+      if (!canvasElement) return;
 
       var buildUrl = "Build";
       var cacheBuster = "?v=" + Date.now();
 
       createUnityInstance(canvasElement, {
-        dataUrl: buildUrl + "/unity.data.unityweb" + cacheBuster,
-        frameworkUrl: buildUrl + "/unity.framework.js.unityweb" + cacheBuster,
-        codeUrl: buildUrl + "/unity.wasm.unityweb" + cacheBuster,
+        dataUrl: buildUrl + "/web.data.unityweb" + cacheBuster,
+        frameworkUrl: buildUrl + "/web.framework.js.unityweb" + cacheBuster,
+        codeUrl: buildUrl + "/web.wasm.unityweb" + cacheBuster,
         streamingAssetsUrl: "StreamingAssets",
-        companyName: "DefaultCompany",
+        companyName: "SHSD",
         productName: "Halabessa",
         productVersion: "1.0",
-        // Transparency & Performance Fixes
         premultipliedAlpha: false,
         webglContextAttributes: {
           preserveDrawingBuffer: true,
@@ -89,59 +64,38 @@
         },
       }).then((instance) => {
         unityInstance = instance;
-        // console.log("Unity instance successfully created.");
-
-        // Expose Unity interface to Flutter
         window.postMessageToUnity = function (message) {
           if (unityInstance !== null) {
-            // console.log("Sending to Unity: " + message);
             unityInstance.SendMessage("UnityBridge", "OnFlutterMessage", message);
-          } else {
-            console.warn("Unity not ready, message dropped: " + message);
           }
         };
       }).catch((message) => {
         console.error("Unity WebGL build failed to load:", message);
-        // Silently retry once after 2 seconds if it's a context issue
-        if (message.toString().indexOf("WebGL") !== -1) {
-          // console.log("Retrying Unity initialization in 2s...");
-          setTimeout(() => createUnityInstanceOnCanvas(canvasElement), 2000);
-        }
       });
     }
 
-    // Fallback global trigger for Flutter to call when mounting UnityGameView wrapper
     window.initUnityEngine = function (canvasElement) {
       createUnityInstanceOnCanvas(canvasElement);
     };
 
-    // Flutter to Unity communication bridge function
     window.handleFlutterMessage = function (message) {
       if (window.postMessageToUnity) {
         window.postMessageToUnity(message);
-      } else {
-        console.warn("Unity bridge not established yet. Dropping: " + message);
       }
     };
 
-    // Listen for window.postMessage from Flutter and route to Unity
     window.addEventListener('message', function (event) {
       if (typeof event.data === 'string') {
         try {
           var data = JSON.parse(event.data);
-          // If it has objectName and methodName, it's a specific Unity-bound message from Flutter
           if (data.objectName && data.methodName && unityInstance) {
-            // console.log("Direct Routine to Unity: " + data.objectName + "." + data.methodName);
             unityInstance.SendMessage(data.objectName, data.methodName, data.message || "");
           }
-        } catch (e) {
-          // Not a JSON message or not for Unity
-        }
+        } catch (e) { }
       }
     });
   </script>
 
-  <!-- Default Flutter bootstrap -->
   <script src="flutter_bootstrap.js" async></script>
 </body>
 
