@@ -20,7 +20,7 @@ namespace Studio.OverOne.DragMe.Editor
             Rigidbody2D rb = go.AddComponent<Rigidbody2D>();
             
             // Config rigidbody.
-            rb.isKinematic = true;
+            rb.bodyType = RigidbodyType2D.Kinematic;
             rb.interpolation = RigidbodyInterpolation2D.Interpolate;
 
             // Add sprite.

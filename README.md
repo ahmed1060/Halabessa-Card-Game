@@ -1,16 +1,33 @@
-# halabessa
+# 💎 Halabessa (هلبسة)
 
-A new Flutter project.
+Halabessa is the ultimate Egyptian card game experience, reimagined with a stunning 3D engine integrated seamlessly into a high-performance Flutter application.
 
-## Getting Started
+## 🚀 Vision
 
-This project is a starting point for a Flutter application.
+To bring the authentic, high-stakes atmosphere of the coffee-shop "Halabessa" card game to mobile and web platforms using cutting-edge technology:
 
-A few resources to get you started if this is your first Flutter project:
+- **Flutter**: For a silky-smooth, cross-platform UI.
+- **Unity 3D**: Powering the immersive game board, physics, and card animations.
+- **Firebase**: Real-time multiplayer synchronization and secure user profiles.
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+## ✨ Key Features
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+- **3D Interactive Board**: Dynamic camera, realistic physics, and premium card skins.
+- **Real-time Multiplayer**: Compete with friends or join public rooms globally.
+- **Modern UI/UX**: Glassmorphism, vibrant gradients, and intuitive gestures.
+- **Fully Localized**: Seamless experience in English and Arabic (Egypt/Saudi).
+- **Hardened Security**: Production-ready Firebase rules and cross-platform authentication.
+
+## 🛠 Tech Stack
+
+- **Frontend**: Flutter (Riverpod, Easy Localization, Audioplayers)
+- **Engine**: Unity 6000+ (C# Scripting, WebGL/Native Bridge)
+- **Backend**: Firebase Realtime Database, Cloud Functions, Storage, Auth
+- **Styling**: Vanilla CSS for WebGL, Custom Theme System in Flutter
+
+## 📦 Deployment
+
+For final build and deployment instructions, refer to the [FINAL_DEPLOYMENT_CHECKLIST](C:\Users\ahmed\.gemini\antigravity\brain\e3e55071-1d39-4427-a105-59697ebe02fe\FINAL_DEPLOYMENT_CHECKLIST.md) artifact.
+
+---
+*Created with ❤️ by the Halabessa Team*

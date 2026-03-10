@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:easy_localization/easy_localization.dart';
 import '../theme/theme_config.dart';
@@ -115,29 +116,34 @@ class _CyclingLoadingText extends StatefulWidget {
 
 class _CyclingLoadingTextState extends State<_CyclingLoadingText> {
   int _currentIndex = 0;
-  final List<String> _steps = [
-    "Warming up card physics...",
-    "Loading 3D assets...",
-    "Syncing with servers...",
-    "Preparing casino tables...",
-    "Readying Egyptian vibes...",
-  ];
+  late final List<String> _steps;
+  late final Timer _timer;
 
   @override
   void initState() {
     super.initState();
-    _startCycle();
-  }
-
-  void _startCycle() {
-    Future.doWhile(() async {
-      await Future.delayed(const Duration(milliseconds: 1800));
-      if (!mounted) return false;
+    _steps = [
+      'loading_step_physics'.tr(),
+      'loading_step_assets'.tr(),
+      'loading_step_sync'.tr(),
+      'loading_step_tables'.tr(),
+      'loading_step_vibes'.tr(),
+    ];
+    _timer = Timer.periodic(const Duration(milliseconds: 1800), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
       setState(() {
         _currentIndex = (_currentIndex + 1) % _steps.length;
       });
-      return true;
     });
+  }
+
+  @override
+  void dispose() {
+    _timer.cancel();
+    super.dispose();
   }
 
   @override

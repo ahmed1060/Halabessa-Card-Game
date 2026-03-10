@@ -1,7 +1,0 @@
-{
-  "status": "success",
-  "result": {
-    "fileName": "google-services.json",
-    "fileContents": "{\n  \"project_info\": {\n    \"project_number\": \"54223815037\",\n    \"project_id\": \"halabessa-card-game1\",\n    \"storage_bucket\": \"halabessa-card-game1.firebasestorage.app\"\n  },\n  \"client\": [\n    {\n      \"client_info\": {\n        \"mobilesdk_app_id\": \"1:54223815037:android:95f419bbf30e11d90b4c14\",\n        \"android_client_info\": {\n          \"package_name\": \"com.example.halabessa\"\n        }\n      },\n      \"oauth_client\": [],\n      \"api_key\": [\n        {\n          \"current_key\": \"AIzaSyBhzPD2BYU_jtIXClvp3WrRu818oJuMVjk\"\n        }\n      ],\n      \"services\": {\n        \"appinvite_service\": {\n          \"other_platform_oauth_client\": []\n        }\n      }\n    }\n  ],\n  \"configuration_version\": \"1\"\n}"
-  }
-}

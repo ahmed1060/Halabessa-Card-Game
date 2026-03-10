@@ -332,5 +332,12 @@
     "user_not_found": "المستخدم غير موجود",
     "error_label": "خطأ",
     "log_out_confirm": "هل أنت متأكد من تسجيل الخروج؟",
-    "no_friends_found": "لم يتم العثور على أصدقاء"
+    "no_friends_found": "لم يتم العثور على أصدقاء",
+    "loading_step_physics": "جاري ضبط فيزياء اللعبة...",
+    "loading_step_assets": "جاري تحميل موارد البطاقات...",
+    "loading_step_sync": "جاري المزامنة مع الخادم...",
+    "loading_step_tables": "جاري تجهيز الطاولات...",
+    "loading_step_vibes": "جاري ضبط الأجواء...",
+    "loading_step_engine": "جاري تشغيل محرك يونيتي...",
+    "loading_step_interface": "جاري اللمسات النهائية للواجهة..."
 }

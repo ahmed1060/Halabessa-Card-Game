@@ -8,12 +8,14 @@
 
 /* Begin PBXBuildFile section */
 		00000000008063A1000160D3 /* libiPhone-lib.a in Frameworks */ = {isa = PBXBuildFile; fileRef = D8A1C72A0E8063A1000160D3 /* libiPhone-lib.a */; };
-		166D472A9813AD9B05DBBB29 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = D45B42C0A7D53E82703D51BF /* GoogleService-Info.plist */; };
+		0C7646A299277A3B686AF0E2 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 0E4A4002A3199DE8D212385E /* GoogleService-Info.plist */; };
 		178C9ABCFE5BB1DE2BD16D2D /* NativeCallProxy.mm in Sources */ = {isa = PBXBuildFile; fileRef = CAE0DAFFEEF167F8D2A2BC72 /* NativeCallProxy.mm */; };
+		17FC4FD0803B138E678E38DF /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = 40AC44FBAC4730A57DB93C42 /* FirebaseCore */; };
+		1DAD49E68974A1FF43458D69 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 44E54A58A5C2B80A21AAC1D2 /* FirebaseAuth */; };
+		3E34410A9B7309929499AEA5 /* Dummy.swift in Sources */ = {isa = PBXBuildFile; fileRef = C85446098F8FE861856EFC9B /* Dummy.swift */; };
 		414692D0B041F573ABD3EE45 /* libFirebaseCppDatabase.a in Frameworks */ = {isa = PBXBuildFile; fileRef = A5D6D20C6F05B85D825076A8 /* libFirebaseCppDatabase.a */; };
 		415674EFD2EC187355BC05B1 /* LaunchScreen-iPhoneLandscape.png in Resources */ = {isa = PBXBuildFile; fileRef = 1E24B93E9D27D99850693BAF /* LaunchScreen-iPhoneLandscape.png */; };
 		4341F98D5F376910CD7F2C8E /* libFirebaseCppAnalytics.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 0819ED6FB58563E092F6A63D /* libFirebaseCppAnalytics.a */; };
-		46E54FD1A17CE5AEFAF97773 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = D45B42C0A7D53E82703D51BF /* GoogleService-Info.plist */; };
 		475B26F38A3A652C6174529D /* IUnityInterface.h in Headers */ = {isa = PBXBuildFile; fileRef = 679ACDCF6D14CA6FE6F81479 /* IUnityInterface.h */; };
 		5623C57617FDCB0800090B9E /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1D30AB110D05D00D00671497 /* Foundation.framework */; };
 		5623C57717FDCB0800090B9E /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 830B5C100E5ED4C100C7819F /* UIKit.framework */; };
@@ -23,8 +25,6 @@
 		56C56C9817D6015200616839 /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 56C56C9717D6015100616839 /* Images.xcassets */; };
 		574A8D1BFDF4103B13A6538A /* GameController.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 21ECD27EDF8EB21168769097 /* GameController.framework */; settings = {ATTRIBUTES = (Weak, ); }; };
 		63ACF7178776C648B96974EB /* baselib.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 7CD8D832DF5E49F3229DE515 /* baselib.a */; };
-		64654DE79CCE8FD5320D208C /* Dummy.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC474C4AB782722DC6E5A262 /* Dummy.swift */; };
-		6FE443FB8BE2A5B8DE938409 /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = 93EA4826A33A1CF005566A39 /* FirebaseAnalytics */; };
 		763ED5D885EABF761B2FE262 /* LaunchScreen-iPad.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = A6444ABDD2799CC877EBAF7E /* LaunchScreen-iPad.storyboard */; };
 		7F4E05AB2717219200A2CBE4 /* libGameAssembly.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 7F4E05A02717216D00A2CBE4 /* libGameAssembly.a */; };
 		826E40C67FAA509B29A0EFA3 /* IUnityGraphics.h in Headers */ = {isa = PBXBuildFile; fileRef = 30347B5D7991A325732A4F10 /* IUnityGraphics.h */; };
@@ -35,7 +35,8 @@
 		8BEDFA3929C88F86007F26D7 /* UnityViewControllerBase+visionOS.h in Headers */ = {isa = PBXBuildFile; fileRef = 8BEDFA3729C88F86007F26D7 /* UnityViewControllerBase+visionOS.h */; };
 		8BEDFA3A29C88F86007F26D7 /* UnityViewControllerBase+visionOS.mm in Sources */ = {isa = PBXBuildFile; fileRef = 8BEDFA3829C88F86007F26D7 /* UnityViewControllerBase+visionOS.mm */; };
 		91C1EB5F348833EAD02A7E9A /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = F2E4BD281D8D2761198E3AA0 /* PrivacyInfo.xcprivacy */; };
-		922741E790BE16A9AF9EC47E /* FirebaseDatabase in Frameworks */ = {isa = PBXBuildFile; productRef = 1A7B48319872D263F25B0E3E /* FirebaseDatabase */; };
+		92EA460E9DE535DCB4A0676A /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 0E4A4002A3199DE8D212385E /* GoogleService-Info.plist */; };
+		94BA471BBFB70DE019538631 /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = 92BC47658720DFB29058A886 /* FirebaseAnalytics */; };
 		96404FBF2C2C5F18006837EE /* IUnityEventQueue.h in Headers */ = {isa = PBXBuildFile; fileRef = 96404FBE2C2C5F18006837EE /* IUnityEventQueue.h */; };
 		96404FC52C2C5F43006837EE /* IUnityProfiler.h in Headers */ = {isa = PBXBuildFile; fileRef = 96404FC02C2C5F43006837EE /* IUnityProfiler.h */; };
 		96404FC62C2C5F43006837EE /* IUnityProfilerCallbacks.h in Headers */ = {isa = PBXBuildFile; fileRef = 96404FC12C2C5F43006837EE /* IUnityProfilerCallbacks.h */; };
@@ -106,8 +107,6 @@
 		9DC67E8921CBBEDF005F9FA1 /* LifeCycleListener.h in Headers */ = {isa = PBXBuildFile; fileRef = 8A292A9717992CE100409BA4 /* LifeCycleListener.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		9DFA7F9D21410F2E00C2880E /* main.mm in Sources */ = {isa = PBXBuildFile; fileRef = D82DCFBB0E8000A5005D6AD8 /* main.mm */; };
 		9E277B346B541C2D072C5489 /* IUnityGraphicsMetal.h in Headers */ = {isa = PBXBuildFile; fileRef = 894C1B251937BE1BC2B4D36C /* IUnityGraphicsMetal.h */; };
-		A9D34D8CAF87B0E24278A6A8 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = AE1448C79ECCDD156D9DF750 /* FirebaseAuth */; };
-		BB0946699BA475E2CE7CFE91 /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = 5DE347EA9323170C0D0B6B5B /* FirebaseCore */; };
 		BEE3E21D322649C83B0DD4DC /* LaunchScreen-iPhone.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 5A3A1B4C3FB1FC90023B942E /* LaunchScreen-iPhone.storyboard */; };
 		C6CFB0052F2CBC7300896C0E /* UnityScene.mm in Sources */ = {isa = PBXBuildFile; fileRef = C6CFB0042F2CBC7300896C0E /* UnityScene.mm */; };
 		C6CFB0062F2CBC7300896C0E /* UnityScene.h in Headers */ = {isa = PBXBuildFile; fileRef = C6CFB0032F2CBC7300896C0E /* UnityScene.h */; };
@@ -115,6 +114,7 @@
 		E22AFF0A3F5BDAC0D9C0871C /* NativeCallProxy.h in Headers */ = {isa = PBXBuildFile; fileRef = 51E0FA324635BD384CCB75D3 /* NativeCallProxy.h */; };
 		F11BC3F59ADE07474DC08F54 /* libFirebaseCppAuth.a in Frameworks */ = {isa = PBXBuildFile; fileRef = FAB4686DE9CC8A8597F3A1F4 /* libFirebaseCppAuth.a */; };
 		F5C03E9DD3BF40D8EC0F4404 /* LaunchScreen-iPhonePortrait.png in Resources */ = {isa = PBXBuildFile; fileRef = 681AA63C19788ACA381FB8C1 /* LaunchScreen-iPhonePortrait.png */; };
+		FD174B1593FA89F050088195 /* FirebaseDatabase in Frameworks */ = {isa = PBXBuildFile; productRef = BDF8424E812C93BD2EEBA9B0 /* FirebaseDatabase */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -191,6 +191,7 @@
 		0D31AAF3C6C0CC11D285C738 /* UnityEngine.CoreModule__2.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = UnityEngine.CoreModule__2.cpp; path = Il2CppOutputProject/Source/il2cppOutput/UnityEngine.CoreModule__2.cpp; sourceTree = SOURCE_ROOT; };
 		0D74EFEA392C0E65155F7A96 /* UnityEngine.PropertiesModule_CodeGen.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = UnityEngine.PropertiesModule_CodeGen.c; path = Il2CppOutputProject/Source/il2cppOutput/UnityEngine.PropertiesModule_CodeGen.c; sourceTree = SOURCE_ROOT; };
 		0E3F3917340B2949C8B8E209 /* Il2CppMetadataUsage.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = Il2CppMetadataUsage.c; path = Il2CppOutputProject/Source/il2cppOutput/Il2CppMetadataUsage.c; sourceTree = SOURCE_ROOT; };
+		0E4A4002A3199DE8D212385E /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = SOURCE_ROOT; };
 		0E687189B4541BF06DADF853 /* Generics__24.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Generics__24.cpp; path = Il2CppOutputProject/Source/il2cppOutput/Generics__24.cpp; sourceTree = SOURCE_ROOT; };
 		0E7DE2AF2C7B2AF1EB054BA0 /* UnityEngine.InputForUIModule.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = UnityEngine.InputForUIModule.cpp; path = Il2CppOutputProject/Source/il2cppOutput/UnityEngine.InputForUIModule.cpp; sourceTree = SOURCE_ROOT; };
 		0E9D8AC8B3C7AE96482477D4 /* Generics__59.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Generics__59.cpp; path = Il2CppOutputProject/Source/il2cppOutput/Generics__59.cpp; sourceTree = SOURCE_ROOT; };
@@ -546,6 +547,7 @@
 		C6CFB0042F2CBC7300896C0E /* UnityScene.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = UnityScene.mm; sourceTree = "<group>"; };
 		C74C563E02CE38C5DC9590E7 /* Generics__2.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Generics__2.cpp; path = Il2CppOutputProject/Source/il2cppOutput/Generics__2.cpp; sourceTree = SOURCE_ROOT; };
 		C781E8293E44AB31F04D57A7 /* FirebaseSDK_CodeGen.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = FirebaseSDK_CodeGen.c; path = Il2CppOutputProject/Source/il2cppOutput/FirebaseSDK_CodeGen.c; sourceTree = SOURCE_ROOT; };
+		C85446098F8FE861856EFC9B /* Dummy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Dummy.swift; sourceTree = SOURCE_ROOT; };
 		C862D3A89A9BA3E4ED7205BD /* System.Configuration_CodeGen.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = System.Configuration_CodeGen.c; path = Il2CppOutputProject/Source/il2cppOutput/System.Configuration_CodeGen.c; sourceTree = SOURCE_ROOT; };
 		C865CD21D06B3F35209C5FA5 /* Generics__7.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Generics__7.cpp; path = Il2CppOutputProject/Source/il2cppOutput/Generics__7.cpp; sourceTree = SOURCE_ROOT; };
 		C89119454D57EDC42A59D87C /* UnityEngine.TextRenderingModule.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = UnityEngine.TextRenderingModule.cpp; path = Il2CppOutputProject/Source/il2cppOutput/UnityEngine.TextRenderingModule.cpp; sourceTree = SOURCE_ROOT; };
@@ -565,7 +567,6 @@
 		D36225A528040BD949BFC983 /* Generics__30.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Generics__30.cpp; path = Il2CppOutputProject/Source/il2cppOutput/Generics__30.cpp; sourceTree = SOURCE_ROOT; };
 		D36D733DA6A3052F599DC7CE /* mscorlib__5.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = mscorlib__5.cpp; path = Il2CppOutputProject/Source/il2cppOutput/mscorlib__5.cpp; sourceTree = SOURCE_ROOT; };
 		D3F41D4408A318CCAE49693A /* Il2CppGenericMethodDefinitions.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = Il2CppGenericMethodDefinitions.c; path = Il2CppOutputProject/Source/il2cppOutput/Il2CppGenericMethodDefinitions.c; sourceTree = SOURCE_ROOT; };
-		D45B42C0A7D53E82703D51BF /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = SOURCE_ROOT; };
 		D51F4747FAFFCAC3B247BB05 /* Generics__26.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Generics__26.cpp; path = Il2CppOutputProject/Source/il2cppOutput/Generics__26.cpp; sourceTree = SOURCE_ROOT; };
 		D52C8290C7A4A82448D38C34 /* Generics__55.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Generics__55.cpp; path = Il2CppOutputProject/Source/il2cppOutput/Generics__55.cpp; sourceTree = SOURCE_ROOT; };
 		D556450C3DBEECE838996A3D /* LaunchScreen-iPad.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "LaunchScreen-iPad.png"; sourceTree = SOURCE_ROOT; };
@@ -580,7 +581,6 @@
 		D904E5E376B4426FDF7E041B /* DOTween.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = DOTween.cpp; path = Il2CppOutputProject/Source/il2cppOutput/DOTween.cpp; sourceTree = SOURCE_ROOT; };
 		DA1731C322C733D4F9215478 /* UnityEngine.AnimationModule.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = UnityEngine.AnimationModule.cpp; path = Il2CppOutputProject/Source/il2cppOutput/UnityEngine.AnimationModule.cpp; sourceTree = SOURCE_ROOT; };
 		DC1C002DA32AACE7AD91663B /* GenericMethods__9.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = GenericMethods__9.cpp; path = Il2CppOutputProject/Source/il2cppOutput/GenericMethods__9.cpp; sourceTree = SOURCE_ROOT; };
-		DC474C4AB782722DC6E5A262 /* Dummy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Dummy.swift; sourceTree = SOURCE_ROOT; };
 		DC641E85B09D087E3E294418 /* GenericMethods.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = GenericMethods.cpp; path = Il2CppOutputProject/Source/il2cppOutput/GenericMethods.cpp; sourceTree = SOURCE_ROOT; };
 		DC6D25CF35344C8E6CBCC43D /* Generics__71.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Generics__71.cpp; path = Il2CppOutputProject/Source/il2cppOutput/Generics__71.cpp; sourceTree = SOURCE_ROOT; };
 		DCC618ACC1C885764FCFF788 /* mscorlib__19.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = mscorlib__19.cpp; path = Il2CppOutputProject/Source/il2cppOutput/mscorlib__19.cpp; sourceTree = SOURCE_ROOT; };
@@ -690,10 +690,10 @@
 				56A9086D77955EE3E8FD4CD4 /* libFirebaseCppApp.a in Frameworks */,
 				63ACF7178776C648B96974EB /* baselib.a in Frameworks */,
 				574A8D1BFDF4103B13A6538A /* GameController.framework in Frameworks */,
-				6FE443FB8BE2A5B8DE938409 /* FirebaseAnalytics in Frameworks */,
-				BB0946699BA475E2CE7CFE91 /* FirebaseCore in Frameworks */,
-				A9D34D8CAF87B0E24278A6A8 /* FirebaseAuth in Frameworks */,
-				922741E790BE16A9AF9EC47E /* FirebaseDatabase in Frameworks */,
+				94BA471BBFB70DE019538631 /* FirebaseAnalytics in Frameworks */,
+				17FC4FD0803B138E678E38DF /* FirebaseCore in Frameworks */,
+				1DAD49E68974A1FF43458D69 /* FirebaseAuth in Frameworks */,
+				FD174B1593FA89F050088195 /* FirebaseDatabase in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -746,8 +746,8 @@
 				5A3A1B4C3FB1FC90023B942E /* LaunchScreen-iPhone.storyboard */,
 				1E24B93E9D27D99850693BAF /* LaunchScreen-iPhoneLandscape.png */,
 				681AA63C19788ACA381FB8C1 /* LaunchScreen-iPhonePortrait.png */,
-				D45B42C0A7D53E82703D51BF /* GoogleService-Info.plist */,
-				DC474C4AB782722DC6E5A262 /* Dummy.swift */,
+				0E4A4002A3199DE8D212385E /* GoogleService-Info.plist */,
+				C85446098F8FE861856EFC9B /* Dummy.swift */,
 			);
 			name = CustomTemplate;
 			sourceTree = "<group>";
@@ -1430,10 +1430,10 @@
 			);
 			name = UnityFramework;
 			packageProductDependencies = (
-				93EA4826A33A1CF005566A39 /* FirebaseAnalytics */,
-				5DE347EA9323170C0D0B6B5B /* FirebaseCore */,
-				AE1448C79ECCDD156D9DF750 /* FirebaseAuth */,
-				1A7B48319872D263F25B0E3E /* FirebaseDatabase */,
+				92BC47658720DFB29058A886 /* FirebaseAnalytics */,
+				40AC44FBAC4730A57DB93C42 /* FirebaseCore */,
+				44E54A58A5C2B80A21AAC1D2 /* FirebaseAuth */,
+				BDF8424E812C93BD2EEBA9B0 /* FirebaseDatabase */,
 			);
 			productName = UnityFramework;
 			productReference = 9D25AB9D213FB47800354C27 /* UnityFramework.framework */;
@@ -1483,7 +1483,7 @@
 			);
 			mainGroup = 29B97314FDCFA39411CA2CEA /* CustomTemplate */;
 			packageReferences = (
-				DFFF4A76B337F08084F12910 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+				1E674D608A5C0C3462C5435D /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
 			);
 			projectDirPath = "";
 			projectRoot = "";
@@ -1508,7 +1508,7 @@
 				415674EFD2EC187355BC05B1 /* LaunchScreen-iPhoneLandscape.png in Resources */,
 				763ED5D885EABF761B2FE262 /* LaunchScreen-iPad.storyboard in Resources */,
 				D085C06443DB1B1B5C6637B6 /* LaunchScreen-iPad.png in Resources */,
-				46E54FD1A17CE5AEFAF97773 /* GoogleService-Info.plist in Resources */,
+				92EA460E9DE535DCB4A0676A /* GoogleService-Info.plist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1525,7 +1525,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				91C1EB5F348833EAD02A7E9A /* PrivacyInfo.xcprivacy in Resources */,
-				166D472A9813AD9B05DBBB29 /* GoogleService-Info.plist in Resources */,
+				0C7646A299277A3B686AF0E2 /* GoogleService-Info.plist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1614,7 +1614,7 @@
 				9D25ABB2213FB6E300354C27 /* ActivityIndicator.mm in Sources */,
 				9D25ABC9213FB6F800354C27 /* MetalHelper.mm in Sources */,
 				178C9ABCFE5BB1DE2BD16D2D /* NativeCallProxy.mm in Sources */,
-				64654DE79CCE8FD5320D208C /* Dummy.swift in Sources */,
+				3E34410A9B7309929499AEA5 /* Dummy.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1677,7 +1677,7 @@
 					"$(inherited)",
 					"$(OTHER_CFLAGS)",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.example.halabessa;
+				PRODUCT_BUNDLE_IDENTIFIER = com.halabessa.game;
 				PRODUCT_NAME = "$(PRODUCT_NAME_APP)";
 				PROVISIONING_PROFILE = "$(PROVISIONING_PROFILE_APP)";
 				PROVISIONING_PROFILE_APP = "";
@@ -1715,7 +1715,7 @@
 					"$(inherited)",
 					"$(OTHER_CFLAGS)",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.example.halabessa;
+				PRODUCT_BUNDLE_IDENTIFIER = com.halabessa.game;
 				PRODUCT_NAME = "$(PRODUCT_NAME_APP)";
 				PROVISIONING_PROFILE = "$(PROVISIONING_PROFILE_APP)";
 				PROVISIONING_PROFILE_APP = "";
@@ -1886,7 +1886,7 @@
 					"$(inherited)",
 					"$(OTHER_CFLAGS)",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.example.halabessa;
+				PRODUCT_BUNDLE_IDENTIFIER = com.halabessa.game;
 				PRODUCT_NAME = "$(PRODUCT_NAME_APP)";
 				PROVISIONING_PROFILE = "$(PROVISIONING_PROFILE_APP)";
 				PROVISIONING_PROFILE_APP = "";
@@ -2007,7 +2007,7 @@
 					"$(inherited)",
 					"$(OTHER_CFLAGS)",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.example.halabessa;
+				PRODUCT_BUNDLE_IDENTIFIER = com.halabessa.game;
 				PRODUCT_NAME = "$(PRODUCT_NAME_APP)";
 				PROVISIONING_PROFILE = "$(PROVISIONING_PROFILE_APP)";
 				PROVISIONING_PROFILE_APP = "";
@@ -2652,7 +2652,7 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		DFFF4A76B337F08084F12910 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+		1E674D608A5C0C3462C5435D /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/firebase/firebase-ios-sdk.git";
 			requirement = {
@@ -2663,25 +2663,25 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		1A7B48319872D263F25B0E3E /* FirebaseDatabase */ = {
+		40AC44FBAC4730A57DB93C42 /* FirebaseCore */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = DFFF4A76B337F08084F12910 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
-			productName = FirebaseDatabase;
-		};
-		5DE347EA9323170C0D0B6B5B /* FirebaseCore */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = DFFF4A76B337F08084F12910 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			package = 1E674D608A5C0C3462C5435D /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseCore;
 		};
-		93EA4826A33A1CF005566A39 /* FirebaseAnalytics */ = {
+		44E54A58A5C2B80A21AAC1D2 /* FirebaseAuth */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = DFFF4A76B337F08084F12910 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			package = 1E674D608A5C0C3462C5435D /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAuth;
+		};
+		92BC47658720DFB29058A886 /* FirebaseAnalytics */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 1E674D608A5C0C3462C5435D /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseAnalytics;
 		};
-		AE1448C79ECCDD156D9DF750 /* FirebaseAuth */ = {
+		BDF8424E812C93BD2EEBA9B0 /* FirebaseDatabase */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = DFFF4A76B337F08084F12910 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
-			productName = FirebaseAuth;
+			package = 1E674D608A5C0C3462C5435D /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseDatabase;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

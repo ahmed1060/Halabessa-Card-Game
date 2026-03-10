@@ -13,7 +13,7 @@
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
-	<string>com.example.halabessa</string>
+	<string>com.halabessa.game</string>
 	<key>PROJECT_ID</key>
 	<string>halabessa-card-game1</string>
 	<key>STORAGE_BUCKET</key>

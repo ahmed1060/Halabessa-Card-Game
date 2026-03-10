@@ -12,12 +12,11 @@ public class CelebrationManager : MonoBehaviour {
 
     public void PlayWinEffect() {
         if (winConfetti != null) winConfetti.Play();
-        // Add more grandiose effects here
-        Debug.Log("Unity VFX: Playing Match Win Celebration!");
+        // Debug.Log("Unity VFX: Playing Match Win Celebration!");
     }
 
     public void PlayBasraEffect() {
         if (basraSparkles != null) basraSparkles.Play();
-        Debug.Log("Unity VFX: Playing Basra Sparkles!");
+        // Debug.Log("Unity VFX: Playing Basra Sparkles!");
     }
 }

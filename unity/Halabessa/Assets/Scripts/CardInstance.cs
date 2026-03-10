@@ -1,6 +1,7 @@
 using UnityEngine;
 using DG.Tweening;
 using Studio.OverOne.DragMe.Data.Events;
+using Studio.OverOne.DragMe.Data.Abstractions;
 
 public class CardInstance : MonoBehaviour {
     public string cardId;
@@ -52,13 +53,13 @@ public class CardInstance : MonoBehaviour {
     private void OnCardReleased(IReleasedEventData data) {
         // If the card is released in the "Table Area" (e.g. y > -0.5f)
         if (transform.position.z > -1.5f) { // Table is at Z=-1.0, Hand is at Z=-2.5
-             Debug.Log($"CardInstance: Card {cardId} played at {transform.position}");
+             // Debug.Log($"CardInstance: Card {cardId} played at {transform.position}");
              if (UnityBridge.Instance != null) {
                  UnityBridge.Instance.NotifyFlutter("PLAY_CARD", cardId);
              }
         } else {
              // Snap back to original hand position (handled by UnityBridge.HandleSyncState on next update)
-             Debug.Log("CardInstance: Card released but not played. Snapping back.");
+             // Debug.Log("CardInstance: Card released but not played. Snapping back.");
         }
     }
     
@@ -103,5 +104,10 @@ public class CardInstance : MonoBehaviour {
 
     public void ShakeOnBasra() {
         transform.DOShakePosition(0.5f, 0.2f, 10, 90, false, true);
+    }
+
+    void OnDestroy() {
+        // Essential DOTween cleanup (God Move)
+        transform.DOKill();
     }
 }

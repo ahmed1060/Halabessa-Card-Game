@@ -4,9 +4,11 @@ import 'package:halabessa/core/utils/web_utils.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_unity_widget/flutter_unity_widget.dart';
-import '../providers/unity_layer_provider.dart';
 import '../../domain/models/match_state.dart';
 import '../../domain/providers/game_providers.dart';
+import 'package:halabessa/features/auth/presentation/providers/auth_providers.dart';
+import 'package:halabessa/core/providers/settings_provider.dart';
+import 'package:halabessa/features/game/presentation/providers/unity_layer_provider.dart';
 
 final unityCommunicationServiceProvider = Provider((ref) => UnityCommunicationService(ref)..init());
 
@@ -67,9 +69,6 @@ class UnityCommunicationService {
     }
   }
 
-  void _postToUnity(String objectName, String methodName, String message) {
-    postMessage(objectName, methodName, message);
-  }
 
   void syncState(MatchState state) {
     final currentUserUid = _ref.read(currentUserProvider)?.uid;
@@ -82,7 +81,7 @@ class UnityCommunicationService {
       'phase': state.phase.name,
       'turnIndex': state.currentTurnIndex,
     };
-    _postToUnity('UnityBridge', 'OnFlutterMessage', jsonEncode(message));
+    postMessage('UnityBridge', 'OnFlutterMessage', jsonEncode(message));
   }
 
   void playCard(String cardId, Map<String, double> position) {
@@ -92,25 +91,25 @@ class UnityCommunicationService {
       'x': position['x'],
       'y': position['y'],
     };
-    _postToUnity('UnityBridge', 'OnFlutterMessage', jsonEncode(message));
+    postMessage('UnityBridge', 'OnFlutterMessage', jsonEncode(message));
   }
 
   void updateSkins(String skinId) {
-    _postToUnity('UnityBridge', 'OnFlutterMessage', jsonEncode({
+    postMessage('UnityBridge', 'OnFlutterMessage', jsonEncode({
       'type': 'UPDATE_SKINS',
       'skinId': skinId,
     }));
   }
 
   void startTimer(int durationSeconds) {
-    _postToUnity('UnityBridge', 'OnFlutterMessage', jsonEncode({
+    postMessage('UnityBridge', 'OnFlutterMessage', jsonEncode({
       'type': 'START_TIMER',
       'duration': durationSeconds.toDouble(),
     }));
   }
 
   void setMode(String mode) {
-    _postToUnity('UnityBridge', 'OnFlutterMessage', jsonEncode({
+    postMessage('UnityBridge', 'OnFlutterMessage', jsonEncode({
       'type': 'SET_MODE',
       'mode': mode,
     }));
@@ -121,41 +120,46 @@ class UnityCommunicationService {
       isReady.value = true;
       _ref.read(unityInitializedProvider.notifier).state = true;
       
-      // Auto-hide the boot splash after a small delay for a smooth transition
+      // Smooth transition: Hide splash after 2s
       Future.delayed(const Duration(seconds: 2), () {
-        // Only hide if we aren't ALREADY on a screen that requested Unity visibility
-        // (This handles the case where Unity finishes loading exactly as we enter a game)
-        _ref.read(unityLayerVisibilityProvider.notifier).update((isVisible) => isVisible ? false : false);
-        // Wait, the above logic is flawed. Let's just set it to false. 
-        // If GameBoardScreen is active, it will have its own logic or we can check the route.
         _ref.read(unityLayerVisibilityProvider.notifier).state = false;
       });
     }
     try {
       final data = jsonDecode(message);
-      print("Unity Message Received: $data");
-      
-        if (data['event'] == 'BASRA_EVENT') {
-          // Trigger Flutter-side celebratory logic or haptics
-          HapticFeedback.heavyImpact();
-        } else if (data['event'] == 'PLAY_CARD') {
-          final String cardId = data['data'];
-          // Find the card in the match state and play it
-          final matchState = _ref.read(matchStateProvider);
-          if (matchState != null) {
-            final currentUserUid = _ref.read(currentUserProvider)?.uid;
-            if (currentUserUid != null) {
-              final hand = matchState.handCards[currentUserUid] ?? [];
-              final card = hand.firstWhere((c) => c.suit + "_" + c.rank == cardId, orElse: () => hand.firstWhere((c) => c.id == cardId));
-              _ref.read(gameControllerProvider.notifier).playCard(card);
-              HapticFeedback.mediumImpact();
+      if (data is! Map) return;
+
+      final event = data['event'];
+      final settings = _ref.read(settingsProvider);
+
+      if (event == 'BASRA_EVENT') {
+        if (settings.isHapticsEnabled) HapticFeedback.heavyImpact();
+      } else if (event == 'PLAY_CARD') {
+        final cardId = data['data'];
+        if (cardId is! String) return;
+
+        final matchState = _ref.read(matchStateProvider);
+        if (matchState != null) {
+          final currentUserUid = _ref.read(currentUserProvider)?.uid;
+          if (currentUserUid != null) {
+            final hand = matchState.handCards[currentUserUid] ?? [];
+            try {
+              final card = hand.firstWhere(
+                (c) => c.suit.name + "_" + c.rank.name == cardId, 
+                orElse: () => hand.firstWhere((c) => c.firebaseKey == cardId)
+              );
+              _ref.read(matchStateProvider.notifier).playCard(currentUserUid, card);
+              if (settings.isHapticsEnabled) HapticFeedback.mediumImpact();
+            } catch (e) {
+              debugPrint("Card $cardId not found in hand.");
             }
           }
-        } else if (data['event'] == 'ANIMATION_COMPLETE') {
-        // Handle synchronization points
+        }
+      } else if (event == 'ANIMATION_COMPLETE') {
+        // Handle sync
       }
     } catch (e) {
-      print("Error decoding Unity message: $e");
+      debugPrint("Error decoding Unity message: $e");
     }
   }
 }

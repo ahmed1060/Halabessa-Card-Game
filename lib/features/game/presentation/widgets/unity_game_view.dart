@@ -49,7 +49,7 @@ class _UnityGameViewState extends ConsumerState<UnityGameView> {
           comms.handleUnityMessage(message);
         },
         onUnitySceneLoaded: (name) {
-          print("Unity Scene Loaded: $name");
+          // debugPrint("Unity Scene Loaded: $name");
         },
         useAndroidViewSurface: true, // For performance on Android
       );

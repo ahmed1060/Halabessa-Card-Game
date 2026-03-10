@@ -1,6 +1,7 @@
 import 'dart:html' as html;
 import 'dart:ui_web' as ui_web;
 import 'dart:js' as js;
+import 'package:flutter/foundation.dart';
 
 void registerWebUnityView() {
   ui_web.platformViewRegistry.registerViewFactory('unity-web-view', (int viewId) {
@@ -26,7 +27,7 @@ void registerWebUnityView() {
       try {
         js.context.callMethod('initUnityEngine', [canvas]);
       } catch (e) {
-        print("Error initializing Unity engine on canvas: $e");
+        debugPrint("Error initializing Unity engine on canvas: $e");
       }
     });
 

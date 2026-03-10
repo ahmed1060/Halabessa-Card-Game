@@ -32,7 +32,7 @@ public class DeckManager : MonoBehaviour {
         CardSkin activeSkin = skinDict[skinId];
         // In a real implementation, you would update the Material on the Card prefabs
         // or notify all active card instances to swap their textures.
-        Debug.Log("Unity: Updating all cards to use skin: " + skinId);
+        // Debug.Log("Unity: Updating all cards to use skin: " + skinId);
         
         // Example: Find all cards and update their materials
         // var allCards = FindObjectsOfType<CardInstance>();

@@ -21,30 +21,39 @@ class SettingsOverlay extends ConsumerWidget {
     final user = ref.watch(currentUserProvider);
     final currentLocale = context.locale;
 
-    return Center(
+    return Align(
+      alignment: Alignment.bottomCenter,
       child: Container(
-        margin: const EdgeInsets.all(24),
-        constraints: const BoxConstraints(maxWidth: 500),
+        constraints: const BoxConstraints(maxWidth: 600),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1A1A2E).withOpacity(0.95),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+          border: Border.all(color: Colors.white.withOpacity(0.1), width: 1.5),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.6),
+              blurRadius: 40,
+              offset: const Offset(0, -10),
+            ),
+          ],
+        ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(32),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
           child: BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
-            child: Container(
-              decoration: BoxDecoration(
-                color: const Color(0xFF1A1A2E).withOpacity(0.8),
-                borderRadius: BorderRadius.circular(32),
-                border: Border.all(color: Colors.white.withOpacity(0.1), width: 1.5),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.5),
-                    blurRadius: 30,
-                    offset: const Offset(0, 10),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Drag Handle for Swipe-Down (God Move)
+                const SizedBox(height: 12),
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.white24,
+                    borderRadius: BorderRadius.circular(2),
                   ),
-                ],
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
+                ),
                   // Header
                   _buildHeader(context),
                   
@@ -143,9 +152,8 @@ class SettingsOverlay extends ConsumerWidget {
             ),
           ),
         ),
-      ),
-    );
-  }
+        );
+    }
 
   Widget _buildHeader(BuildContext context) {
     return Container(

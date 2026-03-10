@@ -40,10 +40,10 @@
         <key>CFBundleTypeRole</key>
         <string>Editor</string>
         <key>CFBundleURLName</key>
-        <string>com.example.halabessa</string>
+        <string>com.halabessa.game</string>
         <key>CFBundleURLSchemes</key>
         <array>
-          <string>com.example.halabessa</string>
+          <string>com.halabessa.game</string>
         </array>
       </dict>
     </array>

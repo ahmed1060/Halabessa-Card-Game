@@ -143,7 +143,7 @@ namespace Studio.OverOne.DragMe.Data
         {
             Assert.IsNotNull(config._inputSourcePrefab, Errors.IsNull.Fmt(nameof(config._inputSourcePrefab)));
 
-            InputSourceBase lInputSource = FindObjectOfType<InputSourceBase>();
+            InputSourceBase lInputSource = FindFirstObjectByType<InputSourceBase>(FindObjectsInactive.Include);
 
             if(lInputSource == null)
             {

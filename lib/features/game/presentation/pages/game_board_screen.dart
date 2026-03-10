@@ -26,7 +26,6 @@ import 'package:halabessa/core/services/multimedia_service.dart';
 import '../widgets/unity_game_view.dart';
 import '../providers/unity_communication_service.dart';
 import '../providers/unity_layer_provider.dart';
-import '../../domain/providers/game_providers.dart';
 import 'package:flutter_unity_widget/flutter_unity_widget.dart';
 import 'dart:convert';
 
@@ -347,6 +346,9 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
 
     final myUid = currentUser.uid;
     final bool isSpectator = matchState.playerIds.indexOf(myUid) == -1;
+    final isUnityVisible = ref.watch(unityLayerVisibilityProvider);
+    final isUnityInitialized = ref.watch(unityInitializedProvider);
+    final show3DHand = isUnityVisible && isUnityInitialized;
 
 
     return PopScope(
@@ -489,8 +491,8 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
                       child: _buildLocalPlayerArea(context, ref, matchState, myUid),
                     ),
 
-                    // Centered Hand Cards
-                    if (!isSpectator && (matchState.handCards[myUid]?.length ?? 0) > 0)
+                    // Centered Hand Cards (Hidden if 3D Hand is active)
+                    if (!isSpectator && !show3DHand && (matchState.handCards[myUid]?.length ?? 0) > 0)
                       Align(
                         alignment: Alignment.bottomCenter,
                         child: Padding(

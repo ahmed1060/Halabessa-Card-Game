@@ -10,7 +10,7 @@
             "client_info": {
                 "mobilesdk_app_id": "1:54223815037:android:95f419bbf30e11d90b4c14",
                 "android_client_info": {
-                    "package_name": "com.example.halabessa"
+                    "package_name": "com.halabessa.game"
                 }
             },
             "oauth_client": [
@@ -35,7 +35,7 @@
                             "client_id": "54223815037-dj2uqcbstbo3j5r600cegvrt4cltt7lj.apps.googleusercontent.com",
                             "client_type": 2,
                             "ios_info": {
-                                "bundle_id": "com.example.halabessa"
+                                "bundle_id": "com.halabessa.game"
                             }
                         }
                     ]

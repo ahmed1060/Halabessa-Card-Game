@@ -89,13 +89,13 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "com.example" "\0"
-            VALUE "FileDescription", "halabessa" "\0"
+            VALUE "CompanyName", "Halabessa" "\0"
+            VALUE "FileDescription", "Halabessa" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "halabessa" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2024 com.example. All rights reserved." "\0"
-            VALUE "OriginalFilename", "halabessa.exe" "\0"
-            VALUE "ProductName", "halabessa" "\0"
+            VALUE "InternalName", "Halabessa" "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2024 Halabessa. All rights reserved." "\0"
+            VALUE "OriginalFilename", "Halabessa.exe" "\0"
+            VALUE "ProductName", "Halabessa" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

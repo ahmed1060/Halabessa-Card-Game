@@ -25,7 +25,8 @@ if (flutterVersionName == null) {
 android {
     namespace "com.halabessa.game"
     compileSdk 35 // Align with modern plugins that require 35
-    ndkVersion "25.1.8937393"
+    ndkVersion "27.2.12479018"
+    ndkPath "C:/Program Files/Unity/Hub/Editor/6000.0.69f1/Editor/Data/PlaybackEngines/AndroidPlayer/NDK"
 
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17

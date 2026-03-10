@@ -55,7 +55,7 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyBhzPD2BYU_jtIXClvp3WrRu818oJuMVjk',
-    appId: '1:54223815037:android:95f419bbf30e11d90b4c14',
+    appId: '1:54223815037:android:a5de8787c5ee81600b4c14',
     messagingSenderId: '54223815037',
     projectId: 'halabessa-card-game1',
     storageBucket: 'halabessa-card-game1.firebasestorage.app',
@@ -64,21 +64,21 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyAIuSJXCHGPw3WT1iZ4OIIhE_-QzzfwEFk',
-    appId: '1:54223815037:ios:16014a0cc65fa3700b4c14',
+    appId: '1:54223815037:ios:816ca98e5695208b0b4c14',
     messagingSenderId: '54223815037',
     projectId: 'halabessa-card-game1',
     storageBucket: 'halabessa-card-game1.firebasestorage.app',
-    iosBundleId: 'com.example.halabessa',
+    iosBundleId: 'com.halabessa.game',
     databaseURL: 'https://halabessa-card-game1-default-rtdb.firebaseio.com',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
     apiKey: 'AIzaSyAIuSJXCHGPw3WT1iZ4OIIhE_-QzzfwEFk',
-    appId: '1:54223815037:ios:16014a0cc65fa3700b4c14',
+    appId: '1:54223815037:ios:816ca98e5695208b0b4c14',
     messagingSenderId: '54223815037',
     projectId: 'halabessa-card-game1',
     storageBucket: 'halabessa-card-game1.firebasestorage.app',
-    iosBundleId: 'com.example.halabessa',
+    iosBundleId: 'com.halabessa.game',
     databaseURL: 'https://halabessa-card-game1-default-rtdb.firebaseio.com',
   );
 }

@@ -1,0 +1,5 @@
+D:/SHSD/Projects (Github)/Halabessa/Halabessa-Card-Game/androidBuild/unityExport/unityLibrary/.cxx/RelWithDebInfo/5m1v312l/arm64-v8a/CMakeFiles/edit_cache.dir
+D:/SHSD/Projects (Github)/Halabessa/Halabessa-Card-Game/androidBuild/unityExport/unityLibrary/.cxx/RelWithDebInfo/5m1v312l/arm64-v8a/CMakeFiles/rebuild_cache.dir
+D:/SHSD/Projects (Github)/Halabessa/Halabessa-Card-Game/androidBuild/unityExport/unityLibrary/.cxx/RelWithDebInfo/5m1v312l/arm64-v8a/FramePacing/CMakeFiles/swappywrapper.dir
+D:/SHSD/Projects (Github)/Halabessa/Halabessa-Card-Game/androidBuild/unityExport/unityLibrary/.cxx/RelWithDebInfo/5m1v312l/arm64-v8a/FramePacing/CMakeFiles/edit_cache.dir
+D:/SHSD/Projects (Github)/Halabessa/Halabessa-Card-Game/androidBuild/unityExport/unityLibrary/.cxx/RelWithDebInfo/5m1v312l/arm64-v8a/FramePacing/CMakeFiles/rebuild_cache.dir

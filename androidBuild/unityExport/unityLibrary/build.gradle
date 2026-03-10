@@ -34,11 +34,11 @@ android {
 // Android Resolver Exclusions End
 android {
     namespace "com.unity3d.player"
-    // ndkPath "C:/Program Files/Unity/Hub/Editor/6000.0.69f1/Editor/Data/PlaybackEngines/AndroidPlayer/NDK"
+    ndkPath "C:/Program Files/Unity/Hub/Editor/6000.0.69f1/Editor/Data/PlaybackEngines/AndroidPlayer/NDK"
     ndkVersion "27.2.12479018"
 
-    compileSdk 36
-    buildToolsVersion = "36.0.0"
+    compileSdk 35
+    buildToolsVersion = "35.0.0"
 
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
@@ -47,7 +47,7 @@ android {
 
     defaultConfig {
         minSdk 23
-        targetSdk 36
+        targetSdk 35
         ndk {
             abiFilters 'arm64-v8a'
             debugSymbolLevel 'none'

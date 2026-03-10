@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
@@ -35,11 +36,11 @@ class MultiplayerSyncService {
       try {
         return MatchState.fromJson(value);
       } catch (e) {
-        debugPrint('CRITICAL: Error parsing match state for $matchId: $e');
+        if (kDebugMode) debugPrint('CRITICAL: Error parsing match state for $matchId: $e');
         return null;
       }
     }).handleError((error) {
-      debugPrint('STREAM ERROR for match $matchId: $error');
+      if (kDebugMode) debugPrint('STREAM ERROR for match $matchId: $error');
       return null;
     });
   }

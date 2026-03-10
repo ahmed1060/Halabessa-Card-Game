@@ -336,5 +336,12 @@
     "rank_label": "ترتيبك {}",
     "your_team_wins": "فريقك كسب!",
     "user_not_found": "المستخدم مش موجود",
-    "error_label": "خطأ"
+    "error_label": "خطأ",
+    "loading_step_physics": "بنظبط فيزيا اللعب...",
+    "loading_step_assets": "بنحمل أشكال الكوتشينة...",
+    "loading_step_sync": "بنربط مع السيرفر...",
+    "loading_step_tables": "بنجهز الترابيزات الـ 3D...",
+    "loading_step_vibes": "بنظبط الأجواء...",
+    "loading_step_engine": "بنقوم محرك يونيتي...",
+    "loading_step_interface": "بنخلص الواجهة..."
 }

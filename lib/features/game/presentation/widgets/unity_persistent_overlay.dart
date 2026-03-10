@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/foundation.dart';
+import 'package:easy_localization/easy_localization.dart';
 import 'unity_game_view.dart';
 import '../providers/unity_layer_provider.dart';
 
@@ -66,31 +68,35 @@ class _CyclingLoadingText extends StatefulWidget {
 
 class _CyclingLoadingTextState extends State<_CyclingLoadingText> {
   int _currentIndex = 0;
-  final List<String> _loadingSteps = [
-    "Initializing Engine...",
-    "Loading Card Assets...",
-    "Readying Casino Environment...",
-    "Configuring Card Physics...",
-    "Synchronizing With Server...",
-    "Finalizing Interface...",
-  ];
+  late final List<String> _steps;
+  late final Timer _timer;
 
   @override
   void initState() {
     super.initState();
-    _startDisplayTimer();
+    _steps = [
+      'loading_step_engine'.tr(),
+      'loading_step_assets'.tr(),
+      'loading_step_physics'.tr(),
+      'loading_step_sync'.tr(),
+      'loading_step_interface'.tr(),
+    ];
+    
+    _timer = Timer.periodic(const Duration(milliseconds: 1500), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      setState(() {
+        _currentIndex = (_currentIndex + 1) % _steps.length;
+      });
+    });
   }
 
-  void _startDisplayTimer() {
-    // Cycle every 1.5 seconds
-    Future.doWhile(() async {
-      await Future.delayed(const Duration(milliseconds: 1500));
-      if (!mounted) return false;
-      setState(() {
-        _currentIndex = (_currentIndex + 1) % _loadingSteps.length;
-      });
-      return true;
-    });
+  @override
+  void dispose() {
+    _timer.cancel();
+    super.dispose();
   }
 
   @override
@@ -98,7 +104,7 @@ class _CyclingLoadingTextState extends State<_CyclingLoadingText> {
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 500),
       child: Text(
-        _loadingSteps[_currentIndex],
+        _steps[_currentIndex],
         key: ValueKey(_currentIndex),
         style: const TextStyle(
           color: Colors.white70,

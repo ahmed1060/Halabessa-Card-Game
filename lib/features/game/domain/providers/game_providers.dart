@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -106,7 +107,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
         if (newOnlineStatus[playerId] != isOnline) {
           newOnlineStatus[playerId] = isOnline;
           changed = true;
-          debugPrint('PRESENCE: Player $playerId is now ${isOnline ? 'Online' : 'Offline (AFK)'}');
+        if (kDebugMode) debugPrint('PRESENCE: Player $playerId is now ${isOnline ? 'Online' : 'Offline (AFK)'}');
         }
       }
     }
@@ -130,7 +131,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     final prefs = await SharedPreferences.getInstance();
     final lastId = prefs.getString(_matchIdKey);
     if (lastId != null && state == null) {
-       debugPrint('RECOVERY: Attempting to recover match $lastId');
+      if (kDebugMode) debugPrint('RECOVERY: Attempting to recover match $lastId');
        bindToMatch(lastId);
     }
   }
@@ -206,7 +207,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
             // Sync local profile if needed (first join or update)
             _syncProfileWithMatch(serverState);
           } catch (e) {
-            debugPrint('ERROR in match listener callback: $e');
+            if (kDebugMode) debugPrint('ERROR in match listener callback: $e');
           }
         } else if (lastBoundMatchId != null) {
           leaveMatch();
@@ -407,7 +408,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
           bool isAFK = currentState.playerOnlineStatus[activeId] == false;
 
           if (isBot || isAFK) {
-             if (isAFK) debugPrint('AFK TAKEOVER: Host playing for $activeId');
+             if (isAFK && kDebugMode) debugPrint('AFK TAKEOVER: Host playing for $activeId');
              
              await Future.delayed(Duration(milliseconds: 800 + Random().nextInt(1500)));
              final finalState = state;

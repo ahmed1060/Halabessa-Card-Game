@@ -63,7 +63,7 @@ public class GameStateManager : MonoBehaviour {
     
     public void ChangeState(GameState newState) {
         currentState = newState;
-        Debug.Log("Game State Changed to: " + newState);
+        // Debug.Log("Game State Changed to: " + newState);
         
         switch (newState) {
             case GameState.PLAYER_TURN:

@@ -3,6 +3,7 @@ using FlutterUnityIntegration;
 using System;
 using System.Runtime.InteropServices;
 using System.Collections.Generic;
+using DG.Tweening;
 
 public class UnityBridge : MonoBehaviour {
     public static UnityBridge Instance;
@@ -29,14 +30,14 @@ public class UnityBridge : MonoBehaviour {
         if (Camera.main != null) {
             Camera.main.clearFlags = CameraClearFlags.SolidColor;
             Camera.main.backgroundColor = new Color(0, 0, 0, 0);
-            Debug.Log("UnityBridge: Forced Camera transparency (Alpha 0)");
+            // Debug.Log("UnityBridge: Forced Camera transparency (Alpha 0)");
         }
         NotifyFlutter("UNITY_READY", "Unity initialized");
     }
     
     // Proxy for console visibility to avoid "object not found" routing issues
     public void ToggleConsole(string dummy) {
-        UnityDebugConsole console = FindObjectOfType<UnityDebugConsole>(true);
+        UnityDebugConsole console = FindFirstObjectByType<UnityDebugConsole>(FindObjectsInactive.Include);
         if (console != null) {
             console.ToggleVisibility();
         } else {
@@ -46,7 +47,7 @@ public class UnityBridge : MonoBehaviour {
 
     // Called from Flutter via _unityWidgetController.postMessage('UnityBridge', 'OnFlutterMessage', json)
     public void OnFlutterMessage(string messageJson) {
-        Debug.Log("UnityBridge Received: " + messageJson);
+        // Silenced chatty log for production (God Move)
         try {
             MessageData data = JsonUtility.FromJson<MessageData>(messageJson);
             
@@ -70,97 +71,87 @@ public class UnityBridge : MonoBehaviour {
             return;
         }
 
-        // 1. Destroy cards that are no longer on the board
-        List<string> newBoardIds = new List<string>();
-        foreach(var c in boardCards) {
-            newBoardIds.Add(c.id ?? (c.suit + "_" + c.rank)); // Fallback ID creation
+        // 1. Identify all desired cards and their target positions
+        HashSet<string> desiredIds = new HashSet<string>();
+        Dictionary<string, Vector3> targetPositions = new Dictionary<string, Vector3>();
+        Dictionary<string, bool> isOnHand = new Dictionary<string, bool>();
+
+        // Prep Board Positions
+        float boardStartX = -1.5f;
+        float boardSpacing = 1.0f;
+        for (int i = 0; i < boardCards.Count; i++) {
+            string id = GetCardId(boardCards[i]);
+            desiredIds.Add(id);
+            targetPositions[id] = new Vector3(boardStartX + (i * boardSpacing), 0.1f, -1.0f);
+            isOnHand[id] = false;
         }
 
+        // Prep Hand Positions
+        float handBaseZ = -2.5f;
+        float handY = -1.5f;
+        float handSpacing = 0.6f;
+        float handStartX = -((handCards.Count - 1) * handSpacing) / 2f;
+        for (int i = 0; i < handCards.Count; i++) {
+            string id = GetCardId(handCards[i]);
+            desiredIds.Add(id);
+            targetPositions[id] = new Vector3(handStartX + (i * handSpacing), handY, handBaseZ);
+            isOnHand[id] = true;
+        }
+
+        // 2. Cleanup: Remove cards no longer in the state
         List<string> keysToRemove = new List<string>();
-        foreach(var kvp in activeCards) {
-            if (!newBoardIds.Contains(kvp.Key)) {
-                Destroy(kvp.Value);
+        foreach (var kvp in activeCards) {
+            if (!desiredIds.Contains(kvp.Key)) {
+                if (kvp.Value != null) {
+                    kvp.Value.transform.DOKill();
+                    Destroy(kvp.Value);
+                }
                 keysToRemove.Add(kvp.Key);
             }
         }
-        foreach(var k in keysToRemove) activeCards.Remove(k);
+        foreach (var k in keysToRemove) activeCards.Remove(k);
 
-        // 2. Spawn and Position new cards
-        float startX = -1.5f; // Slightly more compact
-        float spacing = 1.0f;
-        
-        for (int i = 0; i < boardCards.Count; i++) {
-            CardJson cardData = boardCards[i];
-            string cardId = cardData.id ?? (cardData.suit + "_" + cardData.rank);
+        // 3. Update Existing and Spawn New
+        foreach (var id in desiredIds) {
+            Vector3 targetPos = targetPositions[id];
+            bool inHand = isOnHand[id];
 
-            if (!activeCards.ContainsKey(cardId)) {
-                Debug.Log($"UnityBridge: Attempting to spawn card {cardId}");
-                
-                // Spawn a new card
+            if (!activeCards.ContainsKey(id)) {
+                // Spawn new
                 GameObject newCard = Instantiate(cardPrefab);
-                newCard.name = "Card_" + cardId;
-                
-                // Ensure scale is correct (important if prefab is tiny/huge)
-                newCard.transform.localScale = Vector3.one * 1.5f; 
-                
-                // FLATTEN ON TABLE (God Move)
-                newCard.transform.localRotation = Quaternion.Euler(90, 0, 0);
-                
-                // Target position on the table (Moved Z closer to camera for visibility)
-                Vector3 targetPos = new Vector3(startX + (i * spacing), 0.1f, -1.0f); 
-                
-                CardInstance cardScript = newCard.GetComponent<CardInstance>();
-                if (cardScript != null) {
-                    Debug.Log($"UnityBridge: Customizing card {cardId}");
-                    // Start flying from off-screen
-                    newCard.transform.position = new Vector3(0, 5f, 5f); 
-                    cardScript.PlayAnimation(targetPos, 0.5f + (i * 0.1f));
-                } else {
-                    Debug.LogWarning($"UnityBridge: CardInstance script missing on {newCard.name}. Using static position.");
-                    newCard.transform.position = targetPos;
-                }
-                
-                activeCards.Add(cardId, newCard);
-                Debug.Log($"UnityBridge: SUCCESS - Card {cardId} flying to {targetPos}");
-            }
-        }
-
-        // 3. Spawn and Position Hand Cards (Premium 3D Hand)
-        float handBaseZ = -2.5f; // Closer to camera
-        float handY = -1.5f; // Bottom of screen (adjusted for camera view)
-        float handSpacing = 0.6f;
-        float handStartX = -((handCards.Count - 1) * handSpacing) / 2f;
-
-        for (int i = 0; i < handCards.Count; i++) {
-            CardJson cardData = handCards[i];
-            string cardId = cardData.id ?? (cardData.suit + "_" + cardData.rank);
-            
-            if (!activeCards.ContainsKey(cardId)) {
-                GameObject newCard = Instantiate(cardPrefab);
-                newCard.name = "HandCard_" + cardId;
+                newCard.name = (inHand ? "Hand_" : "Board_") + id;
                 newCard.transform.localScale = Vector3.one * 1.5f;
-                newCard.transform.localRotation = Quaternion.Euler(60, 0, 0); 
                 
-                Vector3 targetPos = new Vector3(handStartX + (i * handSpacing), handY, handBaseZ);
-                newCard.transform.position = new Vector3(targetPos.x, targetPos.y - 2f, targetPos.z); 
-                
+                // Initial position (coming from above)
+                newCard.transform.position = new Vector3(targetPos.x, targetPos.y + 5f, targetPos.z + 5f);
+                newCard.transform.localRotation = Quaternion.Euler(inHand ? 60 : 90, 0, 0);
+
                 CardInstance cardScript = newCard.GetComponent<CardInstance>();
                 if (cardScript != null) {
-                    cardScript.cardId = cardId;
-                    cardScript.rank = cardData.rank;
-                    cardScript.suit = cardData.suit;
+                    cardScript.cardId = id;
+                    // Find card data for metadata
+                    CardJson meta = boardCards.Find(c => GetCardId(c) == id) ?? handCards.Find(c => GetCardId(c) == id);
+                    if (meta != null) {
+                        cardScript.rank = meta.rank;
+                        cardScript.suit = meta.suit;
+                    }
                     cardScript.PlayAnimation(targetPos, 0.6f);
                 } else {
                     newCard.transform.position = targetPos;
                 }
-                
-                activeCards.Add(cardId, newCard);
+                activeCards.Add(id, newCard);
             } else {
-                Vector3 targetPos = new Vector3(handStartX + (i * handSpacing), handY, handBaseZ);
-                GameObject existing = activeCards[cardId];
-                existing.transform.DOMove(targetPos, 0.3f);
+                // Update existing
+                GameObject existing = activeCards[id];
+                existing.transform.DOMove(targetPos, 0.4f).SetEase(Ease.OutQuad);
+                existing.transform.DORotate(new Vector3(inHand ? 60 : 90, 0, 0), 0.4f);
             }
         }
+    }
+
+    private string GetCardId(CardJson c) {
+        if (!string.IsNullOrEmpty(c.id)) return c.id;
+        return (c.suit ?? "nil") + "_" + (c.rank ?? "nil");
     }
 
     public void NotifyFlutter(string eventName, string data = "") {

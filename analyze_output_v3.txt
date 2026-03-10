@@ -1,4 +1,0 @@
-Analyzing Halabessa-Card-Game...                                
-
-   info - Unnecessary cast - lib\features\game\data\repositories\multiplayer_sync_service.dart:156:53 - unnecessary_cast
-

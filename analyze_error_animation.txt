@@ -1,6 +1,0 @@
-Analyzing Halabessa-Card-Game...                                
-
-  error - The name 'Offset' isn't a type, so it can't be used as a type argument - lib\features\game\domain\providers\game_providers.dart:27:60 - non_type_as_type_argument
-  error - Undefined class 'Offset' - lib\features\game\domain\providers\game_providers.dart:784:64 - undefined_class
-
-2 issues found. (ran in 2.2s)

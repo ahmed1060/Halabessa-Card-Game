@@ -35,7 +35,7 @@ public class UnityFirebaseListener : MonoBehaviour {
         
         // DataSnapshot contains the new board state
         // Use this to trigger DOTween animations if a new card was added
-        Debug.Log("Unity: Firebase Board Stream Updated!");
+        // Debug.Log("Unity: Firebase Board Stream Updated!");
     }
 
     void OnDestroy() {
@@ -45,7 +45,7 @@ public class UnityFirebaseListener : MonoBehaviour {
     }
 #else
     void Start() {
-        Debug.Log("Unity: Firebase C# SDK is disabled on WebGL. Using Flutter Bridge for data.");
+        // Debug.Log("Unity: Firebase C# SDK is disabled on WebGL. Using Flutter Bridge for data.");
     }
 #endif
 }

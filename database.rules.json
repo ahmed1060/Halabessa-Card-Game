@@ -1,16 +1,22 @@
 {
     "rules": {
         "matches": {
-            ".read": "true",
-            ".write": "true"
+            "$matchId": {
+                ".read": "auth != null",
+                ".write": "auth != null && (!data.exists() || data.child('players').hasChild(auth.uid))"
+            }
         },
         "matchmaking_queue": {
-            ".read": "true",
-            ".write": "true"
+            ".read": "auth != null",
+            "$uid": {
+                ".write": "auth != null && auth.uid == $uid"
+            }
         },
         "users": {
-            ".read": "true",
-            ".write": "true"
+            ".read": "auth != null",
+            "$uid": {
+                ".write": "auth != null && auth.uid == $uid"
+            }
         }
     }
 }

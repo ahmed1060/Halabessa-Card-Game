@@ -1,0 +1,36 @@
+name: Flutter iOS Build
+
+on:
+    push:
+        branches:
+            - main
+    pull_request:
+        branches:
+            - main
+
+jobs:
+    build:
+        runs-on: macos-latest
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Set up Flutter
+              uses: subosito/flutter-action@v2
+              with:
+                  channel: "stable"
+                  cache: true
+
+            - name: Install dependencies
+              run: flutter pub get
+
+            - name: Build iOS (No codesign)
+              run: flutter build ios --release --no-codesign
+              # Note: Codesigning requires certificates/profiles in GitHub Secrets.
+              # This step verifies the code compiles for iOS in a CI environment.
+
+            - name: Upload iOS Build
+              uses: actions/upload-artifact@v4
+              with:
+                  name: ios-build
+                  path: build/ios/iphoneos/Runner.app

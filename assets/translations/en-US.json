@@ -339,5 +339,12 @@
     "buy_ticket_btn": "Buy Ticket",
     "winner": "Winner",
     "user_not_found": "User not found",
-    "error_label": "Error"
+    "error_label": "Error",
+    "loading_step_physics": "Configuring Game Physics...",
+    "loading_step_assets": "Downloading Card Assets...",
+    "loading_step_sync": "Synchronizing with Server...",
+    "loading_step_tables": "Preparing 3D Tables...",
+    "loading_step_vibes": "Setting the Vibes...",
+    "loading_step_engine": "Initializing Unity Engine...",
+    "loading_step_interface": "Finalizing Interface..."
 }

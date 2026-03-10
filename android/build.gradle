@@ -57,12 +57,18 @@ subprojects {
                 jvmTarget = "17"
             }
         }
+
+        if (project.name == 'flutter_unity_widget') {
+            project.dependencies {
+                implementation rootProject.files("../androidBuild/unityExport/unityLibrary/libs/unity-classes.jar")
+            }
+        }
     }
 }
 
 def configureNamespace(project) {
     if (project.android.namespace == null) {
-        project.android.namespace = "com.example.halabessa.${project.name.replaceAll(":", "").replaceAll("-", "_")}"
+        project.android.namespace = "com.halabessa.game.${project.name.replaceAll(":", "").replaceAll("-", "_")}"
     }
 }
 

@@ -8,11 +8,15 @@ public class UnityDebugConsole : MonoBehaviour {
     private bool isVisible = false;
     
     void OnEnable() {
+#if UNITY_EDITOR || DEBUG
         Application.logMessageReceived += HandleLog;
+#endif
     }
 
     void OnDisable() {
+#if UNITY_EDITOR || DEBUG
         Application.logMessageReceived -= HandleLog;
+#endif
     }
 
     void HandleLog(string logString, string stackTrace, LogType type) {
@@ -24,10 +28,13 @@ public class UnityDebugConsole : MonoBehaviour {
     }
 
     public void ToggleVisibility() {
+#if UNITY_EDITOR || DEBUG
         isVisible = !isVisible;
+#endif
     }
 
     void OnGUI() {
+#if UNITY_EDITOR || DEBUG
         if (!isVisible) return;
         
         GUI.backgroundColor = new Color(0, 0, 0, 0.8f);
@@ -37,5 +44,6 @@ public class UnityDebugConsole : MonoBehaviour {
             GUILayout.Label(log);
         }
         GUILayout.EndArea();
+#endif
     }
 }

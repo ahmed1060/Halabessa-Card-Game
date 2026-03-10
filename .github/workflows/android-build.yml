@@ -30,13 +30,12 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Build APK (Debug)
-        run: flutter build apk --debug --android-skip-build-dependency-validation
-        # We use --debug here for faster CI verification.
-        # Change to --release if you have signing configs set up in android/app/build.gradle
+      - name: Build APK (Release)
+        run: flutter build apk --release --android-skip-build-dependency-validation
+        # We use --release for the final production deliverable.
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: app-debug-apk
-          path: build/app/outputs/flutter-apk/app-debug.apk
+          name: app-release-apk
+          path: build/app/outputs/flutter-apk/app-release.apk

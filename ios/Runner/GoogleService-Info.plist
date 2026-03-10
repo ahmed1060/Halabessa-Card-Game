@@ -3,9 +3,11 @@
 <plist version="1.0">
 <dict>
 	<key>CLIENT_ID</key>
-	<string>54223815037-dj2uqcbstbo3j5r600cegvrt4cltt7lj.apps.googleusercontent.com</string>
+	<string>54223815037-647c34d72d4dih6mgv9j18btb8867crt.apps.googleusercontent.com</string>
 	<key>REVERSED_CLIENT_ID</key>
-	<string>com.googleusercontent.apps.54223815037-dj2uqcbstbo3j5r600cegvrt4cltt7lj</string>
+	<string>com.googleusercontent.apps.54223815037-647c34d72d4dih6mgv9j18btb8867crt</string>
+	<key>ANDROID_CLIENT_ID</key>
+	<string>54223815037-dq5enirupin28ub3olvlifamf035aipk.apps.googleusercontent.com</string>
 	<key>API_KEY</key>
 	<string>AIzaSyAIuSJXCHGPw3WT1iZ4OIIhE_-QzzfwEFk</string>
 	<key>GCM_SENDER_ID</key>
@@ -13,7 +15,7 @@
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
-	<string>com.example.halabessa</string>
+	<string>com.halabessa.game</string>
 	<key>PROJECT_ID</key>
 	<string>halabessa-card-game1</string>
 	<key>STORAGE_BUCKET</key>
@@ -29,7 +31,7 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:54223815037:ios:16014a0cc65fa3700b4c14</string>
+	<string>1:54223815037:ios:816ca98e5695208b0b4c14</string>
 	<key>DATABASE_URL</key>
 	<string>https://halabessa-card-game1-default-rtdb.firebaseio.com</string>
 </dict>
