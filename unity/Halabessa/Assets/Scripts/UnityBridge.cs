@@ -124,7 +124,9 @@ public class UnityBridge : MonoBehaviour {
                 
                 // Initial position (coming from above)
                 newCard.transform.position = new Vector3(targetPos.x, targetPos.y + 5f, targetPos.z + 5f);
-                newCard.transform.localRotation = Quaternion.Euler(inHand ? 60 : 90, 0, 0);
+                newCard.transform.localRotation = Quaternion.Euler(inHand ? -60 : -90, 0, 0);
+
+                Debug.Log($"[PRODUCTION_FIX] Spawned card: {id} at {newCard.transform.position}");
 
                 CardInstance cardScript = newCard.GetComponent<CardInstance>();
                 if (cardScript != null) {
@@ -135,6 +137,7 @@ public class UnityBridge : MonoBehaviour {
                         cardScript.rank = meta.rank;
                         cardScript.suit = meta.suit;
                     }
+                    Debug.Log($"[PRODUCTION_FIX] Animating card {id} flying to {targetPos}");
                     cardScript.PlayAnimation(targetPos, 0.6f);
                 } else {
                     newCard.transform.position = targetPos;
@@ -144,7 +147,7 @@ public class UnityBridge : MonoBehaviour {
                 // Update existing
                 GameObject existing = activeCards[id];
                 existing.transform.DOMove(targetPos, 0.4f).SetEase(Ease.OutQuad);
-                existing.transform.DORotate(new Vector3(inHand ? 60 : 90, 0, 0), 0.4f);
+                existing.transform.DORotate(new Vector3(inHand ? -60 : -90, 0, 0), 0.4f);
             }
         }
     }
