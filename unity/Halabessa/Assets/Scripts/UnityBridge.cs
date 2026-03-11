@@ -40,9 +40,8 @@ public class UnityBridge : MonoBehaviour {
         UnityDebugConsole console = FindFirstObjectByType<UnityDebugConsole>(FindObjectsInactive.Include);
         if (console != null) {
             console.ToggleVisibility();
-        } else {
-            Debug.LogWarning("UnityBridge: UnityDebugConsole script not found in scene!");
         }
+        // Silently no-op if console component is absent (production build)
     }
 
     // Called from Flutter via _unityWidgetController.postMessage('UnityBridge', 'OnFlutterMessage', json)
