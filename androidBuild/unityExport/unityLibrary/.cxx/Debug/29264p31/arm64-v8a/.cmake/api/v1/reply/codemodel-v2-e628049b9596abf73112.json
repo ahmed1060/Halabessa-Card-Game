@@ -10,7 +10,7 @@
 					[
 						1
 					],
-					"jsonFile" : "directory-.-RelWithDebInfo-d0094a50bb2071803777.json",
+					"jsonFile" : "directory-.-Debug-d0094a50bb2071803777.json",
 					"minimumCMakeVersion" : 
 					{
 						"string" : "3.6.0"
@@ -20,10 +20,10 @@
 				},
 				{
 					"build" : "FramePacing",
-					"jsonFile" : "directory-FramePacing-RelWithDebInfo-7f9c8865fd027a154c90.json",
+					"jsonFile" : "directory-FramePacing-Debug-7f9c8865fd027a154c90.json",
 					"minimumCMakeVersion" : 
 					{
-						"string" : "3.4.1"
+						"string" : "3.22.1"
 					},
 					"parentIndex" : 0,
 					"projectIndex" : 1,
@@ -34,7 +34,7 @@
 					]
 				}
 			],
-			"name" : "RelWithDebInfo",
+			"name" : "Debug",
 			"projects" : 
 			[
 				{
@@ -66,7 +66,7 @@
 				{
 					"directoryIndex" : 1,
 					"id" : "swappywrapper::@7e25bd1f32ce224db4e9",
-					"jsonFile" : "target-swappywrapper-RelWithDebInfo-2e6d2e8509ac7f3473ef.json",
+					"jsonFile" : "target-swappywrapper-Debug-57f1273189b6fd4bf47a.json",
 					"name" : "swappywrapper",
 					"projectIndex" : 1
 				}
@@ -76,7 +76,7 @@
 	"kind" : "codemodel",
 	"paths" : 
 	{
-		"build" : "D:/SHSD/Projects (Github)/Halabessa/Halabessa-Card-Game/androidBuild/unityExport/unityLibrary/.cxx/RelWithDebInfo/5m1v312l/arm64-v8a",
+		"build" : "D:/SHSD/Projects (Github)/Halabessa/Halabessa-Card-Game/androidBuild/unityExport/unityLibrary/.cxx/Debug/29264p31/arm64-v8a",
 		"source" : "D:/SHSD/Projects (Github)/Halabessa/Halabessa-Card-Game/androidBuild/unityExport/unityLibrary/src/main/cpp"
 	},
 	"version" : 

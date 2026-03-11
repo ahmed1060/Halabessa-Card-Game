@@ -1,3 +1,13 @@
 # ninja log v5
 0	803	7948121409710825	FramePacing/CMakeFiles/swappywrapper.dir/UnitySwappyWrapper.cpp.o	91fbb6fd4bf156a3
-804	1003	7948121411675847	D:/SHSD/Projects (Github)/Halabessa/Halabessa-Card-Game/build/unityLibrary/intermediates/cxx/RelWithDebInfo/5m1v312l/obj/arm64-v8a/libswappywrapper.so	20a9ce9d7c093139
+23	610	7949029641704263	D:/SHSD/Projects (Github)/Halabessa/Halabessa-Card-Game/build/unityLibrary/intermediates/cxx/RelWithDebInfo/5m1v312l/obj/arm64-v8a/libswappywrapper.so	20a9ce9d7c093139
+1	21	0	clean	b54861c1655bbf72
+1	26	0	clean	b54861c1655bbf72
+20	1856	7949060338107351	FramePacing/CMakeFiles/swappywrapper.dir/UnitySwappyWrapper.cpp.o	91fbb6fd4bf156a3
+1856	2359	7949060343132996	D:/SHSD/Projects (Github)/Halabessa/Halabessa-Card-Game/build/unityLibrary/intermediates/cxx/RelWithDebInfo/5m1v312l/obj/arm64-v8a/libswappywrapper.so	20a9ce9d7c093139
+0	21	0	clean	b54861c1655bbf72
+31	791	7949067112660364	FramePacing/CMakeFiles/swappywrapper.dir/UnitySwappyWrapper.cpp.o	91fbb6fd4bf156a3
+792	1142	7949067116218756	D:/SHSD/Projects (Github)/Halabessa/Halabessa-Card-Game/build/unityLibrary/intermediates/cxx/RelWithDebInfo/5m1v312l/obj/arm64-v8a/libswappywrapper.so	20a9ce9d7c093139
+0	36	0	clean	b54861c1655bbf72
+22	391	7949072626184080	FramePacing/CMakeFiles/swappywrapper.dir/UnitySwappyWrapper.cpp.o	91fbb6fd4bf156a3
+392	686	7949072629125787	D:/SHSD/Projects (Github)/Halabessa/Halabessa-Card-Game/build/unityLibrary/intermediates/cxx/RelWithDebInfo/5m1v312l/obj/arm64-v8a/libswappywrapper.so	20a9ce9d7c093139

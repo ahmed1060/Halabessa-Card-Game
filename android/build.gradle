@@ -11,25 +11,42 @@ allprojects {
     }
 }
 
-rootProject.buildDir = '../build'
+rootProject.buildDir = file('../build')
 subprojects {
-    project.buildDir = "${rootProject.buildDir}/${project.name}"
+    // Drive-aware build directory logic to avoid Windows "different roots" error
+    def rootDrive = rootProject.buildDir.absolutePath.split(':')[0]
+    def projectDrive = project.projectDir.absolutePath.split(':')[0]
+    
+    if (rootDrive.equalsIgnoreCase(projectDrive)) {
+        project.buildDir = "${rootProject.buildDir}/${project.name}"
+    } else {
+        // Fallback to default build dir if paths are on different drives (e.g. plugins in C:\ while project is on D:)
+        println "INFO: Using default buildDir for ${project.name} to avoid cross-drive issues."
+    }
 
     afterEvaluate { project ->
         if (project.hasProperty('android')) {
             project.android {
                 compileSdkVersion 35
                 buildToolsVersion "35.0.0"
+                
+                // Force Java 21 Toolchain
                 compileOptions {
-                    sourceCompatibility JavaVersion.VERSION_17
-                    targetCompatibility JavaVersion.VERSION_17
+                    sourceCompatibility JavaVersion.VERSION_21
+                    targetCompatibility JavaVersion.VERSION_21
+                }
+                
+                if (project.android.hasProperty('kotlinOptions')) {
+                    project.android.kotlinOptions {
+                        jvmTarget = "21"
+                    }
                 }
                 
                 if (project.android.namespace == null) {
                     project.android.namespace = "com.halabessa.game.${project.name.replaceAll("-", ".")}"
                 }
-
-                // AGP 8+ hack: Strip package attribute from AndroidManifest.xml
+                
+                // ... rest of manifest sanitization ...
                 project.android.sourceSets.all { sourceSet ->
                     def manifestFile = sourceSet.manifest.srcFile
                     if (manifestFile != null && manifestFile.exists() && !manifestFile.isDirectory()) {
@@ -48,13 +65,13 @@ subprojects {
         }
 
         tasks.withType(JavaCompile).configureEach {
-            sourceCompatibility = '17'
-            targetCompatibility = '17'
+            sourceCompatibility = '21'
+            targetCompatibility = '21'
         }
 
         tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
             kotlinOptions {
-                jvmTarget = "17"
+                jvmTarget = "21"
             }
         }
 

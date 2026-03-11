@@ -1,0 +1,1 @@
+D:\SHSD\Projects (Github)\Halabessa\Halabessa-Card-Game\androidBuild\unityExport\unityLibrary\src\main\cpp\FramePacing\UnitySwappyWrapper.h
