@@ -17,19 +17,27 @@ import 'package:halabessa/core/services/asset_preloader_service.dart';
 
 import 'package:halabessa/features/auth/presentation/widgets/username_onboarding_overlay.dart';
 
-class HomeScreen extends ConsumerWidget {
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final user = ref.watch(currentUserProvider);
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
+}
 
-    // Initiate Background Music
+class _HomeScreenState extends ConsumerState<HomeScreen> {
+  bool _hasCheckedOnboarding = false;
+
+  @override
+  void initState() {
+    super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       ref.read(multimediaServiceProvider).playMusic('music/bg_music.mp3');
 
-      // Username Onboarding Check
-      if (user != null && user.username == null) {
+      // Check onboarding once
+      final user = ref.read(currentUserProvider);
+      if (user != null && user.username == null && !_hasCheckedOnboarding) {
+        _hasCheckedOnboarding = true;
         showModalBottomSheet(
           context: context,
           isScrollControlled: true,
@@ -40,8 +48,7 @@ class HomeScreen extends ConsumerWidget {
         );
       }
 
-
-      // ONE-TIME CLEANUP (Stale Rooms)
+      // One-time cleanup for admin
       if (user?.isAdmin == true) {
         final matchesToDelete = ['RHY17001', 'ZIM64878'];
         final sync = ref.read(multiplayerSyncServiceProvider);
@@ -50,6 +57,27 @@ class HomeScreen extends ConsumerWidget {
         }
       }
     });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final user = ref.watch(currentUserProvider);
+
+    // Secondary check if user state updates asynchronously
+    if (user != null && user.username == null && !_hasCheckedOnboarding) {
+      _hasCheckedOnboarding = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        showModalBottomSheet(
+          context: context,
+          isScrollControlled: true,
+          isDismissible: false,
+          enableDrag: false,
+          backgroundColor: Colors.transparent,
+          builder: (context) => const UsernameOnboardingOverlay(),
+        );
+      });
+    }
 
     return Scaffold(
       backgroundColor: const Color(0xFF0D1B2A),
@@ -143,7 +171,7 @@ class HomeScreen extends ConsumerWidget {
                         label: 'create_room'.tr(),
                         icon: Icons.add_box_outlined,
                         color: ThemeConfig.primaryTeal,
-                        onTap: () => _showCreateRoomDialog(context, ref, user?.uid ?? '', user?.displayName ?? ''),
+                        onTap: () => _showCreateRoomDialog(context, user?.uid ?? '', user?.displayName ?? ''),
                       ),
                     ),
                     const SizedBox(width: 16),
@@ -153,7 +181,7 @@ class HomeScreen extends ConsumerWidget {
                         label: 'join_room'.tr(),
                         icon: Icons.login_outlined,
                         color: ThemeConfig.goldAccent,
-                        onTap: () => _showJoinRoomDialog(context, ref, user?.uid ?? '', user?.displayName ?? ''),
+                        onTap: () => _showJoinRoomDialog(context, user?.uid ?? '', user?.displayName ?? ''),
                       ),
                     ),
                   ],
@@ -215,7 +243,7 @@ class HomeScreen extends ConsumerWidget {
     );
   }
 
-  void _showCreateRoomDialog(BuildContext context, WidgetRef ref, String playerId, String displayName) {
+  void _showCreateRoomDialog(BuildContext context, String playerId, String displayName) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -227,7 +255,7 @@ class HomeScreen extends ConsumerWidget {
     );
   }
 
-  void _showJoinRoomDialog(BuildContext context, WidgetRef ref, String playerId, String displayName) {
+  void _showJoinRoomDialog(BuildContext context, String playerId, String displayName) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,

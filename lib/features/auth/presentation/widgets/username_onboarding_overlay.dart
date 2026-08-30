@@ -54,7 +54,7 @@ class _UsernameOnboardingOverlayState extends ConsumerState<UsernameOnboardingOv
       return;
     }
 
-    final regex = RegExp(r'^[a-zA-Z0-9_]+$');
+    final regex = RegExp(r'^[a-zA-Z0-9_\u0600-\u06FF]+$');
     if (!regex.hasMatch(username)) {
       setState(() {
         _error = 'invalid_chars'.tr();
