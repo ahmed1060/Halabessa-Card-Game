@@ -19,8 +19,8 @@ void registerWebUnityView() {
       ..style.pointerEvents = 'auto'
       ..style.zIndex = '0';
 
-    // Minimal opacity ensures the browser assigns a WebGL context (0.0 can sometimes be de-optimized)
-    canvas.style.opacity = '0.01';
+    // Ensure full opacity so the WebGL canvas renders visibly when Flutter's layer is visible
+    canvas.style.opacity = '1.0';
 
     // Increased delay to 1500ms to ensure the DOM has fully settled and painted
     Future.delayed(const Duration(milliseconds: 1500), () {

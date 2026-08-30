@@ -21,6 +21,14 @@ class UnityCommunicationService {
 
   void init() {
     if (kIsWeb) {
+      // Graceful fallback: If Unity WebGL does not report ready within 3.5s, unlock UI
+      Future.delayed(const Duration(milliseconds: 3500), () {
+        if (!isReady.value) {
+          debugPrint("Unity WebGL startup timeout - enabling UI.");
+          _ref.read(unityInitializedProvider.notifier).state = true;
+        }
+      });
+
       WebUtils.onMessage?.listen((event) {
         try {
           final message = event.data;
@@ -52,6 +60,12 @@ class UnityCommunicationService {
 
   void setController(UnityWidgetController controller) {
     _controller = controller;
+    // Fallback for native
+    Future.delayed(const Duration(milliseconds: 2500), () {
+      if (!isReady.value) {
+        _ref.read(unityInitializedProvider.notifier).state = true;
+      }
+    });
   }
 
   void postMessage(String objectName, String methodName, String message) {

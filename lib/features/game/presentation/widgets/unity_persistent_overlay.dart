@@ -21,18 +21,18 @@ class UnityPersistentOverlay extends ConsumerWidget {
     return Positioned.fill(
       child: Stack(
         children: [
-          // Background Unity view (partially visible while loading)
+          // Background Unity view
           IgnorePointer(
             ignoring: !isVisible,
             child: AnimatedOpacity(
               duration: const Duration(milliseconds: 300),
-              opacity: isVisible ? 1.0 : (isInitialized ? 0.0 : 0.01),
+              opacity: isVisible ? 1.0 : 0.0,
               child: const UnityGameView(),
             ),
           ),
           
-          // Background Loading Feedback (Old UI style)
-          if (!isInitialized)
+          // Background Loading Feedback (Only show when Unity layer is requested to be visible)
+          if (!isInitialized && isVisible)
             Container(
               color: Colors.black.withOpacity(0.4),
               child: Center(
