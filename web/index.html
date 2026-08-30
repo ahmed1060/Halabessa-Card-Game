@@ -64,6 +64,10 @@
         },
       }).then((instance) => {
         unityInstance = instance;
+        // Release keyboard capture so Flutter input fields function normally
+        if (instance.Module && typeof instance.Module.WebGLInput !== 'undefined') {
+          instance.Module.WebGLInput.captureAllKeyboardInput = false;
+        }
         window.postMessageToUnity = function (message) {
           if (unityInstance !== null) {
             unityInstance.SendMessage("UnityBridge", "OnFlutterMessage", message);

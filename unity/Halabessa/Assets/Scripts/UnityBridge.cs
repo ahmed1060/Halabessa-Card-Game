@@ -26,6 +26,9 @@ public class UnityBridge : MonoBehaviour {
     }
 
     void Start() {
+#if UNITY_WEBGL && !UNITY_EDITOR
+        WebGLInput.captureAllKeyboardInput = false;
+#endif
         // FORCE TRANSPARENCY AT RUNTIME (God Move)
         if (Camera.main != null) {
             Camera.main.clearFlags = CameraClearFlags.SolidColor;

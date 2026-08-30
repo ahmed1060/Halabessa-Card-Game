@@ -46,7 +46,6 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with TickerProviderStat
       duration: const Duration(seconds: 10),
     )..addListener(() {
         _updateParticles();
-        setState(() {});
       })..repeat();
 
     for (int i = 0; i < 30; i++) {
@@ -243,7 +242,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with TickerProviderStat
           // Animated Particles
           Positioned.fill(
             child: CustomPaint(
-              painter: ParticlePainter(_particles),
+              painter: ParticlePainter(_particles, repaint: _particleController),
             ),
           ),
           
@@ -508,7 +507,7 @@ class Particle {
 
 class ParticlePainter extends CustomPainter {
   final List<Particle> particles;
-  ParticlePainter(this.particles);
+  ParticlePainter(this.particles, {super.repaint});
 
   @override
   void paint(Canvas canvas, Size size) {
