@@ -16,7 +16,7 @@ void registerWebUnityView() {
       ..style.border = 'none'
       ..style.background = 'transparent'
       ..style.backgroundColor = 'transparent'
-      ..style.pointerEvents = 'auto'
+      ..style.pointerEvents = 'none'
       ..style.zIndex = '0';
 
     // Ensure full opacity so the WebGL canvas renders visibly when Flutter's layer is visible
@@ -33,4 +33,18 @@ void registerWebUnityView() {
 
     return canvas;
   });
+}
+
+void setWebUnityPointerEvents(bool interactive) {
+  try {
+    final canvas = html.document.getElementById('unity-canvas');
+    if (canvas != null) {
+      canvas.style.pointerEvents = interactive ? 'auto' : 'none';
+      if (!interactive) {
+        canvas.blur();
+      }
+    }
+  } catch (e) {
+    debugPrint("Error setting Unity canvas pointer events: $e");
+  }
 }

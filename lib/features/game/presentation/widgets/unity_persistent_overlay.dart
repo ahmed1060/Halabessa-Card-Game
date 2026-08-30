@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'unity_game_view.dart';
 import '../providers/unity_layer_provider.dart';
+import '../../../../core/utils/web_registry.dart';
 
 class UnityPersistentOverlay extends ConsumerWidget {
   const UnityPersistentOverlay({super.key});
@@ -13,6 +14,10 @@ class UnityPersistentOverlay extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final isVisible = ref.watch(unityLayerVisibilityProvider);
     final isInitialized = ref.watch(unityInitializedProvider);
+    
+    if (kIsWeb) {
+      setWebUnityPointerEvents(isVisible);
+    }
     
     // We keep Unity in the background. Clicks are handled by the layers ON TOP of it (Flutter)
     // unless isVisible is true (e.g. in GameBoardScreen), but even then, 

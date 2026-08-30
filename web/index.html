@@ -64,10 +64,15 @@
         },
       }).then((instance) => {
         unityInstance = instance;
-        // Release keyboard capture so Flutter input fields function normally
-        if (instance.Module && typeof instance.Module.WebGLInput !== 'undefined') {
-          instance.Module.WebGLInput.captureAllKeyboardInput = false;
+        // Restrict keyboard listening to the canvas element only
+        if (instance.Module) {
+          instance.Module.keyboardListeningElement = canvasElement;
+          if (typeof instance.Module.WebGLInput !== 'undefined') {
+            instance.Module.WebGLInput.captureAllKeyboardInput = false;
+          }
         }
+        canvasElement.removeAttribute("tabindex");
+
         window.postMessageToUnity = function (message) {
           if (unityInstance !== null) {
             unityInstance.SendMessage("UnityBridge", "OnFlutterMessage", message);
@@ -77,6 +82,19 @@
         console.error("Unity WebGL build failed to load:", message);
       });
     }
+
+    // Global Safeguard: Prevent Unity WebGL from ever hijacking keys when interacting with Flutter UI
+    function releaseUnityKeyboard() {
+      if (typeof unityInstance !== 'undefined' && unityInstance && unityInstance.Module) {
+        if (unityInstance.Module.WebGLInput) {
+          unityInstance.Module.WebGLInput.captureAllKeyboardInput = false;
+        }
+      }
+    }
+    window.addEventListener('keydown', releaseUnityKeyboard, true);
+    window.addEventListener('keyup', releaseUnityKeyboard, true);
+    window.addEventListener('keypress', releaseUnityKeyboard, true);
+    window.addEventListener('focusin', releaseUnityKeyboard, true);
 
     window.initUnityEngine = function (canvasElement) {
       createUnityInstanceOnCanvas(canvasElement);

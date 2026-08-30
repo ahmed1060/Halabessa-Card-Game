@@ -37,6 +37,14 @@ public class UnityBridge : MonoBehaviour {
         }
         NotifyFlutter("UNITY_READY", "Unity initialized");
     }
+
+    void Update() {
+#if UNITY_WEBGL && !UNITY_EDITOR
+        if (WebGLInput.captureAllKeyboardInput) {
+            WebGLInput.captureAllKeyboardInput = false;
+        }
+#endif
+    }
     
     // Proxy for console visibility to avoid "object not found" routing issues
     public void ToggleConsole(string dummy) {
