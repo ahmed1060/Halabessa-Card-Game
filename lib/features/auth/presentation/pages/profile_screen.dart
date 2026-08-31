@@ -17,6 +17,8 @@ class ProfileScreen extends ConsumerStatefulWidget {
 }
 
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
+  bool _hasCheckedOnboarding = false;
+
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(currentUserProvider);
@@ -33,9 +35,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final currentXP = user.points % 100;
     final level = (user.points / 100).floor() + 1;
 
-    // Mandatory Username Check
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (user.username == null) {
+    // Mandatory Username Check — guarded to run only once
+    if (user.username == null && !_hasCheckedOnboarding) {
+      _hasCheckedOnboarding = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
         showModalBottomSheet(
           context: context,
           isScrollControlled: true,
@@ -44,8 +48,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           backgroundColor: Colors.transparent,
           builder: (context) => const UsernameOnboardingOverlay(),
         );
-      }
-    });
+      });
+    }
 
     return Scaffold(
       backgroundColor: ThemeConfig.darkBg,
