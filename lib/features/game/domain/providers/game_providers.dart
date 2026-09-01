@@ -13,6 +13,7 @@ import '../../domain/models/game_action.dart';
 import '../../domain/logic/deck.dart';
 import '../../domain/logic/game_engine.dart';
 import '../../domain/logic/bot_brain.dart';
+import '../../domain/logic/score_config.dart';
 import '../../data/repositories/multiplayer_sync_service.dart';
 import 'package:halabessa/features/auth/presentation/providers/auth_providers.dart';
 import 'package:halabessa/features/home/presentation/providers/store_provider.dart';
@@ -876,9 +877,9 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
       int pointsB = currentState.teamBScore;
 
       if (totalCardsA > totalCardsB) {
-         pointsA += 3;
+         pointsA += ScoreConfig.majorityCapture;
       } else if (totalCardsB > totalCardsA) {
-         pointsB += 3;
+         pointsB += ScoreConfig.majorityCapture;
       }
 
       // 3. SHOW SCORING PHASE (Popping up the cards collected)

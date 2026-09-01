@@ -3,6 +3,7 @@ import '../models/game_action.dart';
 import '../models/card.dart' as game_card;
 import '../models/capture.dart';
 import 'game_engine_utils.dart';
+import 'score_config.dart';
 import 'deck.dart';
 
 class GameEngine {
@@ -27,7 +28,16 @@ class GameEngine {
     
     final playerId = action.playerId;
     final card = action.card;
-    
+
+    // Guard against an out-of-range index -- playerIds is assumed to be
+    // exactly 4 (Halabessa is a fixed 4-player, 2-team game; a room's
+    // playerIds is always seeded with 4 entries, using 'waiting_' as a
+    // placeholder for an open seat), but a corrupt or partial match object
+    // should never throw here.
+    if (state.playerIds.isEmpty || state.currentTurnIndex < 0 || state.currentTurnIndex >= state.playerIds.length) {
+      return GameEngineResult(state);
+    }
+
     // Validate turn
     if (state.playerIds[state.currentTurnIndex] != playerId) return GameEngineResult(state);
 
@@ -63,7 +73,7 @@ class GameEngine {
     final capturedCards = GameEngineUtils.calculateCapture(card, board);
     final teamId = (state.playerIds.indexOf(playerId) % 2 == 0) ? 'teamA' : 'teamB';
     int pointsEarned = 0;
-    int nextTurn = (state.currentTurnIndex + 1) % 4;
+    int nextTurn = (state.currentTurnIndex + 1) % state.playerIds.length;
 
     if (capturedCards.isEmpty) {
       board.add(card);
@@ -80,28 +90,28 @@ class GameEngine {
         ),
       );
     } else {
-      pointsEarned = 1;
-      
+      pointsEarned = ScoreConfig.normalCapture;
+
       // Handle Tafweet bonus points
       if (state.mode == GameMode.tafweet) {
         final playerSkips = List<String>.from(skipped[playerId] ?? []);
-        final previousPlayerId = state.playerIds[(state.currentTurnIndex + 3) % 4];
-        
+        final previousPlayerId = state.playerIds[(state.currentTurnIndex + state.playerIds.length - 1) % state.playerIds.length];
+
         bool isFashaTafweet = playerSkips.contains('${card.rank.name}:fasha');
         int rankSkipCount = playerSkips.where((s) => s.startsWith('${card.rank.name}:')).length;
         bool isDoubleTafweet = rankSkipCount >= 2 && playerSkips.contains('${card.rank.name}:$previousPlayerId');
         bool isStandardTafweet = playerSkips.contains('${card.rank.name}:$previousPlayerId');
 
         if (isFashaTafweet) {
-          pointsEarned += 5;
+          pointsEarned += ScoreConfig.fashaTafweet;
           emojis[playerId] = '😎';
           playerSkips.remove('${card.rank.name}:fasha');
         } else if (isDoubleTafweet) {
-          pointsEarned += 10;
+          pointsEarned += ScoreConfig.doubleTafweet;
           emojis[playerId] = '🔥';
           playerSkips.removeWhere((s) => s.startsWith('${card.rank.name}:'));
         } else if (isStandardTafweet) {
-          pointsEarned += 5;
+          pointsEarned += ScoreConfig.standardTafweet;
           emojis[playerId] = '😂';
           playerSkips.removeWhere((s) => s.startsWith('${card.rank.name}:'));
         }
@@ -137,9 +147,10 @@ class GameEngine {
 
   static GameEngineResult _cut(MatchState state, CutAction action, Deck? secretDeck) {
     if (state.phase != GamePhase.preRoundCut) return GameEngineResult(state);
-    
+    if (state.playerIds.isEmpty) return GameEngineResult(state);
+
     // Only cutter can cut
-    int cutterIdx = (state.dealerIndex + 3) % 4;
+    int cutterIdx = (state.dealerIndex + state.playerIds.length - 1) % state.playerIds.length;
     if (state.playerIds[cutterIdx] != action.playerId) return GameEngineResult(state);
 
     if (secretDeck != null) {

@@ -18,11 +18,17 @@ jobs:
             - name: Set up Flutter
               uses: subosito/flutter-action@v2
               with:
-                  channel: "stable"
+                  flutter-version: "3.47.2"
                   cache: true
 
             - name: Install dependencies
               run: flutter pub get
+
+            - name: Analyze
+              run: flutter analyze
+
+            - name: Test
+              run: flutter test
 
             - name: Build iOS (No codesign)
               run: flutter build ios --release --no-codesign

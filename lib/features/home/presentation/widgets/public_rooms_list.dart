@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easy_localization/easy_localization.dart';
-import 'package:halabessa/features/game/domain/models/match_state.dart';
+import 'package:halabessa/features/game/domain/models/room_summary.dart';
 import 'package:halabessa/features/game/domain/providers/game_providers.dart';
 import 'package:halabessa/features/game/data/repositories/multiplayer_sync_service.dart';
 import 'package:halabessa/features/auth/presentation/providers/auth_providers.dart';
@@ -14,7 +14,7 @@ class PublicRoomsList extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final syncService = ref.watch(multiplayerSyncServiceProvider);
     final currentUser = ref.watch(currentUserProvider);
-    return StreamBuilder<List<MatchState>>(
+    return StreamBuilder<List<RoomSummary>>(
       stream: syncService.watchPublicMatches(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {

@@ -18,6 +18,12 @@
         ".write": "auth != null && auth.uid == $uid"
       }
     },
+    "rooms": {
+      ".read": "auth != null",
+      "$roomId": {
+        ".write": "auth != null"
+      }
+    },
     "users": {
       ".read": "auth != null",
       "$uid": {

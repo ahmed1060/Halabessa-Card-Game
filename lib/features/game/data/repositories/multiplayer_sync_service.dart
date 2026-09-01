@@ -4,6 +4,7 @@ import 'package:firebase_database/firebase_database.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import '../../domain/models/match_state.dart';
+import '../../domain/models/room_summary.dart';
 import '../../domain/models/chat_message.dart';
 import '../../../auth/domain/models/app_user.dart';
 
@@ -32,22 +33,40 @@ class MultiplayerSyncService {
     await _handsRef(matchState.id).update(updates);
   }
 
+  /// Lightweight lobby index -- see room_summary.dart and HAL-06.
+  DatabaseReference get _roomsRef => _db.ref('rooms');
+
+  Future<void> _writeRoomIndex(MatchState matchState) async {
+    final summary = RoomSummary(
+      id: matchState.id,
+      mode: matchState.mode,
+      playerIds: matchState.playerIds,
+      isPublic: matchState.isPublic,
+      phase: matchState.phase,
+      expireAt: matchState.expireAt,
+    );
+    await _roomsRef.child(matchState.id).set(summary.toJson());
+  }
+
   /// Create a new match room in Firebase Realtime Database
   Future<void> createMatch(MatchState matchState) async {
     await matchRef.child(matchState.id).set(matchState.toJson());
     await _writeHands(matchState);
+    await _writeRoomIndex(matchState);
   }
 
   /// Update an entire existing match state
   Future<void> updateMatchState(MatchState matchState) async {
     await matchRef.child(matchState.id).update(matchState.toJson());
     await _writeHands(matchState);
+    await _writeRoomIndex(matchState);
   }
 
   /// Delete a match room
   Future<void> deleteMatch(String matchId) async {
     await matchRef.child(matchId).remove();
     await _handsRef(matchId).remove();
+    await _roomsRef.child(matchId).remove();
   }
 
   /// Watches the public match node and the (participant-only) hands tree
@@ -134,40 +153,43 @@ class MultiplayerSyncService {
     });
   }
 
-  /// Listen to all public matches
-  Stream<List<MatchState>> watchPublicMatches() {
-    return matchRef.onValue.map((event) {
-      if (event.snapshot.value == null) return [];
+  /// Listen to joinable public rooms via the lightweight rooms/ index
+  /// instead of the full matches/ tree -- see HAL-06. Every client sitting
+  /// on the lobby used to re-download and re-parse every match's complete
+  /// object (board, chat, playHistory, presence, ...) on every single write
+  /// to any match, active games included; the index carries only what
+  /// PublicRoomsList actually needs (see room_summary.dart).
+  Stream<List<RoomSummary>> watchPublicMatches() {
+    return _roomsRef.onValue.map((event) {
+      final value = event.snapshot.value;
+      if (value == null || value is! Map) return <RoomSummary>[];
       try {
-        if (event.snapshot.value is! Map) return [];
-        final Map<dynamic, dynamic> matches = event.snapshot.value as Map<dynamic, dynamic>;
-        
-        final List<MatchState> validMatches = [];
+        final rooms = <RoomSummary>[];
         final now = DateTime.now();
 
-        matches.forEach((id, data) {
+        value.forEach((id, data) {
           try {
             if (data is! Map) return;
-            final match = MatchState.fromJson(Map<String, dynamic>.from(data));
-            
+            final room = RoomSummary.fromJson(id.toString(), data);
+
             // AUTO-DESTRUCT: If the room is expired, delete it and don't show it
-            if (match.expireAt != null && now.isAfter(match.expireAt!)) {
-              deleteMatch(match.id);
+            if (room.expireAt != null && now.isAfter(room.expireAt!)) {
+              deleteMatch(room.id);
               return;
             }
 
-            if (match.isPublic && match.phase == GamePhase.waitingForPlayers) {
-              validMatches.add(match);
+            if (room.isPublic && room.phase == GamePhase.waitingForPlayers) {
+              rooms.add(room);
             }
           } catch (e) {
             // Skip invalid data
           }
         });
 
-        return validMatches;
+        return rooms;
       } catch (e) {
-        debugPrint('Error parsing public matches: $e');
-        return [];
+        debugPrint('Error parsing rooms index: $e');
+        return <RoomSummary>[];
       }
     });
   }
