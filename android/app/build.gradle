@@ -26,7 +26,12 @@ android {
     namespace "com.halabessa.game"
     compileSdk 35 // Align with modern plugins that require 35
     ndkVersion "27.2.12479018"
-    ndkPath "C:/Program Files/Unity/Hub/Editor/6000.0.69f1/Editor/Data/PlaybackEngines/AndroidPlayer/NDK"
+    // ndkPath pointed at a local Unity Editor install (someone's Windows
+    // machine) -- unityLibrary/build.gradle already has this same line
+    // commented out for the same reason. ndkVersion alone is enough: AGP
+    // auto-provisions that NDK version via the SDK manager if it isn't
+    // already present.
+    // ndkPath "C:/Program Files/Unity/Hub/Editor/6000.0.69f1/Editor/Data/PlaybackEngines/AndroidPlayer/NDK"
 
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_21
