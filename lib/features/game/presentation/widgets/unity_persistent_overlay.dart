@@ -14,11 +14,19 @@ class UnityPersistentOverlay extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final isVisible = ref.watch(unityLayerVisibilityProvider);
     final isInitialized = ref.watch(unityInitializedProvider);
-    
+
+    // Side effect belongs in a listener, not directly in build(). Calling
+    // setWebUnityPointerEvents() inline here ran as an uncontrolled side
+    // effect during the build phase -- it could fire multiple times per
+    // frame or before the canvas element even existed, so the toggle back
+    // to interactive was unpredictable. ref.listen defers it to after the
+    // build phase and only fires when the value actually changes.
     if (kIsWeb) {
-      setWebUnityPointerEvents(isVisible);
+      ref.listen<bool>(unityLayerVisibilityProvider, (previous, next) {
+        setWebUnityPointerEvents(next);
+      });
     }
-    
+
     // We keep Unity in the background. Clicks are handled by the layers ON TOP of it (Flutter)
     // unless isVisible is true (e.g. in GameBoardScreen), but even then, 
     // the GameBoardScreen is likely on top.

@@ -2,6 +2,9 @@ using UnityEngine;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine.SceneManagement;
+using UnityEngine.EventSystems;
+using UnityEngine.UI;
+using TMPro;
 
 public class AutoSceneBuilder : EditorWindow
 {
@@ -31,8 +34,20 @@ public class AutoSceneBuilder : EditorWindow
         // 3. Create GameManager
         GameObject goManager = new GameObject("GameManager");
         goManager.AddComponent<GameStateManager>();
-        goManager.AddComponent<TurnTimer>();
+        TurnTimer turnTimer = goManager.AddComponent<TurnTimer>();
         goManager.AddComponent<CelebrationManager>();
+        // Previously never added to the scene at all -- its [SerializeField]
+        // stateText stayed null and the debug FSM label never appeared.
+        FSMStateVisualizer fsmVisualizer = goManager.AddComponent<FSMStateVisualizer>();
+
+        // 3.1 EventSystem + PhysicsRaycaster. Without these, CardInstance's
+        // DragMe component never receives pointer events at all -- the 3D
+        // hand renders but e_Released (the only path that emits PLAY_CARD
+        // back to Flutter) can never fire.
+        GameObject goEventSystem = new GameObject("EventSystem");
+        goEventSystem.AddComponent<EventSystem>();
+        goEventSystem.AddComponent<StandaloneInputModule>();
+        mainCam.gameObject.AddComponent<PhysicsRaycaster>();
 
         // 4. Create UnityBridge
         GameObject goBridge = new GameObject("UnityBridge");
@@ -74,8 +89,14 @@ public class AutoSceneBuilder : EditorWindow
         // Remove collider from shadow
         if (shadow.GetComponent<Collider>()) DestroyImmediate(shadow.GetComponent<Collider>());
 
-        // Create a simple shadow material
-        Material shadowMat = new Material(Shader.Find("Transparent/Diffuse"));
+        // Create a simple shadow material. Sprites/Default instead of the
+        // legacy Transparent/Diffuse: legacy built-in shaders are only kept
+        // in a player build if they're in Graphics > Always Included
+        // Shaders, which this one wasn't -- it rendered magenta (Unity's
+        // "shader missing" fallback) in the WebGL build despite looking
+        // correct in the editor. Sprites/Default ships with Unity's core
+        // resources, is never stripped, and honors material.color alpha.
+        Material shadowMat = new Material(Shader.Find("Sprites/Default"));
         shadowMat.color = new Color(0, 0, 0, 0.4f);
         shadow.GetComponent<Renderer>().material = shadowMat;
         
@@ -88,6 +109,61 @@ public class AutoSceneBuilder : EditorWindow
 
         // Note: We completely removed the 3D Table Plane!
         // The Flutter glowing UI will now serve as the table natively.
+
+        // 9.1 Screen-space UI Canvas for the turn timer and the FSM debug
+        // label. Previously there was no Canvas anywhere in the generated
+        // scene, so TurnTimer.timerFill/timerText and
+        // FSMStateVisualizer.stateText stayed null forever.
+        GameObject goCanvas = new GameObject("GameCanvas");
+        Canvas canvas = goCanvas.AddComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        CanvasScaler scaler = goCanvas.AddComponent<CanvasScaler>();
+        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(1920, 1080);
+        goCanvas.AddComponent<GraphicRaycaster>();
+
+        GameObject goTimerFill = new GameObject("TimerFill", typeof(RectTransform));
+        goTimerFill.transform.SetParent(goCanvas.transform, false);
+        Image timerFill = goTimerFill.AddComponent<Image>();
+        timerFill.type = Image.Type.Filled;
+        timerFill.fillMethod = Image.FillMethod.Radial360;
+        RectTransform timerFillRect = goTimerFill.GetComponent<RectTransform>();
+        timerFillRect.anchorMin = timerFillRect.anchorMax = new Vector2(0.5f, 0f);
+        timerFillRect.anchoredPosition = new Vector2(0, 120);
+        timerFillRect.sizeDelta = new Vector2(120, 120);
+
+        GameObject goTimerText = new GameObject("TimerText", typeof(RectTransform));
+        goTimerText.transform.SetParent(goTimerFill.transform, false);
+        TextMeshProUGUI timerText = goTimerText.AddComponent<TextMeshProUGUI>();
+        timerText.alignment = TextAlignmentOptions.Center;
+        timerText.fontSize = 36;
+        RectTransform timerTextRect = goTimerText.GetComponent<RectTransform>();
+        timerTextRect.anchorMin = Vector2.zero;
+        timerTextRect.anchorMax = Vector2.one;
+        timerTextRect.offsetMin = timerTextRect.offsetMax = Vector2.zero;
+
+        GameObject goFsmLabel = new GameObject("FSMStateLabel", typeof(RectTransform));
+        goFsmLabel.transform.SetParent(goCanvas.transform, false);
+        TextMeshProUGUI fsmText = goFsmLabel.AddComponent<TextMeshProUGUI>();
+        fsmText.alignment = TextAlignmentOptions.TopLeft;
+        fsmText.fontSize = 24;
+        RectTransform fsmRect = goFsmLabel.GetComponent<RectTransform>();
+        fsmRect.anchorMin = fsmRect.anchorMax = fsmRect.pivot = new Vector2(0, 1);
+        fsmRect.anchoredPosition = new Vector2(20, -20);
+        fsmRect.sizeDelta = new Vector2(400, 60);
+
+        // Wire the Canvas elements into TurnTimer/FSMStateVisualizer's
+        // private [SerializeField] fields -- there's no public setter, and
+        // this is the standard editor-time way to assign a serialized
+        // reference without one.
+        SerializedObject soTimer = new SerializedObject(turnTimer);
+        soTimer.FindProperty("timerFill").objectReferenceValue = timerFill;
+        soTimer.FindProperty("timerText").objectReferenceValue = timerText;
+        soTimer.ApplyModifiedPropertiesWithoutUndo();
+
+        SerializedObject soFsm = new SerializedObject(fsmVisualizer);
+        soFsm.FindProperty("stateText").objectReferenceValue = fsmText;
+        soFsm.ApplyModifiedPropertiesWithoutUndo();
 
         // 10. Save the Scene
         EditorSceneManager.SaveScene(newScene, "Assets/GameScene.unity");

@@ -85,6 +85,8 @@ flutter:
     - assets/images/items/
     - assets/images/avatars/
     - assets/images/gaming/
-    - assets/unity/
+    # Unity WebGL loads from web/Build/ (see web/index.html), not a Flutter
+    # asset directory -- assets/unity/ was a stale export target from the
+    # old Halabessa/Export/WebGL (Brotli) command (see BuildScripts.cs).
 
   # Fonts are provided via Google Fonts CDN in web/index.html to ensure Safari compatibility and avoid duplication errors.

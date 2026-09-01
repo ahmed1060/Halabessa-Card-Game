@@ -69,6 +69,8 @@ public class UnityBridge : MonoBehaviour {
                 }
             } else if (data.type == "SET_MODE") {
                 GameStateManager.Instance.SetMode(data.mode);
+            } else if (data.type == "UPDATE_SKINS") {
+                DeckManager.Instance?.UpdateSkins(data.skinId);
             }
         } catch (Exception e) {
             Debug.LogError("Error parsing Flutter message: " + e.Message);
@@ -147,6 +149,11 @@ public class UnityBridge : MonoBehaviour {
                         cardScript.rank = meta.rank;
                         cardScript.suit = meta.suit;
                     }
+                    // Without this every card spawns as an untextured white
+                    // quad -- the prefab's MeshRenderer never gets a
+                    // material.mainTexture assigned anywhere else.
+                    DeckManager.CardSkin skin = DeckManager.Instance != null ? DeckManager.Instance.GetActiveSkin() : null;
+                    if (skin != null) cardScript.ApplySkin(skin);
                     Debug.Log($"[PRODUCTION_FIX] Animating card {id} flying to {targetPos}");
                     cardScript.PlayAnimation(targetPos, 0.6f);
                 } else {
