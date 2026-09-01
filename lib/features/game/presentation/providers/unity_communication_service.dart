@@ -8,7 +8,6 @@ import '../../domain/models/match_state.dart';
 import '../../domain/providers/game_providers.dart';
 import 'package:halabessa/features/auth/presentation/providers/auth_providers.dart';
 import 'package:halabessa/core/providers/settings_provider.dart';
-import 'package:halabessa/features/game/presentation/providers/unity_layer_provider.dart';
 
 final unityCommunicationServiceProvider = Provider((ref) => UnityCommunicationService(ref)..init());
 
@@ -133,11 +132,12 @@ class UnityCommunicationService {
     if (!isReady.value) {
       isReady.value = true;
       _ref.read(unityInitializedProvider.notifier).state = true;
-      
-      // Smooth transition: Hide splash after 2s
-      Future.delayed(const Duration(seconds: 2), () {
-        _ref.read(unityLayerVisibilityProvider.notifier).state = false;
-      });
+      // Visibility belongs to the screen (GameBoardScreen sets it true in
+      // initState / false in dispose) — a communication service should
+      // never own layout state. This used to hide the Unity layer 2s after
+      // the *first* message of any kind, which fires mid-match on Android
+      // and iOS (every Unity event routes through here), fading the board
+      // out while the game screen is still visible.
     }
     try {
       final data = jsonDecode(message);

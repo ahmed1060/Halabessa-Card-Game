@@ -106,6 +106,21 @@
       }
     };
 
+    // Unity -> Flutter direction. FlutterUnity.jslib's OnUnityMessageWeb /
+    // OnUnitySceneLoadedWeb call these directly; without them every
+    // UnityMessageManager.SendMessageToFlutter() throws a TypeError inside
+    // the WASM callback (e.g. on every GameStateManager state change and
+    // every CardAnimator capture). Forward the raw message string through
+    // the same window.postMessage channel Flutter's WebUtils.onMessage
+    // listener already reads.
+    window.handleUnityMessage = function (message) {
+      window.postMessage(message, '*');
+    };
+
+    window.handleUnitySceneLoaded = function (name, buildIndex, isLoaded, isValid) {
+      console.log('[Unity] Scene loaded:', name, buildIndex, isLoaded, isValid);
+    };
+
     window.addEventListener('message', function (event) {
       if (typeof event.data === 'string') {
         try {

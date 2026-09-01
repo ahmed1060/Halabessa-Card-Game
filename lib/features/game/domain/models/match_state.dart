@@ -214,6 +214,11 @@ class MatchState {
       'mode': mode.name,
       'maxPoints': maxPoints,
       'playerIds': playerIds,
+      // Keyed presence map required by database.rules.json's
+      // `data.child('players').hasChild(auth.uid)` write check — the rule
+      // cannot be satisfied by `playerIds` alone, since that's a JSON array
+      // (children keyed 0,1,2,3 with the uid as the value, not the key).
+      'players': {for (final uid in playerIds) uid: true},
       'deckCount': deckCount,
       'board': board.map((c) => c.toJson()).toList(),
       'cutLastCard': cutLastCard?.toJson(),
