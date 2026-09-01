@@ -224,7 +224,11 @@ class MatchState {
       'cutLastCard': cutLastCard?.toJson(),
       'lastCardRevealed': lastCardRevealed?.toJson(),
       'recentFasha': recentFasha.map((c) => c.toJson()).toList(),
-      'handCards': handCards.map((k, v) => MapEntry(k, v.map((c) => c.toJson()).toList())),
+      // handCards is deliberately NOT written here -- MultiplayerSyncService
+      // writes it separately to the matchHands/$matchId tree, which
+      // database.rules.json restricts to this match's own participants.
+      // Nesting it under matches/$matchId here would inherit that node's
+      // open (lobby-browsing) read rule instead. See HAL-05.
       'harvestStacks': harvestStacks.map((k, v) => MapEntry(k, v.map((c) => c.toJson()).toList())),
       'skippedMatches': skippedMatches,
       'playHistory': playHistory.map((c) => c.toJson()).toList(),

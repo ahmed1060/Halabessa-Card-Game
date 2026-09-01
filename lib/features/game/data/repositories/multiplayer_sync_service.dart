@@ -1,7 +1,8 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/foundation.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import '../../domain/models/match_state.dart';
 import '../../domain/models/chat_message.dart';
 import '../../../auth/domain/models/app_user.dart';
@@ -13,36 +14,95 @@ class MultiplayerSyncService {
 
   DatabaseReference get matchRef => _db.ref('matches');
 
+  /// Hand cards live in a tree separate from matches/$matchId on purpose:
+  /// database.rules.json restricts matchHands/$matchId to that match's own
+  /// participants, while matches/$matchId itself stays readable by any
+  /// signed-in user so the lobby can browse rooms nobody has joined yet.
+  /// Nesting hands under matches/$matchId would inherit that open read
+  /// instead -- RTDB read access only ever widens going down a path, it
+  /// can't be narrowed by a rule on a child. See HAL-05.
+  DatabaseReference _handsRef(String matchId) => _db.ref('matchHands').child(matchId);
+
+  Future<void> _writeHands(MatchState matchState) async {
+    if (matchState.handCards.isEmpty) return;
+    final updates = <String, dynamic>{};
+    matchState.handCards.forEach((uid, cards) {
+      updates[uid] = cards.map((c) => c.toJson()).toList();
+    });
+    await _handsRef(matchState.id).update(updates);
+  }
+
   /// Create a new match room in Firebase Realtime Database
   Future<void> createMatch(MatchState matchState) async {
     await matchRef.child(matchState.id).set(matchState.toJson());
+    await _writeHands(matchState);
   }
 
   /// Update an entire existing match state
   Future<void> updateMatchState(MatchState matchState) async {
     await matchRef.child(matchState.id).update(matchState.toJson());
+    await _writeHands(matchState);
   }
 
   /// Delete a match room
   Future<void> deleteMatch(String matchId) async {
     await matchRef.child(matchId).remove();
+    await _handsRef(matchId).remove();
   }
 
+  /// Watches the public match node and the (participant-only) hands tree
+  /// together, merging both into one MatchState stream. Kept as a manual
+  /// two-subscription merge rather than combining via a Stream library --
+  /// this file has no reactive-streams dependency to reach for, and the
+  /// merge itself is small enough not to need one.
   Stream<MatchState?> watchMatch(String matchId) {
-    return matchRef.child(matchId).onValue.map((event) {
-      final value = event.snapshot.value;
-      if (value == null || value is! Map) return null;
-      
+    final controller = StreamController<MatchState?>.broadcast();
+    Map<String, dynamic>? latestPublic;
+    Object? latestHands;
+    var havePublic = false;
+
+    void emit() {
+      if (!havePublic || latestPublic == null) {
+        controller.add(null);
+        return;
+      }
       try {
-        return MatchState.fromJson(value);
+        final merged = Map<String, dynamic>.from(latestPublic!);
+        if (latestHands != null) merged['handCards'] = latestHands;
+        controller.add(MatchState.fromJson(merged));
       } catch (e) {
         if (kDebugMode) debugPrint('CRITICAL: Error parsing match state for $matchId: $e');
-        return null;
+        controller.add(null);
       }
-    }).handleError((error) {
+    }
+
+    final publicSub = matchRef.child(matchId).onValue.listen((event) {
+      final value = event.snapshot.value;
+      havePublic = true;
+      latestPublic = (value is Map) ? Map<String, dynamic>.from(value) : null;
+      emit();
+    }, onError: (error) {
       if (kDebugMode) debugPrint('STREAM ERROR for match $matchId: $error');
-      return null;
+      controller.add(null);
     });
+
+    final handsSub = _handsRef(matchId).onValue.listen((event) {
+      final value = event.snapshot.value;
+      latestHands = (value is Map) ? value : null;
+      if (havePublic) emit();
+    }, onError: (error) {
+      // Expected before you've joined a match (matchHands read is
+      // participant-only) -- leave handCards empty rather than surfacing it.
+      if (kDebugMode) debugPrint('Hands stream error for $matchId (not a participant yet?): $error');
+      latestHands = null;
+    });
+
+    controller.onCancel = () {
+      publicSub.cancel();
+      handsSub.cancel();
+    };
+
+    return controller.stream;
   }
 
   /// Sync presence for a player: sets online status and removes it on disconnect
@@ -160,125 +220,36 @@ class MultiplayerSyncService {
     }
   }
 
-  /// Send a friend request
+  /// Send a friend request.
+  ///
+  /// Routed through a Cloud Function: this writes to the *other* user's
+  /// document, which both database.rules.json and firestore.rules only ever
+  /// allow that user themselves to write. Direct RTDB + Firestore writes
+  /// from here always failed with PERMISSION_DENIED; Firestore is now the
+  /// social graph's sole source of truth (RTDB's copy was an unread,
+  /// silently-drifting duplicate) and functions/index.js's
+  /// sendFriendRequest validates the real caller via the Admin SDK, which
+  /// bypasses rules entirely. See HAL-07. `fromUid` is kept for API
+  /// compatibility with existing call sites -- the function trusts only
+  /// request.auth.uid, never a client-supplied sender id.
   Future<void> sendFriendRequest(String fromUid, String toUid) async {
-    // 1. Update RTDB for receiver (Pending)
-    final toUserRequestsRef = _db.ref('users').child(toUid).child('pendingFriendRequests');
-    final snapTo = await toUserRequestsRef.get();
-    final requestsTo = List<String>.from((snapTo.value as List?) ?? []);
-    if (!requestsTo.contains(fromUid)) {
-      requestsTo.add(fromUid);
-      await toUserRequestsRef.set(requestsTo);
-    }
-
-    // 2. Update RTDB for sender (Sent)
-    final fromUserSentRef = _db.ref('users').child(fromUid).child('sentFriendRequests');
-    final snapFrom = await fromUserSentRef.get();
-    final requestsFrom = List<String>.from((snapFrom.value as List?) ?? []);
-    if (!requestsFrom.contains(toUid)) {
-      requestsFrom.add(toUid);
-      await fromUserSentRef.set(requestsFrom);
-    }
-
-    // 3. Update Firestore (Source of Truth)
-    try {
-      final firestore = FirebaseFirestore.instance;
-      final batch = firestore.batch();
-      batch.update(firestore.collection('users').doc(toUid), {
-        'pendingFriendRequests': FieldValue.arrayUnion([fromUid]),
-      });
-      batch.update(firestore.collection('users').doc(fromUid), {
-        'sentFriendRequests': FieldValue.arrayUnion([toUid]),
-      });
-      await batch.commit();
-    } catch (e) {
-      debugPrint("Firestore Friend Request Update failed: $e");
-    }
+    await FirebaseFunctions.instance.httpsCallable('sendFriendRequest').call({'toUid': toUid});
   }
 
-  /// Accept a friend request
+  /// Accept a friend request. See sendFriendRequest for why this is a
+  /// callable rather than a direct write.
   Future<void> acceptFriendRequest(String myUid, String friendUid) async {
-    // 1. RTDB: Remove from both pending (mine) and sent (theirs)
-    final myRequestsRef = _db.ref('users').child(myUid).child('pendingFriendRequests');
-    final snapMy = await myRequestsRef.get();
-    final requestsMy = List<String>.from((snapMy.value as List?) ?? [])..remove(friendUid);
-    await myRequestsRef.set(requestsMy);
-
-    final friendSentRef = _db.ref('users').child(friendUid).child('sentFriendRequests');
-    final snapFriend = await friendSentRef.get();
-    final requestsFriend = List<String>.from((snapFriend.value as List?) ?? [])..remove(myUid);
-    await friendSentRef.set(requestsFriend);
-
-    // 2. Add to both friends lists
-    await addFriend(myUid, friendUid);
-
-    // 3. Update Firestore
-    try {
-      final firestore = FirebaseFirestore.instance;
-      final batch = firestore.batch();
-      batch.update(firestore.collection('users').doc(myUid), {
-        'pendingFriendRequests': FieldValue.arrayRemove([friendUid]),
-        'friends': FieldValue.arrayUnion([friendUid]),
-      });
-      batch.update(firestore.collection('users').doc(friendUid), {
-        'sentFriendRequests': FieldValue.arrayRemove([myUid]),
-        'friends': FieldValue.arrayUnion([myUid]),
-      });
-      await batch.commit();
-    } catch (e) {
-      debugPrint("Firestore Accept Friend failed: $e");
-    }
+    await FirebaseFunctions.instance
+        .httpsCallable('respondToFriendRequest')
+        .call({'fromUid': friendUid, 'accept': true});
   }
 
-  /// Reject a friend request
+  /// Reject a friend request. See sendFriendRequest for why this is a
+  /// callable rather than a direct write.
   Future<void> rejectFriendRequest(String myUid, String friendUid) async {
-    // 1. RTDB: Remove from both lists
-    final myRequestsRef = _db.ref('users').child(myUid).child('pendingFriendRequests');
-    final snapMy = await myRequestsRef.get();
-    final requestsMy = List<String>.from((snapMy.value as List?) ?? [])..remove(friendUid);
-    await myRequestsRef.set(requestsMy);
-
-    final friendSentRef = _db.ref('users').child(friendUid).child('sentFriendRequests');
-    final snapFriend = await friendSentRef.get();
-    final requestsFriend = List<String>.from((snapFriend.value as List?) ?? [])..remove(myUid);
-    await friendSentRef.set(requestsFriend);
-
-    // 2. Firestore
-    try {
-      final firestore = FirebaseFirestore.instance;
-      final batch = firestore.batch();
-      batch.update(firestore.collection('users').doc(myUid), {
-        'pendingFriendRequests': FieldValue.arrayRemove([friendUid]),
-      });
-      batch.update(firestore.collection('users').doc(friendUid), {
-        'sentFriendRequests': FieldValue.arrayRemove([myUid]),
-      });
-      await batch.commit();
-    } catch (e) {
-      debugPrint("Firestore Reject Friend failed: $e");
-    }
-  }
-
-  /// Accept a friend request / Add a friend (Internal helper for mutual add)
-  Future<void> addFriend(String myUid, String friendUid) async {
-    final myFriendsRef = _db.ref('users').child(myUid).child('friends');
-    final friendFriendsRef = _db.ref('users').child(friendUid).child('friends');
-    
-    // Add to my list
-    final mySnap = await myFriendsRef.get();
-    final myFriends = List<String>.from((mySnap.value as List?) ?? []);
-    if (!myFriends.contains(friendUid)) {
-      myFriends.add(friendUid);
-      await myFriendsRef.set(myFriends);
-    }
-    
-    // Add to friend's list (mutual)
-    final friendSnap = await friendFriendsRef.get();
-    final friendFriends = List<String>.from((friendSnap.value as List?) ?? []);
-    if (!friendFriends.contains(myUid)) {
-      friendFriends.add(myUid);
-      await friendFriendsRef.set(friendFriends);
-    }
+    await FirebaseFunctions.instance
+        .httpsCallable('respondToFriendRequest')
+        .call({'fromUid': friendUid, 'accept': false});
   }
 
   /// CHAT: Send a message to the match chat
