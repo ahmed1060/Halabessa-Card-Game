@@ -122,8 +122,15 @@ class GameEngine {
       final keysToRemove = capturedCards.map((c) => c.firebaseKey).toSet();
       board.removeWhere((c) => keysToRemove.contains(c.firebaseKey));
       
-      if (!harvest.containsKey(teamId)) harvest[teamId] = [];
-      harvest[teamId]?.add(Capture(leadingCard: card, capturedCards: harvestedCards));
+      // Replace rather than mutate in place: harvest[teamId] can be the
+      // literal const [] MatchState.harvestStacks defaults to whenever a
+      // match is constructed directly instead of via fromJson (which always
+      // allocates fresh mutable lists) -- .add() on that throws Unsupported
+      // operation: Cannot add to an unmodifiable list.
+      harvest[teamId] = [
+        ...?harvest[teamId],
+        Capture(leadingCard: card, capturedCards: harvestedCards),
+      ];
 
       return GameEngineResult(
         state.copyWith(
