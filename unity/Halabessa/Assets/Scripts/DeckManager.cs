@@ -14,6 +14,7 @@ public class DeckManager : MonoBehaviour {
 
     public List<CardSkin> availableSkins;
     private Dictionary<string, CardSkin> skinDict;
+    private string activeSkinId;
 
     void Awake() {
         Instance = this;
@@ -23,19 +24,29 @@ public class DeckManager : MonoBehaviour {
         }
     }
 
+    // Resolves the skin newly spawned cards should render with: whatever
+    // Flutter last selected via UPDATE_SKINS, falling back to the first
+    // configured skin so a card still gets a texture before any selection
+    // ever arrives (see UnityBridge.HandleSyncState).
+    public CardSkin GetActiveSkin() {
+        if (activeSkinId != null && skinDict.TryGetValue(activeSkinId, out var skin)) {
+            return skin;
+        }
+        return availableSkins != null && availableSkins.Count > 0 ? availableSkins[0] : null;
+    }
+
     public void UpdateSkins(string skinId) {
         if (!skinDict.ContainsKey(skinId)) {
             Debug.LogWarning("Skin ID not found: " + skinId);
             return;
         }
 
+        activeSkinId = skinId;
         CardSkin activeSkin = skinDict[skinId];
-        // In a real implementation, you would update the Material on the Card prefabs
-        // or notify all active card instances to swap their textures.
-        // Debug.Log("Unity: Updating all cards to use skin: " + skinId);
-        
-        // Example: Find all cards and update their materials
-        // var allCards = FindObjectsOfType<CardInstance>();
-        // foreach(var card in allCards) card.ApplySkin(activeSkin);
+
+        var allCards = FindObjectsByType<CardInstance>(FindObjectsSortMode.None);
+        foreach (var card in allCards) {
+            card.ApplySkin(activeSkin);
+        }
     }
 }

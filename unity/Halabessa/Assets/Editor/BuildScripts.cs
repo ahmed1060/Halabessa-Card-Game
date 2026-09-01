@@ -55,22 +55,83 @@ public class BuildScripts {
         Debug.Log("iOS Export Done: " + report.summary.result);
     }
 
-    [MenuItem("Halabessa/Export/WebGL (Brotli)")]
+    // Single source of truth for the WebGL build. This used to be split
+    // across two menu items (this one and Halabessa/Fix WebGL Transparency)
+    // that disagreed about decompressionFallback -- whichever you clicked
+    // last silently decided the output format, and firebase.json's hosting
+    // headers have to match whichever one won. It also used to export to
+    // assets/unity/, a path web/index.html never loads from (it loads
+    // Build/web.*) that's gitignored anyway and never reaches CI.
+    [MenuItem("Halabessa/Export/WebGL")]
     public static void ExportWebGL() {
-        string exportPath = Path.Combine(Application.dataPath, "../../../assets/unity");
-        if (!Directory.Exists(exportPath)) Directory.CreateDirectory(exportPath);
+        // Build into Temp/ (already gitignored) rather than straight into
+        // web/. Unity's WebGL build regenerates index.html from its own
+        // template on every run, which would clobber the hand-written
+        // web/index.html and web/canvas.css that implement the
+        // Flutter<->Unity bridge (HAL-03/UNI-02). Only the Build/ output --
+        // renamed with the "web." prefix web/index.html expects -- and
+        // StreamingAssets/ get copied into web/ afterward.
+        string scratchPath = Path.Combine(Application.dataPath, "../Temp/WebGLExport");
+        if (Directory.Exists(scratchPath)) Directory.Delete(scratchPath, true);
+        Directory.CreateDirectory(scratchPath);
 
-        // Configure Brotli
+        // Transparency: linear color space + preserved framebuffer alpha,
+        // required for the Unity canvas to composite over Flutter's UI.
+        PlayerSettings.colorSpace = ColorSpace.Linear;
+        PlayerSettings.preserveFramebufferAlpha = true;
+
+        // Compression: Brotli with the JS-side decompression fallback left
+        // ON. firebase.json intentionally sends **/Build/*.unityweb with NO
+        // Content-Encoding header (see HAL-01) because that's what a
+        // fallback=true build produces -- a JS-decompressed container, not
+        // raw brotli. Flipping this to false changes the output extension
+        // to .br and needs firebase.json's headers updated to match; don't
+        // change one without the other.
         PlayerSettings.WebGL.compressionFormat = WebGLCompressionFormat.Brotli;
         PlayerSettings.WebGL.decompressionFallback = true;
 
         BuildPlayerOptions options = new BuildPlayerOptions();
         options.scenes = GetEnabledScenes();
-        options.locationPathName = exportPath;
+        options.locationPathName = scratchPath;
         options.target = BuildTarget.WebGL;
 
         BuildReport report = BuildPipeline.BuildPlayer(options);
-        Debug.Log("WebGL Export Done: " + report.summary.result);
+        if (report.summary.result != BuildResult.Succeeded) {
+            Debug.LogError("WebGL Export failed: " + report.summary.result);
+            return;
+        }
+
+        string webRoot = Path.Combine(Application.dataPath, "../../../web");
+        string flutterBuildDir = Path.Combine(webRoot, "Build");
+        Directory.CreateDirectory(flutterBuildDir);
+
+        string productName = PlayerSettings.productName;
+        foreach (string file in Directory.GetFiles(Path.Combine(scratchPath, "Build"))) {
+            string fileName = Path.GetFileName(file);
+            // Unity names build output after the product name
+            // ("Halabessa.wasm.unityweb"); web/index.html loads it with a
+            // "web." prefix instead ("web.wasm.unityweb").
+            string suffix = fileName.StartsWith(productName) ? fileName.Substring(productName.Length) : fileName;
+            File.Copy(file, Path.Combine(flutterBuildDir, "web" + suffix), true);
+        }
+
+        string scratchStreamingAssets = Path.Combine(scratchPath, "StreamingAssets");
+        if (Directory.Exists(scratchStreamingAssets)) {
+            CopyDirectoryRecursive(scratchStreamingAssets, Path.Combine(webRoot, "StreamingAssets"));
+        }
+
+        Directory.Delete(scratchPath, true);
+        Debug.Log("WebGL Export Done: copied Build output into web/Build/.");
+    }
+
+    private static void CopyDirectoryRecursive(string sourceDir, string destDir) {
+        Directory.CreateDirectory(destDir);
+        foreach (string file in Directory.GetFiles(sourceDir)) {
+            File.Copy(file, Path.Combine(destDir, Path.GetFileName(file)), true);
+        }
+        foreach (string subDir in Directory.GetDirectories(sourceDir)) {
+            CopyDirectoryRecursive(subDir, Path.Combine(destDir, Path.GetFileName(subDir)));
+        }
     }
 
     private static string[] GetEnabledScenes() {

@@ -1,0 +1,57 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Profiles. isAdmin, friends, pendingFriendRequests, and
+    // sentFriendRequests are excluded from client writes entirely: the
+    // first three used to be directly client-writable (including on
+    // someone else's document via the friend-request flow, which the
+    // Firestore SDK's own auth model already should have rejected), which
+    // let any signed-in user grant themselves admin, or forge a friendship,
+    // by writing straight to a profile document. Real mutation of all four
+    // now only happens through the Admin SDK inside functions/index.js
+    // (grantAdminIfEligible, setUserAdminClaim, sendFriendRequest,
+    // respondToFriendRequest), which bypasses these rules and validates the
+    // caller server-side. See HAL-07 and HAL-08.
+    match /users/{uid} {
+      allow read: if request.auth != null;
+
+      allow create: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.isAdmin == false;
+
+      allow update: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.isAdmin == resource.data.get('isAdmin', false)
+        && request.resource.data.get('friends', []) == resource.data.get('friends', [])
+        && request.resource.data.get('pendingFriendRequests', []) == resource.data.get('pendingFriendRequests', [])
+        && request.resource.data.get('sentFriendRequests', []) == resource.data.get('sentFriendRequests', []);
+    }
+
+    // Username reservations (uniqueness index for the users collection).
+    // Ownership is checked against the *existing* document on update/delete
+    // so a client can't hijack a username someone else already claimed by
+    // just overwriting the doc with their own uid.
+    match /usernames/{username} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && request.resource.data.uid == request.auth.uid;
+      allow update: if request.auth != null
+        && request.resource.data.uid == request.auth.uid
+        && resource.data.uid == request.auth.uid;
+      allow delete: if request.auth != null && resource.data.uid == request.auth.uid;
+    }
+
+    // App-wide config (store catalog, audio overrides). Readable by any
+    // signed-in client, writable only by the custom-claim admin (mirrors
+    // the client-side gating already in store_provider.dart /
+    // global_settings_provider.dart, now actually enforced server-side).
+    match /settings/{docId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.token.admin == true;
+
+      match /overrides/{overrideId} {
+        allow read: if request.auth != null;
+        allow write: if request.auth != null && request.auth.token.admin == true;
+      }
+    }
+  }
+}

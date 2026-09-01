@@ -133,11 +133,12 @@ class UnityCommunicationService {
     if (!isReady.value) {
       isReady.value = true;
       _ref.read(unityInitializedProvider.notifier).state = true;
-      
-      // Smooth transition: Hide splash after 2s
-      Future.delayed(const Duration(seconds: 2), () {
-        _ref.read(unityLayerVisibilityProvider.notifier).state = false;
-      });
+      // Visibility belongs to the screen (GameBoardScreen sets it true in
+      // initState / false in dispose) — a communication service should
+      // never own layout state. This used to hide the Unity layer 2s after
+      // the *first* message of any kind, which fires mid-match on Android
+      // and iOS (every Unity event routes through here), fading the board
+      // out while the game screen is still visible.
     }
     try {
       final data = jsonDecode(message);

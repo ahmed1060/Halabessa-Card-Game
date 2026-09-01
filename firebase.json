@@ -2,6 +2,13 @@
   "database": {
     "rules": "database.rules.json"
   },
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "storage": {
+    "rules": "storage.rules"
+  },
   "hosting": {
     "public": "build/web",
     "ignore": [
@@ -12,15 +19,6 @@
     "headers": [
       {
         "source": "**/*.br",
-        "headers": [
-          {
-            "key": "Content-Encoding",
-            "value": "br"
-          }
-        ]
-      },
-      {
-        "source": "**/Build/*.unityweb",
         "headers": [
           {
             "key": "Content-Encoding",

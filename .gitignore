@@ -10,6 +10,9 @@
 .svn/
 migrate_working_dir/
 
+# Cloud Functions (Node)
+functions/node_modules/
+
 # IntelliJ related
 *.iml
 *.ipr
@@ -30,13 +33,6 @@ migrate_working_dir/
 .pub-cache/
 .pub/
 /build/
-
-# Unity WebGL Build Artifacts (Don't commit heavy binary data)
-assets/unity/Build/
-assets/unity/StreamingAssets/
-assets/unity/TemplateData/
-# But keep the index.html or other small configuration files if needed
-!assets/unity/index.html
 
 # Mobile Library Exports (We WANT to commit these for CI/CD)
 # Ensure these ARE NOT ignored by the /build/ rule above

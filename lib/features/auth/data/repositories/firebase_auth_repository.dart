@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -13,6 +14,33 @@ class FirebaseAuthRepository implements AuthRepository {
   final firebase_auth.FirebaseAuth _firebaseAuth;
 
   FirebaseAuthRepository(this._firebaseAuth);
+
+  // Cache of the last synced admin claim, keyed by uid, so authStateChanges
+  // (which fires on every token refresh, not just sign-in) doesn't call the
+  // Cloud Function more often than the signed-in user actually changes.
+  String? _adminSyncedForUid;
+  bool _cachedIsAdmin = false;
+
+  /// The real source of admin authorization: the Firebase Auth custom claim
+  /// grantAdminIfEligible sets server-side, never the (client-writable)
+  /// `isAdmin` database field. See HAL-08.
+  Future<bool> _syncAdminClaim(String uid) async {
+    if (_adminSyncedForUid == uid) return _cachedIsAdmin;
+    try {
+      final result = await FirebaseFunctions.instance.httpsCallable('grantAdminIfEligible').call();
+      final data = result.data;
+      final isAdmin = data is Map && data['admin'] == true;
+      // Force a fresh ID token so the new claim (if it just changed) is
+      // active locally without waiting for the SDK's normal refresh cycle.
+      await _firebaseAuth.currentUser?.getIdToken(true);
+      _adminSyncedForUid = uid;
+      _cachedIsAdmin = isAdmin;
+      return isAdmin;
+    } catch (e) {
+      debugPrint("Admin claim sync failed: $e");
+      return false;
+    }
+  }
 
   Future<void> _syncUserToDatabase(AppUser user, {bool isFullUpdate = false}) async {
     try {
@@ -59,16 +87,18 @@ class FirebaseAuthRepository implements AuthRepository {
     if (user == null) {
       return null;
     }
-    
-    // Hardcoded check + potential existing role in Firestore (handled in authStateChanges)
-    final bool isAdminEmail = user.email == 'ahmed.hossam1060@gmail.com';
-    
+
+    // isAdmin is never set true here, even for the admin's own email: this
+    // object gets persisted by _syncUserToDatabase, and firestore.rules now
+    // rejects any client write that sets isAdmin to anything but false (see
+    // HAL-08). The real value comes from _syncAdminClaim in
+    // authStateChanges, which asks the server-side custom claim instead.
     return AppUser(
       uid: user.uid,
       email: user.email ?? '',
       displayName: (user.displayName != null && user.displayName!.trim().isNotEmpty) ? user.displayName! : 'Player',
       avatarUrl: user.photoURL,
-      isAdmin: isAdminEmail,
+      isAdmin: false,
     );
   }
 
@@ -76,21 +106,29 @@ class FirebaseAuthRepository implements AuthRepository {
   Stream<AppUser?> get authStateChanges {
     return _firebaseAuth.userChanges().asyncMap((firebaseUser) async {
       if (firebaseUser == null) return null;
-      
+
+      AppUser? user;
       try {
         final doc = await FirebaseFirestore.instance
             .collection('users')
             .doc(firebaseUser.uid)
             .get();
-            
+
         if (doc.exists && doc.data() != null) {
-          return AppUser.fromJson(doc.data()!, firebaseUser.uid);
+          user = AppUser.fromJson(doc.data()!, firebaseUser.uid);
         }
       } catch (e) {
         debugPrint("Error fetching Firestore user: $e");
       }
-      
-      return _userFromFirebase(firebaseUser);
+      user ??= _userFromFirebase(firebaseUser);
+      if (user == null) return null;
+
+      // Authorization comes from the live custom claim, not whatever
+      // Firestore's isAdmin mirror currently says -- overriding it here
+      // means a stale or (pre-fix) tampered mirror can never grant more
+      // than the claim actually allows. See HAL-08.
+      final isAdmin = await _syncAdminClaim(firebaseUser.uid);
+      return user.copyWith(isAdmin: isAdmin);
     });
   }
 

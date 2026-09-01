@@ -1,22 +1,33 @@
 {
-    "rules": {
-        "matches": {
-            "$matchId": {
-                ".read": "auth != null",
-                ".write": "auth != null && (!data.exists() || data.child('players').hasChild(auth.uid))"
-            }
-        },
-        "matchmaking_queue": {
-            ".read": "auth != null",
-            "$uid": {
-                ".write": "auth != null && auth.uid == $uid"
-            }
-        },
-        "users": {
-            ".read": "auth != null",
-            "$uid": {
-                ".write": "auth != null && auth.uid == $uid"
-            }
+  "rules": {
+    "matches": {
+      "$matchId": {
+        ".read": "auth != null",
+        ".write": "auth != null && (!data.exists() || data.child('players').hasChild(auth.uid))"
+      }
+    },
+    "matchHands": {
+      "$matchId": {
+        ".read": "auth != null && root.child('matches').child($matchId).child('players').hasChild(auth.uid)",
+        ".write": "auth != null && root.child('matches').child($matchId).child('players').hasChild(auth.uid)"
+      }
+    },
+    "matchmaking_queue": {
+      ".read": "auth != null",
+      "$uid": {
+        ".write": "auth != null && auth.uid == $uid"
+      }
+    },
+    "users": {
+      ".read": "auth != null",
+      "$uid": {
+        ".write": "auth != null && auth.uid == $uid",
+        "friendInvites": {
+          "$matchId": {
+            ".write": "auth != null"
+          }
         }
+      }
     }
+  }
 }
