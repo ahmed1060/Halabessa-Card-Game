@@ -34,7 +34,14 @@ android {
 // Android Resolver Exclusions End
 android {
     namespace "com.unity3d.player"
-    ndkPath "C:/Program Files/Unity/Hub/Editor/6000.0.69f1/Editor/Data/PlaybackEngines/AndroidPlayer/NDK"
+    // ndkPath pointed at a local Unity Editor install (someone's Windows
+    // machine). This is the file android/settings.gradle actually points
+    // :unityLibrary at (androidBuild/unityExport/unityLibrary, NOT
+    // android/unityLibrary -- that copy is unused by the build and was
+    // fixed separately for consistency). ndkVersion alone is enough: AGP
+    // auto-provisions that NDK version via the SDK manager if it isn't
+    // already present.
+    // ndkPath "C:/Program Files/Unity/Hub/Editor/6000.0.69f1/Editor/Data/PlaybackEngines/AndroidPlayer/NDK"
     ndkVersion "27.2.12479018"
 
     compileSdk 35

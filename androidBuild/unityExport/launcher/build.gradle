@@ -8,7 +8,11 @@ dependencies {
 
 android {
     namespace "com.halabessa.game"
-    ndkPath "C:/Program Files/Unity/Hub/Editor/6000.0.69f1/Editor/Data/PlaybackEngines/AndroidPlayer/NDK"
+    // Same local-machine ndkPath issue as unityLibrary/build.gradle in this
+    // directory -- not used by the app's actual build (android/settings.gradle
+    // never includes :launcher), but this project is a standalone exported
+    // Android Studio project in its own right, so fix it here too.
+    // ndkPath "C:/Program Files/Unity/Hub/Editor/6000.0.69f1/Editor/Data/PlaybackEngines/AndroidPlayer/NDK"
     ndkVersion "27.2.12479018"
     compileSdk 35
     buildToolsVersion "35.0.0"
