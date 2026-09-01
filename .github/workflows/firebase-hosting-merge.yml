@@ -32,12 +32,17 @@ jobs:
       # deployed them. Reuses the same service account secret; the CLI picks
       # it up as Application Default Credentials via GOOGLE_APPLICATION_CREDENTIALS.
       #
-      # Deployed as three independent steps rather than one combined
-      # `--only firestore:rules,storage:rules,database` command: the CLI
-      # processes targets in its own order and aborts the whole command on
-      # the first failure, so one target failing silently prevented the
-      # other two from being attempted at all.
+      # Three independent steps rather than one combined
+      # `--only firestore:rules,storage:rules,database` command, each with
+      # continue-on-error + if: always() so one target failing (e.g. a
+      # missing IAM role on the deploy service account for that specific
+      # target) can never prevent the others from being attempted. Without
+      # both of these, GitHub Actions' default "stop the job on the first
+      # failing step" would have the exact same silent-skip problem the
+      # split was meant to fix.
       - name: Deploy Firestore rules
+        if: always()
+        continue-on-error: true
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/firebase-service-account.json
         run: |
@@ -46,6 +51,8 @@ jobs:
           rm -f "$GOOGLE_APPLICATION_CREDENTIALS"
 
       - name: Deploy Storage rules
+        if: always()
+        continue-on-error: true
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/firebase-service-account.json
         run: |
@@ -53,15 +60,8 @@ jobs:
           npx firebase-tools deploy --only storage:rules --project halabessa-card-game1 --non-interactive
           rm -f "$GOOGLE_APPLICATION_CREDENTIALS"
 
-      # continue-on-error: the service account used here was originally
-      # provisioned just for Hosting deploys (via `firebase init
-      # hosting:github`) and this failed with "Failed to get instance
-      # details for instance: halabessa-card-game1-default-rtdb" -- almost
-      # certainly missing the Firebase Realtime Database IAM role, which
-      # only a project owner can grant in Google Cloud Console > IAM & Admin.
-      # Not blocking Firestore/Storage rules (which don't need that role) on
-      # a permission gap I can't grant myself.
       - name: Deploy Realtime Database rules
+        if: always()
         continue-on-error: true
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/firebase-service-account.json
