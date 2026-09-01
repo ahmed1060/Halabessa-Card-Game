@@ -31,10 +31,41 @@ jobs:
       # database.rules.json) sat in the repo unenforced until now -- nothing
       # deployed them. Reuses the same service account secret; the CLI picks
       # it up as Application Default Credentials via GOOGLE_APPLICATION_CREDENTIALS.
-      - name: Deploy Firestore/Storage/Database rules
+      #
+      # Deployed as three independent steps rather than one combined
+      # `--only firestore:rules,storage:rules,database` command: the CLI
+      # processes targets in its own order and aborts the whole command on
+      # the first failure, so one target failing silently prevented the
+      # other two from being attempted at all.
+      - name: Deploy Firestore rules
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/firebase-service-account.json
         run: |
           echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_HALABESSA_CARD_GAME1 }}' > "$GOOGLE_APPLICATION_CREDENTIALS"
-          npx firebase-tools deploy --only firestore:rules,storage:rules,database --project halabessa-card-game1 --non-interactive
+          npx firebase-tools deploy --only firestore:rules --project halabessa-card-game1 --non-interactive
+          rm -f "$GOOGLE_APPLICATION_CREDENTIALS"
+
+      - name: Deploy Storage rules
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/firebase-service-account.json
+        run: |
+          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_HALABESSA_CARD_GAME1 }}' > "$GOOGLE_APPLICATION_CREDENTIALS"
+          npx firebase-tools deploy --only storage:rules --project halabessa-card-game1 --non-interactive
+          rm -f "$GOOGLE_APPLICATION_CREDENTIALS"
+
+      # continue-on-error: the service account used here was originally
+      # provisioned just for Hosting deploys (via `firebase init
+      # hosting:github`) and this failed with "Failed to get instance
+      # details for instance: halabessa-card-game1-default-rtdb" -- almost
+      # certainly missing the Firebase Realtime Database IAM role, which
+      # only a project owner can grant in Google Cloud Console > IAM & Admin.
+      # Not blocking Firestore/Storage rules (which don't need that role) on
+      # a permission gap I can't grant myself.
+      - name: Deploy Realtime Database rules
+        continue-on-error: true
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/firebase-service-account.json
+        run: |
+          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_HALABESSA_CARD_GAME1 }}' > "$GOOGLE_APPLICATION_CREDENTIALS"
+          npx firebase-tools deploy --only database --project halabessa-card-game1 --non-interactive
           rm -f "$GOOGLE_APPLICATION_CREDENTIALS"
