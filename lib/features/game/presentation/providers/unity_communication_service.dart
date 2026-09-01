@@ -8,6 +8,7 @@ import '../../domain/models/match_state.dart';
 import '../../domain/providers/game_providers.dart';
 import 'package:halabessa/features/auth/presentation/providers/auth_providers.dart';
 import 'package:halabessa/core/providers/settings_provider.dart';
+import 'package:halabessa/features/game/presentation/providers/unity_layer_provider.dart';
 
 final unityCommunicationServiceProvider = Provider((ref) => UnityCommunicationService(ref)..init());
 
