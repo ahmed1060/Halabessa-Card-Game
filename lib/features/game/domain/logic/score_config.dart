@@ -1,3 +1,5 @@
+import '../models/match_state.dart';
+
 /// Single source of truth for Halabessa's scoring numbers. GameEngine and
 /// GameNotifier (game_providers.dart's Al-Ard bonus) both read from this
 /// instead of the inline literals they used to hard-code separately, which

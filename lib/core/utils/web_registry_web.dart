@@ -27,17 +27,15 @@ void registerWebUnityView() {
     // real layout size, instead of guessing a fixed delay: a fast first
     // paint wasted 1.5s, a slow one could still hand Unity a 0x0 GL
     // context because the element wasn't attached yet.
-    Timer? poll;
     var elapsedMs = 0;
     const pollIntervalMs = 50;
     const timeoutMs = 10000;
-    poll = Timer.periodic(const Duration(milliseconds: pollIntervalMs), (timer) {
+    Timer.periodic(const Duration(milliseconds: pollIntervalMs), (timer) {
       elapsedMs += pollIntervalMs;
       final attached = canvas.isConnected == true && canvas.clientWidth > 0 && canvas.clientHeight > 0;
       if (!attached && elapsedMs < timeoutMs) return;
 
       timer.cancel();
-      poll = null;
       if (!attached) {
         debugPrint("Unity canvas never attached with a non-zero size after ${timeoutMs}ms; booting anyway.");
       }
