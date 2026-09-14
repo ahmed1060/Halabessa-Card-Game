@@ -70,17 +70,25 @@ class UnityCommunicationService {
   }
 
   void postMessage(String objectName, String methodName, String message) {
-    if (kIsWeb) {
-      // For WebGL: Dispatch to the IFrame via window.postMessage
-      final data = jsonEncode({
-        'objectName': objectName,
-        'methodName': methodName,
-        'message': message,
-      });
-      WebUtils.postMessage(data, '*');
-    } else {
-      // For Native: Use the controller
-      _controller?.postMessage(objectName, methodName, message);
+    if (!kIsWeb && _controller == null) {
+      // Unity controller not attached; silently ignore in 2D mode
+      return;
+    }
+    try {
+      if (kIsWeb) {
+        // For WebGL: Dispatch to the IFrame via window.postMessage
+        final data = jsonEncode({
+          'objectName': objectName,
+          'methodName': methodName,
+          'message': message,
+        });
+        WebUtils.postMessage(data, '*');
+      } else {
+        // For Native: Use the controller safely
+        _controller?.postMessage(objectName, methodName, message);
+      }
+    } catch (e) {
+      debugPrint("UnityCommunicationService: Failed to postMessage ($methodName): $e");
     }
   }
 

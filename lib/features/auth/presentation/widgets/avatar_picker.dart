@@ -129,8 +129,22 @@ class _AvatarPickerState extends ConsumerState<AvatarPicker> {
                     ),
                     child: ClipOval(
                       child: item.assetPath.startsWith('http')
-                        ? Image.network(item.assetPath, fit: BoxFit.cover)
-                        : Image.asset(item.assetPath, fit: BoxFit.cover),
+                        ? Image.network(
+                            item.assetPath,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) => Container(
+                              color: ThemeConfig.cardDarkBg,
+                              child: const Icon(Icons.person, color: ThemeConfig.goldAccent, size: 36),
+                            ),
+                          )
+                        : Image.asset(
+                            item.assetPath,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) => Container(
+                              color: ThemeConfig.cardDarkBg,
+                              child: const Icon(Icons.person, color: ThemeConfig.goldAccent, size: 36),
+                            ),
+                          ),
                     ),
                   ),
                 );

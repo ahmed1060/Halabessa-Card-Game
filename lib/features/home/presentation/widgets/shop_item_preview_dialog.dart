@@ -204,8 +204,22 @@ class _ShopItemPreviewDialogState extends State<ShopItemPreviewDialog> {
       child: ClipRRect(
         borderRadius: BorderRadius.circular(12),
         child: widget.item.assetPath.startsWith('http')
-            ? Image.network(widget.item.assetPath, fit: BoxFit.cover)
-            : Image.asset(widget.item.assetPath, fit: BoxFit.cover),
+            ? Image.network(
+                widget.item.assetPath,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Container(
+                  color: ThemeConfig.primaryTeal,
+                  child: const Center(child: Icon(Icons.style, color: ThemeConfig.goldAccent, size: 40)),
+                ),
+              )
+            : Image.asset(
+                widget.item.assetPath,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Container(
+                  color: ThemeConfig.primaryTeal,
+                  child: const Center(child: Icon(Icons.style, color: ThemeConfig.goldAccent, size: 40)),
+                ),
+              ),
       ),
     );
   }
@@ -232,8 +246,28 @@ class _ShopItemPreviewDialogState extends State<ShopItemPreviewDialog> {
                   ClipRRect(
                     borderRadius: BorderRadius.circular(8),
                     child: iconPath.startsWith('http')
-                      ? Image.network(iconPath, width: 40, height: 40, fit: BoxFit.contain)
-                      : Image.asset(iconPath, width: 40, height: 40, fit: BoxFit.contain),
+                      ? Image.network(
+                          iconPath,
+                          width: 40,
+                          height: 40,
+                          fit: BoxFit.contain,
+                          errorBuilder: (_, __, ___) => const SizedBox(
+                            width: 40,
+                            height: 40,
+                            child: Center(child: Icon(Icons.favorite, color: ThemeConfig.goldAccent, size: 24)),
+                          ),
+                        )
+                      : Image.asset(
+                          iconPath,
+                          width: 40,
+                          height: 40,
+                          fit: BoxFit.contain,
+                          errorBuilder: (_, __, ___) => const SizedBox(
+                            width: 40,
+                            height: 40,
+                            child: Center(child: Icon(Icons.favorite, color: ThemeConfig.goldAccent, size: 24)),
+                          ),
+                        ),
                   ),
                   const SizedBox(height: 4),
                   Text(label, style: const TextStyle(color: Colors.white30, fontSize: 10)),
@@ -258,8 +292,22 @@ class _ShopItemPreviewDialogState extends State<ShopItemPreviewDialog> {
         child: ClipRRect(
           borderRadius: BorderRadius.circular(16),
           child: widget.item.assetPath.startsWith('http')
-              ? Image.network(widget.item.assetPath, fit: BoxFit.cover)
-              : Image.asset(widget.item.assetPath, fit: BoxFit.cover),
+              ? Image.network(
+                  widget.item.assetPath,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => Container(
+                    color: ThemeConfig.boardGreen,
+                    child: const Center(child: Icon(Icons.table_restaurant, color: ThemeConfig.goldAccent, size: 40)),
+                  ),
+                )
+              : Image.asset(
+                  widget.item.assetPath,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => Container(
+                    color: ThemeConfig.boardGreen,
+                    child: const Center(child: Icon(Icons.table_restaurant, color: ThemeConfig.goldAccent, size: 40)),
+                  ),
+                ),
         ),
       ),
     );
@@ -270,8 +318,30 @@ class _ShopItemPreviewDialogState extends State<ShopItemPreviewDialog> {
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
         child: widget.item.assetPath.startsWith('http')
-            ? Image.network(widget.item.assetPath, width: 150, height: 150, fit: BoxFit.contain)
-            : Image.asset(widget.item.assetPath, width: 150, height: 150, fit: BoxFit.contain),
+            ? Image.network(
+                widget.item.assetPath,
+                width: 150,
+                height: 150,
+                fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) => Container(
+                  width: 150,
+                  height: 150,
+                  color: ThemeConfig.cardDarkBg,
+                  child: const Center(child: Icon(Icons.shopping_bag, color: ThemeConfig.goldAccent, size: 48)),
+                ),
+              )
+            : Image.asset(
+                widget.item.assetPath,
+                width: 150,
+                height: 150,
+                fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) => Container(
+                  width: 150,
+                  height: 150,
+                  color: ThemeConfig.cardDarkBg,
+                  child: const Center(child: Icon(Icons.shopping_bag, color: ThemeConfig.goldAccent, size: 48)),
+                ),
+              ),
       ),
     );
   }

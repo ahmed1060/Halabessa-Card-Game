@@ -23,6 +23,8 @@ import '../widgets/player_profile_preview.dart';
 import '../widgets/harvest_piles_widget.dart';
 import '../widgets/match_summary_dialog.dart';
 import '../widgets/board_cards_widget.dart';
+import '../widgets/basra_celebration_overlay.dart';
+import '../widgets/emote_wheel_overlay.dart';
 import 'package:flutter/services.dart';
 import 'package:halabessa/core/services/multimedia_service.dart';
 import '../widgets/unity_game_view.dart';
@@ -41,6 +43,7 @@ class GameBoardScreen extends ConsumerStatefulWidget {
 class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
   late ConfettiController _confettiController;
   final GlobalKey _boardKey = GlobalKey();
+  bool _isEmoteWheelOpen = false;
 
   @override
   void initState() {
@@ -395,8 +398,16 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
                         duration: const Duration(milliseconds: 500),
                         opacity: is3DActive ? 0.0 : 1.0,
                         child: activeTable.assetPath.startsWith('http')
-                          ? Image.network(activeTable.assetPath, fit: BoxFit.cover)
-                          : Image.asset(activeTable.assetPath, fit: BoxFit.cover),
+                          ? Image.network(
+                              activeTable.assetPath,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Container(color: ThemeConfig.boardGreen),
+                            )
+                          : Image.asset(
+                              activeTable.assetPath,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Container(color: ThemeConfig.boardGreen),
+                            ),
                       );
                     },
                   ),
@@ -537,6 +548,7 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
                     if (matchState.phase == GamePhase.roundScoring) _buildContextualScoringOverlay(matchState, myUid),
                     if (matchState.phase == GamePhase.rematchVoting) _buildRematchVoteOverlay(context, ref, matchState, myUid),
                     if (matchState.phase == GamePhase.matchOver) _buildContextualGameOverOverlay(matchState, myUid),
+                    if (matchState.phase == GamePhase.capturing && matchState.board.isEmpty) _buildBasraOverlay(matchState, myUid),
                       
                     Positioned(
                       left: 12,
@@ -561,6 +573,17 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
                                 ref.read(chatStateProvider.notifier).toggleOverlay();
                               },
                               showBadge: true,
+                            ),
+                            const SizedBox(height: 16),
+                            _buildSideButton(
+                              ref: ref,
+                              icon: Icons.emoji_emotions_outlined,
+                              color: ThemeConfig.goldAccent,
+                              onTap: () {
+                                setState(() {
+                                  _isEmoteWheelOpen = !_isEmoteWheelOpen;
+                                });
+                              },
                             ),
                             const SizedBox(height: 16),
                             _buildSideButton(
@@ -600,6 +623,15 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
               
               // Chat Panel
               const ChatOverlay(),
+
+              // Emote Wheel Overlay
+              if (_isEmoteWheelOpen)
+                Positioned.fill(
+                  child: EmoteWheelOverlay(
+                    myUid: myUid,
+                    onDismiss: () => setState(() => _isEmoteWheelOpen = false),
+                  ),
+                ),
 
               // Confetti Celebration
               Align(
@@ -904,6 +936,18 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
       isCapturing: isCapturing,
       capturingTeam: matchState.capturingTeam,
       capturingStage: matchState.capturingStage,
+    );
+  }
+
+  Widget _buildBasraOverlay(MatchState matchState, String myUid) {
+    final capturingTeam = matchState.capturingTeam ?? 'teamA';
+    final myTeam = _getTeamOfPlayer(myUid, matchState.playerIds);
+    return Positioned.fill(
+      child: BasraCelebrationOverlay(
+        capturingTeam: capturingTeam,
+        isMyTeam: myTeam == capturingTeam,
+        onDismissed: () {},
+      ),
     );
   }
 
@@ -1273,34 +1317,116 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
   Widget _buildContextualGameOverOverlay(MatchState state, String currentUid) {
     final bool aWins = state.teamAScore >= state.teamBScore;
     final winnerTeam = aWins ? 'teamA' : 'teamB';
+    final isOffline = state.id.startsWith('OFFLINE_');
+    final currentUser = ref.read(currentUserProvider);
     
-    // We show a simple overlay that links to the MatchSummaryDialog if not already shown
     return Container(
-      color: Colors.black54,
+      color: Colors.black87,
       child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('match_over'.tr(), style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold, letterSpacing: 2)),
-            const SizedBox(height: 24),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: ThemeConfig.goldAccent,
-                foregroundColor: Colors.black,
-                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 360),
+          margin: const EdgeInsets.symmetric(horizontal: 24),
+          padding: const EdgeInsets.all(28),
+          decoration: BoxDecoration(
+            color: const Color(0xFF141A29),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: ThemeConfig.goldAccent.withOpacity(0.3), width: 1.5),
+            boxShadow: [
+              BoxShadow(color: Colors.black.withOpacity(0.6), blurRadius: 30, spreadRadius: 5),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'match_over'.tr().toUpperCase(),
+                style: const TextStyle(
+                  fontFamily: ThemeConfig.fontHeading,
+                  color: Colors.white,
+                  fontSize: 26,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 2,
+                ),
               ),
-              onPressed: () {
-                showGeneralDialog(
-                  context: context,
-                  barrierDismissible: false,
-                  barrierLabel: '',
-                  pageBuilder: (context, anim1, anim2) => MatchSummaryDialog(matchState: state, winnerTeam: winnerTeam),
-                );
-              },
-              child: Text('view_results'.tr().toUpperCase(), style: const TextStyle(fontWeight: FontWeight.bold)),
-            ),
-          ],
+              const SizedBox(height: 8),
+              Text(
+                '${state.teamAScore} - ${state.teamBScore}',
+                style: const TextStyle(
+                  fontFamily: ThemeConfig.fontHeading,
+                  color: ThemeConfig.goldAccent,
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 24),
+              // Play Again Button
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: ThemeConfig.goldAccent,
+                    foregroundColor: Colors.black,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                  icon: const Icon(Icons.replay_rounded, size: 20),
+                  label: Text('play_again'.tr().toUpperCase(), style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1)),
+                  onPressed: () {
+                    if (isOffline) {
+                      ref.read(matchStateProvider.notifier).startOfflinePracticeMatch(
+                        currentUser?.uid ?? 'player',
+                        currentUser?.displayName ?? 'Player',
+                      );
+                    } else {
+                      ref.read(matchStateProvider.notifier).voteRematch(currentUid, true);
+                    }
+                  },
+                ),
+              ),
+              const SizedBox(height: 12),
+              // View Results Button
+              SizedBox(
+                width: double.infinity,
+                height: 44,
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    side: const BorderSide(color: Colors.white24),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                  icon: const Icon(Icons.bar_chart_rounded, size: 18),
+                  label: Text('view_results'.tr()),
+                  onPressed: () {
+                    showGeneralDialog(
+                      context: context,
+                      barrierDismissible: false,
+                      barrierLabel: '',
+                      pageBuilder: (context, anim1, anim2) => MatchSummaryDialog(matchState: state, winnerTeam: winnerTeam),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 12),
+              // Return to Home
+              SizedBox(
+                width: double.infinity,
+                height: 44,
+                child: TextButton.icon(
+                  style: TextButton.styleFrom(
+                    foregroundColor: Colors.white60,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                  icon: const Icon(Icons.home_rounded, size: 18),
+                  label: Text('return_home'.tr()),
+                  onPressed: () {
+                    ref.read(matchStateProvider.notifier).leaveMatch();
+                    Navigator.of(context).popUntil((route) => route.isFirst);
+                    ref.read(multimediaServiceProvider).playMusic('music/bg_music.mp3');
+                  },
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

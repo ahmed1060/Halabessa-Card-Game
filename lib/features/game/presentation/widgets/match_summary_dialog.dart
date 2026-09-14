@@ -6,6 +6,7 @@ import '../../../../core/theme/theme_config.dart';
 import '../../domain/models/match_state.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../../core/services/multimedia_service.dart';
+import '../../domain/providers/game_providers.dart';
 
 class MatchSummaryDialog extends ConsumerStatefulWidget {
   final MatchState matchState;
@@ -81,6 +82,26 @@ class _MatchSummaryDialogState extends ConsumerState<MatchSummaryDialog> with Si
         ref.read(multimediaServiceProvider).playSfx('sfx/lose.mp3');
       }
     });
+  }
+
+  void _onPlayAgain(BuildContext context, dynamic currentUser) {
+    Navigator.of(context).pop();
+    final isOffline = widget.matchState.id.startsWith('OFFLINE_');
+    if (isOffline) {
+      ref.read(matchStateProvider.notifier).startOfflinePracticeMatch(
+        currentUser.uid,
+        currentUser.displayName ?? 'Player',
+      );
+    } else {
+      ref.read(matchStateProvider.notifier).voteRematch(currentUser.uid, true);
+    }
+  }
+
+  void _onReturnHome(BuildContext context) {
+    Navigator.of(context).pop();
+    ref.read(matchStateProvider.notifier).leaveMatch();
+    Navigator.of(context).popUntil((route) => route.isFirst);
+    ref.read(multimediaServiceProvider).playMusic('music/bg_music.mp3');
   }
 
   @override
@@ -227,13 +248,76 @@ class _MatchSummaryDialogState extends ConsumerState<MatchSummaryDialog> with Si
 
               const SizedBox(height: 40),
 
-              // Action Button
-              SizedBox(
-                width: double.infinity,
-                child: ElevatorButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: Text('continue'.tr()),
-                ),
+              // Action Buttons: Return Home & Play Again
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.white70,
+                        side: const BorderSide(color: Colors.white24),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      ),
+                      onPressed: () => _onReturnHome(context),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.home_rounded, size: 18, color: Colors.white70),
+                          const SizedBox(width: 6),
+                          Text(
+                            'return_home'.tr(),
+                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white70),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Container(
+                      height: 48,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(16),
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFFD4AF37), Color(0xFFAA7C11)],
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: ThemeConfig.goldAccent.withOpacity(0.35),
+                            blurRadius: 10,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(16),
+                          onTap: () => _onPlayAgain(context, currentUser),
+                          child: Center(
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(Icons.replay_rounded, color: Colors.black, size: 18),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'play_again'.tr().toUpperCase(),
+                                  style: const TextStyle(
+                                    color: Colors.black,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                    letterSpacing: 1,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

@@ -34,7 +34,8 @@ class MultiplayerSyncService {
   }
 
   /// Lightweight lobby index -- see room_summary.dart and HAL-06.
-  DatabaseReference get _roomsRef => _db.ref('rooms');
+  DatabaseReference get roomsRef => _db.ref('rooms');
+  DatabaseReference get _roomsRef => roomsRef;
 
   Future<void> _writeRoomIndex(MatchState matchState) async {
     final summary = RoomSummary(
@@ -276,12 +277,13 @@ class MultiplayerSyncService {
 
   /// CHAT: Send a message to the match chat
   Future<void> sendChatMessage(String matchId, ChatMessage message) async {
+    if (matchId.isEmpty || matchId.startsWith('OFFLINE_')) return;
     final chatRef = matchRef.child(matchId).child('chat').push();
     await chatRef.set(message.toJson());
   }
 
   Stream<List<ChatMessage>> watchChatMessages(String matchId) {
-    if (matchId.isEmpty) return Stream.value([]);
+    if (matchId.isEmpty || matchId.startsWith('OFFLINE_')) return Stream.value([]);
     
     return matchRef.child(matchId).child('chat')
       .orderByKey()

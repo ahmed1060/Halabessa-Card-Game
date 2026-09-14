@@ -47,7 +47,7 @@ class StoreScreen extends ConsumerWidget {
           _buildSkinGrid(context, ref, notifier, store, ShopItemType.tableSkin, user),
           _buildSectionHeader(context, 'avatars_label'.tr(), ShopItemType.avatar, user, notifier),
           _buildSkinGrid(context, ref, notifier, store, ShopItemType.avatar, user),
-          _buildSectionHeader(context, 'items_label'.tr(), ShopItemType.consumable, user, notifier),
+          _buildSectionHeader(context, 'store_consumables'.tr(), ShopItemType.consumable, user, notifier),
           _buildSkinGrid(context, ref, notifier, store, ShopItemType.consumable, user),
           const SliverPadding(padding: EdgeInsets.only(bottom: 40)),
         ],
@@ -88,14 +88,42 @@ class StoreScreen extends ConsumerWidget {
   Widget _buildSkinGrid(BuildContext context, WidgetRef ref, StoreNotifier notifier, StoreState store, ShopItemType type, AppUser? user) {
     final items = notifier.allItems.where((i) => i.type == type).toList();
 
+    if (items.isEmpty) {
+      return SliverToBoxAdapter(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.03),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: Colors.white10),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.inventory_2_outlined, color: Colors.white30, size: 18),
+                const SizedBox(width: 8),
+                Text('no_items_available'.tr(), style: const TextStyle(color: Colors.white38, fontSize: 13)),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final int crossAxisCount = screenWidth < 500 ? 2 : (screenWidth < 850 ? 3 : 4);
+    final double childAspectRatio = screenWidth < 500 ? 0.78 : (screenWidth < 850 ? 0.72 : 0.66);
+
     return SliverPadding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       sliver: SliverGrid(
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 4,
-          mainAxisSpacing: 10,
-          crossAxisSpacing: 10,
-          childAspectRatio: 0.65,
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: crossAxisCount,
+          mainAxisSpacing: 12,
+          crossAxisSpacing: 12,
+          childAspectRatio: childAspectRatio,
         ),
         delegate: SliverChildBuilderDelegate(
           (context, index) {
@@ -127,7 +155,31 @@ class StoreScreen extends ConsumerWidget {
                   }
                 }
               } catch (e) {
-                debugPrint('Purchase error: $e');
+                if (context.mounted) {
+                  final errorStr = e.toString();
+                  final message = errorStr.contains('diamonds')
+                      ? 'not_enough_diamonds'.tr()
+                      : (errorStr.contains('coins') ? 'not_enough_coins'.tr() : errorStr.replaceAll('Exception: ', ''));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      backgroundColor: Colors.red.shade900,
+                      behavior: SnackBarBehavior.floating,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      content: Row(
+                        children: [
+                          const Icon(Icons.warning_amber_rounded, color: Colors.amberAccent, size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              message,
+                              style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }
               }
             }, onDelete: () => notifier.deleteItem(item.id));
           },
@@ -159,17 +211,21 @@ class StoreScreen extends ConsumerWidget {
       child: Stack(
         children: [
           AnimatedContainer(
-            duration: const Duration(milliseconds: 300),
+            duration: const Duration(milliseconds: 250),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.04),
+              color: const Color(0xFF131A26),
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: isActive ? ThemeConfig.goldAccent : (isOwned ? Colors.white24 : Colors.white10),
-                width: isActive ? 1.5 : 1,
+                color: isActive 
+                    ? ThemeConfig.goldAccent 
+                    : (isOwned ? Colors.tealAccent.withOpacity(0.4) : Colors.white10),
+                width: isActive ? 2 : 1,
               ),
               boxShadow: [
                 if (isActive)
-                  BoxShadow(color: ThemeConfig.goldAccent.withOpacity(0.15), blurRadius: 8, spreadRadius: 1),
+                  BoxShadow(color: ThemeConfig.goldAccent.withOpacity(0.25), blurRadius: 10, spreadRadius: 1)
+                else if (isOwned)
+                  BoxShadow(color: Colors.teal.withOpacity(0.1), blurRadius: 6),
               ],
             ),
             child: Column(
@@ -179,19 +235,23 @@ class StoreScreen extends ConsumerWidget {
                     padding: const EdgeInsets.all(8.0),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(12),
-                      child: item.assetPath.startsWith('http') 
-                        ? Image.network(
-                            item.assetPath,
-                            fit: (item.type == ShopItemType.cardBack || item.type == ShopItemType.avatar) ? BoxFit.contain : BoxFit.cover,
-                            width: double.infinity,
-                            errorBuilder: (_, __, ___) => const Icon(Icons.broken_image, color: Colors.white24, size: 30),
-                          )
-                        : Image.asset(
-                            item.assetPath,
-                            fit: (item.type == ShopItemType.cardBack || item.type == ShopItemType.avatar) ? BoxFit.contain : BoxFit.cover,
-                            width: double.infinity,
-                            errorBuilder: (_, __, ___) => const Icon(Icons.style, color: Colors.white24, size: 30),
-                          ),
+                      child: Container(
+                        color: Colors.black26,
+                        alignment: Alignment.center,
+                        child: item.assetPath.startsWith('http') 
+                          ? Image.network(
+                              item.assetPath,
+                              fit: (item.type == ShopItemType.cardBack || item.type == ShopItemType.avatar) ? BoxFit.contain : BoxFit.cover,
+                              width: double.infinity,
+                              errorBuilder: (_, __, ___) => const Icon(Icons.broken_image, color: Colors.white24, size: 32),
+                            )
+                          : Image.asset(
+                              item.assetPath,
+                              fit: (item.type == ShopItemType.cardBack || item.type == ShopItemType.avatar) ? BoxFit.contain : BoxFit.cover,
+                              width: double.infinity,
+                              errorBuilder: (_, __, ___) => const Icon(Icons.style, color: Colors.white24, size: 32),
+                            ),
+                      ),
                     ),
                   ),
                 ),
@@ -199,27 +259,42 @@ class StoreScreen extends ConsumerWidget {
                   padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
                   child: Column(
                     children: [
-                       Text(
+                      Text(
                         item.name,
-                        style: const TextStyle(fontFamily: ThemeConfig.fontHeading, fontSize: 13, color: Colors.white),
+                        style: const TextStyle(
+                          fontFamily: ThemeConfig.fontHeading, 
+                          fontSize: 13, 
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         textAlign: TextAlign.center,
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 6),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: isActive ? ThemeConfig.goldAccent : (isOwned ? Colors.teal.withOpacity(0.2) : Colors.white10),
+                          color: isActive 
+                              ? ThemeConfig.goldAccent 
+                              : (isOwned ? Colors.teal.withOpacity(0.2) : Colors.white10),
                           borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: isActive 
+                                ? ThemeConfig.goldAccent 
+                                : (isOwned ? Colors.teal.withOpacity(0.4) : Colors.white12),
+                            width: 0.8,
+                          ),
                         ),
                         child: Text(
                           statusText,
+                          textAlign: TextAlign.center,
                           style: TextStyle(
                             fontFamily: ThemeConfig.fontBody,
-                            fontSize: 9, 
+                            fontSize: 11, 
                             fontWeight: FontWeight.bold,
-                            color: isActive ? Colors.black : (isOwned ? Colors.teal : Colors.white38),
+                            color: isActive ? Colors.black : (isOwned ? Colors.tealAccent : Colors.white70),
                           ),
                         ),
                       ),
@@ -231,8 +306,8 @@ class StoreScreen extends ConsumerWidget {
           ),
           // Overlay Actions (Admin Edit/Delete & Preview)
           Positioned(
-            top: 4,
-            right: 4,
+            top: 6,
+            right: 6,
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -299,13 +374,15 @@ class StoreScreen extends ConsumerWidget {
   Widget _buildMiniAction(IconData icon, VoidCallback onTap, {bool isDelete = false}) {
     return InkWell(
       onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
       child: Container(
-        padding: const EdgeInsets.all(4),
+        padding: const EdgeInsets.all(5),
         decoration: BoxDecoration(
-          color: (isDelete ? Colors.red : Colors.black).withOpacity(0.6),
+          color: (isDelete ? Colors.red : Colors.black).withOpacity(0.7),
           shape: BoxShape.circle,
+          border: Border.all(color: Colors.white24, width: 0.8),
         ),
-        child: Icon(icon, color: Colors.white, size: 12),
+        child: Icon(icon, color: Colors.white, size: 13),
       ),
     );
   }

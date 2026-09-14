@@ -23,6 +23,8 @@ class _FannedHandWidgetState extends State<FannedHandWidget> {
   int? hoveredIndex;
   int? preSelectedIndex;
   Offset? preSelectedOrigin;
+  double dragOffsetY = 0.0;
+  bool isDraggingUp = false;
 
   @override
   void didUpdateWidget(FannedHandWidget oldWidget) {
@@ -41,6 +43,8 @@ class _FannedHandWidgetState extends State<FannedHandWidget> {
             setState(() {
               preSelectedIndex = null;
               preSelectedOrigin = null;
+              dragOffsetY = 0.0;
+              isDraggingUp = false;
             });
           }
         });
@@ -48,6 +52,8 @@ class _FannedHandWidgetState extends State<FannedHandWidget> {
         setState(() {
           preSelectedIndex = null;
           preSelectedOrigin = null;
+          dragOffsetY = 0.0;
+          isDraggingUp = false;
         });
       }
     }
@@ -58,27 +64,44 @@ class _FannedHandWidgetState extends State<FannedHandWidget> {
         setState(() {
           preSelectedIndex = null;
           preSelectedOrigin = null;
+          dragOffsetY = 0.0;
+          isDraggingUp = false;
         });
       }
     }
   }
 
   void _handleHoverUpdate(Offset localPosition, double fanWidth, double preferredSpacing, int cardCount) {
-    // Magnetic/Exit logic: If finger is too far left/right or too far up, clear hover
-    // Fix: Increased right boundary to include the full width of the rightmost card
-    if (localPosition.dx < -50 || localPosition.dx > (fanWidth + 100) || localPosition.dy < -100 || localPosition.dy > 200) {
+    // If finger is too far left/right or too far below, clear hover
+    if (localPosition.dx < -50 || localPosition.dx > (fanWidth + 100) || localPosition.dy > 200) {
       if (hoveredIndex != null) {
-        setState(() => hoveredIndex = null);
+        setState(() {
+          hoveredIndex = null;
+          dragOffsetY = 0.0;
+          isDraggingUp = false;
+        });
       }
       return;
     }
 
-    // Map X position to card index
-    int newIndex = (localPosition.dx / preferredSpacing).floor().clamp(0, cardCount - 1);
+    // Vertical drag: negative dy means dragging upwards toward the table
+    final double dy = localPosition.dy;
+    final bool draggingUp = dy < -20;
+
+    int newIndex = hoveredIndex ?? (localPosition.dx / preferredSpacing).floor().clamp(0, cardCount - 1);
+    if (!draggingUp) {
+      newIndex = (localPosition.dx / preferredSpacing).floor().clamp(0, cardCount - 1);
+    }
     
-    if (newIndex != hoveredIndex) {
-      HapticFeedback.selectionClick();
-      setState(() => hoveredIndex = newIndex);
+    if (newIndex != hoveredIndex || draggingUp != isDraggingUp || (dragOffsetY - dy).abs() > 2) {
+      if (newIndex != hoveredIndex) {
+        HapticFeedback.selectionClick();
+      }
+      setState(() {
+        hoveredIndex = newIndex;
+        dragOffsetY = dy.clamp(-150.0, 0.0);
+        isDraggingUp = draggingUp;
+      });
     }
   }
 
@@ -120,8 +143,6 @@ class _FannedHandWidgetState extends State<FannedHandWidget> {
           onPanUpdate: (details) => _handleHoverUpdate(details.localPosition, fanWidth, preferredSpacing, cardCount),
           onPanEnd: (_) {
             if (hoveredIndex != null) {
-              // Get the global position of the card element
-              // We'll approximate based on the widget's global position + local card offset
               final RenderBox? box = context.findRenderObject() as RenderBox?;
               Offset globalOrigin = Offset.zero;
               
@@ -134,7 +155,7 @@ class _FannedHandWidgetState extends State<FannedHandWidget> {
                 final double yFromBottom = 20 + (arcHeight - yPos) + (cardHeight / 2);
                 
                 final double localX = xPos;
-                final double localY = box.size.height - yFromBottom;
+                final double localY = box.size.height - yFromBottom + dragOffsetY;
                 globalOrigin = box.localToGlobal(Offset(localX, localY));
               }
 
@@ -149,7 +170,7 @@ class _FannedHandWidgetState extends State<FannedHandWidget> {
                 // Pre-selection mode
                 HapticFeedback.lightImpact();
                 setState(() {
-                  if (preSelectedIndex == hoveredIndex) {
+                  if (preSelectedIndex == hoveredIndex && dragOffsetY >= -30) {
                     preSelectedIndex = null;
                     preSelectedOrigin = null;
                   } else {
@@ -159,9 +180,17 @@ class _FannedHandWidgetState extends State<FannedHandWidget> {
                 });
               }
             }
-            setState(() => hoveredIndex = null);
+            setState(() {
+              hoveredIndex = null;
+              dragOffsetY = 0.0;
+              isDraggingUp = false;
+            });
           },
-          onPanCancel: () => setState(() => hoveredIndex = null),
+          onPanCancel: () => setState(() {
+            hoveredIndex = null;
+            dragOffsetY = 0.0;
+            isDraggingUp = false;
+          }),
           child: Container(
             width: totalWidth,
             height: cardHeight + arcHeight + 60, // Added buffer for hover scaling
@@ -180,8 +209,11 @@ class _FannedHandWidgetState extends State<FannedHandWidget> {
 
                 final bool isHovered = hoveredIndex == index;
                 final bool isPreSelected = preSelectedIndex == index;
-                final double elevationY = (isHovered || isPreSelected) ? -40.0 : 0.0;
-                final double scale = (isHovered || isPreSelected) ? 1.25 : 1.0;
+                final double dynamicDragOffset = isHovered ? dragOffsetY : 0.0;
+                final double elevationY = (isHovered || isPreSelected) ? (-40.0 + dynamicDragOffset) : 0.0;
+                final double scale = (isHovered || isPreSelected) 
+                    ? (1.25 + (isDraggingUp && isHovered ? 0.08 : 0.0)) 
+                    : 1.0;
 
                 return Positioned(
                   left: xPos,

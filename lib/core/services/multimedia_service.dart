@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/settings_provider.dart';
 import '../providers/global_settings_provider.dart';
+import 'default_audio_assets.dart';
 
 class MultimediaService extends ChangeNotifier {
   final AudioPlayer _musicPlayer = AudioPlayer();
@@ -152,6 +153,7 @@ class MultimediaService extends ChangeNotifier {
       }
 
       _lastPlayedUrl = overrideUrl;
+      await _musicPlayer.setVolume(settings.musicVolume);
       await _musicPlayer.setReleaseMode(loop ? ReleaseMode.loop : ReleaseMode.release);
       await _musicPlayer.play(UrlSource(overrideUrl)).then((_) {
         _pendingMusic = null;
@@ -187,15 +189,13 @@ class MultimediaService extends ChangeNotifier {
 
         Source? source;
         if (overrideUrl != null && overrideUrl.isNotEmpty) {
-          if (overrideUrl.startsWith('data:')) {
-            source = UrlSource(overrideUrl);
-          } else {
-            source = UrlSource(overrideUrl);
-          }
+          source = UrlSource(overrideUrl);
         } else {
-          // Only play AssetSource if we are SURE it's not one of the missing ones
-          // Since the user said there are NO original sounds, we skip.
-          return;
+          // Zero-network fallback: use procedural embedded audio
+          final defaultDataUri = DefaultAudioAssets.getSfx(assetPath);
+          if (defaultDataUri != null) {
+            source = UrlSource(defaultDataUri);
+          }
         }
 
         if (source != null) {

@@ -5,6 +5,8 @@ import 'package:halabessa/features/game/domain/logic/score_config.dart';
 import 'package:halabessa/features/game/domain/models/card.dart';
 import 'package:halabessa/features/game/domain/models/game_action.dart';
 import 'package:halabessa/features/game/domain/models/match_state.dart';
+import 'package:halabessa/features/game/domain/models/capture.dart';
+import 'package:halabessa/features/game/domain/logic/deck.dart';
 
 /// GameEngine is pure (state in, state out), which makes it the cheapest
 /// possible regression net for the actual ruleset -- these are the first
@@ -182,6 +184,50 @@ void main() {
       expect(afterCapture.capturedCards, isNotEmpty);
       final teamAScore = afterCapture.newState.teamAScore;
       expect(teamAScore, ScoreConfig.normalCapture + ScoreConfig.fashaTafweet);
+    });
+  });
+
+  group('Deck.reconstructRemaining', () {
+    test('correctly reconstructs 52 minus visible cards and pins bottom cut card', () {
+      const bottom = Card(Suit.spades, Rank.ace);
+      final board = [const Card(Suit.hearts, Rank.two), const Card(Suit.diamonds, Rank.seven)];
+      final hands = {
+        'p0': [const Card(Suit.clubs, Rank.king), const Card(Suit.spades, Rank.queen)],
+      };
+      final harvest = {
+        'teamA': [
+          Capture(
+            leadingCard: const Card(Suit.diamonds, Rank.jack),
+            capturedCards: [const Card(Suit.hearts, Rank.jack)],
+            teamId: 'teamA',
+          ),
+        ],
+      };
+
+      // 2 on board + 2 in hand + 2 in harvest = 6 visible cards
+      // Remaining deck should have 52 - 6 = 46 cards
+      final deck = Deck.reconstructRemaining(board, hands, harvest, bottomCard: bottom);
+
+      expect(deck.remaining, 46);
+      expect(deck.cards.first, bottom); // Conceptually bottom card is index 0
+      
+      // None of the visible cards should be in the remaining deck
+      final visibleKeys = {
+        const Card(Suit.hearts, Rank.two).firebaseKey,
+        const Card(Suit.diamonds, Rank.seven).firebaseKey,
+        const Card(Suit.clubs, Rank.king).firebaseKey,
+        const Card(Suit.spades, Rank.queen).firebaseKey,
+        const Card(Suit.diamonds, Rank.jack).firebaseKey,
+        const Card(Suit.hearts, Rank.jack).firebaseKey,
+      };
+      for (final card in deck.cards) {
+        expect(visibleKeys.contains(card.firebaseKey), isFalse);
+      }
+    });
+
+    test('handles empty board, hands, harvest, and null bottom card', () {
+      final deck = Deck.reconstructRemaining([], {}, {});
+      expect(deck.remaining, 52);
     });
   });
 }

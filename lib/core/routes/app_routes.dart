@@ -8,6 +8,7 @@ import '../../features/home/presentation/pages/store_screen.dart';
 import 'package:halabessa/features/home/presentation/pages/admin_music_management_screen.dart';
 import 'package:halabessa/features/home/presentation/pages/admin_sfx_management_screen.dart';
 import '../../features/home/presentation/pages/admin_user_management_screen.dart';
+import '../../features/home/presentation/pages/leaderboard_screen.dart';
 
 class AppRoutes {
   static const String initial = '/';
@@ -15,6 +16,7 @@ class AppRoutes {
   static const String game = '/game';
   static const String profile = '/profile';
   static const String store = '/store';
+  static const String leaderboard = '/leaderboard';
   static const String adminMusic = '/admin/music';
   static const String adminSfx = '/admin/sfx';
   static const String adminUsers = '/admin/users';
@@ -25,6 +27,7 @@ class AppRoutes {
         game: (context) => const GameBoardScreen(),
         profile: (context) => const ProfileScreen(),
         store: (context) => const StoreScreen(),
+        leaderboard: (context) => const LeaderboardScreen(),
         adminMusic: (context) => const AdminMusicManagementScreen(),
         adminSfx: (context) => const AdminSfxManagementScreen(),
         adminUsers: (context) => const AdminUserManagementScreen(),

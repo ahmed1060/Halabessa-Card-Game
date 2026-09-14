@@ -38,11 +38,14 @@ class Deck {
   /// RECONSTRUCTION: Rebuilds the hidden part of the deck by subtracting all visible cards 
   /// (Board + Hands + Harvested) from a standard 52-card deck.
   /// This is used when a new Host takes over or when rejoining a "hibernated" game.
+  /// Optionally preserves [bottomCard] (e.g. cutLastCard from the pre-round cut)
+  /// at the very bottom of the deck (index 0, drawn last).
   factory Deck.reconstructRemaining(
     List<game_card.Card> board,
     Map<String, List<game_card.Card>> hands,
-    Map<String, List<Capture>> harvest,
-  ) {
+    Map<String, List<Capture>> harvest, {
+    game_card.Card? bottomCard,
+  }) {
     // 1. Start with a full 52-card deck
     final fullDeck = Deck.standard().cards;
     
@@ -71,8 +74,20 @@ class Deck {
     // 3. Subtract visible cards to find the remaining hidden cards
     final remainingCards = fullDeck.where((c) => !visibleKeys.contains(c.firebaseKey)).toList();
     
-    // Note: We don't shuffle here because the original order is lost,
-    // but the remaining cards ARE the deck for the rest of this round.
+    // Shuffle the remaining cards for fair random distribution
+    remainingCards.shuffle();
+
+    // 4. If a bottomCard was revealed during cut and is still in the undealt pool,
+    // ensure it is pinned to index 0 (the bottom of the deck, drawn last).
+    if (bottomCard != null) {
+      final bottomKey = bottomCard.firebaseKey;
+      final bottomIdx = remainingCards.indexWhere((c) => c.firebaseKey == bottomKey);
+      if (bottomIdx != -1) {
+        final card = remainingCards.removeAt(bottomIdx);
+        remainingCards.insert(0, card);
+      }
+    }
+    
     return Deck(remainingCards);
   }
 

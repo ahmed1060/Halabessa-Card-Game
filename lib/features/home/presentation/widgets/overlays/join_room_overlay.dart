@@ -155,12 +155,12 @@ class _JoinRoomOverlayState extends ConsumerState<JoinRoomOverlay> {
         keyboardType: TextInputType.text,
         textCapitalization: TextCapitalization.characters,
         inputFormatters: [
-          LengthLimitingTextInputFormatter(6),
+          LengthLimitingTextInputFormatter(10),
           FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9]')),
         ],
         decoration: InputDecoration(
-          hintText: '      ',
-          hintStyle: TextStyle(color: Colors.white.withOpacity(0.1)),
+          hintText: 'ROOM CODE',
+          hintStyle: TextStyle(color: Colors.white.withOpacity(0.12), letterSpacing: 4, fontSize: 20),
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(vertical: 20),
         ),

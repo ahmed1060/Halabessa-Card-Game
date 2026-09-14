@@ -77,8 +77,16 @@ class CardWidget extends ConsumerWidget {
               cardBackContentBuilder: (context) => ClipRRect(
                 borderRadius: BorderRadius.circular(10),
                 child: effectiveBackPath.startsWith('http')
-                  ? Image.network(effectiveBackPath, fit: BoxFit.cover)
-                  : Image.asset(effectiveBackPath, fit: BoxFit.cover),
+                  ? Image.network(
+                      effectiveBackPath,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => _buildCardBackFallback(),
+                    )
+                  : Image.asset(
+                      effectiveBackPath,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => _buildCardBackFallback(),
+                    ),
               ),
             ),
             shape: RoundedRectangleBorder(
@@ -112,8 +120,16 @@ class CardWidget extends ConsumerWidget {
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(10),
                   child: effectiveFrontPath.startsWith('http')
-                    ? Image.network(effectiveFrontPath, fit: BoxFit.cover)
-                    : Image.asset(effectiveFrontPath, fit: BoxFit.cover),
+                    ? Image.network(
+                        effectiveFrontPath,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(color: Colors.white),
+                      )
+                    : Image.asset(
+                        effectiveFrontPath,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(color: Colors.white),
+                      ),
                 ),
               ),
               // Face Card Illustration
@@ -127,8 +143,16 @@ class CardWidget extends ConsumerWidget {
                         child: Padding(
                           padding: const EdgeInsets.symmetric(vertical: 18.0),
                           child: illustrationPath.startsWith('http')
-                            ? Image.network(illustrationPath, fit: BoxFit.contain)
-                            : Image.asset(illustrationPath, fit: BoxFit.contain),
+                            ? Image.network(
+                                illustrationPath,
+                                fit: BoxFit.contain,
+                                errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                              )
+                            : Image.asset(
+                                illustrationPath,
+                                fit: BoxFit.contain,
+                                errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                              ),
                         ),
                       ),
                     );
@@ -141,6 +165,35 @@ class CardWidget extends ConsumerWidget {
                 customSuitIcons: effectiveSuitIcons,
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCardBackFallback() {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF1B2A4A), Color(0xFF0B132B)],
+        ),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFD4AF37).withOpacity(0.6), width: 1.5),
+      ),
+      child: Center(
+        child: Container(
+          width: 32,
+          height: 48,
+          decoration: BoxDecoration(
+            border: Border.all(color: const Color(0xFFD4AF37).withOpacity(0.4), width: 1),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: const Icon(
+            Icons.style_rounded,
+            color: Color(0xFFD4AF37),
+            size: 20,
           ),
         ),
       ),
@@ -170,8 +223,18 @@ class CardWidget extends ConsumerWidget {
       final suitPath = customSuitIcons[suitKey];
       if (suitPath != null) {
         suitWidget = suitPath.startsWith('http') 
-          ? Image.network(suitPath, width: 12, height: 12) 
-          : Image.asset(suitPath, width: 12, height: 12);
+          ? Image.network(
+              suitPath,
+              width: 12,
+              height: 12,
+              errorBuilder: (_, __, ___) => Icon(_getSuitIcon(), color: color, size: 12),
+            ) 
+          : Image.asset(
+              suitPath,
+              width: 12,
+              height: 12,
+              errorBuilder: (_, __, ___) => Icon(_getSuitIcon(), color: color, size: 12),
+            );
       } else {
         suitWidget = Icon(_getSuitIcon(), color: color, size: 12);
       }
@@ -212,8 +275,16 @@ class CardWidget extends ConsumerWidget {
                       final suitPath = customSuitIcons?[suitKey];
                       if (suitPath != null) {
                         return suitPath.startsWith('http')
-                          ? Image.network(suitPath, fit: BoxFit.contain)
-                          : Image.asset(suitPath, fit: BoxFit.contain);
+                          ? Image.network(
+                              suitPath,
+                              fit: BoxFit.contain,
+                              errorBuilder: (_, __, ___) => Icon(_getSuitIcon(), color: color, size: 40),
+                            )
+                          : Image.asset(
+                              suitPath,
+                              fit: BoxFit.contain,
+                              errorBuilder: (_, __, ___) => Icon(_getSuitIcon(), color: color, size: 40),
+                            );
                       }
                       return Icon(_getSuitIcon(), color: color, size: 40);
                     },

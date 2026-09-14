@@ -59,16 +59,15 @@ class UserAvatar extends StatelessWidget {
                     ? AssetImage(user.avatarUrl!) as ImageProvider
                     : NetworkImage(user.avatarUrl!))
                 : null,
-            child: user.avatarUrl == null
-                ? Text(
-                    user.displayName.isNotEmpty ? user.displayName[0].toUpperCase() : '?',
-                    style: TextStyle(
-                      fontSize: radius * 0.8,
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  )
-                : null,
+            onBackgroundImageError: user.avatarUrl != null ? (_, __) {} : null,
+            child: Text(
+              user.displayName.isNotEmpty ? user.displayName[0].toUpperCase() : '?',
+              style: TextStyle(
+                fontSize: radius * 0.8,
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
         ),
       ),
