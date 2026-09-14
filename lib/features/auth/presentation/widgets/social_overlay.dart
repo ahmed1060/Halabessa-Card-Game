@@ -4,6 +4,7 @@ import 'package:easy_localization/easy_localization.dart';
 import '../../../auth/domain/models/app_user.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../game/domain/providers/game_providers.dart';
+import '../../../../core/utils/error_handler.dart';
 
 class SocialOverlay extends ConsumerStatefulWidget {
   const SocialOverlay({super.key});
@@ -181,10 +182,20 @@ class _SocialOverlayState extends ConsumerState<SocialOverlay> {
               trailing: ElevatedButton(
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.orangeAccent, foregroundColor: Colors.black, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
                 child: Text('join'.tr(), style: const TextStyle(fontWeight: FontWeight.bold)),
-                onPressed: () {
-                   ref.read(matchStateProvider.notifier).joinMatch(invite.key, currentUser.uid, currentUser.displayName);
-                   Navigator.pop(context);
-                   Navigator.pushNamed(context, '/game');
+                onPressed: () async {
+                  try {
+                    await ref.read(matchStateProvider.notifier).joinMatch(invite.key, currentUser.uid, currentUser.displayName);
+                    if (context.mounted) {
+                      Navigator.pop(context);
+                      Navigator.pushNamed(context, '/game');
+                    }
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(ErrorHandler.getAuthErrorMessage(e))),
+                      );
+                    }
+                  }
                 },
               ),
             ),

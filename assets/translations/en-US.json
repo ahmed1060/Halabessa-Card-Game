@@ -148,6 +148,8 @@
     "arabic_sa": "Arabic (Saudi)",
     "english": "English",
     "theme": "Theme",
+    "graphics": "Graphics",
+    "mode_3d": "3D Experience (Unity)",
     "light_mode": "Light",
     "dark_mode": "Dark",
     "system_mode": "System",

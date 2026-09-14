@@ -6,6 +6,7 @@ import 'package:halabessa/features/game/domain/providers/game_providers.dart';
 import 'package:halabessa/features/game/data/repositories/multiplayer_sync_service.dart';
 import 'package:halabessa/features/auth/presentation/providers/auth_providers.dart';
 import 'package:halabessa/core/theme/theme_config.dart';
+import 'package:halabessa/core/utils/error_handler.dart';
 
 class PublicRoomsList extends ConsumerWidget {
   const PublicRoomsList({super.key});
@@ -53,7 +54,10 @@ class PublicRoomsList extends ConsumerWidget {
                   style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                 ),
                 subtitle: Text(
-                  'room_players_info'.tr(args: [match.playerIds.length.toString(), match.id]),
+                  'room_players_info'.tr(args: [
+                    '${match.playerIds.where((id) => !id.startsWith('waiting_')).length}/4', 
+                    match.id
+                  ]),
                   style: const TextStyle(color: Colors.white70),
                 ),
                 trailing: Row(
@@ -82,14 +86,24 @@ class PublicRoomsList extends ConsumerWidget {
                               ),
                             if (currentUser?.isAdmin == true) const SizedBox(width: 8),
                             ElevatedButton(
-                              onPressed: isFull ? null : () {
+                              onPressed: isFull ? null : () async {
                                 if (currentUser != null) {
-                                  ref.read(matchStateProvider.notifier).joinMatch(
-                                    match.id, 
-                                    currentUser.uid, 
-                                    currentUser.displayName
-                                  );
-                                  Navigator.pushNamed(context, '/game');
+                                  try {
+                                    await ref.read(matchStateProvider.notifier).joinMatch(
+                                      match.id, 
+                                      currentUser.uid, 
+                                      currentUser.displayName
+                                    );
+                                    if (context.mounted) {
+                                      Navigator.pushNamed(context, '/game');
+                                    }
+                                  } catch (e) {
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(content: Text(ErrorHandler.getAuthErrorMessage(e))),
+                                      );
+                                    }
+                                  }
                                 }
                               },
                               style: ElevatedButton.styleFrom(

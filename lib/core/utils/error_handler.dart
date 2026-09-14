@@ -34,6 +34,17 @@ class ErrorHandler {
       return getFirebaseErrorMessage(error);
     }
     
+    final errorStr = error.toString();
+    if (errorStr.contains('room_expired')) {
+      return 'room_expired'.tr();
+    }
+    if (errorStr.contains('room_is_full') || errorStr.contains('room-full')) {
+      return 'error_room_full'.tr();
+    }
+    if (errorStr.contains('room_not_found') || errorStr.contains('not-found')) {
+      return 'error_not_found'.tr();
+    }
+    
     // Fallback for non-firebase errors
     return 'error_general'.tr(args: [error.toString()]);
   }

@@ -6,6 +6,7 @@ class SettingsState {
   final bool isSoundEnabled;
   final bool isMusicEnabled;
   final bool isHapticsEnabled;
+  final bool is3DModeEnabled;
   final double musicVolume;
   final double soundVolume;
   final String languageCode;
@@ -15,6 +16,7 @@ class SettingsState {
     this.isSoundEnabled = true,
     this.isMusicEnabled = true,
     this.isHapticsEnabled = true,
+    this.is3DModeEnabled = true,
     this.musicVolume = 1.0,
     this.soundVolume = 1.0,
     this.languageCode = 'en',
@@ -25,6 +27,7 @@ class SettingsState {
     bool? isSoundEnabled,
     bool? isMusicEnabled,
     bool? isHapticsEnabled,
+    bool? is3DModeEnabled,
     double? musicVolume,
     double? soundVolume,
     String? languageCode,
@@ -34,6 +37,7 @@ class SettingsState {
       isSoundEnabled: isSoundEnabled ?? this.isSoundEnabled,
       isMusicEnabled: isMusicEnabled ?? this.isMusicEnabled,
       isHapticsEnabled: isHapticsEnabled ?? this.isHapticsEnabled,
+      is3DModeEnabled: is3DModeEnabled ?? this.is3DModeEnabled,
       musicVolume: musicVolume ?? this.musicVolume,
       soundVolume: soundVolume ?? this.soundVolume,
       languageCode: languageCode ?? this.languageCode,
@@ -54,6 +58,7 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
       isSoundEnabled: _prefs.getBool('isSoundEnabled') ?? true,
       isMusicEnabled: _prefs.getBool('isMusicEnabled') ?? true,
       isHapticsEnabled: _prefs.getBool('isHapticsEnabled') ?? true,
+      is3DModeEnabled: _prefs.getBool('is3DModeEnabled') ?? true,
       musicVolume: _prefs.getDouble('musicVolume') ?? 1.0,
       soundVolume: _prefs.getDouble('soundVolume') ?? 1.0,
       languageCode: _prefs.getString('languageCode') ?? 'en',
@@ -84,6 +89,11 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
   Future<void> toggleHaptics(bool value) async {
     state = state.copyWith(isHapticsEnabled: value);
     await _prefs.setBool('isHapticsEnabled', value);
+  }
+
+  Future<void> toggle3DMode(bool value) async {
+    state = state.copyWith(is3DModeEnabled: value);
+    await _prefs.setBool('is3DModeEnabled', value);
   }
 
   Future<void> setLanguage(String langCode) async {

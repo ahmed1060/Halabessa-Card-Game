@@ -3,7 +3,7 @@
     "matches": {
       "$matchId": {
         ".read": "auth != null",
-        ".write": "auth != null && (!data.exists() || data.child('players').hasChild(auth.uid))"
+        ".write": "auth != null && (!data.exists() || data.child('players').hasChild(auth.uid) || (data.child('phase').val() == 'waitingForPlayers'))"
       }
     },
     "matchHands": {

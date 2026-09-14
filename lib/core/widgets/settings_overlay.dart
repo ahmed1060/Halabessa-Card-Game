@@ -136,6 +136,18 @@ class SettingsOverlay extends ConsumerWidget {
                           _buildSectionTitle('theme'.tr()),
                           _buildThemeSelector(settings.themeMode, notifier, multimedia),
 
+                          const SizedBox(height: 24),
+                          _buildSectionTitle('graphics'.tr()),
+                          _buildToggleTile(
+                            'mode_3d'.tr(),
+                            settings.is3DModeEnabled,
+                            Icons.view_in_ar_rounded,
+                            (val) {
+                              notifier.toggle3DMode(val);
+                              multimedia.vibrate();
+                            },
+                          ),
+
                           if (user?.isAdmin == true) ...[
                             const SizedBox(height: 32),
                             _buildSectionTitle('admin_actions'.tr()),

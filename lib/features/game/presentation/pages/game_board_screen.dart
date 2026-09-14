@@ -15,12 +15,14 @@ import 'package:halabessa/features/game/domain/models/capture.dart';
 import 'package:halabessa/features/home/presentation/providers/store_provider.dart';
 import 'package:halabessa/core/theme/theme_config.dart';
 import 'package:halabessa/core/widgets/settings_overlay.dart';
+import 'package:halabessa/core/providers/settings_provider.dart';
 import 'package:halabessa/features/game/presentation/providers/chat_providers.dart';
 import 'package:halabessa/features/game/presentation/widgets/chat_overlay.dart';
 import 'package:confetti/confetti.dart';
 import '../widgets/player_profile_preview.dart';
 import '../widgets/harvest_piles_widget.dart';
 import '../widgets/match_summary_dialog.dart';
+import '../widgets/board_cards_widget.dart';
 import 'package:flutter/services.dart';
 import 'package:halabessa/core/services/multimedia_service.dart';
 import '../widgets/unity_game_view.dart';
@@ -346,9 +348,10 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
 
     final myUid = currentUser.uid;
     final bool isSpectator = matchState.playerIds.indexOf(myUid) == -1;
+    final settings = ref.watch(settingsProvider);
     final isUnityVisible = ref.watch(unityLayerVisibilityProvider);
     final isUnityInitialized = ref.watch(unityInitializedProvider);
-    final show3DHand = isUnityVisible && isUnityInitialized;
+    final show3DHand = settings.is3DModeEnabled && isUnityVisible && isUnityInitialized;
 
 
     return PopScope(
@@ -382,12 +385,15 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
                 Positioned.fill(
                   child: Consumer(
                     builder: (context, ref, child) {
+                      final settings = ref.watch(settingsProvider);
                       final activeTable = ref.watch(activeTableSkinProvider);
+                      final isUnityVisible = ref.watch(unityLayerVisibilityProvider);
                       final isUnityInitialized = ref.watch(unityInitializedProvider);
+                      final is3DActive = settings.is3DModeEnabled && isUnityVisible && isUnityInitialized;
                       
                       return AnimatedOpacity(
                         duration: const Duration(milliseconds: 500),
-                        opacity: isUnityInitialized ? 0.0 : 1.0,
+                        opacity: is3DActive ? 0.0 : 1.0,
                         child: activeTable.assetPath.startsWith('http')
                           ? Image.network(activeTable.assetPath, fit: BoxFit.cover)
                           : Image.asset(activeTable.assetPath, fit: BoxFit.cover),
@@ -482,7 +488,7 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
                     ),
 
                     Positioned.fill(
-                      child: _buildBoardCenter(context, ref, matchState, myUid),
+                      child: _buildBoardCenter(context, ref, matchState, myUid, isLandscape, is3DActive: show3DHand),
                     ),
 
                     // Local Player (Bottom Left - more robust alignment)
@@ -855,7 +861,7 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
                ref.read(matchStateProvider.notifier).rebind(lastId);
             } else {
                ref.read(matchStateProvider.notifier).leaveMatch();
-               Navigator.pop(context);
+               Navigator.of(context).popUntil((route) => route.isFirst);
             }
         },
         child: Text(
@@ -878,8 +884,27 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
     return null;
   }
 
-  Widget _buildBoardCenter(BuildContext context, WidgetRef ref, MatchState matchState, String myUid) {
-    return const SizedBox.shrink();
+  Widget _buildBoardCenter(
+    BuildContext context, 
+    WidgetRef ref, 
+    MatchState matchState, 
+    String myUid, 
+    bool isLandscape, 
+    {bool is3DActive = false}
+  ) {
+    if (is3DActive) {
+      return const SizedBox.shrink();
+    }
+
+    final isCapturing = matchState.phase == GamePhase.capturing;
+
+    return BoardCardsWidget(
+      cards: matchState.board,
+      isLandscape: isLandscape,
+      isCapturing: isCapturing,
+      capturingTeam: matchState.capturingTeam,
+      capturingStage: matchState.capturingStage,
+    );
   }
 
   Widget _buildLocalPlayerArea(BuildContext context, WidgetRef ref, MatchState matchState, String myUid) {

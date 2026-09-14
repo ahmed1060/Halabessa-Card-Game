@@ -589,58 +589,78 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
   Future<void> joinMatch(String matchId, String playerId, String displayName) async {
     final dbRef = FirebaseDatabase.instance.ref('matches/$matchId');
     final snapshot = await dbRef.get();
-    if (snapshot.exists) {
-      final json = Map<String, dynamic>.from(snapshot.value as Map);
-      
-      // AUTO-DESTRUCT check: If trying to join an expired room, delete it.
-      if (json['expireAt'] != null) {
-         final expireAt = DateTime.tryParse(json['expireAt'].toString());
-         if (expireAt != null && DateTime.now().isAfter(expireAt)) {
-           await ref.read(multiplayerSyncServiceProvider).deleteMatch(matchId);
-           throw Exception('room_expired'); // Translation key
-         }
-      }
+    if (!snapshot.exists) {
+      throw Exception('room_not_found');
+    }
 
-      final playerIds = List<String>.from(json['playerIds'] ?? []);
-      final playerNames = Map<String, String>.from(json['playerNames'] ?? {});
-      
-      if (playerIds.contains(playerId)) {
-        bindToMatch(matchId);
-        return;
-      }
+    final json = Map<String, dynamic>.from(snapshot.value as Map);
+    
+    // AUTO-DESTRUCT check: If trying to join an expired room, delete it.
+    if (json['expireAt'] != null) {
+       final expireAt = DateTime.tryParse(json['expireAt'].toString());
+       if (expireAt != null && DateTime.now().isAfter(expireAt)) {
+         await ref.read(multiplayerSyncServiceProvider).deleteMatch(matchId);
+         throw Exception('room_expired'); // Translation key
+       }
+    }
 
-      int targetIdx = -1;
-      // Prioritize partner slot (index 2) for second human as requested
-      if (playerIds.length >= 3 && playerIds[2].startsWith('waiting_')) {
-        targetIdx = 2;
-      } else {
-        // Find first available waiting slot
-        for (int i = 0; i < playerIds.length; i++) {
-          if (playerIds[i].startsWith('waiting_')) {
-            targetIdx = i;
-            break;
-          }
+    final playerIds = List<String>.from(json['playerIds'] ?? []);
+    final playerNames = Map<String, String>.from(json['playerNames'] ?? {});
+    
+    if (playerIds.contains(playerId)) {
+      bindToMatch(matchId);
+      return;
+    }
+
+    int targetIdx = -1;
+    // Prioritize partner slot (index 2) for second human as requested
+    if (playerIds.length >= 3 && playerIds[2].startsWith('waiting_')) {
+      targetIdx = 2;
+    } else {
+      // Find first available waiting slot
+      for (int i = 0; i < playerIds.length; i++) {
+        if (playerIds[i].startsWith('waiting_')) {
+          targetIdx = i;
+          break;
         }
       }
+    }
 
-      if (targetIdx != -1) {
-        playerIds[targetIdx] = playerId;
-        playerNames[playerId] = displayName;
-        
-        final skins = Map<String, String>.from(json['playerSkins'] ?? {});
-        skins[playerId] = ref.read(storeProvider).activeCardBackId;
+    if (targetIdx != -1) {
+      playerIds[targetIdx] = playerId;
+      playerNames[playerId] = displayName;
+      
+      final skins = Map<String, String>.from(json['playerSkins'] ?? {});
+      skins[playerId] = ref.read(storeProvider).activeCardBackId;
 
-        final avatars = Map<String, String>.from(json['playerAvatars'] ?? {});
-        avatars[playerId] = ref.read(currentUserProvider)?.avatarUrl ?? "";
+      final avatars = Map<String, String>.from(json['playerAvatars'] ?? {});
+      avatars[playerId] = ref.read(currentUserProvider)?.avatarUrl ?? "";
 
-        await dbRef.update({
-          'playerIds': playerIds,
-          'playerNames': playerNames,
-          'playerSkins': skins,
-          'playerAvatars': avatars,
-        });
-        bindToMatch(matchId);
-      }
+      await dbRef.update({
+        'playerIds': playerIds,
+        'playerNames': playerNames,
+        'playerSkins': skins,
+        'playerAvatars': avatars,
+        'players/$playerId': true,
+      });
+
+      // Also update room index so lobby count updates
+      final phaseStr = json['phase']?.toString() ?? 'waitingForPlayers';
+      final isPublic = json['isPublic'] == true;
+      final modeStr = json['mode']?.toString() ?? 'classic';
+      final expireAtStr = json['expireAt']?.toString();
+      
+      await FirebaseDatabase.instance.ref('rooms/$matchId').update({
+        'playerIds': playerIds,
+        'mode': modeStr,
+        'isPublic': isPublic,
+        'phase': phaseStr,
+        if (expireAtStr != null) 'expireAt': expireAtStr,
+      });
+
+      bindToMatch(matchId);
+    } else {
+      throw Exception('room_is_full');
     }
   }
 

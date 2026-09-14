@@ -21,11 +21,12 @@ class UnityCommunicationService {
 
   void init() {
     if (kIsWeb) {
-      // Graceful fallback: If Unity WebGL does not report ready within 3.5s, unlock UI
+      // Graceful fallback: If Unity WebGL does not report ready within 3.5s, fall back to Flutter 2D
       Future.delayed(const Duration(milliseconds: 3500), () {
         if (!isReady.value) {
-          debugPrint("Unity WebGL startup timeout - enabling UI.");
-          _ref.read(unityInitializedProvider.notifier).state = true;
+          debugPrint("Unity WebGL startup timeout - falling back to Flutter 2D.");
+          _ref.read(unityInitializedProvider.notifier).state = false;
+          _ref.read(unityLayerVisibilityProvider.notifier).state = false;
         }
       });
 
@@ -60,10 +61,10 @@ class UnityCommunicationService {
 
   void setController(UnityWidgetController controller) {
     _controller = controller;
-    // Fallback for native
+    // Fallback for native: if no handshake received, keep 2D active
     Future.delayed(const Duration(milliseconds: 2500), () {
       if (!isReady.value) {
-        _ref.read(unityInitializedProvider.notifier).state = true;
+        debugPrint("Native Unity handshake timeout - keeping Flutter 2D fallback.");
       }
     });
   }
