@@ -10,7 +10,7 @@ void main() {
     testWidgets('login and verify main menu loads', (tester) async {
       // Start the app
       app.main();
-      await tester.pumpAndSettle();
+      await tester.pump(const Duration(seconds: 3));
 
       // Wait for login screen and find elements
       final emailField = find.byKey(const ValueKey('login_email_field'));
@@ -30,21 +30,20 @@ void main() {
       if (isLoginPage) {
         // Enter credentials
         await tester.enterText(emailField, 'test@example.com');
-        await tester.pumpAndSettle();
+        await tester.pump(const Duration(seconds: 1));
         
         await tester.enterText(passwordField, 'password123');
-        await tester.pumpAndSettle();
+        await tester.pump(const Duration(seconds: 1));
 
         // Tap Login
         await tester.tap(loginBtn);
-        await tester.pumpAndSettle();
+        await tester.pump(const Duration(seconds: 5));
       }
 
       // Verify we are not on the login screen anymore (e.g., in Lobby)
       // We expect the 'Play Now' button or some lobby element to be present.
       // Wait for loading to finish.
       await tester.pump(const Duration(seconds: 5));
-      await tester.pumpAndSettle();
 
       final playNowBtn = find.byKey(const ValueKey('play_now_btn'));
       expect(playNowBtn, findsOneWidget, reason: 'Failed to reach the main menu/lobby after login.');
