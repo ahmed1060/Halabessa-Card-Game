@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easy_localization/easy_localization.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:halabessa/core/services/daily_streak_service.dart';
 import 'package:halabessa/core/services/multimedia_service.dart';
 import 'package:halabessa/core/theme/theme_config.dart';
@@ -33,8 +34,12 @@ class _DailyStreakDialogState extends ConsumerState<DailyStreakDialog> {
     if (user != null) {
       final updatedCoins = user.coins + reward.coins;
       final updatedDiamonds = user.diamonds + reward.diamonds;
-      final updatedUser = user.copyWith(coins: updatedCoins, diamonds: updatedDiamonds);
-      ref.read(currentUserProvider.notifier).state = updatedUser;
+      try {
+        await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
+          'coins': updatedCoins,
+          'diamonds': updatedDiamonds,
+        });
+      } catch (_) {}
     }
 
     if (mounted) {

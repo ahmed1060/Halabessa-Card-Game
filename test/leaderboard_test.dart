@@ -1,6 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:halabessa/features/auth/domain/models/app_user.dart';
-import 'package:halabessa/features/auth/presentation/providers/auth_providers.dart';
 
 void main() {
   group('Leaderboard Sorting & Category Tests', () {

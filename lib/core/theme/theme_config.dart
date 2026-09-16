@@ -12,6 +12,8 @@ class ThemeConfig {
   static const Color accentGreen = Color(0xFF4CAF50);
   static const Color darkTeal = Color(0xFF004D40);
   static const Color crimsonAccent = Color(0xFFB71C1C);
+  static const Color boardGreen = Color(0xFF1B3022);
+  static const Color cardDarkBg = Color(0xFF1B263B);
 
   static const String fontHeading = 'Righteous';
   static const String fontBody = 'Outfit';

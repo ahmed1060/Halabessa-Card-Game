@@ -199,7 +199,6 @@ void main() {
           Capture(
             leadingCard: const Card(Suit.diamonds, Rank.jack),
             capturedCards: [const Card(Suit.hearts, Rank.jack)],
-            teamId: 'teamA',
           ),
         ],
       };

@@ -205,8 +205,8 @@ class _BasraCelebrationOverlayState extends State<BasraCelebrationOverlay>
                         ),
                         child: Text(
                           widget.isMyTeam
-                              ? 'basra_my_team'.tr(fallback: 'فريقك اكتسح الطاولة!')
-                              : 'basra_other_team'.tr(fallback: 'اكتساح كامل!'),
+                              ? 'basra_my_team'.tr()
+                              : 'basra_other_team'.tr(),
                           style: TextStyle(
                             color: widget.isMyTeam ? Colors.tealAccent : Colors.orangeAccent,
                             fontSize: 13,

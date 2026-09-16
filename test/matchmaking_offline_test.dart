@@ -84,10 +84,8 @@ void main() {
     });
 
     test('8-character room code format is compatible with input text formatter limit', () {
-      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-      const digits = '0123456789';
       // 3 letters + 5 digits format = 8 chars
-      final code = 'RHY17001';
+      const code = 'RHY17001';
       expect(code.length, 8);
       expect(code.length <= 10, isTrue);
       expect(RegExp(r'^[a-zA-Z0-9]+$').hasMatch(code), isTrue);

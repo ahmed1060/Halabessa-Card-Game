@@ -399,5 +399,7 @@
     "not_enough_diamonds": "Not enough diamonds!",
     "no_items_available": "No items available in this category",
     "store_consumables": "Special Items & Tickets",
-    "return_home": "Return to Home"
+    "return_home": "Return to Home",
+    "basra_my_team": "Your team swept the table!",
+    "basra_other_team": "Total sweep!"
 }

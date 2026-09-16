@@ -598,6 +598,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       backgroundColor: Colors.transparent,
       builder: (context) => const AvatarPicker(),
     );
+  }
+
   void _showChangePasswordDialog(BuildContext context) {
     final passwordController = TextEditingController();
     final confirmController = TextEditingController();
@@ -816,7 +818,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     return;
                   }
 
-                  await ref.read(authRepositoryProvider).updateUsername(newUsername);
+                  await ref.read(authRepositoryProvider).updateProfile(username: newUsername);
                   
                   if (context.mounted) {
                     Navigator.pop(context);

@@ -392,5 +392,7 @@
     "not_enough_diamonds": "لا تملك ألماس كافي!",
     "no_items_available": "لا توجد عناصر متاحة في هذا القسم حالياً",
     "store_consumables": "عناصر وتذاكر خاصة",
-    "return_home": "العودة للرئيسية"
+    "return_home": "العودة للرئيسية",
+    "basra_my_team": "فريقك اكتسح الطاولة!",
+    "basra_other_team": "اكتساح كامل!"
 }
