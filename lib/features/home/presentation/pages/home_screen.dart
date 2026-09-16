@@ -263,6 +263,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   Widget _buildQuickMatchHero(BuildContext context, dynamic user) {
     return GestureDetector(
+      key: const ValueKey('play_now_btn'),
       onTap: () => _handleQuickMatch(context, user),
       child: Container(
         height: 96,

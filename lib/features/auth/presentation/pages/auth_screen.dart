@@ -300,6 +300,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with TickerProviderStat
                               const SizedBox(height: 16),
                             ],
                             TextField(
+                              key: const ValueKey('login_email_field'),
                               controller: _emailController,
                               style: const TextStyle(color: Colors.white),
                               decoration: _inputDecoration('email_address'.tr(), Icons.email_rounded),
@@ -307,6 +308,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with TickerProviderStat
                             ),
                             const SizedBox(height: 16),
                             TextField(
+                              key: const ValueKey('login_password_field'),
                               controller: _passwordController,
                               style: const TextStyle(color: Colors.white),
                               decoration: _inputDecoration('password'.tr(), Icons.lock_rounded),
@@ -327,6 +329,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with TickerProviderStat
                             const SizedBox(height: 8),
                             
                             ElevatedButton(
+                              key: const ValueKey('login_submit_btn'),
                               onPressed: _isLoading ? null : _submit,
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: ThemeConfig.goldAccent,
