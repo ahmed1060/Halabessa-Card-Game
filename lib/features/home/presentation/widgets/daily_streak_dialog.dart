@@ -2,11 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easy_localization/easy_localization.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:halabessa/core/services/daily_streak_service.dart';
 import 'package:halabessa/core/services/multimedia_service.dart';
 import 'package:halabessa/core/theme/theme_config.dart';
-import 'package:halabessa/features/auth/presentation/providers/auth_providers.dart';
 
 class DailyStreakDialog extends ConsumerStatefulWidget {
   final DailyStreakStatus status;
@@ -27,19 +26,31 @@ class _DailyStreakDialogState extends ConsumerState<DailyStreakDialog> {
     HapticFeedback.heavyImpact();
     ref.read(multimediaServiceProvider).playSfx('sfx/purchase.mp3');
 
-    final reward = await DailyStreakService.claimTodayReward();
-
-    // Update user profile coins and diamonds in state/Firestore
-    final user = ref.read(currentUserProvider);
-    if (user != null) {
-      final updatedCoins = user.coins + reward.coins;
-      final updatedDiamonds = user.diamonds + reward.diamonds;
-      try {
-        await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
-          'coins': updatedCoins,
-          'diamonds': updatedDiamonds,
-        });
-      } catch (_) {}
+    try {
+      final response = await FirebaseFunctions.instance
+          .httpsCallable('claimDailyReward')
+          .call();
+      final data = Map<String, dynamic>.from(response.data as Map);
+      await DailyStreakService.recordServerClaim(
+        (data['streak'] as num).toInt(),
+        serverDate: data['date'] as String?,
+      );
+    } on FirebaseFunctionsException catch (e) {
+      if (mounted) {
+        setState(() => _isClaimed = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.message ?? 'Unable to claim the reward. Please try again.')),
+        );
+      }
+      return;
+    } catch (_) {
+      if (mounted) {
+        setState(() => _isClaimed = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Unable to claim the reward. Please try again.')),
+        );
+      }
+      return;
     }
 
     if (mounted) {

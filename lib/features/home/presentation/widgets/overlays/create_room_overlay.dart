@@ -261,7 +261,7 @@ class _CreateRoomOverlayState extends ConsumerState<CreateRoomOverlay> {
 
   void _createMatch(GameMode mode) async {
     try {
-      ref.read(matchStateProvider.notifier).initializeMatch(
+      await ref.read(matchStateProvider.notifier).initializeMatch(
         widget.playerId,
         widget.displayName,
         mode,

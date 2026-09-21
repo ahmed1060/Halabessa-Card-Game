@@ -3,8 +3,8 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Profiles. isAdmin, friends, pendingFriendRequests, and
-    // sentFriendRequests are excluded from client writes entirely: the
+    // Profiles. isAdmin, friends, pendingFriendRequests, sentFriendRequests,
+    // friendInvites, and dailyReward are excluded from client writes entirely: the
     // first three used to be directly client-writable (including on
     // someone else's document via the friend-request flow, which the
     // Firestore SDK's own auth model already should have rejected), which
@@ -18,13 +18,20 @@ service cloud.firestore {
       allow read: if request.auth != null;
 
       allow create: if request.auth != null && request.auth.uid == uid
-        && request.resource.data.isAdmin == false;
+        && request.resource.data.get('isAdmin', false) == false
+        && request.resource.data.get('friends', []) == []
+        && request.resource.data.get('pendingFriendRequests', []) == []
+        && request.resource.data.get('sentFriendRequests', []) == []
+        && request.resource.data.get('friendInvites', {}) == {}
+        && request.resource.data.get('dailyReward', {}) == {};
 
       allow update: if request.auth != null && request.auth.uid == uid
         && request.resource.data.isAdmin == resource.data.get('isAdmin', false)
         && request.resource.data.get('friends', []) == resource.data.get('friends', [])
         && request.resource.data.get('pendingFriendRequests', []) == resource.data.get('pendingFriendRequests', [])
-        && request.resource.data.get('sentFriendRequests', []) == resource.data.get('sentFriendRequests', []);
+        && request.resource.data.get('sentFriendRequests', []) == resource.data.get('sentFriendRequests', [])
+        && request.resource.data.get('friendInvites', {}) == resource.data.get('friendInvites', {})
+        && request.resource.data.get('dailyReward', {}) == resource.data.get('dailyReward', {});
     }
 
     // Username reservations (uniqueness index for the users collection).

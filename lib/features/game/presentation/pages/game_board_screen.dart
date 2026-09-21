@@ -27,6 +27,7 @@ import '../widgets/basra_celebration_overlay.dart';
 import '../widgets/emote_wheel_overlay.dart';
 import 'package:flutter/services.dart';
 import 'package:halabessa/core/services/multimedia_service.dart';
+import 'package:halabessa/core/utils/error_handler.dart';
 import '../widgets/unity_game_view.dart';
 import '../providers/unity_communication_service.dart';
 import '../providers/unity_layer_provider.dart';
@@ -1497,10 +1498,18 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
                           trailing: ElevatedButton(
                             style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white),
                             child: Text('send'.tr()),
-                            onPressed: () {
-                              ref.read(multiplayerSyncServiceProvider).sendInvite(friendId, state.id, currentUser.displayName);
-                              Navigator.pop(context);
-                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('invitation_sent'.tr())));
+                            onPressed: () async {
+                              try {
+                                await ref.read(multiplayerSyncServiceProvider).sendInvite(friendId, state.id);
+                                if (!context.mounted) return;
+                                Navigator.pop(context);
+                                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('invitation_sent'.tr())));
+                              } catch (e) {
+                                if (!context.mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text(ErrorHandler.getAuthErrorMessage(e))),
+                                );
+                              }
                             },
                           ),
                         );

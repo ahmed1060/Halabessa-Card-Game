@@ -77,9 +77,18 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
   static const String _matchIdKey = 'last_match_id';
 
   Future<void> _publishState(MatchState newState) async {
+    final previousState = state;
     state = newState;
     if (!newState.id.startsWith('OFFLINE_')) {
-      await ref.read(multiplayerSyncServiceProvider).updateMatchState(newState);
+      final refreshRoomIndex = previousState == null ||
+          previousState.phase != newState.phase ||
+          previousState.isPublic != newState.isPublic ||
+          previousState.expireAt != newState.expireAt ||
+          !listEquals(previousState.playerIds, newState.playerIds);
+      await ref.read(multiplayerSyncServiceProvider).updateMatchState(
+        newState,
+        refreshRoomIndex: refreshRoomIndex,
+      );
     } else {
       if (_amIHost(newState)) {
         _ensureSecretDeck(newState);
@@ -625,22 +634,13 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     }
   }
 
-  String _generateRoomId() {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-    const digits = '0123456789';
-    final rnd = Random();
-    String c = String.fromCharCodes(Iterable.generate(3, (_) => chars.codeUnitAt(rnd.nextInt(chars.length))));
-    String d = String.fromCharCodes(Iterable.generate(5, (_) => digits.codeUnitAt(rnd.nextInt(digits.length))));
-    return c + d;
-  }
-
-  void initializeMatch(String playerId, String displayName, GameMode mode, {int maxPoints = 41, int timerDurationSeconds = 10, bool isPublic = false}) {
-    final newId = _generateRoomId();
-    // Initialize with only the host. The UI/Joining logic will handle seats.
+  Future<void> initializeMatch(String playerId, String displayName, GameMode mode, {int maxPoints = 41, int timerDurationSeconds = 10, bool isPublic = false}) async {
+    // The server generates the room id and derives the owner from Firebase
+    // Auth. These local values exist only to preserve the current UI model.
     final store = ref.read(storeProvider);
     final avatarUrl = ref.read(currentUserProvider)?.avatarUrl ?? "";
     final initial = MatchState(
-      id: newId,
+      id: 'PENDING',
       mode: mode,
       maxPoints: maxPoints,
       isPublic: isPublic,
@@ -653,9 +653,9 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
       phase: GamePhase.waitingForPlayers,
       timerDurationSeconds: timerDurationSeconds,
     );
-    ref.read(multiplayerSyncServiceProvider).createMatch(initial);
-    state = initial;
-    bindToMatch(newId);
+    final created = await ref.read(multiplayerSyncServiceProvider).createMatch(initial);
+    state = created;
+    bindToMatch(created.id);
   }
 
   void startOfflinePracticeMatch(String playerId, String displayName, {GameMode mode = GameMode.classic, int maxPoints = 41}) {
@@ -743,7 +743,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     }
 
     // Auto-create public match if none found
-    initializeMatch(
+    await initializeMatch(
       playerId,
       displayName,
       mode,
@@ -759,81 +759,19 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
   }
 
   Future<void> joinMatch(String matchId, String playerId, String displayName) async {
-    final dbRef = FirebaseDatabase.instance.ref('matches/$matchId');
-    final snapshot = await dbRef.get();
-    if (!snapshot.exists) {
-      throw Exception('room_not_found');
+    final currentUser = ref.read(currentUserProvider);
+    if (currentUser == null || currentUser.uid != playerId) {
+      throw StateError('Sign in before joining a room.');
     }
 
-    final json = Map<String, dynamic>.from(snapshot.value as Map);
-    
-    // AUTO-DESTRUCT check: If trying to join an expired room, delete it.
-    if (json['expireAt'] != null) {
-       final expireAt = DateTime.tryParse(json['expireAt'].toString());
-       if (expireAt != null && DateTime.now().isAfter(expireAt)) {
-         await ref.read(multiplayerSyncServiceProvider).deleteMatch(matchId);
-         throw Exception('room_expired'); // Translation key
-       }
-    }
-
-    final playerIds = List<String>.from(json['playerIds'] ?? []);
-    final playerNames = Map<String, String>.from(json['playerNames'] ?? {});
-    
-    if (playerIds.contains(playerId)) {
-      bindToMatch(matchId);
-      return;
-    }
-
-    int targetIdx = -1;
-    // Prioritize partner slot (index 2) for second human as requested
-    if (playerIds.length >= 3 && playerIds[2].startsWith('waiting_')) {
-      targetIdx = 2;
-    } else {
-      // Find first available waiting slot
-      for (int i = 0; i < playerIds.length; i++) {
-        if (playerIds[i].startsWith('waiting_')) {
-          targetIdx = i;
-          break;
-        }
-      }
-    }
-
-    if (targetIdx != -1) {
-      playerIds[targetIdx] = playerId;
-      playerNames[playerId] = displayName;
-      
-      final skins = Map<String, String>.from(json['playerSkins'] ?? {});
-      skins[playerId] = ref.read(storeProvider).activeCardBackId;
-
-      final avatars = Map<String, String>.from(json['playerAvatars'] ?? {});
-      avatars[playerId] = ref.read(currentUserProvider)?.avatarUrl ?? "";
-
-      await dbRef.update({
-        'playerIds': playerIds,
-        'playerNames': playerNames,
-        'playerSkins': skins,
-        'playerAvatars': avatars,
-        'players/$playerId': true,
-      });
-
-      // Also update room index so lobby count updates
-      final phaseStr = json['phase']?.toString() ?? 'waitingForPlayers';
-      final isPublic = json['isPublic'] == true;
-      final modeStr = json['mode']?.toString() ?? 'classic';
-      final expireAtStr = json['expireAt']?.toString();
-      
-      await FirebaseDatabase.instance.ref('rooms/$matchId').update({
-        'playerIds': playerIds,
-        'mode': modeStr,
-        'isPublic': isPublic,
-        'phase': phaseStr,
-        if (expireAtStr != null) 'expireAt': expireAtStr,
-      });
-
-      bindToMatch(matchId);
-    } else {
-      throw Exception('room_is_full');
-    }
+    final joined = await ref.read(multiplayerSyncServiceProvider).joinRoom(
+      roomId: matchId,
+      displayName: displayName,
+      cardBackId: ref.read(storeProvider).activeCardBackId,
+      avatarUrl: currentUser.avatarUrl ?? '',
+    );
+    state = joined;
+    bindToMatch(joined.id);
   }
 
   Future<void> voteForBots(String playerId) async {

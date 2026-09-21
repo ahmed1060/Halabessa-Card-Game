@@ -51,15 +51,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         );
       }
 
-      // One-time cleanup for admin
-      if (user?.isAdmin == true) {
-        final matchesToDelete = ['RHY17001', 'ZIM64878'];
-        final sync = ref.read(multiplayerSyncServiceProvider);
-        for (final id in matchesToDelete) {
-          sync.deleteMatch(id);
-        }
-      }
-
       _checkDailyStreakReward();
     });
   }

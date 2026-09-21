@@ -171,12 +171,19 @@ android {
         }
     }
 
-    afterEvaluate {
-        android.libraryVariants.all  { variant ->
-            def mergeTaskName = "merge${variant.name.capitalize()}JniLibFolders"
-            def mergeTask = tasks.findByName(mergeTaskName)
-            if (mergeTask != null) {
-                mergeTask.dependsOn buildIl2Cpp
+    // The checked-in Unity export already contains libil2cpp.so for its
+    // supported ABI. Rebuilding it here requires the Unity Editor's host-
+    // specific IL2CPP toolchain (this export contains a Windows executable),
+    // so it cannot run on Linux CI. Opt in only for a deliberate Unity export
+    // rebuild on a compatible machine.
+    if (project.hasProperty('unityRebuildIl2Cpp')) {
+        afterEvaluate {
+            android.libraryVariants.all  { variant ->
+                def mergeTaskName = "merge${variant.name.capitalize()}JniLibFolders"
+                def mergeTask = tasks.findByName(mergeTaskName)
+                if (mergeTask != null) {
+                    mergeTask.dependsOn buildIl2Cpp
+                }
             }
         }
     }

@@ -31,7 +31,8 @@ android {
 // Android Resolver Exclusions End
 android {
     namespace "com.unity3d.player"
-    ndkPath "**NDKPATH**"
+    // Flutter/AGP provisions the pinned NDK from ndkVersion. Do not embed a
+    // Unity Editor path here; it makes exported projects machine-specific.
     ndkVersion "**NDKVERSION**"
 
     compileSdk **APIVERSION**

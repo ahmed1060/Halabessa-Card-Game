@@ -27,7 +27,7 @@ To bring the authentic, high-stakes atmosphere of the coffee-shop "Halabessa" ca
 
 ## 📦 Deployment
 
-For final build and deployment instructions, refer to the [FINAL_DEPLOYMENT_CHECKLIST](C:\Users\ahmed\.gemini\antigravity\brain\e3e55071-1d39-4427-a105-59697ebe02fe\FINAL_DEPLOYMENT_CHECKLIST.md) artifact.
+For final build and deployment instructions, refer to the [deployment checklist](FINAL_DEPLOYMENT_CHECKLIST.md).
 
 ---
 *Created with ❤️ by the Halabessa Team*

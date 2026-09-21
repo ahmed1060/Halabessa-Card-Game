@@ -32,6 +32,12 @@ class UnityCommunicationService {
 
       WebUtils.onMessage?.listen((event) {
         try {
+          // Unity's WebGL callbacks and Flutter's outbound bridge messages
+          // are posted by this document. Ignore messages injected by a
+          // foreign window before decoding an event that can trigger gameplay.
+          if (event.origin != WebUtils.window.location.origin || event.source != WebUtils.window) {
+            return;
+          }
           final message = event.data;
           if (message is String) {
             final data = jsonDecode(message);
@@ -76,13 +82,14 @@ class UnityCommunicationService {
     }
     try {
       if (kIsWeb) {
-        // For WebGL: Dispatch to the IFrame via window.postMessage
+        // Flutter and WebGL share this document; do not broadcast bridge
+        // messages to arbitrary embedded origins.
         final data = jsonEncode({
           'objectName': objectName,
           'methodName': methodName,
           'message': message,
         });
-        WebUtils.postMessage(data, '*');
+        WebUtils.postMessage(data, Uri.base.origin);
       } else {
         // For Native: Use the controller safely
         _controller?.postMessage(objectName, methodName, message);

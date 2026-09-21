@@ -3,13 +3,19 @@
     "matches": {
       "$matchId": {
         ".read": "auth != null",
-        ".write": "auth != null && (!data.exists() || data.child('players').hasChild(auth.uid) || (data.child('phase').val() == 'waitingForPlayers'))"
+        ".write": "auth != null && data.exists() && data.child('players').hasChild(auth.uid)"
       }
     },
     "matchHands": {
       "$matchId": {
         ".read": "auth != null && root.child('matches').child($matchId).child('players').hasChild(auth.uid)",
         ".write": "auth != null && root.child('matches').child($matchId).child('players').hasChild(auth.uid)"
+      }
+    },
+    "matchSecrets": {
+      "$matchId": {
+        ".read": false,
+        ".write": false
       }
     },
     "matchmaking_queue": {
@@ -21,17 +27,15 @@
     "rooms": {
       ".read": "auth != null",
       "$roomId": {
-        ".write": "auth != null"
+        ".write": false
       }
     },
     "users": {
       ".read": "auth != null",
       "$uid": {
-        ".write": "auth != null && auth.uid == $uid",
+        ".write": "auth != null && auth.uid == $uid && newData.child('friendInvites').val() == data.child('friendInvites').val()",
         "friendInvites": {
-          "$matchId": {
-            ".write": "auth != null"
-          }
+          ".write": false
         }
       }
     }

@@ -104,31 +104,27 @@ class FirebaseAuthRepository implements AuthRepository {
 
   @override
   Stream<AppUser?> get authStateChanges {
-    return _firebaseAuth.userChanges().asyncMap((firebaseUser) async {
+    return _firebaseAuth.userChanges().asyncExpand((firebaseUser) {
       if (firebaseUser == null) return null;
-
-      AppUser? user;
-      try {
-        final doc = await FirebaseFirestore.instance
-            .collection('users')
-            .doc(firebaseUser.uid)
-            .get();
-
+      return FirebaseFirestore.instance
+          .collection('users')
+          .doc(firebaseUser.uid)
+          .snapshots()
+          .asyncMap((doc) async {
+        AppUser? user;
         if (doc.exists && doc.data() != null) {
           user = AppUser.fromJson(doc.data()!, firebaseUser.uid);
         }
-      } catch (e) {
-        debugPrint("Error fetching Firestore user: $e");
-      }
-      user ??= _userFromFirebase(firebaseUser);
-      if (user == null) return null;
+        user ??= _userFromFirebase(firebaseUser);
+        if (user == null) return null;
 
-      // Authorization comes from the live custom claim, not whatever
-      // Firestore's isAdmin mirror currently says -- overriding it here
-      // means a stale or (pre-fix) tampered mirror can never grant more
-      // than the claim actually allows. See HAL-08.
-      final isAdmin = await _syncAdminClaim(firebaseUser.uid);
-      return user.copyWith(isAdmin: isAdmin);
+        // Authorization comes from the live custom claim, not whatever
+        // Firestore's isAdmin mirror currently says -- overriding it here
+        // means a stale or (pre-fix) tampered mirror can never grant more
+        // than the claim actually allows. See HAL-08.
+        final isAdmin = await _syncAdminClaim(firebaseUser.uid);
+        return user.copyWith(isAdmin: isAdmin);
+      });
     });
   }
 

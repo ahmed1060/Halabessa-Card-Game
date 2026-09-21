@@ -24,50 +24,78 @@ class MultiplayerSyncService {
   /// can't be narrowed by a rule on a child. See HAL-05.
   DatabaseReference _handsRef(String matchId) => _db.ref('matchHands').child(matchId);
 
-  Future<void> _writeHands(MatchState matchState) async {
-    if (matchState.handCards.isEmpty) return;
+  Map<String, dynamic> _handUpdates(MatchState matchState) {
     final updates = <String, dynamic>{};
     matchState.handCards.forEach((uid, cards) {
-      updates[uid] = cards.map((c) => c.toJson()).toList();
+      updates['matchHands/${matchState.id}/$uid'] = cards.map((c) => c.toJson()).toList();
     });
-    await _handsRef(matchState.id).update(updates);
+    return updates;
   }
 
   /// Lightweight lobby index -- see room_summary.dart and HAL-06.
   DatabaseReference get roomsRef => _db.ref('rooms');
   DatabaseReference get _roomsRef => roomsRef;
 
-  Future<void> _writeRoomIndex(MatchState matchState) async {
-    final summary = RoomSummary(
-      id: matchState.id,
-      mode: matchState.mode,
-      playerIds: matchState.playerIds,
-      isPublic: matchState.isPublic,
-      phase: matchState.phase,
-      expireAt: matchState.expireAt,
-    );
-    await _roomsRef.child(matchState.id).set(summary.toJson());
-  }
-
-  /// Create a new match room in Firebase Realtime Database
-  Future<void> createMatch(MatchState matchState) async {
-    await matchRef.child(matchState.id).set(matchState.toJson());
-    await _writeHands(matchState);
-    await _writeRoomIndex(matchState);
+  /// Creates a room through the server so the caller cannot choose another
+  /// user's identity or race another room creator for the same id.
+  Future<MatchState> createMatch(MatchState matchState) async {
+    final response = await FirebaseFunctions.instance.httpsCallable('createRoom').call({
+      'mode': matchState.mode.name,
+      'maxPoints': matchState.maxPoints,
+      'timerDurationSeconds': matchState.timerDurationSeconds,
+      'isPublic': matchState.isPublic,
+      'displayName': matchState.playerNames.isEmpty ? '' : matchState.playerNames.values.first,
+      'cardBackId': matchState.playerSkins.isEmpty ? '' : matchState.playerSkins.values.first,
+      'avatarUrl': matchState.playerAvatars.isEmpty ? '' : matchState.playerAvatars.values.first,
+    });
+    final data = Map<String, dynamic>.from(response.data as Map);
+    return MatchState.fromJson(Map<String, dynamic>.from(data['match'] as Map));
   }
 
   /// Update an entire existing match state
-  Future<void> updateMatchState(MatchState matchState) async {
-    await matchRef.child(matchState.id).update(matchState.toJson());
-    await _writeHands(matchState);
-    await _writeRoomIndex(matchState);
+  Future<void> updateMatchState(MatchState matchState, {bool refreshRoomIndex = false}) async {
+    // The public state and private hands must change in the same RTDB update.
+    // Two sequential writes briefly exposed a new turn with old cards and
+    // made reconnects vulnerable to observing a mismatched snapshot.
+    final updates = <String, dynamic>{
+      'matches/${matchState.id}': matchState.toJson(),
+      ..._handUpdates(matchState),
+    };
+    await _db.ref().update(updates);
+    if (!refreshRoomIndex) return;
+    // The lobby index is server-written from the persisted match, avoiding
+    // client-forged room summaries and keeping phase/seat changes visible.
+    try {
+      await FirebaseFunctions.instance
+          .httpsCallable('refreshRoomIndex')
+          .call({'roomId': matchState.id});
+    } catch (e) {
+      // Index refresh must not roll back a successfully persisted move; the
+      // next state update or scheduled cleanup will reconcile it.
+      if (kDebugMode) debugPrint('Could not refresh room index for ${matchState.id}: $e');
+    }
   }
 
-  /// Delete a match room
+  /// Deletes a room through the admin-only server endpoint.
   Future<void> deleteMatch(String matchId) async {
-    await matchRef.child(matchId).remove();
-    await _handsRef(matchId).remove();
-    await _roomsRef.child(matchId).remove();
+    await FirebaseFunctions.instance.httpsCallable('deleteRoom').call({'roomId': matchId});
+  }
+
+  /// Atomically claims a waiting seat through the server.
+  Future<MatchState> joinRoom({
+    required String roomId,
+    required String displayName,
+    required String cardBackId,
+    required String avatarUrl,
+  }) async {
+    final response = await FirebaseFunctions.instance.httpsCallable('joinRoom').call({
+      'roomId': roomId,
+      'displayName': displayName,
+      'cardBackId': cardBackId,
+      'avatarUrl': avatarUrl,
+    });
+    final data = Map<String, dynamic>.from(response.data as Map);
+    return MatchState.fromJson(Map<String, dynamic>.from(data['match'] as Map));
   }
 
   /// Watches the public match node and the (participant-only) hands tree
@@ -173,9 +201,9 @@ class MultiplayerSyncService {
             if (data is! Map) return;
             final room = RoomSummary.fromJson(id.toString(), data);
 
-            // AUTO-DESTRUCT: If the room is expired, delete it and don't show it
+            // Expired rooms are not joinable. Deletion is server-owned; a
+            // lobby observer must never be able to delete another room.
             if (room.expireAt != null && now.isAfter(room.expireAt!)) {
-              deleteMatch(room.id);
               return;
             }
 
@@ -211,10 +239,13 @@ class MultiplayerSyncService {
     });
   }
 
-  /// Send a match invitation to a friend
-  Future<void> sendInvite(String toUid, String matchId, String senderName) async {
-    final inviteRef = _db.ref('users').child(toUid).child('friendInvites').child(matchId);
-    await inviteRef.set(senderName);
+  /// Send a match invitation through the server. The function validates that
+  /// the caller is seated in a waiting room and that the recipient is their
+  /// Firestore friend; clients never write another user's invite map.
+  Future<void> sendInvite(String toUid, String matchId) async {
+    await FirebaseFunctions.instance
+        .httpsCallable('sendRoomInvite')
+        .call({'toUid': toUid, 'roomId': matchId});
   }
 
   /// Search for users by display name (basic prefix search)

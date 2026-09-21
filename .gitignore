@@ -33,6 +33,7 @@ functions/node_modules/
 .pub-cache/
 .pub/
 /build/
+**/local.properties
 
 # Mobile Library Exports (We WANT to commit these for CI/CD)
 # Ensure these ARE NOT ignored by the /build/ rule above

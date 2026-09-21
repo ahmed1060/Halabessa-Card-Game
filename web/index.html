@@ -114,7 +114,7 @@
     // the same window.postMessage channel Flutter's WebUtils.onMessage
     // listener already reads.
     window.handleUnityMessage = function (message) {
-      window.postMessage(message, '*');
+      window.postMessage(message, window.location.origin);
     };
 
     window.handleUnitySceneLoaded = function (name, buildIndex, isLoaded, isValid) {
@@ -122,14 +122,18 @@
     };
 
     window.addEventListener('message', function (event) {
-      if (typeof event.data === 'string') {
-        try {
-          var data = JSON.parse(event.data);
-          if (data.objectName && data.methodName && unityInstance) {
-            unityInstance.SendMessage(data.objectName, data.methodName, data.message || "");
-          }
-        } catch (e) { }
-      }
+      // Flutter and Unity share this window. Reject messages from iframes or
+      // another origin, then permit only the bridge methods Flutter uses.
+      if (event.origin !== window.location.origin || event.source !== window || typeof event.data !== 'string') return;
+
+      try {
+        var data = JSON.parse(event.data);
+        var isBridgeMessage = data.objectName === 'UnityBridge' &&
+          (data.methodName === 'OnFlutterMessage' || data.methodName === 'ToggleConsole');
+        if (isBridgeMessage && unityInstance) {
+          unityInstance.SendMessage('UnityBridge', data.methodName, data.message || "");
+        }
+      } catch (e) { }
     });
   </script>
 

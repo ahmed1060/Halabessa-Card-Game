@@ -19,6 +19,17 @@ jobs:
       # Fatal on errors only -- see android-build.yml for why.
       - run: flutter analyze --no-fatal-warnings --no-fatal-infos
       - run: flutter test
+      - name: Install Functions dependencies
+        run: npm ci --prefix functions
+      # Deploy the server-side enforcement and its rules before the client.
+      # Do not publish a release when any of these steps fails.
+      - name: Deploy Firebase backend and rules
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/firebase-service-account.json
+        run: |
+          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_HALABESSA_CARD_GAME1 }}' > "$GOOGLE_APPLICATION_CREDENTIALS"
+          npx firebase-tools deploy --only functions,firestore:rules,storage:rules,database --project halabessa-card-game1 --non-interactive
+          rm -f "$GOOGLE_APPLICATION_CREDENTIALS"
       - name: Install ChromeDriver
         run: |
           sudo apt-get update && sudo apt-get install -y chromium-chromedriver
@@ -32,46 +43,3 @@ jobs:
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_HALABESSA_CARD_GAME1 }}
           channelId: live
           projectId: halabessa-card-game1
-      # action-hosting-deploy above only ever touches Hosting. Firestore/
-      # Storage/Database rules (firestore.rules, storage.rules,
-      # database.rules.json) sat in the repo unenforced until now -- nothing
-      # deployed them. Reuses the same service account secret; the CLI picks
-      # it up as Application Default Credentials via GOOGLE_APPLICATION_CREDENTIALS.
-      #
-      # Three independent steps rather than one combined
-      # `--only firestore:rules,storage:rules,database` command, each with
-      # continue-on-error + if: always() so one target failing (e.g. a
-      # missing IAM role on the deploy service account for that specific
-      # target) can never prevent the others from being attempted. Without
-      # both of these, GitHub Actions' default "stop the job on the first
-      # failing step" would have the exact same silent-skip problem the
-      # split was meant to fix.
-      - name: Deploy Firestore rules
-        if: always()
-        continue-on-error: true
-        env:
-          GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/firebase-service-account.json
-        run: |
-          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_HALABESSA_CARD_GAME1 }}' > "$GOOGLE_APPLICATION_CREDENTIALS"
-          npx firebase-tools deploy --only firestore:rules --project halabessa-card-game1 --non-interactive
-          rm -f "$GOOGLE_APPLICATION_CREDENTIALS"
-
-      - name: Deploy Storage rules
-        if: always()
-        continue-on-error: true
-        env:
-          GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/firebase-service-account.json
-        run: |
-          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_HALABESSA_CARD_GAME1 }}' > "$GOOGLE_APPLICATION_CREDENTIALS"
-          npx firebase-tools deploy --only storage:rules --project halabessa-card-game1 --non-interactive
-          rm -f "$GOOGLE_APPLICATION_CREDENTIALS"
-
-      - name: Deploy Realtime Database rules
-        if: always()
-        continue-on-error: true
-        env:
-          GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/firebase-service-account.json
-        run: |
-          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_HALABESSA_CARD_GAME1 }}' > "$GOOGLE_APPLICATION_CREDENTIALS"
-          npx firebase-tools deploy --only database --project halabessa-card-game1 --non-interactive
-          rm -f "$GOOGLE_APPLICATION_CREDENTIALS"

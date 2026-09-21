@@ -1,4 +1,5 @@
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 
 class DailyReward {
   final int day;
@@ -43,6 +44,29 @@ class DailyStreakService {
   ];
 
   static Future<DailyStreakStatus> checkStatus({DateTime? overrideNow}) async {
+    // Production status comes from the server's Cairo calendar and the
+    // profile's persistent streak. An explicit time is retained for local
+    // deterministic tests and offline fallback calculations.
+    if (overrideNow == null) {
+      try {
+        final response = await FirebaseFunctions.instance
+            .httpsCallable('getDailyRewardStatus')
+            .call();
+        final data = Map<String, dynamic>.from(response.data as Map);
+        final streak = (data['streak'] as num).toInt();
+        final coins = (data['coins'] as num).toInt();
+        final diamonds = (data['diamonds'] as num).toInt();
+        return DailyStreakStatus(
+          currentStreak: streak,
+          isClaimableToday: data['isClaimableToday'] == true,
+          todayReward: DailyReward(day: streak, coins: coins, diamonds: diamonds),
+          schedule: schedule,
+        );
+      } catch (_) {
+        // Retain a usable offline view; the server still rejects duplicate
+        // claims when connectivity returns.
+      }
+    }
     final prefs = await SharedPreferences.getInstance();
     final lastDateStr = prefs.getString(_lastClaimDateKey);
     final savedStreak = prefs.getInt(_currentStreakKey) ?? 0;
@@ -117,5 +141,16 @@ class DailyStreakService {
     await prefs.setInt(_currentStreakKey, status.currentStreak);
 
     return status.todayReward;
+  }
+
+  /// Mirrors a successful server-side claim locally so the dialog and home
+  /// screen immediately reflect it. Currency is intentionally not handled
+  /// here; claimDailyReward Cloud Function owns that mutation.
+  static Future<void> recordServerClaim(int streak, {String? serverDate, DateTime? now}) async {
+    final prefs = await SharedPreferences.getInstance();
+    final current = now ?? DateTime.now();
+    final date = serverDate ?? '${current.year}-${current.month.toString().padLeft(2, '0')}-${current.day.toString().padLeft(2, '0')}';
+    await prefs.setString(_lastClaimDateKey, date);
+    await prefs.setInt(_currentStreakKey, streak);
   }
 }
