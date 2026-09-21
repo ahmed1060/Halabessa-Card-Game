@@ -2,7 +2,7 @@
 
 const assert = require("node:assert/strict");
 const test = require("node:test");
-const { standardDeck, cutDeck, cut, deal, playCard } = require("../match_engine");
+const { standardDeck, startRound, cutDeck, cut, deal, playCard } = require("../match_engine");
 
 test("deal distributes four cards to each player and four to the board", () => {
   const state = { playerIds: ["a", "b", "c", "d"], handCards: {}, board: {} };
@@ -39,4 +39,13 @@ test("deal rejects out-of-order calls and incomplete decks", () => {
   const state = { phase: "playing", dealerIndex: 0, playerIds: ["a", "b", "c", "d"], handCards: {} };
   assert.throws(() => deal(state, standardDeck(), "a", { initial: true }), /not ready/);
   assert.throws(() => deal({ ...state, phase: "dealingFasha" }, standardDeck().slice(0, 19), "a", { initial: true }), /Not enough/);
+});
+
+test("only a host can create the hidden round deck", () => {
+  const state = { phase: "waitingForPlayers", dealerIndex: 0, roundCount: 0, playerIds: ["a", "b", "c", "d"] };
+  assert.throws(() => startRound(state, "b", () => 0), /room host/);
+  const result = startRound(state, "a", () => 0);
+  assert.equal(result.state.phase, "preRoundCut");
+  assert.equal(result.state.deckCount, 52);
+  assert.equal(new Set(result.deck.map((card) => `${card.suit}_${card.rank}`)).size, 52);
 });

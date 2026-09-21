@@ -30,6 +30,34 @@ function shuffleDeck(deck, randomInt) {
   return next;
 }
 
+function startRound(state, playerId, randomInt) {
+  if (!Array.isArray(state.playerIds) || state.playerIds.length !== 4 || state.playerIds.some((id) => id.startsWith("waiting_"))) {
+    throw new Error("A full match is required to start a round.");
+  }
+  if (state.playerIds[0] !== playerId) throw new Error("Only the room host can start a round.");
+  if (!["waitingForPlayers", "shuffleVoting", "rematchVoting", "roundScoring"].includes(state.phase)) {
+    throw new Error("Match is not ready to start a round.");
+  }
+  const deck = shuffleDeck(standardDeck(), randomInt);
+  const firstRound = !Number.isInteger(state.roundCount) || state.roundCount < 1;
+  const dealerIndex = firstRound ? 0 : (state.dealerIndex + 1) % state.playerIds.length;
+  return {
+    state: {
+      ...state,
+      dealerIndex,
+      currentTurnIndex: (dealerIndex + 1) % state.playerIds.length,
+      phase: "preRoundCut",
+      roundCount: firstRound ? 1 : state.roundCount + 1,
+      roundsSinceLastShuffle: 0,
+      board: [], handCards: {}, harvestStacks: { teamA: [], teamB: [] },
+      shuffleVotes: {}, rematchVotes: {}, botInjectionVotes: {}, recentFasha: [],
+      cardOwnership: {}, skippedMatches: {}, cutLastCard: null, lastCaptureTeam: null,
+      deckCount: deck.length,
+    },
+    deck,
+  };
+}
+
 function cutDeck(deck, position) {
   if (!Number.isInteger(position) || position <= 0 || position >= deck.length) return [...deck];
   return [...deck.slice(position), ...deck.slice(0, position)];
@@ -183,4 +211,4 @@ function playCard(state, playerId, card) {
   };
 }
 
-module.exports = { cardKey, standardDeck, shuffleDeck, cutDeck, cut, deal, playCard };
+module.exports = { cardKey, standardDeck, shuffleDeck, startRound, cutDeck, cut, deal, playCard };

@@ -294,6 +294,14 @@ exports.submitMatchAction = onCall(async (request) => {
   let nextDeck = secret.deck || [];
   try {
     switch (action.type) {
+      case "startRound": {
+        ({ state: nextState, deck: nextDeck } = matchEngine.startRound(
+          state,
+          auth.uid,
+          (upperBound) => crypto.randomInt(upperBound),
+        ));
+        break;
+      }
       case "cut": {
         ({ state: nextState, deck: nextDeck } = matchEngine.cut(state, nextDeck, auth.uid, action.position));
         break;
