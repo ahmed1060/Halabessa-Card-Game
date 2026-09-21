@@ -24,7 +24,11 @@ jobs:
           java-version: "21"
 
       - name: Set up Android SDK, NDK, and CMake
-        uses: android-actions/setup-android@v3
+        # v3 attempts to install Google's retired `tools` SDK package and
+        # fails before the Flutter build starts. v4 uses command-line tools.
+        uses: android-actions/setup-android@v4
+        with:
+          packages: platform-tools
 
       - name: Install Unity export build tools
         run: sdkmanager "ndk;27.2.12479018" "cmake;3.22.1"
