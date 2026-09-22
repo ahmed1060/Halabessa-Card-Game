@@ -21,7 +21,7 @@ version: 1.0.0+1
 environment:
   # Flutter 3.47 ships with a modern Dart SDK. Keep the lower bound aligned
   # with the dependency graph rather than resolving packages that cannot build.
-  sdk: ">=3.4.0 <4.0.0"
+  sdk: ">=3.10.0 <4.0.0"
 
 # Dependencies specify other packages that your package needs in order to work.
 # To automatically upgrade your package dependencies to the latest versions
@@ -50,6 +50,9 @@ dependencies:
   cloud_firestore: ^5.4.0
   firebase_storage: ^12.1.0
   image_picker: ^1.1.2
+  # Flutter 3.47 removed the Android v1 embedding APIs. Older transitive
+  # lifecycle releases still reference PluginRegistry.Registrar.
+  flutter_plugin_android_lifecycle: 2.0.35
   quiver: ^3.2.1
   file_picker: ^8.0.0+1
   http: 1.2.2
