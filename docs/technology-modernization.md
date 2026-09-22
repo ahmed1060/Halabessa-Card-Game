@@ -40,21 +40,29 @@ the visual client cannot become a second source of game truth.
 
 ### Foundation — now
 
-- Keep a single Flutter-to-Unity data path and remove the unused Unity Firebase
-  SDK/listener.
-- Make CI consume Git LFS Unity binaries and verify their archive signatures.
-- Keep Firebase Hosting deploys serialized and independently reproducible.
-- Remove Firebase Storage from every client and route asset uploads through the
-  server-authorized Supabase Storage gateway.
+- [x] Keep a single Flutter-to-Unity data path and remove the unused Unity
+  Firebase SDK/listener.
+- [x] Make CI consume Git LFS Unity binaries and verify their archive
+  signatures.
+- [x] Keep Firebase Hosting deploys serialized and independently reproducible.
+- [x] Remove Firebase Storage from every client and route asset uploads through
+  the server-authorized Supabase Storage gateway.
+- [x] Back every newly created online room with a private Postgres authority
+  record, private secrets row and monotonic version. Synchronize joins under a
+  row lock and cascade administrative deletion through both data stores.
+- [x] Add a private idempotent command ledger keyed by room and command UUID;
+  browser roles have neither table grants nor an allow policy.
 - Regenerate the checked-in Android and iOS Unity exports from the cleaned
   Unity source before store submission, removing the temporary legacy Firebase
   resource compatibility code from the iOS Podfile.
 
 ### Authoritative multiplayer
 
-- Move `startRound`, `cut`, `deal`, `playCard`, votes, timeouts and scoring into
-  the Supabase Edge Function.
-- Store the secret deck and action version in private server storage.
+- [ ] Move `startRound`, `cut`, `deal`, `playCard`, votes, timeouts and scoring
+  into the Supabase Edge Function.
+- [ ] Store the secret deck and action version in private server storage. The
+  schema and room lifecycle are live; command handlers and client routing are
+  the remaining work.
 - Return redacted per-player snapshots and lock RTDB gameplay writes to the
   backend service account.
 - Add deterministic engine fixtures shared between client expectations and the

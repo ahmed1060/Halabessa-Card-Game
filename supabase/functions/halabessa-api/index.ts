@@ -321,14 +321,53 @@ Deno.serve(async (request) => {
             players: { [user.uid]: true }, playerNames: { [user.uid]: displayName },
             playerSkins: { [user.uid]: cardBackId }, playerAvatars: { [user.uid]: avatarUrl },
             dealerIndex: 0, currentTurnIndex: 1, phase: "waitingForPlayers",
-            timerDurationSeconds: body.timerDurationSeconds, isPublic: body.isPublic, expiresAt,
+            timerDurationSeconds: body.timerDurationSeconds, isPublic: body.isPublic, expireAt: expiresAt,
           };
-          const created = await firebaseRequest(`matches/${id}`, "PUT", match, "null_etag");
-          if (created.status === 412) continue;
-          if (created.status < 200 || created.status >= 300) throw new Error("room_create_failed");
-          const indexed = await firebaseRequest(`rooms/${id}`, "PUT", roomSummary(match));
-          if (indexed.status < 200 || indexed.status >= 300) throw new Error("room_index_failed");
-          return reply({ roomId: id, match }, 200, origin);
+          let transactionOpen = false;
+          let firebaseCreated = false;
+          try {
+            await connection.queryObject`begin`;
+            transactionOpen = true;
+            const inserted = await connection.queryObject<{ room_id: string }>`
+              insert into halabessa.rooms (room_id, owner_uid, state, expires_at)
+              values (${id}, ${user.uid}, ${JSON.stringify(match)}::jsonb, ${expiresAt}::timestamptz)
+              on conflict do nothing
+              returning room_id
+            `;
+            if (!inserted.rows[0]) {
+              await connection.queryObject`rollback`;
+              transactionOpen = false;
+              continue;
+            }
+            await connection.queryObject`
+              insert into halabessa.room_secrets (room_id) values (${id})
+            `;
+            const created = await firebaseRequest(`matches/${id}`, "PUT", match, "null_etag");
+            if (created.status === 412) {
+              await connection.queryObject`rollback`;
+              transactionOpen = false;
+              continue;
+            }
+            if (created.status < 200 || created.status >= 300) throw new Error("room_create_failed");
+            firebaseCreated = true;
+            const indexed = await firebaseRequest(`rooms/${id}`, "PUT", roomSummary(match));
+            if (indexed.status < 200 || indexed.status >= 300) throw new Error("room_index_failed");
+            await connection.queryObject`commit`;
+            transactionOpen = false;
+            return reply({ roomId: id, match, version: 0 }, 200, origin);
+          } catch (error) {
+            if (transactionOpen) await connection.queryObject`rollback`;
+            if (firebaseCreated) {
+              const cleanup = await firebaseRequest("", "PATCH", {
+                [`matches/${id}`]: null,
+                [`rooms/${id}`]: null,
+              });
+              if (cleanup.status < 200 || cleanup.status >= 300) {
+                console.error("room create compensation failed", { roomId: id, status: cleanup.status });
+              }
+            }
+            throw error;
+          }
         }
         throw new Error("room_create_failed");
       }
@@ -357,14 +396,57 @@ Deno.serve(async (request) => {
             match.playerNames = { ...(match.playerNames as Record<string, string> ?? {}), [user.uid]: displayName };
             match.playerSkins = { ...(match.playerSkins as Record<string, string> ?? {}), [user.uid]: cardBackId };
             match.playerAvatars = { ...(match.playerAvatars as Record<string, string> ?? {}), [user.uid]: avatarUrl };
-            const written = await firebaseRequest(`matches/${id}`, "PUT", match, current.etag ?? undefined);
-            if (written.status === 412) continue;
-            if (written.status < 200 || written.status >= 300) throw new Error("room_join_failed");
+            let transactionOpen = false;
+            try {
+              await connection.queryObject`begin`;
+              transactionOpen = true;
+              const authoritative = await connection.queryObject<{ version: string }>`
+                select version::text as version from halabessa.rooms where room_id = ${id} for update
+              `;
+              if (!authoritative.rows[0]) {
+                await connection.queryObject`rollback`;
+                transactionOpen = false;
+                return reply({ error: "room_not_authoritative" }, 409, origin);
+              }
+              await connection.queryObject`
+                update halabessa.rooms
+                set state = ${JSON.stringify(match)}::jsonb,
+                    expires_at = ${typeof match.expireAt === "string" ? match.expireAt : null}::timestamptz,
+                    updated_at = now()
+                where room_id = ${id}
+              `;
+              const written = await firebaseRequest(`matches/${id}`, "PUT", match, current.etag ?? undefined);
+              if (written.status === 412) {
+                await connection.queryObject`rollback`;
+                transactionOpen = false;
+                continue;
+              }
+              if (written.status < 200 || written.status >= 300) throw new Error("room_join_failed");
+              const indexed = await firebaseRequest(`rooms/${id}`, "PUT", roomSummary(match));
+              if (indexed.status < 200 || indexed.status >= 300) throw new Error("room_index_failed");
+              await connection.queryObject`delete from halabessa.room_invites where room_id = ${id} and recipient_uid = ${user.uid}`;
+              await connection.queryObject`commit`;
+              transactionOpen = false;
+              return reply({
+                roomId: id,
+                match,
+                seatIndex: seat,
+                alreadyJoined: false,
+                version: Number(authoritative.rows[0].version),
+              }, 200, origin);
+            } catch (error) {
+              if (transactionOpen) await connection.queryObject`rollback`;
+              throw error;
+            }
           }
           const indexed = await firebaseRequest(`rooms/${id}`, "PUT", roomSummary(match));
           if (indexed.status < 200 || indexed.status >= 300) throw new Error("room_index_failed");
           await connection.queryObject`delete from halabessa.room_invites where room_id = ${id} and recipient_uid = ${user.uid}`;
-          return reply({ roomId: id, match, seatIndex: seat, alreadyJoined: existing >= 0 }, 200, origin);
+          const authoritative = await connection.queryObject<{ version: string }>`
+            select version::text as version from halabessa.rooms where room_id = ${id}
+          `;
+          if (!authoritative.rows[0]) return reply({ error: "room_not_authoritative" }, 409, origin);
+          return reply({ roomId: id, match, seatIndex: seat, alreadyJoined: true, version: Number(authoritative.rows[0].version) }, 200, origin);
         }
         return reply({ error: "room_changed_retry" }, 409, origin);
       }
@@ -384,15 +466,25 @@ Deno.serve(async (request) => {
         if (!await isAdmin(connection, user)) return reply({ error: "admin_required" }, 403, origin);
         const id = typeof body.roomId === "string" && /^[A-Z]{3}[0-9]{5}$/.test(body.roomId) ? body.roomId : null;
         if (!id) return reply({ error: "invalid_room_id" }, 400, origin);
-        const deleted = await firebaseRequest("", "PATCH", {
-          [`matches/${id}`]: null,
-          [`matchHands/${id}`]: null,
-          [`matchSecrets/${id}`]: null,
-          [`rooms/${id}`]: null,
-        });
-        if (deleted.status < 200 || deleted.status >= 300) throw new Error("room_delete_failed");
-        await connection.queryObject`delete from halabessa.room_invites where room_id = ${id}`;
-        return reply({ ok: true, roomId: id }, 200, origin);
+        let transactionOpen = false;
+        try {
+          await connection.queryObject`begin`;
+          transactionOpen = true;
+          await connection.queryObject`delete from halabessa.rooms where room_id = ${id}`;
+          const deleted = await firebaseRequest("", "PATCH", {
+            [`matches/${id}`]: null,
+            [`matchHands/${id}`]: null,
+            [`matchSecrets/${id}`]: null,
+            [`rooms/${id}`]: null,
+          });
+          if (deleted.status < 200 || deleted.status >= 300) throw new Error("room_delete_failed");
+          await connection.queryObject`commit`;
+          transactionOpen = false;
+          return reply({ ok: true, roomId: id }, 200, origin);
+        } catch (error) {
+          if (transactionOpen) await connection.queryObject`rollback`;
+          throw error;
+        }
       }
       if (body.action === "sendRoomInvite") {
         const id = typeof body.roomId === "string" && /^[A-Z]{3}[0-9]{5}$/.test(body.roomId) ? body.roomId : null;
