@@ -73,11 +73,13 @@ subprojects {
         }
 
         if (project.name == 'flutter_unity_widget') {
-            project.dependencies {
-                // The plugin needs Unity's classes to compile, but the app already
-                // receives the same JAR through project(':unityLibrary'). Keeping
-                // this compile-only prevents duplicate classes in the release APK.
-                compileOnly rootProject.files("../androidBuild/unityExport/unityLibrary/libs/unity-classes.jar")
+            // The Unity 6000 plugin declares both project(':unityLibrary') and
+            // unity-classes.jar. The Unity module already publishes that JAR,
+            // so the second dependency duplicates every com.unity3d.player
+            // class in the release runtime classpath. Keep the project
+            // dependency and remove only the redundant flatDir dependency.
+            project.configurations.implementation.dependencies.removeAll {
+                it.name == 'unity-classes'
             }
         }
     }

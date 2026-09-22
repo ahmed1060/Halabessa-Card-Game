@@ -26,6 +26,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Verify Unity native libraries
+        run: |
+          git lfs pull --include="androidBuild/unityExport/unityLibrary/src/main/jniLibs/**" --exclude=""
+          test "$(head -c 4 androidBuild/unityExport/unityLibrary/src/main/jniLibs/arm64-v8a/libil2cpp.so | xxd -p)" = '7f454c46'
+          test "$(head -c 4 androidBuild/unityExport/unityLibrary/src/main/jniLibs/arm64-v8a/libunity.so | xxd -p)" = '7f454c46'
+          test "$(head -c 4 androidBuild/unityExport/unityLibrary/src/main/jniLibs/arm64-v8a/libmain.so | xxd -p)" = '7f454c46'
+
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
