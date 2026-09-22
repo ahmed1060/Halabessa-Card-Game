@@ -82,7 +82,9 @@ class AssetPreloaderService {
     try {
       final globalSettings = _ref.read(globalSettingsProvider);
       if (globalSettings.musicOverrideUrl != null) {
-        await _audioCache.setSourceUrl(globalSettings.musicOverrideUrl!);
+        await _audioCache
+            .setSourceUrl(globalSettings.musicOverrideUrl!)
+            .timeout(const Duration(seconds: 5));
       }
     } catch (_) {}
 

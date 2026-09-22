@@ -26,12 +26,17 @@ class _AuthWrapperState extends ConsumerState<AuthWrapper> {
 
   Future<void> _initAssets() async {
     final preloader = ref.read(assetPreloaderServiceProvider);
-    
+
     // We wait for the first frame to ensure context is available for preloader
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      await preloader.preloadAll(context);
-      if (mounted) {
-        setState(() => _assetsPreloaded = true);
+      try {
+        await preloader.preloadAll(context);
+      } catch (error, stackTrace) {
+        debugPrint('Asset preloading failed: $error\n$stackTrace');
+      } finally {
+        if (mounted) {
+          setState(() => _assetsPreloaded = true);
+        }
       }
     });
   }
