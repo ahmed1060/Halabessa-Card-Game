@@ -19,7 +19,9 @@ publish_to: "none" # Remove this line if you wish to publish to pub.dev
 version: 1.0.0+1
 
 environment:
-  sdk: ">=3.3.3 <4.0.0"
+  # Flutter 3.47 ships with a modern Dart SDK. Keep the lower bound aligned
+  # with the dependency graph rather than resolving packages that cannot build.
+  sdk: ">=3.4.0 <4.0.0"
 
 # Dependencies specify other packages that your package needs in order to work.
 # To automatically upgrade your package dependencies to the latest versions
@@ -51,6 +53,9 @@ dependencies:
   image_picker: ^1.1.2
   quiver: ^3.2.1
   file_picker: ^8.0.0+1
+  # 5.5.0 references the removed UnmodifiableUint8ListView API. Pin the first
+  # compatible release until upstream plugin constraints naturally resolve it.
+  win32: 5.5.1
   confetti: ^0.8.0
   flutter_unity_widget:
     git:

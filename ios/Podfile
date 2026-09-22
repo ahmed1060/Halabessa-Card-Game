@@ -1,5 +1,5 @@
 # Uncomment this line to define a global platform for your project
-platform :ios, '13.0'
+platform :ios, '15.0'
 
 # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
 ENV['COCOAPODS_DISABLE_STATS'] = '1'
@@ -23,7 +23,12 @@ def flutter_root
   raise "FLUTTER_ROOT not found in Generated.xcconfig. Try deleting Generated.xcconfig and running flutter pub get."
 end
 
-require File.expand_path(File.join('..', 'Flutter', 'flutter_export_environment.rb'))
+# Generated.xcconfig exposes FLUTTER_ROOT; podhelper supplies the Flutter
+# CocoaPods integration methods used below. The export-environment script is
+# not a Ruby file and must not be required by CocoaPods.
+require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelper'), flutter_root)
+
+flutter_ios_podfile_setup
 
 install! 'cocoapods', :deterministic_uuids => false
 
