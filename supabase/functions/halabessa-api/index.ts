@@ -1,6 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { Pool } from "jsr:@db/postgres@^0";
-import { createRemoteJWKSet, jwtVerify } from "npm:jose@6";
+import { createRemoteJWKSet, importPKCS8, jwtVerify, SignJWT } from "npm:jose@6";
 
 const firebaseProject = "halabessa-card-game1";
 const firebaseKeys = createRemoteJWKSet(new URL(
@@ -12,6 +12,11 @@ const allowedOrigins = new Set([
   "http://localhost:3000",
   "http://localhost:5000",
 ]);
+const firebaseDatabaseUrl = "https://halabessa-card-game1-default-rtdb.firebaseio.com";
+const roomModes = new Set(["classic", "tafweet"]);
+const roomPoints = new Set([21, 41, 61]);
+const roomTimers = new Set([0, 5, 10, 15]);
+let firebaseToken: { value: string; expiresAt: number } | null = null;
 
 function headers(origin: string | null) {
   return {
@@ -39,7 +44,80 @@ async function firebaseUser(request: Request) {
     uid: payload.sub,
     email: typeof payload.email === "string" ? payload.email : null,
     name: typeof payload.name === "string" ? payload.name.slice(0, 64) : "Player",
+    admin: payload.admin === true,
   };
+}
+
+async function firebaseAccessToken() {
+  if (firebaseToken && firebaseToken.expiresAt > Date.now() + 60_000) return firebaseToken.value;
+  const raw = Deno.env.get("FIREBASE_SERVICE_ACCOUNT_JSON");
+  if (!raw) throw new Error("firebase_bridge_not_configured");
+  const account = JSON.parse(raw) as { client_email?: string; private_key?: string; token_uri?: string };
+  if (!account.client_email || !account.private_key || !account.token_uri) throw new Error("firebase_bridge_not_configured");
+  const now = Math.floor(Date.now() / 1000);
+  const key = await importPKCS8(account.private_key, "RS256");
+  const assertion = await new SignJWT({
+    scope: "https://www.googleapis.com/auth/firebase.database https://www.googleapis.com/auth/userinfo.email",
+  })
+    .setProtectedHeader({ alg: "RS256", typ: "JWT" })
+    .setIssuer(account.client_email)
+    .setSubject(account.client_email)
+    .setAudience(account.token_uri)
+    .setIssuedAt(now)
+    .setExpirationTime(now + 3600)
+    .sign(key);
+  const response = await fetch(account.token_uri, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+      assertion,
+    }),
+  });
+  if (!response.ok) throw new Error("firebase_token_failed");
+  const data = await response.json() as { access_token?: string; expires_in?: number };
+  if (!data.access_token) throw new Error("firebase_token_failed");
+  firebaseToken = { value: data.access_token, expiresAt: Date.now() + (data.expires_in ?? 3600) * 1000 };
+  return firebaseToken.value;
+}
+
+async function firebaseRequest(path: string, method = "GET", body?: unknown, etag?: string) {
+  const token = await firebaseAccessToken();
+  const response = await fetch(`${firebaseDatabaseUrl}/${path}.json`, {
+    method,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+      ...(method === "GET" ? { "X-Firebase-ETag": "true" } : {}),
+      ...(etag ? { "if-match": etag } : {}),
+    },
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+  });
+  const text = await response.text();
+  const json = text ? JSON.parse(text) : null;
+  return { status: response.status, data: json, etag: response.headers.get("etag") };
+}
+
+function roomId() {
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  const random = crypto.getRandomValues(new Uint32Array(8));
+  return `${alphabet[random[0] % 26]}${alphabet[random[1] % 26]}${alphabet[random[2] % 26]}${String(random[3] % 100000).padStart(5, "0")}`;
+}
+
+function roomSummary(state: Record<string, unknown>) {
+  return {
+    mode: state.mode,
+    playerIds: state.playerIds,
+    isPublic: state.isPublic,
+    phase: state.phase,
+    ...(typeof state.expireAt === "string" ? { expireAt: state.expireAt } : {}),
+  };
+}
+
+function optionalText(value: unknown, maximum: number) {
+  if (value == null) return "";
+  if (typeof value !== "string" || value.length > maximum) throw new Error("invalid_room_configuration");
+  return value.trim();
 }
 
 const databaseUrl = Deno.env.get("SUPABASE_DB_URL");
@@ -84,7 +162,7 @@ Deno.serve(async (request) => {
 
   try {
     const user = await firebaseUser(request);
-    const body = await request.json() as { action?: string; toUid?: unknown; fromUid?: unknown; accept?: unknown };
+    const body = await request.json() as { action?: string; toUid?: unknown; fromUid?: unknown; accept?: unknown; roomId?: unknown; mode?: unknown; maxPoints?: unknown; timerDurationSeconds?: unknown; isPublic?: unknown; displayName?: unknown; cardBackId?: unknown; avatarUrl?: unknown };
     const connection = await databasePool.connect();
     try {
       await connection.queryObject`
@@ -112,6 +190,81 @@ Deno.serve(async (request) => {
         const reward = result.rows[0];
         if (!reward) throw new Error("daily_claim_failed");
         return reply({ ok: true, ...reward, date: today }, 200, origin);
+      }
+      if (body.action === "createRoom") {
+        if (!roomModes.has(body.mode as string) || !roomPoints.has(body.maxPoints as number) ||
+            !roomTimers.has(body.timerDurationSeconds as number) || typeof body.isPublic !== "boolean") {
+          return reply({ error: "invalid_room_configuration" }, 400, origin);
+        }
+        const displayName = optionalText(body.displayName, 64) || user.name;
+        const cardBackId = optionalText(body.cardBackId, 64);
+        const avatarUrl = optionalText(body.avatarUrl, 2048);
+        for (let attempt = 0; attempt < 5; attempt += 1) {
+          const id = roomId();
+          const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+          const match = {
+            id, mode: body.mode, maxPoints: body.maxPoints,
+            playerIds: [user.uid, "waiting_1", "waiting_2", "waiting_3"],
+            players: { [user.uid]: true }, playerNames: { [user.uid]: displayName },
+            playerSkins: { [user.uid]: cardBackId }, playerAvatars: { [user.uid]: avatarUrl },
+            dealerIndex: 0, currentTurnIndex: 1, phase: "waitingForPlayers",
+            timerDurationSeconds: body.timerDurationSeconds, isPublic: body.isPublic, expiresAt,
+          };
+          const created = await firebaseRequest(`matches/${id}`, "PUT", match, "null_etag");
+          if (created.status === 412) continue;
+          if (created.status < 200 || created.status >= 300) throw new Error("room_create_failed");
+          const indexed = await firebaseRequest(`rooms/${id}`, "PUT", roomSummary(match));
+          if (indexed.status < 200 || indexed.status >= 300) throw new Error("room_index_failed");
+          return reply({ roomId: id, match }, 200, origin);
+        }
+        throw new Error("room_create_failed");
+      }
+      if (body.action === "joinRoom") {
+        const id = typeof body.roomId === "string" && /^[A-Z]{3}[0-9]{5}$/.test(body.roomId) ? body.roomId : null;
+        if (!id) return reply({ error: "invalid_room_id" }, 400, origin);
+        const displayName = optionalText(body.displayName, 64) || user.name;
+        const cardBackId = optionalText(body.cardBackId, 64);
+        const avatarUrl = optionalText(body.avatarUrl, 2048);
+        for (let attempt = 0; attempt < 5; attempt += 1) {
+          const current = await firebaseRequest(`matches/${id}`);
+          const match = current.data as Record<string, unknown> | null;
+          if (current.status !== 200 || !match) return reply({ error: "room_not_found" }, 404, origin);
+          if (match.phase !== "waitingForPlayers" || (typeof match.expireAt === "string" && Date.parse(match.expireAt) <= Date.now())) {
+            return reply({ error: "room_not_joinable" }, 409, origin);
+          }
+          const playerIds = Array.isArray(match.playerIds) ? [...match.playerIds] : [];
+          if (playerIds.length !== 4) return reply({ error: "invalid_room_state" }, 409, origin);
+          const existing = playerIds.indexOf(user.uid);
+          const seat = existing >= 0 ? existing : playerIds.findIndex((value) => typeof value === "string" && value.startsWith("waiting_"));
+          if (seat < 0) return reply({ error: "room_full" }, 409, origin);
+          if (existing < 0) {
+            playerIds[seat] = user.uid;
+            match.playerIds = playerIds;
+            match.players = { ...(match.players as Record<string, boolean> ?? {}), [user.uid]: true };
+            match.playerNames = { ...(match.playerNames as Record<string, string> ?? {}), [user.uid]: displayName };
+            match.playerSkins = { ...(match.playerSkins as Record<string, string> ?? {}), [user.uid]: cardBackId };
+            match.playerAvatars = { ...(match.playerAvatars as Record<string, string> ?? {}), [user.uid]: avatarUrl };
+            const written = await firebaseRequest(`matches/${id}`, "PUT", match, current.etag ?? undefined);
+            if (written.status === 412) continue;
+            if (written.status < 200 || written.status >= 300) throw new Error("room_join_failed");
+          }
+          const indexed = await firebaseRequest(`rooms/${id}`, "PUT", roomSummary(match));
+          if (indexed.status < 200 || indexed.status >= 300) throw new Error("room_index_failed");
+          return reply({ roomId: id, match, seatIndex: seat, alreadyJoined: existing >= 0 }, 200, origin);
+        }
+        return reply({ error: "room_changed_retry" }, 409, origin);
+      }
+      if (body.action === "refreshRoomIndex") {
+        const id = typeof body.roomId === "string" && /^[A-Z]{3}[0-9]{5}$/.test(body.roomId) ? body.roomId : null;
+        if (!id) return reply({ error: "invalid_room_id" }, 400, origin);
+        const current = await firebaseRequest(`matches/${id}`);
+        const match = current.data as Record<string, unknown> | null;
+        if (!match) return reply({ error: "room_not_found" }, 404, origin);
+        const players = match.players as Record<string, boolean> | undefined;
+        if (!players?.[user.uid]) return reply({ error: "not_room_participant" }, 403, origin);
+        const indexed = await firebaseRequest(`rooms/${id}`, "PUT", roomSummary(match));
+        if (indexed.status < 200 || indexed.status >= 300) throw new Error("room_index_failed");
+        return reply({ ok: true, roomId: id }, 200, origin);
       }
       if (body.action === "getSocialGraph") {
         const friends = await connection.queryObject<{ uid: string }>`select friend_uid as uid from halabessa.friendships where owner_uid = ${user.uid}`;

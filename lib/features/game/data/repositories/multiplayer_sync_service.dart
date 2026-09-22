@@ -39,7 +39,7 @@ class MultiplayerSyncService {
   /// Creates a room through the server so the caller cannot choose another
   /// user's identity or race another room creator for the same id.
   Future<MatchState> createMatch(MatchState matchState) async {
-    final response = await FirebaseFunctions.instance.httpsCallable('createRoom').call({
+    final data = await SupabaseBackendService.call('createRoom', data: {
       'mode': matchState.mode.name,
       'maxPoints': matchState.maxPoints,
       'timerDurationSeconds': matchState.timerDurationSeconds,
@@ -48,7 +48,6 @@ class MultiplayerSyncService {
       'cardBackId': matchState.playerSkins.isEmpty ? '' : matchState.playerSkins.values.first,
       'avatarUrl': matchState.playerAvatars.isEmpty ? '' : matchState.playerAvatars.values.first,
     });
-    final data = Map<String, dynamic>.from(response.data as Map);
     return MatchState.fromJson(Map<String, dynamic>.from(data['match'] as Map));
   }
 
@@ -66,9 +65,10 @@ class MultiplayerSyncService {
     // The lobby index is server-written from the persisted match, avoiding
     // client-forged room summaries and keeping phase/seat changes visible.
     try {
-      await FirebaseFunctions.instance
-          .httpsCallable('refreshRoomIndex')
-          .call({'roomId': matchState.id});
+      await SupabaseBackendService.call(
+        'refreshRoomIndex',
+        data: {'roomId': matchState.id},
+      );
     } catch (e) {
       // Index refresh must not roll back a successfully persisted move; the
       // next state update or scheduled cleanup will reconcile it.
@@ -88,13 +88,12 @@ class MultiplayerSyncService {
     required String cardBackId,
     required String avatarUrl,
   }) async {
-    final response = await FirebaseFunctions.instance.httpsCallable('joinRoom').call({
+    final data = await SupabaseBackendService.call('joinRoom', data: {
       'roomId': roomId,
       'displayName': displayName,
       'cardBackId': cardBackId,
       'avatarUrl': avatarUrl,
     });
-    final data = Map<String, dynamic>.from(response.data as Map);
     return MatchState.fromJson(Map<String, dynamic>.from(data['match'] as Map));
   }
 
