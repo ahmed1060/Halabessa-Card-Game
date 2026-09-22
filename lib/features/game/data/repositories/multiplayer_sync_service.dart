@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -49,6 +50,49 @@ class MultiplayerSyncService {
       'avatarUrl': matchState.playerAvatars.isEmpty ? '' : matchState.playerAvatars.values.first,
     });
     return MatchState.fromJson(Map<String, dynamic>.from(data['match'] as Map));
+  }
+
+  /// Sends player intent to the trusted match engine. The caller supplies the
+  /// last observed [MatchState.serverVersion]; stale commands are rejected by
+  /// the server instead of overwriting a newer turn.
+  Future<MatchState> submitMatchCommand({
+    required MatchState matchState,
+    required String commandType,
+    required String callerUid,
+    Map<String, dynamic> payload = const {},
+    String? actorUid,
+  }) async {
+    final data = await SupabaseBackendService.call(
+      'submitMatchCommand',
+      data: {
+        'roomId': matchState.id,
+        'commandId': _newCommandId(),
+        'commandType': commandType,
+        'expectedVersion': matchState.serverVersion,
+        'commandPayload': payload,
+        if (actorUid != null) 'actorUid': actorUid,
+      },
+    );
+    final publicValue = data['state'];
+    if (publicValue is! Map) {
+      throw const SupabaseBackendException('invalid_match_response');
+    }
+    final merged = Map<String, dynamic>.from(publicValue);
+    final ownHand = data['hand'];
+    if (ownHand is List || ownHand is Map) {
+      merged['handCards'] = {callerUid: ownHand};
+    }
+    return MatchState.fromJson(merged);
+  }
+
+  String _newCommandId() {
+    final random = Random.secure();
+    final bytes = List<int>.generate(16, (_) => random.nextInt(256));
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    final hex = bytes.map((byte) => byte.toRadixString(16).padLeft(2, '0')).join();
+    return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-${hex.substring(12, 16)}-'
+        '${hex.substring(16, 20)}-${hex.substring(20)}';
   }
 
   /// Update an entire existing match state

@@ -448,7 +448,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
 
         case GamePhase.playing:
           // Check for subsequent deal or round completion (Host authoritative)
-          bool allHandsEmpty = currentState.handCards.values.every((h) => h.isEmpty);
+          bool allHandsEmpty = currentState.areAllHandsEmpty;
           if (allHandsEmpty) {
             if (currentState.deckCount > 0) {
               await Future.delayed(const Duration(milliseconds: 1000));
@@ -987,7 +987,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
         _multimedia.playSfx('sfx/play.mp3');
       }
 
-      bool allHandsEmpty = newState.handCards.values.every((h) => h.isEmpty);
+      bool allHandsEmpty = newState.areAllHandsEmpty;
       if (allHandsEmpty && _amIHost(newState)) {
         if (newState.deckCount > 0) {
           await dealSubsequentCards();

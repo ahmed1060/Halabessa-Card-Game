@@ -66,7 +66,9 @@ the visual client cannot become a second source of game truth.
   Public command responses contain hand counts plus only the authenticated
   caller's hand.
 - [ ] Route the Flutter online controller through the command endpoint while
-  retaining the Dart engine only for explicitly offline practice.
+  retaining the Dart engine only for explicitly offline practice. The client
+  now carries `serverVersion`, public hand counts and a typed command transport;
+  controller mutation routing remains to be switched as one atomic change.
 - [ ] Move votes, timeouts, end-of-round settlement and full match scoring into
   the trusted engine.
 - [ ] Stop mirroring complete hands during the transition, subscribe each

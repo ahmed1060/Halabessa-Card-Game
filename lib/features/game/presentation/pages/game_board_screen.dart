@@ -147,7 +147,7 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
           const SizedBox(width: 16),
           _buildMatchStatusRow(Icons.layers_outlined, 'hand_label'.tr(args: [matchState.handInRound.toString()])),
           const SizedBox(width: 16),
-          _buildMatchStatusRow(Icons.style_outlined, 'cards_count'.tr(args: [matchState.handCards[matchState.playerIds[matchState.currentTurnIndex % matchState.playerIds.length]]?.length.toString() ?? '0'])),
+          _buildMatchStatusRow(Icons.style_outlined, 'cards_count'.tr(args: [matchState.cardsRemainingFor(matchState.playerIds[matchState.currentTurnIndex % matchState.playerIds.length]).toString()])),
         ],
       ),
     );
@@ -168,7 +168,7 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
           const SizedBox(width: 10),
           _buildMatchStatusRow(Icons.layers_outlined, '${matchState.handInRound}/3'),
           const SizedBox(width: 10),
-          _buildMatchStatusRow(Icons.style_outlined, matchState.handCards[matchState.playerIds[matchState.currentTurnIndex % matchState.playerIds.length]]?.length.toString() ?? '0'),
+          _buildMatchStatusRow(Icons.style_outlined, matchState.cardsRemainingFor(matchState.playerIds[matchState.currentTurnIndex % matchState.playerIds.length]).toString()),
         ],
       ),
     );

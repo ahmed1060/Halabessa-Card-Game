@@ -27,6 +27,10 @@ class MatchState {
 
   // Player Hands: Map<PlayerId, List<game_card.Card>>
   final Map<String, List<game_card.Card>> handCards;
+  // Public counts let clients render opponents without receiving their cards.
+  final Map<String, int> handCounts;
+  // Monotonic server revision used for optimistic command concurrency.
+  final int serverVersion;
   
   // Harvested cards per team grouped by capture event
   final Map<String, List<Capture>> harvestStacks;
@@ -80,6 +84,8 @@ class MatchState {
       this.lastCardRevealed,
       this.recentFasha = const [],
       this.handCards = const {},
+      this.handCounts = const {},
+      this.serverVersion = 0,
       this.harvestStacks = const {'teamA': [], 'teamB': []},
       this.teamAScore = 0,
       this.teamBScore = 0,
@@ -116,6 +122,12 @@ class MatchState {
       this.earnedCoins = const {},
     });
 
+  int cardsRemainingFor(String playerId) =>
+      handCounts[playerId] ?? handCards[playerId]?.length ?? 0;
+
+  bool get areAllHandsEmpty =>
+      playerIds.isNotEmpty && playerIds.every((playerId) => cardsRemainingFor(playerId) == 0);
+
   MatchState copyWith({
     String? id,
     GameMode? mode,
@@ -124,6 +136,8 @@ class MatchState {
     List<game_card.Card>? board,
     List<game_card.Card>? recentFasha,
     Map<String, List<game_card.Card>>? handCards,
+    Map<String, int>? handCounts,
+    int? serverVersion,
     Map<String, List<Capture>>? harvestStacks,
     int? teamAScore,
     int? teamBScore,
@@ -169,6 +183,8 @@ class MatchState {
       board: board ?? this.board,
       recentFasha: recentFasha ?? this.recentFasha,
       handCards: handCards ?? this.handCards,
+      handCounts: handCounts ?? this.handCounts,
+      serverVersion: serverVersion ?? this.serverVersion,
       harvestStacks: harvestStacks ?? this.harvestStacks,
       teamAScore: teamAScore ?? this.teamAScore,
       teamBScore: teamBScore ?? this.teamBScore,
@@ -224,6 +240,8 @@ class MatchState {
       'cutLastCard': cutLastCard?.toJson(),
       'lastCardRevealed': lastCardRevealed?.toJson(),
       'recentFasha': recentFasha.map((c) => c.toJson()).toList(),
+      'handCounts': handCounts,
+      'serverVersion': serverVersion,
       // handCards is deliberately NOT written here -- MultiplayerSyncService
       // writes it separately to the matchHands/$matchId tree, which
       // database.rules.json restricts to this match's own participants.
@@ -427,6 +445,12 @@ class MatchState {
       final playerSkins = parseStringMap(json['playerSkins']);
       final playerAvatars = parseStringMap(json['playerAvatars']);
 
+      final handCards = parseCardMap(json['handCards'] ?? {});
+      final handCounts = parseIntMap(json['handCounts']);
+      if (handCounts.isEmpty) {
+        handCards.forEach((uid, cards) => handCounts[uid] = cards.length);
+      }
+
       return MatchState(
         id: id,
         mode: mode,
@@ -434,7 +458,9 @@ class MatchState {
         playerIds: playerIds,
         board: parseCards(json['board']),
         recentFasha: parseCards(json['recentFasha']),
-        handCards: parseCardMap(json['handCards'] ?? {}),
+        handCards: handCards,
+        handCounts: handCounts,
+        serverVersion: json['serverVersion'] is num ? (json['serverVersion'] as num).toInt() : 0,
         harvestStacks: parseCaptureMap(json['harvestStacks'] ?? {}),
         teamAScore: json['teamAScore'] is int ? json['teamAScore'] as int : 0,
         teamBScore: json['teamBScore'] is int ? json['teamBScore'] as int : 0,
