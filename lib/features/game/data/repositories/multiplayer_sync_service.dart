@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cloud_functions/cloud_functions.dart';
+import 'package:halabessa/core/services/supabase_backend_service.dart';
 import '../../domain/models/match_state.dart';
 import '../../domain/models/room_summary.dart';
 import '../../domain/models/chat_message.dart';
@@ -276,7 +276,7 @@ class MultiplayerSyncService {
 
   /// Send a friend request.
   ///
-  /// Routed through a Cloud Function: this writes to the *other* user's
+  /// Routed through the Supabase Edge Function: this writes to the *other* user's
   /// document, which both database.rules.json and firestore.rules only ever
   /// allow that user themselves to write. Direct RTDB + Firestore writes
   /// from here always failed with PERMISSION_DENIED; Firestore is now the
@@ -287,23 +287,25 @@ class MultiplayerSyncService {
   /// compatibility with existing call sites -- the function trusts only
   /// request.auth.uid, never a client-supplied sender id.
   Future<void> sendFriendRequest(String fromUid, String toUid) async {
-    await FirebaseFunctions.instance.httpsCallable('sendFriendRequest').call({'toUid': toUid});
+    await SupabaseBackendService.call('sendFriendRequest', data: {'toUid': toUid});
   }
 
   /// Accept a friend request. See sendFriendRequest for why this is a
   /// callable rather than a direct write.
   Future<void> acceptFriendRequest(String myUid, String friendUid) async {
-    await FirebaseFunctions.instance
-        .httpsCallable('respondToFriendRequest')
-        .call({'fromUid': friendUid, 'accept': true});
+    await SupabaseBackendService.call(
+      'respondToFriendRequest',
+      data: {'fromUid': friendUid, 'accept': true},
+    );
   }
 
   /// Reject a friend request. See sendFriendRequest for why this is a
   /// callable rather than a direct write.
   Future<void> rejectFriendRequest(String myUid, String friendUid) async {
-    await FirebaseFunctions.instance
-        .httpsCallable('respondToFriendRequest')
-        .call({'fromUid': friendUid, 'accept': false});
+    await SupabaseBackendService.call(
+      'respondToFriendRequest',
+      data: {'fromUid': friendUid, 'accept': false},
+    );
   }
 
   /// CHAT: Send a message to the match chat

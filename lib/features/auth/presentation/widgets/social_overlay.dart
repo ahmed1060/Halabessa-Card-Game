@@ -370,6 +370,7 @@ class _SocialOverlayState extends ConsumerState<SocialOverlay> {
                 setState(() => _actionLoadingUserIds.add(user.uid));
                 try {
                   await ref.read(multiplayerSyncServiceProvider).acceptFriendRequest(myUid, user.uid);
+                  ref.invalidate(authStateChangesProvider);
                   if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('friend_request_accepted'.tr())));
                 } finally {
                   if (mounted) setState(() => _actionLoadingUserIds.remove(user.uid));
@@ -382,6 +383,7 @@ class _SocialOverlayState extends ConsumerState<SocialOverlay> {
                 setState(() => _actionLoadingUserIds.add(user.uid));
                 try {
                   await ref.read(multiplayerSyncServiceProvider).rejectFriendRequest(myUid, user.uid);
+                  ref.invalidate(authStateChangesProvider);
                   if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('friend_request_rejected'.tr())));
                 } finally {
                   if (mounted) setState(() => _actionLoadingUserIds.remove(user.uid));
@@ -401,6 +403,7 @@ class _SocialOverlayState extends ConsumerState<SocialOverlay> {
            setState(() => _actionLoadingUserIds.add(user.uid));
            try {
              await ref.read(multiplayerSyncServiceProvider).sendFriendRequest(myUid, user.uid);
+             ref.invalidate(authStateChangesProvider);
              if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('friend_request_sent'.tr())));
            } finally {
              if (mounted) setState(() => _actionLoadingUserIds.remove(user.uid));

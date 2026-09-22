@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/foundation.dart';
+import 'package:halabessa/core/services/supabase_backend_service.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 import 'dart:math';
@@ -123,7 +124,28 @@ class FirebaseAuthRepository implements AuthRepository {
         // means a stale or (pre-fix) tampered mirror can never grant more
         // than the claim actually allows. See HAL-08.
         final isAdmin = await _syncAdminClaim(firebaseUser.uid);
-        return user.copyWith(isAdmin: isAdmin);
+        // Friend state is server-owned in Supabase. Firebase Auth and
+        // Firestore remain the identity/profile layer during the migration.
+        try {
+          final social = await SupabaseBackendService.call('getSocialGraph');
+          return user.copyWith(
+            isAdmin: isAdmin,
+            friends: List<String>.from(social['friends'] as List? ?? const []),
+            pendingFriendRequests: List<String>.from(
+              social['pendingFriendRequests'] as List? ?? const [],
+            ),
+            sentFriendRequests: List<String>.from(
+              social['sentFriendRequests'] as List? ?? const [],
+            ),
+            friendInvites: Map<String, String>.from(
+              social['friendInvites'] as Map? ?? const {},
+            ),
+          );
+        } catch (_) {
+          // Keep the existing Firestore-backed values available offline or
+          // while the Edge Function is temporarily unavailable.
+          return user.copyWith(isAdmin: isAdmin);
+        }
       });
     });
   }

@@ -68,6 +68,13 @@ function rewardStatus(daily: Record<string, unknown>, today: string) {
   return { streak: next, isClaimableToday: last !== today, coins, diamonds };
 }
 
+function requiredUid(value: unknown, field: string, currentUid: string) {
+  if (typeof value !== "string" || value.length < 1 || value.length > 128 || value === currentUid) {
+    throw new Error(`invalid_${field}`);
+  }
+  return value;
+}
+
 Deno.serve(async (request) => {
   const origin = request.headers.get("origin");
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: headers(origin) });
@@ -77,13 +84,16 @@ Deno.serve(async (request) => {
 
   try {
     const user = await firebaseUser(request);
-    const body = await request.json() as { action?: string };
+    const body = await request.json() as { action?: string; toUid?: unknown; fromUid?: unknown; accept?: unknown };
     const connection = await databasePool.connect();
     try {
       await connection.queryObject`
         insert into halabessa.user_profiles (firebase_uid, email, display_name)
         values (${user.uid}, ${user.email}, ${user.name})
-        on conflict (firebase_uid) do nothing
+        on conflict (firebase_uid) do update set
+          email = excluded.email,
+          display_name = excluded.display_name,
+          updated_at = now()
       `;
       if (body.action === "bootstrapProfile") return reply({ ok: true, uid: user.uid }, 200, origin);
       const today = cairoDate();
@@ -102,6 +112,49 @@ Deno.serve(async (request) => {
         const reward = result.rows[0];
         if (!reward) throw new Error("daily_claim_failed");
         return reply({ ok: true, ...reward, date: today }, 200, origin);
+      }
+      if (body.action === "getSocialGraph") {
+        const friends = await connection.queryObject<{ uid: string }>`select friend_uid as uid from halabessa.friendships where owner_uid = ${user.uid}`;
+        const incoming = await connection.queryObject<{ uid: string }>`select sender_uid as uid from halabessa.friend_requests where recipient_uid = ${user.uid}`;
+        const outgoing = await connection.queryObject<{ uid: string }>`select recipient_uid as uid from halabessa.friend_requests where sender_uid = ${user.uid}`;
+        const invites = await connection.queryObject<{ room_id: string; display_name: string }>`
+          select i.room_id, p.display_name from halabessa.room_invites i
+          join halabessa.user_profiles p on p.firebase_uid = i.sender_uid
+          where i.recipient_uid = ${user.uid}
+        `;
+        return reply({
+          friends: friends.rows.map((row) => row.uid),
+          pendingFriendRequests: incoming.rows.map((row) => row.uid),
+          sentFriendRequests: outgoing.rows.map((row) => row.uid),
+          friendInvites: Object.fromEntries(invites.rows.map((row) => [row.room_id, row.display_name])),
+        }, 200, origin);
+      }
+      if (body.action === "sendFriendRequest") {
+        const toUid = requiredUid(body.toUid, "to_uid", user.uid);
+        await connection.queryObject`insert into halabessa.user_profiles (firebase_uid) values (${toUid}) on conflict do nothing`;
+        await connection.queryObject`
+          insert into halabessa.friend_requests (sender_uid, recipient_uid) values (${user.uid}, ${toUid})
+          on conflict do nothing
+        `;
+        return reply({ ok: true }, 200, origin);
+      }
+      if (body.action === "respondToFriendRequest") {
+        const fromUid = requiredUid(body.fromUid, "from_uid", user.uid);
+        const accepted = body.accept === true;
+        const request = await connection.queryObject<{ sender_uid: string }>`
+          delete from halabessa.friend_requests
+          where sender_uid = ${fromUid} and recipient_uid = ${user.uid}
+          returning sender_uid
+        `;
+        if (!request.rows[0]) return reply({ error: "friend_request_not_found" }, 404, origin);
+        if (accepted) {
+          await connection.queryObject`
+            insert into halabessa.friendships (owner_uid, friend_uid)
+            values (${user.uid}, ${fromUid}), (${fromUid}, ${user.uid})
+            on conflict do nothing
+          `;
+        }
+        return reply({ ok: true, accepted }, 200, origin);
       }
       return reply({ error: "unsupported_action" }, 400, origin);
     } finally {

@@ -18,13 +18,16 @@ class SupabaseBackendService {
     'https://jmlipglfgmuyegoroepu.supabase.co/functions/v1/halabessa-api',
   );
 
-  static Future<Map<String, dynamic>> call(String action) async {
+  static Future<Map<String, dynamic>> call(
+    String action, {
+    Map<String, dynamic> data = const {},
+  }) async {
     final token = await FirebaseAuth.instance.currentUser?.getIdToken();
     if (token == null || token.isEmpty) throw const SupabaseBackendException('unauthenticated');
     final response = await http.post(
       _endpoint,
       headers: {'Authorization': 'Bearer $token', 'Content-Type': 'application/json'},
-      body: jsonEncode({'action': action}),
+      body: jsonEncode({'action': action, ...data}),
     );
     final body = jsonDecode(response.body) as Map<String, dynamic>;
     if (response.statusCode < 200 || response.statusCode >= 300) {
