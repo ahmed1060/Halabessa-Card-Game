@@ -34,7 +34,7 @@ jobs:
           sudo apt-get update && sudo apt-get install -y chromium-chromedriver
           chromedriver --port=4444 &
       - name: Run Integration Tests
-        run: flutter drive --driver=test_driver/integration_test.dart --target=integration_test/app_test.dart -d web-server --release
+        run: flutter drive --driver=test_driver/integration_test.dart --target=integration_test/app_test.dart -d chrome --release
       - run: flutter build web --release --base-href /
       - uses: FirebaseExtended/action-hosting-deploy@v0
         with:
