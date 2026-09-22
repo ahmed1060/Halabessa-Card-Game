@@ -55,23 +55,6 @@ post_install do |installer|
         config.build_settings['FRAMEWORK_SEARCH_PATHS'] << ' "${PODS_ROOT}/../UnityLibrary"'
       end
 
-      # The checked-in Unity 6000 export links Firebase through Swift Package
-      # Manager. Xcode exposes nanopb/leveldb as transitive resource bundles,
-      # but the Flutter plugin target can request their product paths before
-      # SPM has materialized them. They are not read by Halabessa's Unity
-      # presentation layer; keep valid placeholder bundles until the next
-      # clean Unity export removes the legacy Firebase linkage entirely.
-      phase = target.new_shell_script_build_phase('Prepare Unity resource bundle placeholders')
-      phase.shell_script = <<-'SCRIPT'
-set -e
-destination="${CONFIGURATION_BUILD_DIR}/flutter_unity_widget"
-mkdir -p "${destination}"
-for bundle in nanopb_nanopb.bundle leveldb_leveldb.bundle; do
-  bundle_path="${destination}/${bundle}"
-  mkdir -p "${bundle_path}"
-  printf '%s\n' 'Unused legacy Unity Firebase resource placeholder.' > "${bundle_path}/placeholder.txt"
-done
-SCRIPT
     end
   end
 end

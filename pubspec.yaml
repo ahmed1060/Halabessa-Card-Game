@@ -52,6 +52,10 @@ dependencies:
   audioplayers: ^6.1.0
   cloud_firestore: ^5.4.0
   image_picker: ^1.1.2
+  # 0.8.12+1 still references the Android v1 embedding removed by Flutter
+  # 3.47. Keep the first compatible implementation explicit until the
+  # app-facing package advances the transitive floor.
+  image_picker_android: ^0.8.12+2
   # Flutter 3.47 removed the Android v1 embedding APIs. Older transitive
   # lifecycle releases still reference PluginRegistry.Registrar.
   flutter_plugin_android_lifecycle: 2.0.35

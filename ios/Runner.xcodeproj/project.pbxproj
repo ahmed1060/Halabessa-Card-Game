@@ -146,6 +146,7 @@
 			buildConfigurationList = 97C147051CF9000F007C117D /* Build configuration list for PBXNativeTarget "Runner" */;
 			buildPhases = (
 				9740EEB61CF901F6004384FC /* Run Script */,
+				A1B2C3D4E5F60718293A4B5C /* Prepare Unity resource bundles */,
 				97C146EA1CF9000F007C117D /* Sources */,
 				97C146EB1CF9000F007C117D /* Frameworks */,
 				97C146EC1CF9000F007C117D /* Resources */,
@@ -252,6 +253,21 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "/bin/sh \"$FLUTTER_ROOT/packages/flutter_tools/bin/xcode_backend.sh\" build";
+		};
+		A1B2C3D4E5F60718293A4B5C /* Prepare Unity resource bundles */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "Prepare Unity resource bundles";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -e\ndestination=\"${CONFIGURATION_BUILD_DIR}/flutter_unity_widget\"\nmkdir -p \"${destination}\"\nfor bundle in nanopb_nanopb.bundle leveldb_leveldb.bundle; do\n  bundle_path=\"${destination}/${bundle}\"\n  mkdir -p \"${bundle_path}\"\n  printf '%s\\n' 'Unused legacy Unity Firebase resource placeholder.' > \"${bundle_path}/placeholder.txt\"\ndone\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
