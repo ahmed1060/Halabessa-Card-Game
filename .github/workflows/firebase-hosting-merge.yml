@@ -28,7 +28,9 @@ jobs:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/firebase-service-account.json
         run: |
           echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_HALABESSA_CARD_GAME1 }}' > "$GOOGLE_APPLICATION_CREDENTIALS"
-          npx firebase-tools deploy --only functions,firestore:rules,storage:rules,database --project halabessa-card-game1 --non-interactive
+          # Cloud Storage requires the Blaze plan. Keep Spark deployments
+          # limited to the services this project has initialized.
+          npx firebase-tools deploy --only functions,firestore:rules,database --project halabessa-card-game1 --non-interactive
           rm -f "$GOOGLE_APPLICATION_CREDENTIALS"
       - name: Install ChromeDriver
         run: |
