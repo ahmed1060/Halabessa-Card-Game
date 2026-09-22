@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cloud_functions/cloud_functions.dart';
+import 'package:halabessa/core/services/supabase_backend_service.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:halabessa/core/theme/theme_config.dart';
 import 'package:halabessa/features/auth/domain/models/app_user.dart';
@@ -108,17 +108,16 @@ class AdminUserManagementScreen extends ConsumerWidget {
 
   void _handleAction(BuildContext context, WidgetRef ref, AppUser user, String action) async {
     if (action == 'admin') {
-      // Routed through a Cloud Function: firestore.rules now rejects any
-      // direct client write to isAdmin (it's a mirror of the Firebase Auth
-      // custom claim, and only the Admin SDK may set either). See HAL-08.
+      // Routed through an Edge Function: the client may not alter any user's
+      // authorization state directly.
       try {
-        await FirebaseFunctions.instance.httpsCallable('setUserAdminClaim').call({
-          'targetUid': user.uid,
-          'isAdmin': !user.isAdmin,
-        });
-      } on FirebaseFunctionsException catch (e) {
+        await SupabaseBackendService.call(
+          'setUserAdmin',
+          data: {'targetUid': user.uid, 'isAdmin': !user.isAdmin},
+        );
+      } on SupabaseBackendException catch (e) {
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message ?? e.code)));
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.code)));
         }
       }
     } else if (action == 'points') {

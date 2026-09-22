@@ -13,6 +13,7 @@ const allowedOrigins = new Set([
   "http://localhost:5000",
 ]);
 const firebaseDatabaseUrl = "https://halabessa-card-game1-default-rtdb.firebaseio.com";
+const primaryAdminEmail = "ahmed.hossam1060@gmail.com";
 const roomModes = new Set(["classic", "tafweet"]);
 const roomPoints = new Set([21, 41, 61]);
 const roomTimers = new Set([0, 5, 10, 15]);
@@ -120,6 +121,14 @@ function optionalText(value: unknown, maximum: number) {
   return value.trim();
 }
 
+async function isAdmin(connection: any, user: { uid: string; email: string | null }) {
+  if (user.email?.toLowerCase() === primaryAdminEmail) return true;
+  const result = await connection.queryObject<{ profile: Record<string, unknown> }>`
+    select profile from halabessa.user_profiles where firebase_uid = ${user.uid}
+  `;
+  return result.rows[0]?.profile?.isAdmin === true;
+}
+
 const databaseUrl = Deno.env.get("SUPABASE_DB_URL");
 if (!databaseUrl) throw new Error("server_not_configured");
 
@@ -162,7 +171,7 @@ Deno.serve(async (request) => {
 
   try {
     const user = await firebaseUser(request);
-    const body = await request.json() as { action?: string; toUid?: unknown; fromUid?: unknown; accept?: unknown; roomId?: unknown; mode?: unknown; maxPoints?: unknown; timerDurationSeconds?: unknown; isPublic?: unknown; displayName?: unknown; cardBackId?: unknown; avatarUrl?: unknown };
+    const body = await request.json() as { action?: string; toUid?: unknown; fromUid?: unknown; accept?: unknown; roomId?: unknown; mode?: unknown; maxPoints?: unknown; timerDurationSeconds?: unknown; isPublic?: unknown; displayName?: unknown; cardBackId?: unknown; avatarUrl?: unknown; targetUid?: unknown; isAdmin?: unknown };
     const connection = await databasePool.connect();
     try {
       await connection.queryObject`
@@ -173,6 +182,25 @@ Deno.serve(async (request) => {
           display_name = excluded.display_name,
           updated_at = now()
       `;
+      if (body.action === "getAdminStatus") {
+        return reply({ admin: await isAdmin(connection, user) }, 200, origin);
+      }
+      if (body.action === "setUserAdmin") {
+        if (!await isAdmin(connection, user)) return reply({ error: "admin_required" }, 403, origin);
+        if (typeof body.targetUid !== "string" || body.targetUid.length < 1 || body.targetUid.length > 128 || typeof body.isAdmin !== "boolean") {
+          return reply({ error: "invalid_admin_update" }, 400, origin);
+        }
+        if (body.targetUid === user.uid && user.email?.toLowerCase() === primaryAdminEmail && !body.isAdmin) {
+          return reply({ error: "primary_admin_required" }, 409, origin);
+        }
+        await connection.queryObject`insert into halabessa.user_profiles (firebase_uid) values (${body.targetUid}) on conflict do nothing`;
+        await connection.queryObject`
+          update halabessa.user_profiles
+          set profile = jsonb_set(profile, '{isAdmin}', to_jsonb(${body.isAdmin}::boolean), true), updated_at = now()
+          where firebase_uid = ${body.targetUid}
+        `;
+        return reply({ ok: true, targetUid: body.targetUid, admin: body.isAdmin }, 200, origin);
+      }
       if (body.action === "bootstrapProfile") return reply({ ok: true, uid: user.uid }, 200, origin);
       const today = cairoDate();
       if (body.action === "getDailyRewardStatus") {
@@ -265,6 +293,20 @@ Deno.serve(async (request) => {
         if (!players?.[user.uid]) return reply({ error: "not_room_participant" }, 403, origin);
         const indexed = await firebaseRequest(`rooms/${id}`, "PUT", roomSummary(match));
         if (indexed.status < 200 || indexed.status >= 300) throw new Error("room_index_failed");
+        return reply({ ok: true, roomId: id }, 200, origin);
+      }
+      if (body.action === "deleteRoom") {
+        if (!await isAdmin(connection, user)) return reply({ error: "admin_required" }, 403, origin);
+        const id = typeof body.roomId === "string" && /^[A-Z]{3}[0-9]{5}$/.test(body.roomId) ? body.roomId : null;
+        if (!id) return reply({ error: "invalid_room_id" }, 400, origin);
+        const deleted = await firebaseRequest("", "PATCH", {
+          [`matches/${id}`]: null,
+          [`matchHands/${id}`]: null,
+          [`matchSecrets/${id}`]: null,
+          [`rooms/${id}`]: null,
+        });
+        if (deleted.status < 200 || deleted.status >= 300) throw new Error("room_delete_failed");
+        await connection.queryObject`delete from halabessa.room_invites where room_id = ${id}`;
         return reply({ ok: true, roomId: id }, 200, origin);
       }
       if (body.action === "sendRoomInvite") {

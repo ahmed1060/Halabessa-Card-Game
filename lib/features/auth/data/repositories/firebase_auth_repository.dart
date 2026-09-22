@@ -1,6 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/foundation.dart';
 import 'package:halabessa/core/services/supabase_backend_service.dart';
@@ -16,24 +15,18 @@ class FirebaseAuthRepository implements AuthRepository {
 
   FirebaseAuthRepository(this._firebaseAuth);
 
-  // Cache of the last synced admin claim, keyed by uid, so authStateChanges
-  // (which fires on every token refresh, not just sign-in) doesn't call the
-  // Cloud Function more often than the signed-in user actually changes.
+  // Cache the server-owned admin status per user so authStateChanges does not
+  // repeatedly invoke the Edge Function on Firebase token refreshes.
   String? _adminSyncedForUid;
   bool _cachedIsAdmin = false;
 
-  /// The real source of admin authorization: the Firebase Auth custom claim
-  /// grantAdminIfEligible sets server-side, never the (client-writable)
-  /// `isAdmin` database field. See HAL-08.
+  /// The real source of admin authorization is the Supabase Edge Function,
+  /// never the client-writable Firebase profile field.
   Future<bool> _syncAdminClaim(String uid) async {
     if (_adminSyncedForUid == uid) return _cachedIsAdmin;
     try {
-      final result = await FirebaseFunctions.instance.httpsCallable('grantAdminIfEligible').call();
-      final data = result.data;
-      final isAdmin = data is Map && data['admin'] == true;
-      // Force a fresh ID token so the new claim (if it just changed) is
-      // active locally without waiting for the SDK's normal refresh cycle.
-      await _firebaseAuth.currentUser?.getIdToken(true);
+      final data = await SupabaseBackendService.call('getAdminStatus');
+      final isAdmin = data['admin'] == true;
       _adminSyncedForUid = uid;
       _cachedIsAdmin = isAdmin;
       return isAdmin;

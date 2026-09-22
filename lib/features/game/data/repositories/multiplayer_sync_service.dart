@@ -78,7 +78,7 @@ class MultiplayerSyncService {
 
   /// Deletes a room through the admin-only server endpoint.
   Future<void> deleteMatch(String matchId) async {
-    await FirebaseFunctions.instance.httpsCallable('deleteRoom').call({'roomId': matchId});
+    await SupabaseBackendService.call('deleteRoom', data: {'roomId': matchId});
   }
 
   /// Atomically claims a waiting seat through the server.
