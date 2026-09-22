@@ -4,6 +4,16 @@
 *.pyc
 *.swp
 .DS_Store
+.env
+.env.*
+!.env.example
+*.pem
+*.p12
+*.key
+*-service-account.json
+*-service-account-*.json
+*service-account*.json
+*service_account*.json
 .atom/
 .buildlog/
 .history
