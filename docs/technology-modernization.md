@@ -58,14 +58,21 @@ the visual client cannot become a second source of game truth.
 
 ### Authoritative multiplayer
 
-- [ ] Move `startRound`, `cut`, `deal`, `playCard`, votes, timeouts and scoring
-  into the Supabase Edge Function.
-- [ ] Store the secret deck and action version in private server storage. The
-  schema and room lifecycle are live; command handlers and client routing are
-  the remaining work.
-- Return redacted per-player snapshots and lock RTDB gameplay writes to the
+- [x] Add a versioned, idempotent Edge command endpoint for `startRound`,
+  `cut`, initial/subsequent dealing, beginning play and `playCard`. Commands
+  are serialized under a room row lock and validate membership, phase, turn,
+  dealer/cutter authority and card ownership.
+- [x] Store the deck, all hands and action version in private server storage.
+  Public command responses contain hand counts plus only the authenticated
+  caller's hand.
+- [ ] Route the Flutter online controller through the command endpoint while
+  retaining the Dart engine only for explicitly offline practice.
+- [ ] Move votes, timeouts, end-of-round settlement and full match scoring into
+  the trusted engine.
+- [ ] Stop mirroring complete hands during the transition, subscribe each
+  client only to its permitted view, then lock RTDB gameplay writes to the
   backend service account.
-- Add deterministic engine fixtures shared between client expectations and the
+- [ ] Add deterministic engine fixtures shared between client expectations and the
   server, plus concurrency and replay tests.
 
 ### Live operations and quality

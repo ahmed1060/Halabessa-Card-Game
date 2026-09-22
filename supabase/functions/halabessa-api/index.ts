@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { Pool } from "jsr:@db/postgres@^0";
 import { createRemoteJWKSet, importPKCS8, jwtVerify, SignJWT } from "npm:jose@6";
+import { cut, deal, playCard, startRound, type Card, type MatchState } from "./match_engine.ts";
 
 const firebaseProject = "halabessa-card-game1";
 const firebaseKeys = createRemoteJWKSet(new URL(
@@ -19,6 +20,7 @@ const roomPoints = new Set([21, 41, 61]);
 const roomTimers = new Set([0, 5, 10, 15]);
 const assetBucket = "game-assets";
 const assetKinds = new Set(["avatar", "storeItem", "music", "sfx"]);
+const matchCommandTypes = new Set(["startRound", "cut", "dealInitial", "beginPlay", "dealSubsequent", "playCard"]);
 const assetExtensions = new Map([
   ["image/jpeg", "jpg"],
   ["image/png", "png"],
@@ -129,6 +131,57 @@ function optionalText(value: unknown, maximum: number) {
   if (value == null) return "";
   if (typeof value !== "string" || value.length > maximum) throw new Error("invalid_room_configuration");
   return value.trim();
+}
+
+function validRoomId(value: unknown) {
+  return typeof value === "string" && /^[A-Z]{3}[0-9]{5}$/.test(value) ? value : null;
+}
+
+function validCommandId(value: unknown) {
+  return typeof value === "string" &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
+    ? value.toLowerCase()
+    : null;
+}
+
+function objectPayload(value: unknown) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
+function publicMatchState(state: MatchState, version: number) {
+  const publicState = { ...state } as Record<string, unknown>;
+  const hands = objectPayload(publicState.handCards) as Record<string, unknown[]>;
+  publicState.handCounts = Object.fromEntries(Object.entries(hands).map(([uid, cards]) => [uid, Array.isArray(cards) ? cards.length : 0]));
+  publicState.serverVersion = version;
+  delete publicState.handCards;
+  return publicState;
+}
+
+function applyMatchCommand(
+  commandType: string,
+  state: MatchState,
+  deck: Card[],
+  actorUid: string,
+  payload: Record<string, unknown>,
+) {
+  if (commandType === "startRound") return startRound(state, actorUid);
+  if (commandType === "cut") return cut(state, deck, actorUid, payload.position);
+  if (commandType === "dealInitial") return deal(state, deck, actorUid, true);
+  if (commandType === "dealSubsequent") return deal(state, deck, actorUid, false);
+  if (commandType === "beginPlay") {
+    if (state.phase !== "dealingCards") throw new Error("play_not_ready");
+    const playerIds = state.playerIds;
+    const dealerIndex = Number.isInteger(state.dealerIndex) ? state.dealerIndex as number : -1;
+    if (!Array.isArray(playerIds) || playerIds[dealerIndex] !== actorUid) {
+      throw new Error("dealer_required");
+    }
+    return {
+      state: { ...state, phase: "playing", turnStartTime: new Date().toISOString() } as MatchState,
+      deck,
+    };
+  }
+  if (commandType === "playCard") return { state: playCard(state, actorUid, payload.card), deck };
+  throw new Error("unsupported_command");
 }
 
 async function isAdmin(connection: any, user: { uid: string; email: string | null }) {
@@ -244,7 +297,32 @@ Deno.serve(async (request) => {
 
   try {
     const user = await firebaseUser(request);
-    const body = await request.json() as { action?: string; toUid?: unknown; fromUid?: unknown; accept?: unknown; roomId?: unknown; mode?: unknown; maxPoints?: unknown; timerDurationSeconds?: unknown; isPublic?: unknown; displayName?: unknown; cardBackId?: unknown; avatarUrl?: unknown; targetUid?: unknown; isAdmin?: unknown; kind?: unknown; fileName?: unknown; contentType?: unknown; base64?: unknown; assetKey?: unknown };
+    const body = await request.json() as {
+      action?: string;
+      toUid?: unknown;
+      fromUid?: unknown;
+      accept?: unknown;
+      roomId?: unknown;
+      mode?: unknown;
+      maxPoints?: unknown;
+      timerDurationSeconds?: unknown;
+      isPublic?: unknown;
+      displayName?: unknown;
+      cardBackId?: unknown;
+      avatarUrl?: unknown;
+      targetUid?: unknown;
+      isAdmin?: unknown;
+      kind?: unknown;
+      fileName?: unknown;
+      contentType?: unknown;
+      base64?: unknown;
+      assetKey?: unknown;
+      commandId?: unknown;
+      commandType?: unknown;
+      expectedVersion?: unknown;
+      commandPayload?: unknown;
+      actorUid?: unknown;
+    };
     const connection = await databasePool.connect();
     try {
       await connection.queryObject`
@@ -304,6 +382,151 @@ Deno.serve(async (request) => {
         if (!reward) throw new Error("daily_claim_failed");
         return reply({ ok: true, ...reward, date: today }, 200, origin);
       }
+      if (body.action === "submitMatchCommand") {
+        const id = validRoomId(body.roomId);
+        const commandId = validCommandId(body.commandId);
+        const commandType = typeof body.commandType === "string" && matchCommandTypes.has(body.commandType)
+          ? body.commandType
+          : null;
+        const expectedVersion = typeof body.expectedVersion === "number" && Number.isSafeInteger(body.expectedVersion) && body.expectedVersion >= 0
+          ? body.expectedVersion
+          : null;
+        const payload = objectPayload(body.commandPayload);
+        const payloadJson = JSON.stringify(payload);
+        const requestedActor = typeof body.actorUid === "string" && body.actorUid.length <= 128 ? body.actorUid : user.uid;
+        if (!id || !commandId || !commandType || expectedVersion == null || payloadJson.length > 4096) {
+          return reply({ error: "invalid_match_command" }, 400, origin);
+        }
+        const ledgerPayload = { ...payload, actorUid: requestedActor };
+        let transactionOpen = false;
+        try {
+          await connection.queryObject`begin`;
+          transactionOpen = true;
+          const authoritative = await connection.queryObject<{
+            owner_uid: string;
+            state: MatchState;
+            version: string;
+            deck: Card[];
+            hands: Record<string, Card[]>;
+          }>`
+            select r.owner_uid, r.state, r.version::text as version, s.deck, s.hands
+            from halabessa.rooms r
+            join halabessa.room_secrets s on s.room_id = r.room_id
+            where r.room_id = ${id}
+            for update of r, s
+          `;
+          const room = authoritative.rows[0];
+          if (!room) {
+            await connection.queryObject`rollback`;
+            transactionOpen = false;
+            return reply({ error: "room_not_found" }, 404, origin);
+          }
+          const currentVersion = Number(room.version);
+          const playerIds = Array.isArray(room.state.playerIds) ? room.state.playerIds : [];
+          if (!playerIds.includes(user.uid)) {
+            await connection.queryObject`rollback`;
+            transactionOpen = false;
+            return reply({ error: "not_room_participant" }, 403, origin);
+          }
+          const ownerProxy = room.owner_uid === user.uid && (
+            requestedActor.startsWith("bot_") ||
+            commandType === "dealInitial" ||
+            commandType === "dealSubsequent" ||
+            commandType === "beginPlay"
+          );
+          if (requestedActor !== user.uid && (!ownerProxy || !playerIds.includes(requestedActor))) {
+            await connection.queryObject`rollback`;
+            transactionOpen = false;
+            return reply({ error: "invalid_command_actor" }, 403, origin);
+          }
+          const duplicate = await connection.queryObject<{
+            actor_uid: string;
+            action: string;
+            expected_version: string;
+            payload_matches: boolean;
+            result: Record<string, unknown>;
+          }>`
+            select actor_uid, action, expected_version::text as expected_version,
+                   payload = ${JSON.stringify(ledgerPayload)}::jsonb as payload_matches,
+                   result
+            from halabessa.room_commands
+            where room_id = ${id} and command_id = ${commandId}::uuid
+          `;
+          if (duplicate.rows[0]) {
+            await connection.queryObject`commit`;
+            transactionOpen = false;
+            if (duplicate.rows[0].actor_uid !== user.uid ||
+                duplicate.rows[0].action !== commandType ||
+                Number(duplicate.rows[0].expected_version) !== expectedVersion ||
+                !duplicate.rows[0].payload_matches) {
+              return reply({ error: "command_id_conflict" }, 409, origin);
+            }
+            return reply(duplicate.rows[0].result, 200, origin);
+          }
+          if (currentVersion !== expectedVersion) {
+            await connection.queryObject`rollback`;
+            transactionOpen = false;
+            return reply({ error: "version_conflict", currentVersion }, 409, origin);
+          }
+
+          const fullState = { ...room.state, handCards: room.hands ?? {} } as MatchState;
+          let transition: { state: MatchState; deck: Card[] };
+          try {
+            transition = applyMatchCommand(commandType, fullState, room.deck ?? [], requestedActor, payload);
+          } catch (error) {
+            await connection.queryObject`rollback`;
+            transactionOpen = false;
+            const reason = error instanceof Error ? error.message : "command_rejected";
+            return reply({ error: "command_rejected", reason, currentVersion }, 409, origin);
+          }
+          const appliedVersion = currentVersion + 1;
+          const hands = transition.state.handCards ?? {};
+          const publicState = publicMatchState(transition.state, appliedVersion);
+          const ledgerResult = {
+            ok: true,
+            roomId: id,
+            commandId,
+            commandType,
+            version: appliedVersion,
+            actorUid: requestedActor,
+          };
+          const response = { ...ledgerResult, state: publicState, hand: hands[user.uid] ?? [] };
+          await connection.queryObject`
+            update halabessa.rooms
+            set state = ${JSON.stringify(publicState)}::jsonb,
+                version = ${appliedVersion},
+                expires_at = ${typeof publicState.expireAt === "string" ? publicState.expireAt : null}::timestamptz,
+                updated_at = now()
+            where room_id = ${id}
+          `;
+          await connection.queryObject`
+            update halabessa.room_secrets
+            set deck = ${JSON.stringify(transition.deck)}::jsonb,
+                hands = ${JSON.stringify(hands)}::jsonb
+            where room_id = ${id}
+          `;
+          await connection.queryObject`
+            insert into halabessa.room_commands
+              (room_id, command_id, actor_uid, action, expected_version, applied_version, payload, result)
+            values
+              (${id}, ${commandId}::uuid, ${user.uid}, ${commandType}, ${expectedVersion}, ${appliedVersion},
+               ${JSON.stringify(ledgerPayload)}::jsonb, ${JSON.stringify(response)}::jsonb)
+          `;
+          const mirrored = await firebaseRequest("", "PATCH", {
+            [`matches/${id}`]: publicState,
+            [`matchHands/${id}`]: hands,
+            [`matchSecrets/${id}`]: null,
+            [`rooms/${id}`]: roomSummary(publicState),
+          });
+          if (mirrored.status < 200 || mirrored.status >= 300) throw new Error("match_mirror_failed");
+          await connection.queryObject`commit`;
+          transactionOpen = false;
+          return reply(response, 200, origin);
+        } catch (error) {
+          if (transactionOpen) await connection.queryObject`rollback`;
+          throw error;
+        }
+      }
       if (body.action === "createRoom") {
         if (!roomModes.has(body.mode as string) || !roomPoints.has(body.maxPoints as number) ||
             !roomTimers.has(body.timerDurationSeconds as number) || typeof body.isPublic !== "boolean") {
@@ -322,6 +545,7 @@ Deno.serve(async (request) => {
             playerSkins: { [user.uid]: cardBackId }, playerAvatars: { [user.uid]: avatarUrl },
             dealerIndex: 0, currentTurnIndex: 1, phase: "waitingForPlayers",
             timerDurationSeconds: body.timerDurationSeconds, isPublic: body.isPublic, expireAt: expiresAt,
+            serverVersion: 0,
           };
           let transactionOpen = false;
           let firebaseCreated = false;
