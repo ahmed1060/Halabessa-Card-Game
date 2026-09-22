@@ -240,11 +240,12 @@ class MultiplayerSyncService {
 
   /// Send a match invitation through the server. The function validates that
   /// the caller is seated in a waiting room and that the recipient is their
-  /// Firestore friend; clients never write another user's invite map.
+  /// Supabase friend; clients never write another user's invite map.
   Future<void> sendInvite(String toUid, String matchId) async {
-    await FirebaseFunctions.instance
-        .httpsCallable('sendRoomInvite')
-        .call({'toUid': toUid, 'roomId': matchId});
+    await SupabaseBackendService.call(
+      'sendRoomInvite',
+      data: {'toUid': toUid, 'roomId': matchId},
+    );
   }
 
   /// Search for users by display name (basic prefix search)

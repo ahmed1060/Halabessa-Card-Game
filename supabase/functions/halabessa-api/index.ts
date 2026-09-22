@@ -250,6 +250,7 @@ Deno.serve(async (request) => {
           }
           const indexed = await firebaseRequest(`rooms/${id}`, "PUT", roomSummary(match));
           if (indexed.status < 200 || indexed.status >= 300) throw new Error("room_index_failed");
+          await connection.queryObject`delete from halabessa.room_invites where room_id = ${id} and recipient_uid = ${user.uid}`;
           return reply({ roomId: id, match, seatIndex: seat, alreadyJoined: existing >= 0 }, 200, origin);
         }
         return reply({ error: "room_changed_retry" }, 409, origin);
@@ -264,6 +265,31 @@ Deno.serve(async (request) => {
         if (!players?.[user.uid]) return reply({ error: "not_room_participant" }, 403, origin);
         const indexed = await firebaseRequest(`rooms/${id}`, "PUT", roomSummary(match));
         if (indexed.status < 200 || indexed.status >= 300) throw new Error("room_index_failed");
+        return reply({ ok: true, roomId: id }, 200, origin);
+      }
+      if (body.action === "sendRoomInvite") {
+        const id = typeof body.roomId === "string" && /^[A-Z]{3}[0-9]{5}$/.test(body.roomId) ? body.roomId : null;
+        const toUid = requiredUid(body.toUid, "to_uid", user.uid);
+        if (!id) return reply({ error: "invalid_room_id" }, 400, origin);
+        const current = await firebaseRequest(`matches/${id}`);
+        const match = current.data as Record<string, unknown> | null;
+        const players = match?.players as Record<string, boolean> | undefined;
+        const playerIds = Array.isArray(match?.playerIds) ? match.playerIds : [];
+        if (!match || match.phase !== "waitingForPlayers" || !players?.[user.uid] ||
+            (typeof match.expireAt === "string" && Date.parse(match.expireAt) <= Date.now()) ||
+            playerIds.includes(toUid)) {
+          return reply({ error: "room_not_invitable" }, 409, origin);
+        }
+        const friendship = await connection.queryObject<{ friend_uid: string }>`
+          select friend_uid from halabessa.friendships where owner_uid = ${user.uid} and friend_uid = ${toUid}
+        `;
+        if (!friendship.rows[0]) return reply({ error: "not_friends" }, 403, origin);
+        await connection.queryObject`insert into halabessa.user_profiles (firebase_uid) values (${toUid}) on conflict do nothing`;
+        await connection.queryObject`
+          insert into halabessa.room_invites (room_id, recipient_uid, sender_uid)
+          values (${id}, ${toUid}, ${user.uid})
+          on conflict (room_id, recipient_uid) do update set sender_uid = excluded.sender_uid, created_at = now()
+        `;
         return reply({ ok: true, roomId: id }, 200, origin);
       }
       if (body.action === "getSocialGraph") {
