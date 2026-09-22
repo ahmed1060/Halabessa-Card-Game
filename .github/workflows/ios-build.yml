@@ -17,7 +17,16 @@ jobs:
         runs-on: macos-15
 
         steps:
+            # The checked-in Unity export contains static libraries tracked by
+            # Git LFS. Without this, Xcode receives tiny pointer text files and
+            # reports every .a as an "unknown file type".
             - uses: actions/checkout@v4
+
+            - name: Verify Unity static libraries
+              run: |
+                  git lfs pull --include="ios/UnityLibrary/**" --exclude=""
+                  test "$(head -c 7 ios/UnityLibrary/Libraries/libiPhone-lib.a)" = '!<arch>'
+                  test "$(head -c 7 ios/UnityLibrary/Libraries/baselib.a)" = '!<arch>'
 
             - name: Select Xcode 16.4 for the Unity export
               run: sudo xcode-select -s /Applications/Xcode_16.4.app

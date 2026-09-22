@@ -57,15 +57,14 @@ public class AutoSceneBuilder : EditorWindow
         GameObject goDeck = new GameObject("DeckManager");
         goDeck.AddComponent<DeckManager>();
 
-        // 6. Create Firebase Listener
-        GameObject goFirebase = new GameObject("FirebaseListener");
-        goFirebase.AddComponent<UnityFirebaseListener>();
-
-        // 7. Create Asset Downloader
+        // 6. Create Asset Downloader. Networking and authentication stay in
+        // Flutter; Unity is a deterministic presentation client fed through
+        // UnityBridge. Keeping a second backend client in the scene caused
+        // divergent state and bundled an unnecessary native Firebase SDK.
         GameObject goDownloader = new GameObject("AssetDownloader");
         goDownloader.AddComponent<AssetDownloader>();
 
-        // 8. Create a Professional Card Prefab (A Quad with correct poker aspect ratio)
+        // 7. Create a Professional Card Prefab (A Quad with correct poker aspect ratio)
         if (!AssetDatabase.IsValidFolder("Assets/Resources")) {
             AssetDatabase.CreateFolder("Assets", "Resources");
         }
@@ -77,7 +76,7 @@ public class AutoSceneBuilder : EditorWindow
         // Laying flat, but slightly elevated so it doesn't clip
         dummyCard.transform.rotation = Quaternion.Euler(90, 0, 0); 
 
-        // 8.1 Add Fake Shadow child
+        // 7.1 Add Fake Shadow child
         GameObject shadow = GameObject.CreatePrimitive(PrimitiveType.Quad);
         shadow.name = "Shadow";
         shadow.transform.SetParent(dummyCard.transform);
@@ -100,7 +99,7 @@ public class AutoSceneBuilder : EditorWindow
         shadowMat.color = new Color(0, 0, 0, 0.4f);
         shadow.GetComponent<Renderer>().material = shadowMat;
         
-        // 9. Add CardInstance logic script for DOTween animations
+        // 8. Add CardInstance logic script for DOTween animations
         CardInstance cardInstance = dummyCard.AddComponent<CardInstance>();
         
         // Save the dummy prefab
@@ -110,7 +109,7 @@ public class AutoSceneBuilder : EditorWindow
         // Note: We completely removed the 3D Table Plane!
         // The Flutter glowing UI will now serve as the table natively.
 
-        // 9.1 Screen-space UI Canvas for the turn timer and the FSM debug
+        // 8.1 Screen-space UI Canvas for the turn timer and the FSM debug
         // label. Previously there was no Canvas anywhere in the generated
         // scene, so TurnTimer.timerFill/timerText and
         // FSMStateVisualizer.stateText stayed null forever.
@@ -165,10 +164,10 @@ public class AutoSceneBuilder : EditorWindow
         soFsm.FindProperty("stateText").objectReferenceValue = fsmText;
         soFsm.ApplyModifiedPropertiesWithoutUndo();
 
-        // 10. Save the Scene
+        // 9. Save the Scene
         EditorSceneManager.SaveScene(newScene, "Assets/GameScene.unity");
 
-        // 11. Add to Build Settings automatically
+        // 10. Add to Build Settings automatically
         EditorBuildSettingsScene[] original = EditorBuildSettings.scenes;
         EditorBuildSettingsScene[] newSettings = new EditorBuildSettingsScene[1];
         newSettings[0] = new EditorBuildSettingsScene("Assets/GameScene.unity", true);

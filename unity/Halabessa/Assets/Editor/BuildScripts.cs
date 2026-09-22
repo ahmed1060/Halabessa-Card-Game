@@ -9,7 +9,7 @@ public class BuildScripts {
     public static void ExportAndroid() {
         string exportPath = Path.Combine(Application.dataPath, "../../../androidBuild/unityExport");
         
-        // Match Firebase configuration (Fixing Obsolete Warning)
+        // Keep the embedded Unity library aligned with the Flutter app id.
         PlayerSettings.SetApplicationIdentifier(NamedBuildTarget.Android, "com.halabessa.game");
 
         // Ensure the target is a Gradle project for Flutter
@@ -36,7 +36,7 @@ public class BuildScripts {
     public static void ExportIOS() {
         string exportPath = Path.Combine(Application.dataPath, "../../../iosBuild/UnityLibrary");
         
-        // Set iOS requirements for Firebase (Fixing Obsolete Warning)
+        // Keep the embedded Unity library aligned with the Flutter app id.
         PlayerSettings.SetApplicationIdentifier(NamedBuildTarget.iOS, "com.halabessa.game");
         PlayerSettings.iOS.targetOSVersionString = "15.0";
 

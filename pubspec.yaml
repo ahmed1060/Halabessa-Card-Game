@@ -42,7 +42,10 @@ dependencies:
   firebase_auth: ^5.2.0
   firebase_database: ^11.1.1
   easy_localization: ^3.0.8
-  google_sign_in: ^6.2.2
+  # 6.3.0 raises the Android implementation to the v2-only embedding. Older
+  # 6.1.x implementations reference PluginRegistry.Registrar, removed by the
+  # Flutter 3.47 toolchain used in CI.
+  google_sign_in: ^6.3.0
   sign_in_with_apple: ^7.0.1
   flutter_facebook_auth: ^7.1.0
   shared_preferences: ^2.2.3
