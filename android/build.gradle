@@ -81,6 +81,11 @@ subprojects {
             project.configurations.implementation.dependencies.removeAll {
                 it.name == 'unity-classes'
             }
+            // The plugin still compiles directly against UnityPlayer APIs.
+            // Make the JAR visible to Kotlin without packaging a second copy.
+            project.dependencies {
+                compileOnly rootProject.files("../androidBuild/unityExport/unityLibrary/libs/unity-classes.jar")
+            }
         }
     }
 }
