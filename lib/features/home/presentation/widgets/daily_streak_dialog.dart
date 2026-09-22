@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easy_localization/easy_localization.dart';
-import 'package:cloud_functions/cloud_functions.dart';
 import 'package:halabessa/core/services/daily_streak_service.dart';
+import 'package:halabessa/core/services/supabase_backend_service.dart';
 import 'package:halabessa/core/services/multimedia_service.dart';
 import 'package:halabessa/core/theme/theme_config.dart';
 
@@ -27,19 +27,16 @@ class _DailyStreakDialogState extends ConsumerState<DailyStreakDialog> {
     ref.read(multimediaServiceProvider).playSfx('sfx/purchase.mp3');
 
     try {
-      final response = await FirebaseFunctions.instance
-          .httpsCallable('claimDailyReward')
-          .call();
-      final data = Map<String, dynamic>.from(response.data as Map);
+      final data = await SupabaseBackendService.call('claimDailyReward');
       await DailyStreakService.recordServerClaim(
         (data['streak'] as num).toInt(),
         serverDate: data['date'] as String?,
       );
-    } on FirebaseFunctionsException catch (e) {
+    } on SupabaseBackendException catch (e) {
       if (mounted) {
         setState(() => _isClaimed = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.message ?? 'Unable to claim the reward. Please try again.')),
+          SnackBar(content: Text(e.code == 'already_claimed' ? 'Today\'s reward was already claimed.' : 'Unable to claim the reward. Please try again.')),
         );
       }
       return;

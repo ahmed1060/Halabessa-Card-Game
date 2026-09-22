@@ -1,5 +1,5 @@
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:cloud_functions/cloud_functions.dart';
+import 'package:halabessa/core/services/supabase_backend_service.dart';
 
 class DailyReward {
   final int day;
@@ -49,10 +49,7 @@ class DailyStreakService {
     // deterministic tests and offline fallback calculations.
     if (overrideNow == null) {
       try {
-        final response = await FirebaseFunctions.instance
-            .httpsCallable('getDailyRewardStatus')
-            .call();
-        final data = Map<String, dynamic>.from(response.data as Map);
+        final data = await SupabaseBackendService.call('getDailyRewardStatus');
         final streak = (data['streak'] as num).toInt();
         final coins = (data['coins'] as num).toInt();
         final diamonds = (data['diamonds'] as num).toInt();

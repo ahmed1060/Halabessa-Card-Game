@@ -19,18 +19,15 @@ jobs:
       # Fatal on errors only -- see android-build.yml for why.
       - run: flutter analyze --no-fatal-warnings --no-fatal-infos
       - run: flutter test
-      - name: Install Functions dependencies
-        run: npm ci --prefix functions
-      # Deploy the server-side enforcement and its rules before the client.
-      # Do not publish a release when any of these steps fails.
-      - name: Deploy Firebase backend and rules
+      # Backend mutations run in Supabase Edge Functions because Firebase
+      # Functions requires the Blaze plan. Firebase remains responsible for
+      # Hosting, Authentication, and the existing database rules.
+      - name: Deploy Firebase rules
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/firebase-service-account.json
         run: |
           echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_HALABESSA_CARD_GAME1 }}' > "$GOOGLE_APPLICATION_CREDENTIALS"
-          # Cloud Storage requires the Blaze plan. Keep Spark deployments
-          # limited to the services this project has initialized.
-          npx firebase-tools deploy --only functions,firestore:rules,database --project halabessa-card-game1 --non-interactive
+          npx firebase-tools deploy --only firestore:rules,database --project halabessa-card-game1 --non-interactive
           rm -f "$GOOGLE_APPLICATION_CREDENTIALS"
       - name: Install ChromeDriver
         run: |
