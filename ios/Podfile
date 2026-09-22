@@ -55,6 +55,25 @@ post_install do |installer|
         config.build_settings['FRAMEWORK_SEARCH_PATHS'] << ' "${PODS_ROOT}/../UnityLibrary"'
       end
 
+      # The checked-in Unity export still links Firebase through SPM. Its
+      # transitive nanopb/leveldb resource bundles are requested as outputs of
+      # this plugin target, but are not materialized by that legacy export.
+      # Run before the target's Resources phase so CocoaPods can copy valid
+      # bundle directories. Remove this when Unity is exported again from the
+      # cleaned project that no longer contains the Firebase Unity SDK.
+      phase = target.new_shell_script_build_phase('Prepare Unity resource bundles')
+      phase.shell_script = <<-'SCRIPT'
+set -e
+destination="${CONFIGURATION_BUILD_DIR}/flutter_unity_widget"
+mkdir -p "${destination}"
+for bundle in nanopb_nanopb.bundle leveldb_leveldb.bundle; do
+  bundle_path="${destination}/${bundle}"
+  mkdir -p "${bundle_path}"
+  printf '%s\n' 'Unused legacy Unity Firebase resource placeholder.' > "${bundle_path}/placeholder.txt"
+done
+SCRIPT
+      target.build_phases.delete(phase)
+      target.build_phases.unshift(phase)
     end
   end
 end
