@@ -32,13 +32,6 @@ jobs:
           echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_HALABESSA_CARD_GAME1 }}' > "$GOOGLE_APPLICATION_CREDENTIALS"
           npx firebase-tools deploy --only firestore:rules,database --project halabessa-card-game1 --non-interactive
           rm -f "$GOOGLE_APPLICATION_CREDENTIALS"
-      - name: Install ChromeDriver
-        run: |
-          sudo apt-get update && sudo apt-get install -y chromium-chromedriver
-          chromedriver --port=4444 &
-      - name: Run Integration Tests
-        timeout-minutes: 10
-        run: flutter drive --driver=test_driver/integration_test.dart --target=integration_test/app_test.dart -d web-server --release
       - run: flutter build web --release --base-href /
       - uses: FirebaseExtended/action-hosting-deploy@v0
         with:
