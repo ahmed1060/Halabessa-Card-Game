@@ -2,9 +2,6 @@ allprojects {
     repositories {
         google()
         mavenCentral()
-        maven {
-            url "${project(':app').projectDir}/../../unity/Halabessa/Assets/GeneratedLocalRepo/Firebase/m2repository"
-        }
         flatDir {
             dirs "${project(':unityLibrary').projectDir}/libs"
         }

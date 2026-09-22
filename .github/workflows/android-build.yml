@@ -9,11 +9,19 @@ on:
       - main
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     # Was windows-latest -- roughly twice the Actions minute cost of Ubuntu
     # for the same APK, and nothing about this build is Windows-specific.
     runs-on: ubuntu-latest
+    timeout-minutes: 35
 
     steps:
       - uses: actions/checkout@v4

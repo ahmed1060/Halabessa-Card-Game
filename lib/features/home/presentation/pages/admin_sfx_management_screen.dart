@@ -1,13 +1,12 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:halabessa/core/providers/global_settings_provider.dart';
 import 'package:halabessa/core/theme/theme_config.dart';
 import 'package:halabessa/core/services/multimedia_service.dart';
+import 'package:halabessa/core/services/supabase_backend_service.dart';
 
 class AdminSfxManagementScreen extends ConsumerStatefulWidget {
   const AdminSfxManagementScreen({super.key});
@@ -41,27 +40,34 @@ class _AdminSfxManagementScreenState extends ConsumerState<AdminSfxManagementScr
       if (result != null && result.files.single.bytes != null) {
         final bytes = result.files.single.bytes!;
         
-        // Firestore 1MB limit check (1,048,576 bytes)
-        // Base64 adds ~33% overhead, so we check for ~750KB to be safe
-        if (bytes.length > 750 * 1024) {
+        if (bytes.length > 4 * 1024 * 1024) {
           throw Exception('file_too_large');
         }
 
         setState(() => _isUploading = true);
         
-        final base64String = base64Encode(bytes);
         final extension = result.files.single.extension ?? 'mp3';
-        final mimeType = extension == 'wav' ? 'audio/wav' : 'audio/mpeg';
-        final dataUri = 'data:$mimeType;base64,$base64String';
+        final mimeType = switch (extension.toLowerCase()) {
+          'wav' => 'audio/wav',
+          'm4a' => 'audio/mp4',
+          _ => 'audio/mpeg',
+        };
+        final publicUrl = await SupabaseBackendService.uploadAsset(
+          kind: 'sfx',
+          fileName: result.files.single.name,
+          contentType: mimeType,
+          bytes: bytes,
+          assetKey: assetPath,
+        );
         
         final currentSettings = ref.read(globalSettingsProvider);
         if (type == 'music') {
           await ref.read(globalSettingsProvider.notifier).updateSettings(
-            currentSettings.copyWith(musicOverrideUrl: dataUri),
+            currentSettings.copyWith(musicOverrideUrl: publicUrl),
           );
         } else {
           final newSfx = Map<String, String>.from(currentSettings.sfxOverrides);
-          newSfx[assetPath] = dataUri;
+          newSfx[assetPath] = publicUrl;
           await ref.read(globalSettingsProvider.notifier).updateSettings(
             currentSettings.copyWith(sfxOverrides: newSfx),
           );
@@ -78,7 +84,7 @@ class _AdminSfxManagementScreenState extends ConsumerState<AdminSfxManagementScr
       String errorMessage = e.toString();
       
       if (errorMessage.contains('file_too_large')) {
-        errorMessage = 'File too large for free storage (max 750KB). Please use a small MP3.';
+        errorMessage = 'File too large (max 4 MB). Please compress the audio first.';
       } else if (e is StateError) {
         errorMessage = 'Upload failed. Please try again.';
       }

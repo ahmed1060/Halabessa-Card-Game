@@ -51,7 +51,6 @@ dependencies:
   shared_preferences: ^2.2.3
   audioplayers: ^6.1.0
   cloud_firestore: ^5.4.0
-  firebase_storage: ^12.1.0
   image_picker: ^1.1.2
   # Flutter 3.47 removed the Android v1 embedding APIs. Older transitive
   # lifecycle releases still reference PluginRegistry.Registrar.

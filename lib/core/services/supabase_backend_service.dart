@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
@@ -34,5 +35,34 @@ class SupabaseBackendService {
       throw SupabaseBackendException(body['error'] as String? ?? 'backend_unavailable');
     }
     return body;
+  }
+
+  /// Uploads a release asset through the trusted Edge API. The Supabase
+  /// service-role credential never leaves the backend.
+  static Future<String> uploadAsset({
+    required String kind,
+    required String fileName,
+    required String contentType,
+    required Uint8List bytes,
+    String? assetKey,
+  }) async {
+    if (bytes.isEmpty || bytes.lengthInBytes > 4 * 1024 * 1024) {
+      throw const SupabaseBackendException('file_too_large');
+    }
+    final response = await call(
+      'uploadAsset',
+      data: {
+        'kind': kind,
+        'fileName': fileName,
+        'contentType': contentType,
+        'base64': base64Encode(bytes),
+        if (assetKey != null) 'assetKey': assetKey,
+      },
+    );
+    final publicUrl = response['publicUrl'];
+    if (publicUrl is! String || publicUrl.isEmpty) {
+      throw const SupabaseBackendException('asset_upload_failed');
+    }
+    return publicUrl;
   }
 }

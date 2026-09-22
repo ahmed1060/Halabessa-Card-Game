@@ -17,6 +17,16 @@ const primaryAdminEmail = "ahmed.hossam1060@gmail.com";
 const roomModes = new Set(["classic", "tafweet"]);
 const roomPoints = new Set([21, 41, 61]);
 const roomTimers = new Set([0, 5, 10, 15]);
+const assetBucket = "game-assets";
+const assetKinds = new Set(["avatar", "storeItem", "music", "sfx"]);
+const assetExtensions = new Map([
+  ["image/jpeg", "jpg"],
+  ["image/png", "png"],
+  ["image/webp", "webp"],
+  ["audio/mpeg", "mp3"],
+  ["audio/wav", "wav"],
+  ["audio/mp4", "m4a"],
+]);
 let firebaseToken: { value: string; expiresAt: number } | null = null;
 
 function headers(origin: string | null) {
@@ -162,6 +172,69 @@ function requiredUid(value: unknown, field: string, currentUid: string) {
   return value;
 }
 
+function safeAssetKey(value: unknown) {
+  if (typeof value !== "string") return "";
+  return value.replace(/[^a-zA-Z0-9_-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80);
+}
+
+function decodeAsset(value: unknown, maximumBytes: number) {
+  if (typeof value !== "string" || value.length === 0 || value.length > Math.ceil(maximumBytes * 4 / 3) + 8) {
+    throw new Error("invalid_asset");
+  }
+  try {
+    const binary = atob(value);
+    if (binary.length === 0 || binary.length > maximumBytes) throw new Error("invalid_asset");
+    const bytes = new Uint8Array(binary.length);
+    for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+    return bytes;
+  } catch {
+    throw new Error("invalid_asset");
+  }
+}
+
+async function uploadAsset(
+  body: { kind?: unknown; contentType?: unknown; base64?: unknown; assetKey?: unknown },
+  user: { uid: string },
+) {
+  if (typeof body.kind !== "string" || !assetKinds.has(body.kind) ||
+      typeof body.contentType !== "string" || !assetExtensions.has(body.contentType)) {
+    throw new Error("invalid_asset");
+  }
+  const extension = assetExtensions.get(body.contentType)!;
+  const maximumBytes = body.kind === "avatar" ? 2 * 1024 * 1024 : 4 * 1024 * 1024;
+  const bytes = decodeAsset(body.base64, maximumBytes);
+  const key = safeAssetKey(body.assetKey);
+  if ((body.kind === "music" || body.kind === "sfx") && !key) throw new Error("invalid_asset");
+  const path = body.kind === "avatar"
+    ? `avatars/${safeAssetKey(user.uid)}/profile.${extension}`
+    : body.kind === "storeItem"
+    ? `store-items/${crypto.randomUUID()}.${extension}`
+    : `audio/${body.kind}/${key}.${extension}`;
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!supabaseUrl || !serviceRoleKey) throw new Error("storage_not_configured");
+  const objectPath = path.split("/").map(encodeURIComponent).join("/");
+  const response = await fetch(`${supabaseUrl}/storage/v1/object/${assetBucket}/${objectPath}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${serviceRoleKey}`,
+      apikey: serviceRoleKey,
+      "Content-Type": body.contentType,
+      "cache-control": "3600",
+      "x-upsert": "true",
+    },
+    body: bytes,
+  });
+  if (!response.ok) {
+    console.error("asset upload failed", { status: response.status, detail: await response.text() });
+    throw new Error("asset_upload_failed");
+  }
+  return {
+    path,
+    publicUrl: `${supabaseUrl}/storage/v1/object/public/${assetBucket}/${objectPath}`,
+  };
+}
+
 Deno.serve(async (request) => {
   const origin = request.headers.get("origin");
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: headers(origin) });
@@ -171,7 +244,7 @@ Deno.serve(async (request) => {
 
   try {
     const user = await firebaseUser(request);
-    const body = await request.json() as { action?: string; toUid?: unknown; fromUid?: unknown; accept?: unknown; roomId?: unknown; mode?: unknown; maxPoints?: unknown; timerDurationSeconds?: unknown; isPublic?: unknown; displayName?: unknown; cardBackId?: unknown; avatarUrl?: unknown; targetUid?: unknown; isAdmin?: unknown };
+    const body = await request.json() as { action?: string; toUid?: unknown; fromUid?: unknown; accept?: unknown; roomId?: unknown; mode?: unknown; maxPoints?: unknown; timerDurationSeconds?: unknown; isPublic?: unknown; displayName?: unknown; cardBackId?: unknown; avatarUrl?: unknown; targetUid?: unknown; isAdmin?: unknown; kind?: unknown; fileName?: unknown; contentType?: unknown; base64?: unknown; assetKey?: unknown };
     const connection = await databasePool.connect();
     try {
       await connection.queryObject`
@@ -182,6 +255,18 @@ Deno.serve(async (request) => {
           display_name = excluded.display_name,
           updated_at = now()
       `;
+      if (body.action === "uploadAsset") {
+        if (body.kind !== "avatar" && !await isAdmin(connection, user)) {
+          return reply({ error: "admin_required" }, 403, origin);
+        }
+        try {
+          return reply({ ok: true, ...await uploadAsset(body, user) }, 200, origin);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "asset_upload_failed";
+          if (message === "invalid_asset") return reply({ error: message }, 400, origin);
+          throw error;
+        }
+      }
       if (body.action === "getAdminStatus") {
         return reply({ admin: await isAdmin(connection, user) }, 200, origin);
       }

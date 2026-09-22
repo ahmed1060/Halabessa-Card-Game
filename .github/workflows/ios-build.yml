@@ -9,12 +9,20 @@ on:
             - main
     workflow_dispatch:
 
+permissions:
+    contents: read
+
+concurrency:
+    group: ios-${{ github.ref }}
+    cancel-in-progress: true
+
 jobs:
     build:
         # macos-latest now resolves to macOS 26 / Xcode 26, which cannot
         # consume this checked-in Unity 6000 iOS export reliably. macOS 15
         # supplies the supported Xcode 16.4 toolchain.
         runs-on: macos-15
+        timeout-minutes: 45
 
         steps:
             # The checked-in Unity export contains static libraries tracked by

@@ -1,9 +1,7 @@
-import 'dart:io';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:easy_localization/easy_localization.dart';
+import 'package:halabessa/core/services/supabase_backend_service.dart';
 import 'package:halabessa/core/theme/theme_config.dart';
 import '../providers/store_provider.dart';
 
@@ -63,18 +61,19 @@ class _AdminAddItemDialogState extends State<AdminAddItemDialog> {
 
       setState(() => _isUploading = true);
 
-      final storageRef = FirebaseStorage.instance.ref();
-      final fileName = '${DateTime.now().millisecondsSinceEpoch}_${image.name}';
-      final itemRef = storageRef.child('store_items/${widget.type.name}/$fileName');
-
-      late final TaskSnapshot uploadTask;
-      if (kIsWeb) {
-        uploadTask = await itemRef.putData(await image.readAsBytes());
-      } else {
-        uploadTask = await itemRef.putFile(File(image.path));
-      }
-
-      final downloadUrl = await uploadTask.ref.getDownloadURL();
+      final extension = image.name.split('.').last.toLowerCase();
+      final contentType = switch (extension) {
+        'png' => 'image/png',
+        'webp' => 'image/webp',
+        _ => 'image/jpeg',
+      };
+      final downloadUrl = await SupabaseBackendService.uploadAsset(
+        kind: 'storeItem',
+        fileName: image.name,
+        contentType: contentType,
+        bytes: await image.readAsBytes(),
+        assetKey: '${widget.type.name}-$fieldType',
+      );
 
       setState(() {
         if (fieldType == 'main') {

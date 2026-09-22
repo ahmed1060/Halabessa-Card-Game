@@ -6,12 +6,15 @@ on:
   push:
     branches:
       - main
+permissions:
+  contents: read
 concurrency:
   group: firebase-hosting-main
   cancel-in-progress: true
 jobs:
   build_and_deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2

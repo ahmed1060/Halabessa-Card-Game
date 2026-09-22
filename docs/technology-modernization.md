@@ -16,6 +16,7 @@ the visual client cannot become a second source of game truth.
 | Game presentation | Unity 6 | Board rendering, card interaction, animation, particles, audio cues and haptics; consumes snapshots and emits player intent only |
 | Trusted game API | Supabase Edge Functions | Authenticate Firebase users, validate room and match commands, serialize concurrent actions and publish authoritative results |
 | Private persistence | Supabase Postgres (`halabessa` schema) | Social graph, economy, configuration, audit/replay metadata and future match records; not exposed to the Data API |
+| Game assets | Supabase Storage (`game-assets`) | Public delivery of avatars, store art and audio with MIME/size restrictions; all writes pass through the authenticated Edge API |
 | Live match transport | Firebase Realtime Database (transition) | Low-latency snapshots, presence and chat. Clients subscribe; trusted gameplay state moves toward server-only writes |
 | Identity | Firebase Authentication | Existing player identity and ID tokens, verified by the Supabase Edge Function |
 | Web delivery | Firebase Hosting | Versioned Flutter/Unity WebGL release bundle and security headers |
@@ -43,6 +44,11 @@ the visual client cannot become a second source of game truth.
   SDK/listener.
 - Make CI consume Git LFS Unity binaries and verify their archive signatures.
 - Keep Firebase Hosting deploys serialized and independently reproducible.
+- Remove Firebase Storage from every client and route asset uploads through the
+  server-authorized Supabase Storage gateway.
+- Regenerate the checked-in Android and iOS Unity exports from the cleaned
+  Unity source before store submission, removing the temporary legacy Firebase
+  resource compatibility code from the iOS Podfile.
 
 ### Authoritative multiplayer
 

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:easy_localization/easy_localization.dart';
+import 'package:halabessa/core/services/supabase_backend_service.dart';
 import 'package:halabessa/core/theme/theme_config.dart';
 import '../providers/auth_providers.dart';
 import '../../../home/presentation/providers/store_provider.dart';
@@ -35,13 +35,18 @@ class _AvatarPickerState extends ConsumerState<AvatarPicker> {
       final user = ref.read(currentUserProvider);
       if (user == null) return;
 
-      final storageRef = FirebaseStorage.instance
-          .ref()
-          .child('avatars')
-          .child('${user.uid}.jpg');
-
-      await storageRef.putData(await image.readAsBytes());
-      final downloadUrl = await storageRef.getDownloadURL();
+      final extension = image.name.split('.').last.toLowerCase();
+      final contentType = switch (extension) {
+        'png' => 'image/png',
+        'webp' => 'image/webp',
+        _ => 'image/jpeg',
+      };
+      final downloadUrl = await SupabaseBackendService.uploadAsset(
+        kind: 'avatar',
+        fileName: image.name,
+        contentType: contentType,
+        bytes: await image.readAsBytes(),
+      );
 
       await ref.read(authRepositoryProvider).updateProfile(avatarUrl: downloadUrl);
 

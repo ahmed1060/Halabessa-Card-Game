@@ -28,5 +28,3 @@ plugins {
 include ":app"
 include ":unityLibrary"
 project(":unityLibrary").projectDir = new File(settingsDir, "../androidBuild/unityExport/unityLibrary")
-include ":unityFirebaseAppLib"
-project(":unityFirebaseAppLib").projectDir = new File(settingsDir, "../androidBuild/unityExport/unityLibrary/FirebaseApp.androidlib")
