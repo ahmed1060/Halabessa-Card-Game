@@ -54,6 +54,13 @@ jobs:
         run: flutter test
 
       - name: Build APK (Release)
+        # A previous run failed while Gradle updated a shared runner cache's
+        # last-build.bin. Keep Gradle's mutable state isolated per job and
+        # disable the daemon/file watcher, neither of which helps a one-shot
+        # CI release build.
+        env:
+          GRADLE_USER_HOME: ${{ runner.temp }}/halabessa-gradle
+          GRADLE_OPTS: -Dorg.gradle.daemon=false -Dorg.gradle.vfs.watch=false
         run: flutter build apk --release --android-skip-build-dependency-validation
         # We use --release for the final production deliverable.
 
