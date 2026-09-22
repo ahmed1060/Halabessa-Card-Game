@@ -11,6 +11,11 @@ project 'Runner', {
 }
 
 def flutter_root
+  # Current Flutter CI actions export this directly. Newer Flutter SDKs no
+  # longer guarantee that Generated.xcconfig contains FLUTTER_ROOT.
+  environment_flutter_root = ENV['FLUTTER_ROOT']
+  return environment_flutter_root unless environment_flutter_root.nil? || environment_flutter_root.empty?
+
   generated_xcode_build_settings_path = File.expand_path(File.join('..', 'Flutter', 'Generated.xcconfig'), __FILE__)
   unless File.exist?(generated_xcode_build_settings_path)
     raise "Generated.xcconfig must exist. If you're running pod install manually, make sure flutter pub get has been executed."
