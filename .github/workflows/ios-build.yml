@@ -53,6 +53,19 @@ jobs:
                   cd ios
                   pod install
 
+            - name: Verify Unity privacy bundle isolation
+              run: |
+                  settings="$(xcodebuild \
+                    -project ios/Pods/Pods.xcodeproj \
+                    -target flutter_unity_widget-flutter_unity_widget_privacy \
+                    -configuration Release \
+                    -sdk iphoneos \
+                    -showBuildSettings)"
+                  if printf '%s\n' "$settings" | grep -E '^ *OTHER_LDFLAGS =.*UnityFramework'; then
+                    echo 'UnityFramework leaked into the resource-only privacy target.' >&2
+                    exit 1
+                  fi
+
             - name: Analyze
               # Fatal on errors only -- see android-build.yml for why.
               run: flutter analyze --no-fatal-warnings --no-fatal-infos

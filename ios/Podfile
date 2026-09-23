@@ -47,6 +47,20 @@ end
 post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
+
+    # CocoaPods applies the plugin's xcconfig to its generated privacy bundle
+    # target as well as to the plugin framework.  That xcconfig links
+    # UnityFramework, whose stale Unity export still has Firebase SPM
+    # dependencies. Xcode consequently treats every transitive Firebase
+    # resource bundle as a resource of flutter_unity_widget_privacy and tries
+    # to copy those products before they exist. This target contains only the
+    # privacy manifest and must not link frameworks.
+    if target.name == 'flutter_unity_widget-flutter_unity_widget_privacy'
+      target.build_configurations.each do |config|
+        config.build_settings['OTHER_LDFLAGS'] = ''
+        config.build_settings['FRAMEWORK_SEARCH_PATHS'] = '$(inherited)'
+      end
+    end
     
     # Help the plugin find UnityFramework
     if target.name == 'flutter_unity_widget'
