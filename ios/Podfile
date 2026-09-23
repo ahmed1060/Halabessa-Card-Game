@@ -64,17 +64,21 @@ post_install do |installer|
       phase = target.new_shell_script_build_phase('Prepare Unity resource bundles')
       phase.shell_script = <<-'SCRIPT'
 set -e
-destination="${CONFIGURATION_BUILD_DIR}"
-mkdir -p "${destination}"
-for bundle in \
-  nanopb_nanopb.bundle \
-  leveldb_leveldb.bundle \
-  Promises_FBLPromises.bundle \
-  GoogleUtilities_GoogleUtilities-UserDefaults.bundle \
-  GoogleUtilities_GoogleUtilities-Reachability.bundle; do
-  bundle_path="${destination}/${bundle}"
-  mkdir -p "${bundle_path}"
-  printf '%s\n' 'Unused legacy Unity Firebase resource placeholder.' > "${bundle_path}/placeholder.txt"
+for destination in \
+  "${CONFIGURATION_BUILD_DIR}" \
+  "${CONFIGURATION_BUILD_DIR}/flutter_unity_widget" \
+  "${BUILT_PRODUCTS_DIR}/flutter_unity_widget"; do
+  mkdir -p "${destination}"
+  for bundle in \
+    nanopb_nanopb.bundle \
+    leveldb_leveldb.bundle \
+    Promises_FBLPromises.bundle \
+    GoogleUtilities_GoogleUtilities-UserDefaults.bundle \
+    GoogleUtilities_GoogleUtilities-Reachability.bundle; do
+    bundle_path="${destination}/${bundle}"
+    mkdir -p "${bundle_path}"
+    printf '%s\n' 'Unused legacy Unity Firebase resource placeholder.' > "${bundle_path}/placeholder.txt"
+  done
 done
 SCRIPT
       target.build_phases.delete(phase)

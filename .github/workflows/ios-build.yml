@@ -48,6 +48,12 @@ jobs:
             - name: Install dependencies
               run: flutter pub get
 
+            - name: Verify CocoaPods Unity compatibility phase
+              run: |
+                  cd ios
+                  pod install
+                  grep -q "Prepare Unity resource bundles" Pods/Pods.xcodeproj/project.pbxproj
+
             - name: Analyze
               # Fatal on errors only -- see android-build.yml for why.
               run: flutter analyze --no-fatal-warnings --no-fatal-infos
