@@ -48,20 +48,10 @@ jobs:
             - name: Install dependencies
               run: flutter pub get
 
-            - name: Verify CocoaPods Unity compatibility phase
+            - name: Install CocoaPods dependencies
               run: |
                   cd ios
                   pod install
-                  grep -q "Prepare Unity resource bundles" Runner.xcodeproj/project.pbxproj
-                  grep -q "nanopb_nanopb.bundle" Runner.xcodeproj/project.pbxproj
-                  ruby -rxcodeproj -e '
-                    project = Xcodeproj::Project.open("Runner.xcodeproj")
-                    runner = project.targets.find { |target| target.name == "Runner" }
-                    phases = runner.build_phases.map(&:display_name)
-                    producer = phases.index("Prepare Unity resource bundles")
-                    consumer = phases.index("[CP] Copy Pods Resources")
-                    abort "Unity resource producer is not ordered before CocoaPods resource copy" unless producer && consumer && producer < consumer
-                  '
 
             - name: Analyze
               # Fatal on errors only -- see android-build.yml for why.
@@ -71,7 +61,10 @@ jobs:
               run: flutter test
 
             - name: Build iOS (No codesign)
-              run: flutter build ios --release --no-codesign
+              # Keep verbose output until the stale Unity Firebase SPM export
+              # has been replaced; Flutter's summary hides the failing Xcode
+              # target and copy command needed to repair that export safely.
+              run: flutter build ios --release --no-codesign --verbose
               # Note: Codesigning requires certificates/profiles in GitHub Secrets.
               # This step verifies the code compiles for iOS in a CI environment.
 
