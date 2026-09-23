@@ -8,7 +8,6 @@
 
 /* Begin PBXBuildFile section */
 		00000000008063A1000160D3 /* libiPhone-lib.a in Frameworks */ = {isa = PBXBuildFile; fileRef = D8A1C72A0E8063A1000160D3 /* libiPhone-lib.a */; };
-		01F94DD18EC4507FA96D2AE1 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 7018477F84F45FC731D84E12 /* FirebaseAuth */; };
 		178C9ABCFE5BB1DE2BD16D2D /* NativeCallProxy.mm in Sources */ = {isa = PBXBuildFile; fileRef = CAE0DAFFEEF167F8D2A2BC72 /* NativeCallProxy.mm */; };
 		414692D0B041F573ABD3EE45 /* libFirebaseCppDatabase.a in Frameworks */ = {isa = PBXBuildFile; fileRef = A5D6D20C6F05B85D825076A8 /* libFirebaseCppDatabase.a */; };
 		415674EFD2EC187355BC05B1 /* LaunchScreen-iPhoneLandscape.png in Resources */ = {isa = PBXBuildFile; fileRef = 1E24B93E9D27D99850693BAF /* LaunchScreen-iPhoneLandscape.png */; };
@@ -21,7 +20,6 @@
 		56A9086D77955EE3E8FD4CD4 /* libFirebaseCppApp.a in Frameworks */ = {isa = PBXBuildFile; fileRef = EB9AFF07CBAEB644AECE0C90 /* libFirebaseCppApp.a */; };
 		56C56C9817D6015200616839 /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 56C56C9717D6015100616839 /* Images.xcassets */; };
 		574A8D1BFDF4103B13A6538A /* GameController.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 21ECD27EDF8EB21168769097 /* GameController.framework */; settings = {ATTRIBUTES = (Weak, ); }; };
-		5B1141EE83B2B779F48F87FB /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = 80194022903EDCDBA1076D5A /* FirebaseAnalytics */; };
 		63ACF7178776C648B96974EB /* baselib.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 7CD8D832DF5E49F3229DE515 /* baselib.a */; };
 		763ED5D885EABF761B2FE262 /* LaunchScreen-iPad.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = A6444ABDD2799CC877EBAF7E /* LaunchScreen-iPad.storyboard */; };
 		7BF0419FA7F3AF7F5692FE3B /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 73DA47AFB694AAA465095889 /* GoogleService-Info.plist */; };
@@ -105,12 +103,10 @@
 		9DC67E8921CBBEDF005F9FA1 /* LifeCycleListener.h in Headers */ = {isa = PBXBuildFile; fileRef = 8A292A9717992CE100409BA4 /* LifeCycleListener.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		9DFA7F9D21410F2E00C2880E /* main.mm in Sources */ = {isa = PBXBuildFile; fileRef = D82DCFBB0E8000A5005D6AD8 /* main.mm */; };
 		9E277B346B541C2D072C5489 /* IUnityGraphicsMetal.h in Headers */ = {isa = PBXBuildFile; fileRef = 894C1B251937BE1BC2B4D36C /* IUnityGraphicsMetal.h */; };
-		9EF945188E0831F49F3086FC /* FirebaseDatabase in Frameworks */ = {isa = PBXBuildFile; productRef = A98E4518A51F5895FC7AAB43 /* FirebaseDatabase */; };
 		BEE3E21D322649C83B0DD4DC /* LaunchScreen-iPhone.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 5A3A1B4C3FB1FC90023B942E /* LaunchScreen-iPhone.storyboard */; };
 		C6CFB0052F2CBC7300896C0E /* UnityScene.mm in Sources */ = {isa = PBXBuildFile; fileRef = C6CFB0042F2CBC7300896C0E /* UnityScene.mm */; };
 		C6CFB0062F2CBC7300896C0E /* UnityScene.h in Headers */ = {isa = PBXBuildFile; fileRef = C6CFB0032F2CBC7300896C0E /* UnityScene.h */; };
 		D085C06443DB1B1B5C6637B6 /* LaunchScreen-iPad.png in Resources */ = {isa = PBXBuildFile; fileRef = D556450C3DBEECE838996A3D /* LaunchScreen-iPad.png */; };
-		D3294BDD8943B1784C1B24C2 /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = 2EA14324BF061ABC58A18772 /* FirebaseCore */; };
 		D6A042A8A4E2CDA61B1F66B8 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 73DA47AFB694AAA465095889 /* GoogleService-Info.plist */; };
 		E22AFF0A3F5BDAC0D9C0871C /* NativeCallProxy.h in Headers */ = {isa = PBXBuildFile; fileRef = 51E0FA324635BD384CCB75D3 /* NativeCallProxy.h */; };
 		E8F449D39EE925921A47FCA7 /* Data in Resources */ = {isa = PBXBuildFile; fileRef = AA31BF961B55660D0013FB1B /* Data */; };
@@ -691,10 +687,6 @@
 				56A9086D77955EE3E8FD4CD4 /* libFirebaseCppApp.a in Frameworks */,
 				63ACF7178776C648B96974EB /* baselib.a in Frameworks */,
 				574A8D1BFDF4103B13A6538A /* GameController.framework in Frameworks */,
-				5B1141EE83B2B779F48F87FB /* FirebaseAnalytics in Frameworks */,
-				D3294BDD8943B1784C1B24C2 /* FirebaseCore in Frameworks */,
-				01F94DD18EC4507FA96D2AE1 /* FirebaseAuth in Frameworks */,
-				9EF945188E0831F49F3086FC /* FirebaseDatabase in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1431,10 +1423,6 @@
 			);
 			name = UnityFramework;
 			packageProductDependencies = (
-				80194022903EDCDBA1076D5A /* FirebaseAnalytics */,
-				2EA14324BF061ABC58A18772 /* FirebaseCore */,
-				7018477F84F45FC731D84E12 /* FirebaseAuth */,
-				A98E4518A51F5895FC7AAB43 /* FirebaseDatabase */,
 			);
 			productName = UnityFramework;
 			productReference = 9D25AB9D213FB47800354C27 /* UnityFramework.framework */;
@@ -1484,7 +1472,6 @@
 			);
 			mainGroup = 29B97314FDCFA39411CA2CEA /* CustomTemplate */;
 			packageReferences = (
-				737E4FCCA3EFA7EFC9FAB6B6 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
 			);
 			projectDirPath = "";
 			projectRoot = "";
@@ -2653,39 +2640,6 @@
 		};
 /* End XCConfigurationList section */
 
-/* Begin XCRemoteSwiftPackageReference section */
-		737E4FCCA3EFA7EFC9FAB6B6 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/firebase/firebase-ios-sdk.git";
-			requirement = {
-				kind = exactVersion;
-				version = 12.10.0;
-			};
-		};
-/* End XCRemoteSwiftPackageReference section */
-
-/* Begin XCSwiftPackageProductDependency section */
-		2EA14324BF061ABC58A18772 /* FirebaseCore */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 737E4FCCA3EFA7EFC9FAB6B6 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
-			productName = FirebaseCore;
-		};
-		7018477F84F45FC731D84E12 /* FirebaseAuth */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 737E4FCCA3EFA7EFC9FAB6B6 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
-			productName = FirebaseAuth;
-		};
-		80194022903EDCDBA1076D5A /* FirebaseAnalytics */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 737E4FCCA3EFA7EFC9FAB6B6 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
-			productName = FirebaseAnalytics;
-		};
-		A98E4518A51F5895FC7AAB43 /* FirebaseDatabase */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 737E4FCCA3EFA7EFC9FAB6B6 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
-			productName = FirebaseDatabase;
-		};
-/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 29B97313FDCFA39411CA2CEA /* Project object */;
 }

@@ -1,6 +1,11 @@
 # Uncomment this line to define a global platform for your project
 platform :ios, '15.0'
 
+# The checked-in Unity export was generated with Firebase Apple SDK 12.10.0.
+# Keep FlutterFire and the temporary Unity compatibility target on that exact
+# native SDK version so Xcode sees one Firebase implementation and ABI.
+$FirebaseSDKVersion = '12.10.0'
+
 # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
 ENV['COCOAPODS_DISABLE_STATS'] = '1'
 
@@ -42,6 +47,22 @@ target 'Runner' do
   use_modular_headers!
 
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
+end
+
+# The current Unity source no longer contains Firebase, but the checked-in iOS
+# export still contains Firebase C++ static libraries. Until that export is
+# regenerated from Unity, satisfy those native symbols with the same CocoaPods
+# Firebase build used by Flutter instead of a second Swift Package Manager
+# copy. This target can be removed with the stale Firebase export artifacts.
+target 'UnityFramework' do
+  project 'UnityLibrary/Unity-iPhone.xcodeproj'
+  use_frameworks!
+  use_modular_headers!
+
+  pod 'Firebase/CoreOnly'
+  pod 'Firebase/Auth'
+  pod 'Firebase/Database'
+  pod 'Firebase/Analytics'
 end
 
 post_install do |installer|
