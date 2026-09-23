@@ -15,6 +15,11 @@ project 'Runner', {
   'Release' => :release,
 }
 
+# This Podfile integrates both Runner.xcodeproj and Unity's external Xcode
+# project. CocoaPods cannot infer which workspace owns multiple projects, so
+# bind both integrations to Flutter's existing workspace explicitly.
+workspace 'Runner.xcworkspace'
+
 def flutter_root
   # Current Flutter CI actions export this directly. Newer Flutter SDKs no
   # longer guarantee that Generated.xcconfig contains FLUTTER_ROOT.
