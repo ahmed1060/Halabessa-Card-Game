@@ -61,24 +61,33 @@ post_install do |installer|
       # Run before the target's Resources phase so CocoaPods can copy valid
       # bundle directories. Remove this when Unity is exported again from the
       # cleaned project that no longer contains the Firebase Unity SDK.
+      legacy_unity_resource_bundles = %w[
+        nanopb_nanopb.bundle
+        leveldb_leveldb.bundle
+        Promises_FBLPromises.bundle
+        GoogleUtilities_GoogleUtilities-UserDefaults.bundle
+        GoogleUtilities_GoogleUtilities-Reachability.bundle
+      ]
       phase = target.new_shell_script_build_phase('Prepare Unity resource bundles')
+      # These paths are also inputs to Pods-Runner's resource-copy phase.
+      # Declaring them here makes the Xcode build graph order that copy after
+      # this producer instead of racing both shell phases in parallel.
+      phase.output_paths = legacy_unity_resource_bundles.map do |bundle|
+        "$(BUILT_PRODUCTS_DIR)/flutter_unity_widget/#{bundle}"
+      end
       phase.shell_script = <<-'SCRIPT'
 set -e
-for destination in \
-  "${CONFIGURATION_BUILD_DIR}" \
-  "${CONFIGURATION_BUILD_DIR}/flutter_unity_widget" \
-  "${BUILT_PRODUCTS_DIR}/flutter_unity_widget"; do
-  mkdir -p "${destination}"
-  for bundle in \
-    nanopb_nanopb.bundle \
-    leveldb_leveldb.bundle \
-    Promises_FBLPromises.bundle \
-    GoogleUtilities_GoogleUtilities-UserDefaults.bundle \
-    GoogleUtilities_GoogleUtilities-Reachability.bundle; do
-    bundle_path="${destination}/${bundle}"
-    mkdir -p "${bundle_path}"
-    printf '%s\n' 'Unused legacy Unity Firebase resource placeholder.' > "${bundle_path}/placeholder.txt"
-  done
+destination="${BUILT_PRODUCTS_DIR}/flutter_unity_widget"
+mkdir -p "${destination}"
+for bundle in \
+  nanopb_nanopb.bundle \
+  leveldb_leveldb.bundle \
+  Promises_FBLPromises.bundle \
+  GoogleUtilities_GoogleUtilities-UserDefaults.bundle \
+  GoogleUtilities_GoogleUtilities-Reachability.bundle; do
+  bundle_path="${destination}/${bundle}"
+  mkdir -p "${bundle_path}"
+  printf '%s\n' 'Unused legacy Unity Firebase resource placeholder.' > "${bundle_path}/placeholder.txt"
 done
 SCRIPT
       target.build_phases.delete(phase)

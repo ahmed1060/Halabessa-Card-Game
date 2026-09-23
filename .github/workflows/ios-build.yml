@@ -53,6 +53,7 @@ jobs:
                   cd ios
                   pod install
                   grep -q "Prepare Unity resource bundles" Pods/Pods.xcodeproj/project.pbxproj
+                  grep -q "nanopb_nanopb.bundle" Pods/Pods.xcodeproj/project.pbxproj
 
             - name: Analyze
               # Fatal on errors only -- see android-build.yml for why.
