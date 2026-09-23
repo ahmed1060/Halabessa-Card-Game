@@ -104,3 +104,27 @@ SCRIPT
     user_target.build_phases << phase
   end
 end
+
+# CocoaPods creates its [CP] phases while integrating the user project, after
+# post_install has finished. Reopen the written project at the lifecycle hook
+# intended for post-integration changes, establish the exact producer/consumer
+# order, and persist it before pod install returns.
+post_integrate do |_installer|
+  runner_project = Xcodeproj::Project.open(File.join(__dir__, 'Runner.xcodeproj'))
+  runner_target = runner_project.targets.find { |target| target.name == 'Runner' }
+  raise 'Runner target was not found' unless runner_target
+
+  producer = runner_target.shell_script_build_phases.find do |phase|
+    phase.name == 'Prepare Unity resource bundles'
+  end
+  consumer = runner_target.shell_script_build_phases.find do |phase|
+    phase.name == '[CP] Copy Pods Resources'
+  end
+  raise 'Unity resource producer phase was not generated' unless producer
+  raise 'Runner CocoaPods resource-copy phase was not generated' unless consumer
+
+  runner_target.build_phases.delete(producer)
+  consumer_index = runner_target.build_phases.index(consumer)
+  runner_target.build_phases.insert(consumer_index, producer)
+  runner_project.save
+end
