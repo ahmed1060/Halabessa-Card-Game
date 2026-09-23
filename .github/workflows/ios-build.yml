@@ -70,6 +70,18 @@ jobs:
                     exit 1
                   fi
                   grep -q 'FirebaseCore (12.10.0)' ios/Podfile.lock
+                  for package_version in \
+                    'firebase_core 4.6.0' \
+                    'firebase_auth 6.3.0' \
+                    'firebase_database 12.2.0' \
+                    'cloud_firestore 6.2.0'; do
+                    package="${package_version% *}"
+                    version="${package_version#* }"
+                    if ! grep -A 7 "^  ${package}:" pubspec.lock | grep -q "version: \"${version}\""; then
+                      echo "Resolved ${package} does not match FlutterFire BoM version ${version}." >&2
+                      exit 1
+                    fi
+                  done
                   unity_settings="$(xcodebuild \
                     -project ios/UnityLibrary/Unity-iPhone.xcodeproj \
                     -target UnityFramework \
