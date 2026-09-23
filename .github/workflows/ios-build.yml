@@ -48,6 +48,12 @@ jobs:
             - name: Install dependencies
               run: flutter pub get
 
+            - name: Verify dependency lockfile is committed
+              # Mobile release builds must be reproducible. This also exposes
+              # coordinated FlutterFire upgrades that were resolved in CI but
+              # omitted from the application lockfile.
+              run: git diff --exit-code -- pubspec.lock
+
             - name: Install CocoaPods dependencies
               run: |
                   cd ios
@@ -70,6 +76,16 @@ jobs:
                     exit 1
                   fi
                   grep -q 'FirebaseCore (12.10.0)' ios/Podfile.lock
+                  for flutterfire_pod in \
+                    'firebase_core (4.6.0)' \
+                    'firebase_auth (6.3.0)' \
+                    'firebase_database (12.2.0)' \
+                    'cloud_firestore (6.2.0)'; do
+                    if ! grep -Fqx -- "  - ${flutterfire_pod}:" ios/Podfile.lock; then
+                      echo "FlutterFire pod ${flutterfire_pod} is missing from CocoaPods; SwiftPM/CocoaPods integration has split again." >&2
+                      exit 1
+                    fi
+                  done
                   for package_version in \
                     'firebase_core 4.6.0' \
                     'firebase_auth 6.3.0' \

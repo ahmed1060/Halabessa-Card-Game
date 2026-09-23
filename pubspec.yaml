@@ -97,6 +97,14 @@ dev_dependencies:
 
   # The following section is specific to Flutter packages.
 flutter:
+  # Flutter 3.44+ prefers Swift Package Manager for compatible plugins. The
+  # checked-in Unity iOS export still consumes Firebase through CocoaPods, so
+  # keep every Firebase client on one native dependency graph until that Unity
+  # export is regenerated. Mixing SPM FlutterFire with CocoaPods Unity Firebase
+  # resolves different SDK versions and produces duplicate/incompatible APIs.
+  config:
+    enable-swift-package-manager: false
+
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
   # the material Icons class.

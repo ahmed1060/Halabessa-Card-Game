@@ -64,10 +64,10 @@ target 'UnityFramework' do
   use_frameworks!
   use_modular_headers!
 
-  pod 'Firebase/CoreOnly'
-  pod 'Firebase/Auth'
-  pod 'Firebase/Database'
-  pod 'Firebase/Analytics'
+  pod 'Firebase/CoreOnly', $FirebaseSDKVersion
+  pod 'Firebase/Auth', $FirebaseSDKVersion
+  pod 'Firebase/Database', $FirebaseSDKVersion
+  pod 'Firebase/Analytics', $FirebaseSDKVersion
 end
 
 post_install do |installer|
