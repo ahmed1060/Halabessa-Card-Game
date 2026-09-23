@@ -97,11 +97,10 @@ for bundle in \
 done
 SCRIPT
 
+    # CocoaPods adds [CP] Copy Pods Resources after post_install returns.
+    # Leave this producer at the end of the phases that already exist so the
+    # subsequently generated consumer is ordered after it.
     user_target.build_phases.delete(phase)
-    copy_phase_index = user_target.build_phases.index do |candidate|
-      candidate.display_name == '[CP] Copy Pods Resources'
-    end
-    raise 'Runner CocoaPods resource-copy phase was not generated' unless copy_phase_index
-    user_target.build_phases.insert(copy_phase_index, phase)
+    user_target.build_phases << phase
   end
 end
