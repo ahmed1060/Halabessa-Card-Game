@@ -67,6 +67,17 @@ end
 
 post_install do |installer|
   installer.pods_project.targets.each do |target|
+    # Adding the external Unity project gives the Pods project Unity's
+    # ReleaseForRunning and ReleaseForProfiling configurations in addition to
+    # Flutter's Debug/Profile/Release configurations. CocoaPods otherwise
+    # generates a mixture of 10.0 and 15.0 deployment targets, and Flutter's
+    # pod helper refuses to resolve a target with multiple deployment values.
+    # Normalize first so the helper sees the same minimum supported iOS
+    # version in every generated configuration.
+    target.build_configurations.each do |config|
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
+    end
+
     flutter_additional_ios_build_settings(target)
 
     # CocoaPods applies the plugin's xcconfig to its generated privacy bundle
