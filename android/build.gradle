@@ -11,10 +11,13 @@ allprojects {
 rootProject.buildDir = file('../build')
 subprojects {
     // Drive-aware build directory logic to avoid Windows "different roots" error
-    def rootDrive = rootProject.buildDir.absolutePath.split(':')[0]
-    def projectDrive = project.projectDir.absolutePath.split(':')[0]
+    // Path.root is '/' on Linux/macOS and 'C:\\'/'D:\\' on Windows. Splitting
+    // on ':' treated every Unix absolute path as a different drive and caused
+    // a successful CI build to place its APK outside Flutter's output tree.
+    def rootDrive = rootProject.buildDir.toPath().toAbsolutePath().root
+    def projectDrive = project.projectDir.toPath().toAbsolutePath().root
     
-    if (rootDrive.equalsIgnoreCase(projectDrive)) {
+    if (rootDrive == projectDrive) {
         project.buildDir = "${rootProject.buildDir}/${project.name}"
     } else {
         // Fallback to default build dir if paths are on different drives (e.g. plugins in C:\ while project is on D:)
