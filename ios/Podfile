@@ -45,6 +45,14 @@ target 'Runner' do
 end
 
 post_install do |installer|
+  legacy_unity_resource_bundles = %w[
+    nanopb_nanopb.bundle
+    leveldb_leveldb.bundle
+    Promises_FBLPromises.bundle
+    GoogleUtilities_GoogleUtilities-UserDefaults.bundle
+    GoogleUtilities_GoogleUtilities-Reachability.bundle
+  ]
+
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
     
@@ -55,27 +63,25 @@ post_install do |installer|
         config.build_settings['FRAMEWORK_SEARCH_PATHS'] << ' "${PODS_ROOT}/../UnityLibrary"'
       end
 
-      # The checked-in Unity export still links Firebase through SPM. Its
-      # transitive nanopb/leveldb resource bundles are requested as outputs of
-      # this plugin target, but are not materialized by that legacy export.
-      # Run before the target's Resources phase so CocoaPods can copy valid
-      # bundle directories. Remove this when Unity is exported again from the
-      # cleaned project that no longer contains the Firebase Unity SDK.
-      legacy_unity_resource_bundles = %w[
-        nanopb_nanopb.bundle
-        leveldb_leveldb.bundle
-        Promises_FBLPromises.bundle
-        GoogleUtilities_GoogleUtilities-UserDefaults.bundle
-        GoogleUtilities_GoogleUtilities-Reachability.bundle
-      ]
-      phase = target.new_shell_script_build_phase('Prepare Unity resource bundles')
-      # These paths are also inputs to Pods-Runner's resource-copy phase.
-      # Declaring them here makes the Xcode build graph order that copy after
-      # this producer instead of racing both shell phases in parallel.
-      phase.output_paths = legacy_unity_resource_bundles.map do |bundle|
-        "$(BUILT_PRODUCTS_DIR)/flutter_unity_widget/#{bundle}"
-      end
-      phase.shell_script = <<-'SCRIPT'
+    end
+  end
+
+  # The checked-in Unity export still links Firebase through SPM. Its
+  # transitive resource bundles are listed as inputs to Runner's CocoaPods
+  # resource-copy phase, but the stale export does not materialize them.
+  # Produce them in the consuming Runner target immediately before that copy;
+  # an earlier dependency-target phase is not sufficient because SPM replaces
+  # the dependency product directory later in the build.
+  installer.aggregate_targets.flat_map(&:user_targets).uniq.each do |user_target|
+    next unless user_target.name == 'Runner'
+
+    phase = user_target.shell_script_build_phases.find do |candidate|
+      candidate.name == 'Prepare Unity resource bundles'
+    end || user_target.new_shell_script_build_phase('Prepare Unity resource bundles')
+    phase.output_paths = legacy_unity_resource_bundles.map do |bundle|
+      "$(BUILT_PRODUCTS_DIR)/flutter_unity_widget/#{bundle}"
+    end
+    phase.shell_script = <<-'SCRIPT'
 set -e
 destination="${BUILT_PRODUCTS_DIR}/flutter_unity_widget"
 mkdir -p "${destination}"
@@ -90,8 +96,12 @@ for bundle in \
   printf '%s\n' 'Unused legacy Unity Firebase resource placeholder.' > "${bundle_path}/placeholder.txt"
 done
 SCRIPT
-      target.build_phases.delete(phase)
-      target.build_phases.unshift(phase)
+
+    user_target.build_phases.delete(phase)
+    copy_phase_index = user_target.build_phases.index do |candidate|
+      candidate.display_name == '[CP] Copy Pods Resources'
     end
+    raise 'Runner CocoaPods resource-copy phase was not generated' unless copy_phase_index
+    user_target.build_phases.insert(copy_phase_index, phase)
   end
 end
