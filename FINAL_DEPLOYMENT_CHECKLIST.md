@@ -10,9 +10,9 @@ requirements were checked against official guidance on September 24, 2026.
   ARM64 Unity libraries have 16 KB ELF load-segment alignment; the final AAB
   and a 16 KB device still need validation. See the [Android guidance](https://developer.android.com/guide/practices/page-sizes).
 - Apple has required Xcode 26 or later with the iOS 26 SDK for App Store
-  Connect uploads since April 28, 2026. The current iOS CI uses Xcode 16.4
-  while its old Unity export is repaired, so its `.app` is not a submission
-  artifact. See [Apple's requirements](https://developer.apple.com/news/upcoming-requirements/).
+  Connect uploads since April 28, 2026. CI now targets that toolchain, but its
+  unsigned `.app` is not a submission artifact. See
+  [Apple's requirements](https://developer.apple.com/news/upcoming-requirements/).
 
 ## 1. Unity Build (The Engine)
 >
@@ -45,11 +45,11 @@ requirements were checked against official guidance on September 24, 2026.
   `flutter build appbundle --release` so a missing key fails the build.
   Inspect merged permissions and the Play Console pre-launch report before
   rollout.
-- [ ] **iOS CI**: confirm the unsigned Xcode 16.4 build compiles while the
-  Unity export is being repaired.
-- [ ] **iOS store build**: regenerate the Unity iOS export for Xcode 26, run
-  the build under Xcode 26, configure Apple distribution signing, archive and
-  test the actual IPA in TestFlight.
+- [ ] **iOS CI**: confirm the unsigned Xcode 26 build compiles, including the
+  checked-in Unity export and all CocoaPods dependencies.
+- [ ] **iOS store build**: configure Apple distribution signing, archive under
+  Xcode 26 and test the actual IPA in TestFlight. If the checked-in Unity
+  export fails with Xcode 26, regenerate it with a compatible Unity Editor.
 
 ## 3. Production Environment
 
