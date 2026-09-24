@@ -6,7 +6,6 @@ import 'package:halabessa/core/services/supabase_backend_service.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 import 'dart:math';
-import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import '../../domain/models/app_user.dart';
 import '../../domain/repositories/auth_repository.dart';
 
@@ -285,25 +284,19 @@ class FirebaseAuthRepository implements AuthRepository {
   @override
   Future<AppUser?> signInWithApple() async {
     try {
-       final credential = await SignInWithApple.getAppleIDCredential(
-          scopes: [
-             AppleIDAuthorizationScopes.email,
-             AppleIDAuthorizationScopes.fullName,
-          ],
-       );
-       
-       final oAuthCredential = firebase_auth.OAuthProvider('apple.com').credential(
-          idToken: credential.identityToken,
-          accessToken: credential.authorizationCode,
-       );
-       
-       final userCredential = await _firebaseAuth.signInWithCredential(oAuthCredential);
-       final user = _userFromFirebase(userCredential.user);
-       if (user != null) await _syncUserToDatabase(user);
-       return user;
+      // FlutterFire owns the Apple nonce and token exchange. The old manual
+      // credential path incorrectly treated an authorization code as an access
+      // token, which cannot be relied on for Firebase sign-in.
+      final provider = firebase_auth.AppleAuthProvider();
+      final credential = kIsWeb
+          ? await _firebaseAuth.signInWithPopup(provider)
+          : await _firebaseAuth.signInWithProvider(provider);
+      final user = _userFromFirebase(credential.user);
+      if (user != null) await _syncUserToDatabase(user);
+      return user;
     } catch (e) {
-       debugPrint("Apple Sign In failed: $e");
-       rethrow;
+      debugPrint("Apple Sign In failed: $e");
+      rethrow;
     }
   }
 

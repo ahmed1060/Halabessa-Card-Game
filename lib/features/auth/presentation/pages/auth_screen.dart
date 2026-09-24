@@ -1,8 +1,10 @@
 import 'dart:math';
 import 'dart:ui';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easy_localization/easy_localization.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 import '../providers/auth_providers.dart';
 import '../../../../core/utils/error_handler.dart';
@@ -395,16 +397,21 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with TickerProviderStat
                         color: Colors.blueAccent,
                         onTap: () => _signInWithSocial(() => ref.read(authRepositoryProvider).signInWithFacebook()),
                       ),
-                      const SizedBox(width: 20),
-                      _socialButton(
-                        icon: Icons.apple_rounded,
-                        color: Colors.white,
-                        onTap: () {
-                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('apple_signin_soon'.tr())));
-                        },
-                      ),
                     ],
                   ),
+                  if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) ...[
+                    const SizedBox(height: 20),
+                    SizedBox(
+                      width: 260,
+                      height: 50,
+                      child: SignInWithAppleButton(
+                        style: SignInWithAppleButtonStyle.white,
+                        onPressed: () => _signInWithSocial(
+                          () => ref.read(authRepositoryProvider).signInWithApple(),
+                        ),
+                      ),
+                    ),
+                  ],
 
                   const SizedBox(height: 40),
 

@@ -65,11 +65,14 @@ requirements were checked against official guidance on September 24, 2026.
   for Google Play. The app currently creates accounts but has no deletion
   flow. See [Apple's rule](https://developer.apple.com/support/offering-account-deletion-in-your-app)
   and [Google Play's rule](https://support.google.com/googleplay/android-developer/answer/13327111).
-- [ ] **Social login**: decide whether iOS will offer Google/Facebook login.
-  If it does, add an equivalent privacy-preserving login option under
-  [App Review Guideline 4.8](https://developer.apple.com/app-store/review/guidelines/)
-  and configure each provider fully. The current Facebook buttons are present
-  but the native Facebook app ID/client-token configuration is absent.
+- [ ] **Social login**: iOS now has a Sign in with Apple button and entitlement
+  alongside Google/Facebook. Enable the capability for the App ID and
+  provisioning profile in the Apple Developer account, enable the Apple
+  provider in Firebase Authentication, and verify all three providers on a
+  signed device build. The native Facebook app ID/client-token configuration
+  is still absent; do not submit a nonfunctional button. Apple requires an
+  equivalent privacy-preserving option under
+  [App Review Guideline 4.8](https://developer.apple.com/app-store/review/guidelines/).
 - [ ] **Versioning**: increase `version` in `pubspec.yaml` for every store
   release and commit the matching `pubspec.lock`.
 
