@@ -76,6 +76,25 @@ requirements were checked against official guidance on September 24, 2026.
 - [ ] **Versioning**: increase `version` in `pubspec.yaml` for every store
   release and commit the matching `pubspec.lock`.
 
+### Free-first launch guardrails
+
+- Keep Firebase on Spark and Supabase on Free during development and the
+  initial small launch. Review each provider's usage dashboard before wider
+  promotion; do not add billing to work around a build or configuration bug.
+- Firebase Realtime Database on Spark allows 100 simultaneous connections.
+  Design the initial rollout and multiplayer load test around that limit.
+  See [Firebase's limits](https://firebase.google.com/docs/database/usage/limits).
+- Supabase Free currently includes 500 MB of database space, 1 GB of file
+  storage, and 500,000 monthly Edge Function invocations. Free projects can
+  pause after a week of low activity; account for that in pre-release testing
+  and monitor usage rather than treating the tier as unlimited production
+  capacity. See [Supabase billing](https://supabase.com/docs/guides/platform/billing-on-supabase)
+  and [project pausing](https://supabase.com/docs/guides/platform/free-project-pausing).
+- Standard GitHub-hosted runners are free for this public repository. If the
+  repository becomes private, check its Actions allowance before continued
+  macOS builds. Android and iOS build artifacts now expire after seven days
+  to limit storage use. See [GitHub Actions billing](https://docs.github.com/en/billing/concepts/product-billing/github-actions).
+
 ## 4. Final Sanity Checks
 
 - [ ] **Volume Persistence**: Verify that settings are saved between sessions.

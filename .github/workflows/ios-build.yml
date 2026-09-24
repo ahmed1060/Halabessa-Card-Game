@@ -132,3 +132,4 @@ jobs:
               with:
                   name: ios-build
                   path: build/ios/iphoneos/Runner.app
+                  retention-days: 7
