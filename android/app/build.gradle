@@ -22,9 +22,29 @@ if (flutterVersionName == null) {
     flutterVersionName = '1.0'
 }
 
+// Keep upload credentials outside Git. CI intentionally builds with a debug
+// key until a Play release is explicitly prepared with all four variables.
+def uploadSigning = [
+    storePath: System.getenv('HALABESSA_UPLOAD_KEYSTORE'),
+    storePassword: System.getenv('HALABESSA_UPLOAD_STORE_PASSWORD'),
+    keyAlias: System.getenv('HALABESSA_UPLOAD_KEY_ALIAS'),
+    keyPassword: System.getenv('HALABESSA_UPLOAD_KEY_PASSWORD')
+]
+def hasAnyUploadSigning = uploadSigning.values().any { it }
+def hasCompleteUploadSigning = uploadSigning.values().every { it }
+if (hasAnyUploadSigning && !hasCompleteUploadSigning) {
+    throw new GradleException('All HALABESSA_UPLOAD_* signing variables must be set together.')
+}
+if (hasCompleteUploadSigning && !file(uploadSigning.storePath).isFile()) {
+    throw new GradleException('HALABESSA_UPLOAD_KEYSTORE must point to an existing keystore file.')
+}
+if (System.getenv('HALABESSA_REQUIRE_UPLOAD_SIGNING') == 'true' && !hasCompleteUploadSigning) {
+    throw new GradleException('A Play release requires an upload keystore; CI debug signing is not allowed.')
+}
+
 android {
     namespace "com.halabessa.game"
-    compileSdk 35 // Align with modern plugins that require 35
+    compileSdk 36
     ndkVersion "28.2.13676358"
     // ndkPath pointed at a local Unity Editor install (someone's Windows
     // machine) -- unityLibrary/build.gradle already has this same line
@@ -52,16 +72,25 @@ android {
         // You can update the following values to match your application needs.
         // For more information, see: https://docs.flutter.dev/deployment/android#reviewing-the-gradle-build-configuration.
         minSdkVersion 23
-        targetSdkVersion 35
+        targetSdkVersion 36
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
     }
 
+    signingConfigs {
+        if (hasCompleteUploadSigning) {
+            upload {
+                storeFile file(uploadSigning.storePath)
+                storePassword uploadSigning.storePassword
+                keyAlias uploadSigning.keyAlias
+                keyPassword uploadSigning.keyPassword
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig signingConfigs.debug
+            signingConfig hasCompleteUploadSigning ? signingConfigs.upload : signingConfigs.debug
         }
     }
 }

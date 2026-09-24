@@ -46,8 +46,8 @@ jobs:
         with:
           packages: platform-tools
 
-      - name: Install Unity export build tools
-        run: sdkmanager "ndk;28.2.13676358" "cmake;3.22.1"
+      - name: Install Android 16 and Unity export build tools
+        run: sdkmanager "platforms;android-36" "build-tools;35.0.0" "ndk;28.2.13676358" "cmake;3.22.1"
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
@@ -69,7 +69,7 @@ jobs:
       - name: Test
         run: flutter test
 
-      - name: Build APK (Release)
+      - name: Build APK (Release code, CI signing)
         # A previous run failed while Gradle updated a shared runner cache's
         # last-build.bin. Keep Gradle's mutable state isolated per job and
         # disable the daemon/file watcher, neither of which helps a one-shot
@@ -78,7 +78,21 @@ jobs:
           GRADLE_USER_HOME: ${{ runner.temp }}/halabessa-gradle
           GRADLE_OPTS: -Dorg.gradle.daemon=false -Dorg.gradle.vfs.watch=false
         run: flutter build apk --release --android-skip-build-dependency-validation
-        # We use --release for the final production deliverable.
+        # This validates release-mode code. The current Gradle configuration
+        # signs with the debug key, so this APK is not a Play submission build.
+
+      - name: Verify Play target and 16 KB native library packaging
+        run: |
+          "$ANDROID_HOME/build-tools/35.0.0/zipalign" -v -c -P 16 4 build/app/outputs/flutter-apk/app-release.apk
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging build/app/outputs/flutter-apk/app-release.apk | grep -Fq "targetSdkVersion:'36'"
+
+      - name: Build App Bundle (CI signing)
+        # Exercise the package format Google Play accepts. No upload key is
+        # configured in this workflow, so this output is only a build check.
+        env:
+          GRADLE_USER_HOME: ${{ runner.temp }}/halabessa-gradle
+          GRADLE_OPTS: -Dorg.gradle.daemon=false -Dorg.gradle.vfs.watch=false
+        run: flutter build appbundle --release --android-skip-build-dependency-validation
 
       - name: Upload APK
         uses: actions/upload-artifact@v4

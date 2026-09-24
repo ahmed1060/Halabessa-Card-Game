@@ -27,7 +27,7 @@ subprojects {
     afterEvaluate { project ->
         if (project.hasProperty('android')) {
             project.android {
-                compileSdkVersion 35
+                compileSdkVersion 36
                 buildToolsVersion "35.0.0"
                 
                 // Force Java 21 Toolchain
