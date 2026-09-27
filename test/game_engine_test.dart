@@ -130,6 +130,22 @@ void main() {
       expect(afterRedeal.areAllHandsEmpty, isFalse);
     });
 
+    test('does not deal a fourth or partial hand in a round', () {
+      final state = buildState().copyWith(
+        phase: GamePhase.playing,
+        handInRound: 3,
+        handCards: {for (final id in players) id: <Card>[]},
+      );
+
+      final result = GameEngine.apply(
+        state,
+        DealAction('p0', isInitial: false),
+        secretDeck: Deck.standard(),
+      );
+
+      expect(result.newState, same(state));
+    });
+
     test('turn wraps around from the last player back to the first', () {
       final card = const Card(Suit.hearts, Rank.two);
       final state = buildState(currentTurnIndex: 3, handCards: {'p3': [card]});
@@ -259,4 +275,3 @@ void main() {
     });
   });
 }
-
