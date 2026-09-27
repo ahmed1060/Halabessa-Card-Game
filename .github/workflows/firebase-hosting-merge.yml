@@ -21,7 +21,7 @@ jobs:
         with:
           node-version: "24"
       - name: Test authoritative match engines and database lifecycle
-        run: node --test functions/test/match_engine.test.js functions/test/edge_match_engine.test.ts functions/test/edge_database.test.ts functions/test/unity_web_startup.test.js
+        run: node --test functions/test/match_engine.test.js functions/test/edge_match_engine.test.ts functions/test/edge_database.test.ts functions/test/unity_web_startup.test.js functions/test/web_build_versioning.test.mjs
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: "3.47.2"
@@ -40,7 +40,9 @@ jobs:
           echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_HALABESSA_CARD_GAME1 }}' > "$GOOGLE_APPLICATION_CREDENTIALS"
           npx firebase-tools deploy --only firestore:rules,database --project halabessa-card-game1 --non-interactive
           rm -f "$GOOGLE_APPLICATION_CREDENTIALS"
-      - run: flutter build web --release --base-href /
+      - run: flutter build web --release --base-href / --pwa-strategy=none
+      - name: Fingerprint Flutter entrypoints
+        run: node scripts/version-web-build.mjs
       - uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
