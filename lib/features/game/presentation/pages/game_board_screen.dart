@@ -9,7 +9,6 @@ import 'package:halabessa/features/auth/presentation/providers/auth_providers.da
 import 'package:halabessa/features/auth/domain/models/app_user.dart';
 import 'package:halabessa/features/game/domain/models/card.dart' as game_card;
 import 'package:halabessa/features/game/presentation/widgets/card_widget.dart';
-import 'package:halabessa/features/game/presentation/widgets/player_avatar.dart';
 import 'package:halabessa/features/game/presentation/widgets/fanned_hand_widget.dart';
 import 'package:halabessa/features/game/domain/models/capture.dart';
 import 'package:halabessa/features/home/presentation/providers/store_provider.dart';
@@ -20,9 +19,11 @@ import 'package:halabessa/features/game/presentation/providers/chat_providers.da
 import 'package:halabessa/features/game/presentation/widgets/chat_overlay.dart';
 import 'package:confetti/confetti.dart';
 import '../widgets/player_profile_preview.dart';
-import '../widgets/harvest_piles_widget.dart';
 import '../widgets/match_summary_dialog.dart';
 import '../widgets/board_cards_widget.dart';
+import '../widgets/match_table_layout.dart';
+import '../widgets/table_seat.dart';
+import '../widgets/table_style.dart';
 import '../widgets/basra_celebration_overlay.dart';
 import '../widgets/emote_wheel_overlay.dart';
 import 'package:flutter/services.dart';
@@ -111,85 +112,9 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
      return AppUser(uid: targetUid, email: '', displayName: targetName, avatarUrl: avatarUrl.isEmpty ? null : avatarUrl);
   }
 
-  Widget _buildTeamHarvestPiles(MatchState matchState, String teamId, {required bool isMyTeam}) {
-    final captures = matchState.harvestStacks[teamId] ?? [];
-    if (captures.isEmpty) return const SizedBox.shrink();
 
-    // Alignment: 
-    // Team A (Partner) -> Top Left area (beside top avatar)
-    // Team B (Opponents) -> Mid Right area
-    final alignment = teamId == 'teamA' 
-        ? const Alignment(-0.8, -0.7) // Top left-ish
-        : const Alignment(0.8, -0.4); // Mid right-ish
 
-    return Align(
-      alignment: alignment,
-      child: HarvestPilesWidget(
-        captures: captures, 
-        teamName: isMyTeam ? 'my_team'.tr() : 'opponent_team'.tr(),
-        isMyTeam: isMyTeam,
-      ),
-    );
-  }
 
-  Widget _buildFloatingMatchStatus(MatchState matchState) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.4),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white10),
-        boxShadow: [
-          BoxShadow(color: Colors.black26, blurRadius: 10, offset: const Offset(0, 4)),
-        ],
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _buildMatchStatusRow(Icons.refresh, 'round_label'.tr(args: [matchState.roundCount.toString()])),
-          const SizedBox(width: 16),
-          _buildMatchStatusRow(Icons.layers_outlined, 'hand_label'.tr(args: [matchState.handInRound.toString()])),
-          const SizedBox(width: 16),
-          _buildMatchStatusRow(Icons.style_outlined, 'cards_count'.tr(args: [matchState.cardsRemainingFor(matchState.playerIds[matchState.currentTurnIndex % matchState.playerIds.length]).toString()])),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFloatingMatchStatusSmall(MatchState matchState) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white10),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _buildMatchStatusRow(Icons.refresh, matchState.roundCount.toString()),
-          const SizedBox(width: 10),
-          _buildMatchStatusRow(Icons.layers_outlined, '${matchState.handInRound}/3'),
-          const SizedBox(width: 10),
-          _buildMatchStatusRow(Icons.style_outlined, matchState.cardsRemainingFor(matchState.playerIds[matchState.currentTurnIndex % matchState.playerIds.length]).toString()),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMatchStatusRow(IconData icon, String text) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, color: ThemeConfig.goldAccent.withOpacity(0.8), size: 14),
-        const SizedBox(width: 8),
-        Text(
-          text,
-          style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
-        ),
-      ],
-    );
-  }
 
   String _getTeamOfPlayer(String playerId, List<String> playerIds) {
     final index = playerIds.indexOf(playerId);
@@ -203,19 +128,12 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
     return (myIdx + offset) % 4;
   }
 
-  Color? _getTeamColorForOffset(MatchState state, String myUid, int offset) {
-    if (state.playerIds.isEmpty) return null;
-    final absIdx = _getAbsoluteIndex(state, myUid, offset);
-    if (absIdx >= state.playerIds.length) return null;
-    
-    final team = _getTeamOfPlayer(state.playerIds[absIdx], state.playerIds);
-    return team == 'teamA' ? ThemeConfig.primaryTeal : ThemeConfig.goldAccent;
-  }
 
   void _checkWinner(MatchState? state, String myUid) {
     if (state == null) return;
     if (state.phase == GamePhase.matchOver) {
       final myTeamId = _getTeamOfPlayer(myUid, state.playerIds);
+      if (myTeamId.isEmpty) return;
       final aWins = state.teamAScore >= state.teamBScore;
       final iWin = aWins == (myTeamId == 'teamA');
       
@@ -238,11 +156,6 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
       }
     });
 
-    // Trigger celebration if match is over and we won
-    if (currentUser != null) {
-      _checkWinner(matchState, currentUser.uid);
-    }
-
     // Match Over Rewards Popup
     ref.listen<MatchState?>(matchStateProvider, (previous, next) {
       if (next == null) return;
@@ -255,6 +168,9 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
       }
 
       if (next.phase == GamePhase.matchOver && previous?.phase != GamePhase.matchOver) {
+        if (currentUser != null && !MediaQuery.disableAnimationsOf(context)) {
+          _checkWinner(next, currentUser.uid);
+        }
         final winnerTeam = next!.teamAScore >= next.teamBScore ? 'teamA' : 'teamB';
         showDialog(
           context: context,
@@ -378,19 +294,6 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
           builder: (context, orientation) {
             final isLandscape = orientation == Orientation.landscape;
             
-            // Auto-trigger confetti on match over win
-            if (matchState.phase == GamePhase.matchOver) {
-              final myIndex = matchState.playerIds.indexOf(myUid);
-              if (myIndex != -1) {
-                final myTeam = (myIndex == 0 || myIndex == 2) ? 'teamA' : 'teamB';
-                final aWins = matchState.teamAScore >= matchState.teamBScore;
-                final winnerTeam = aWins ? 'teamA' : 'teamB';
-                if (myTeam == winnerTeam && _confettiController.state != ConfettiControllerState.playing) {
-                  _confettiController.play();
-                }
-              }
-            }
-
             return Stack(
               children: [
                 // Background Table (Skin)
@@ -404,7 +307,9 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
                       return AnimatedOpacity(
                         duration: is3DActive ? const Duration(milliseconds: 500) : Duration.zero,
                         opacity: is3DActive ? 0.0 : 1.0,
-                        child: activeTable.assetPath.startsWith('http')
+                        child: activeTable.id == 'default_table'
+                          ? const ColoredBox(color: TableStyle.felt)
+                          : activeTable.assetPath.startsWith('http')
                           ? Image.network(
                               activeTable.assetPath,
                               fit: BoxFit.cover,
@@ -435,113 +340,10 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
                 SafeArea(
                   child: Stack(
                     children: [
-                      // New Top Bar (Persistent)
-                      _buildTopBar(context, ref, matchState, isLandscape),
-                    
-                    // ... Players and Board Center next ...
-                    // Partner / Opposite Player (Offset 2 in Anticlockwise)
-                    Align(
-                      alignment: isLandscape ? const Alignment(0, -0.9) : Alignment.topCenter,
-                      child: Padding(
-                        padding: EdgeInsets.only(top: isLandscape ? 0 : 10.0), 
-                        child: GestureDetector(
-                          onTap: () => _showPlayerProfile(context, ref, matchState, myUid, 2),
-                          child: PlayerAvatar(
-                            user: _getAvatarUser(ref, matchState, myUid, 2),
-                            isCurrentTurn: matchState.currentTurnIndex == _getAbsoluteIndex(matchState, myUid, 2),
-                            turnStartTime: matchState.turnStartTime,
-                            timerDurationSeconds: matchState.timerDurationSeconds,
-                            activeEmoji: _getPlayerEmoji(matchState, myUid, 2),
-                            activeMessage: ref.watch(lastMessageForUserProvider(matchState.playerIds.isEmpty ? '' : matchState.playerIds[(_getAbsoluteIndex(matchState, myUid, 2)) % matchState.playerIds.length]))?.text,
-                            teamColor: _getTeamColorForOffset(matchState, myUid, 2),
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    // Left Player (Offset 3 in Anticlockwise)
-                    Align(
-                      alignment: isLandscape ? const Alignment(-0.95, 0.2) : const Alignment(-0.95, -0.15),
-                      child: GestureDetector(
-                        onTap: () => _showPlayerProfile(context, ref, matchState, myUid, 3),
-                        child: PlayerAvatar(
-                          user: _getAvatarUser(ref, matchState, myUid, 3),
-                          isCurrentTurn: matchState.currentTurnIndex == _getAbsoluteIndex(matchState, myUid, 3),
-                          turnStartTime: matchState.turnStartTime,
-                          timerDurationSeconds: matchState.timerDurationSeconds,
-                          activeEmoji: _getPlayerEmoji(matchState, myUid, 3),
-                          activeMessage: ref.watch(lastMessageForUserProvider(matchState.playerIds.isEmpty ? '' : matchState.playerIds[(_getAbsoluteIndex(matchState, myUid, 3)) % matchState.playerIds.length]))?.text,
-                          teamColor: _getTeamColorForOffset(matchState, myUid, 3),
-                        ),
-                      ),
-                    ),
-
-                    // Right Player (Offset 1 in Anticlockwise)
-                    Align(
-                      alignment: isLandscape ? const Alignment(0.95, 0.2) : const Alignment(0.95, -0.15),
-                      child: GestureDetector(
-                        onTap: () => _showPlayerProfile(context, ref, matchState, myUid, 1),
-                        child: PlayerAvatar(
-                          user: _getAvatarUser(ref, matchState, myUid, 1),
-                          isCurrentTurn: matchState.currentTurnIndex == _getAbsoluteIndex(matchState, myUid, 1),
-                          turnStartTime: matchState.turnStartTime,
-                          timerDurationSeconds: matchState.timerDurationSeconds,
-                          activeEmoji: _getPlayerEmoji(matchState, myUid, 1),
-                          activeMessage: ref.watch(lastMessageForUserProvider(matchState.playerIds.isEmpty ? '' : matchState.playerIds[(_getAbsoluteIndex(matchState, myUid, 1)) % matchState.playerIds.length]))?.text,
-                          teamColor: _getTeamColorForOffset(matchState, myUid, 1),
-                        ),
-                      ),
-                    ),
-
-                    // Harvest Piles
-                    Positioned(
-                      left: isLandscape ? 120 : 16,
-                      top: isLandscape ? 70 : 160,
-                      child: _buildTeamHarvestPiles(matchState, 'teamA', isMyTeam: _getTeamOfPlayer(myUid, matchState.playerIds) == 'teamA'),
-                    ),
-                    Positioned(
-                      right: isLandscape ? 120 : 16,
-                      top: isLandscape ? 70 : 160,
-                      child: _buildTeamHarvestPiles(matchState, 'teamB', isMyTeam: _getTeamOfPlayer(myUid, matchState.playerIds) == 'teamB'),
-                    ),
-
-                    Positioned.fill(
-                      child: _buildBoardCenter(context, ref, matchState, myUid, isLandscape, is3DActive: show3DHand),
-                    ),
-
-                    // Local Player (Bottom Left - more robust alignment)
-                    Align(
-                      alignment: isLandscape ? const Alignment(-0.85, 0.95) : const Alignment(-0.85, 0.95),
-                      child: _buildLocalPlayerArea(context, ref, matchState, myUid),
-                    ),
-
-                    // Centered Hand Cards (Hidden if 3D Hand is active)
-                    if (!isSpectator && !show3DHand && (matchState.handCards[myUid]?.length ?? 0) > 0)
-                      Align(
-                        alignment: Alignment.bottomCenter,
-                        child: Padding(
-                          padding: EdgeInsets.zero,
-                          child: FannedHandWidget(
-                            cards: matchState.handCards[myUid] ?? [],
-                            isMyTurn: matchState.playerIds.isNotEmpty && 
-                                     matchState.currentTurnIndex == _getAbsoluteIndex(matchState, myUid, 0),
-                            onCardTap: (card, globalOrigin) {
-                              HapticFeedback.lightImpact();
-                              
-                              final RenderBox? boardBox = _boardKey.currentContext?.findRenderObject() as RenderBox?;
-                              Offset relativeOrigin = Offset.zero;
-                              
-                              if (boardBox != null && globalOrigin != Offset.zero) {
-                                final localOffset = boardBox.globalToLocal(globalOrigin);
-                                // Board center is (100, 100)
-                                relativeOrigin = Offset(localOffset.dx - 100, localOffset.dy - 100);
-                              }
-                              
-                              ref.read(matchStateProvider.notifier).playCard(myUid, card, origin: relativeOrigin);
-                            },
-                          ),
-                        ),
-                      ),
+                      Positioned.fill(child: _buildTable(
+                        context, ref, matchState, myUid, isLandscape,
+                        isSpectator: isSpectator, show3DHand: show3DHand,
+                      )),
 
                     // Overlays
                     if (matchState.phase == GamePhase.waitingForPlayers) _buildLobbyOverlay(context, ref, matchState, myUid),
@@ -557,73 +359,6 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
                     if (matchState.phase == GamePhase.matchOver) _buildContextualGameOverOverlay(matchState, myUid),
                     if (matchState.phase == GamePhase.capturing && matchState.board.isEmpty) _buildBasraOverlay(matchState, myUid),
                       
-                    Positioned(
-                      left: 12,
-                      top: isLandscape ? 60 : 70, // Below top bar
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 8),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.4),
-                          borderRadius: BorderRadius.circular(30),
-                          border: Border.all(color: Colors.white10),
-                          boxShadow: [
-                            BoxShadow(color: Colors.black26, blurRadius: 10, offset: const Offset(0, 4)),
-                          ],
-                        ),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            _buildSideButton(
-                              ref: ref,
-                              icon: Icons.chat_bubble_outline,
-                              onTap: () {
-                                ref.read(chatStateProvider.notifier).toggleOverlay();
-                              },
-                              showBadge: true,
-                            ),
-                            const SizedBox(height: 16),
-                            _buildSideButton(
-                              ref: ref,
-                              icon: Icons.emoji_emotions_outlined,
-                              color: ThemeConfig.goldAccent,
-                              onTap: () {
-                                setState(() {
-                                  _isEmoteWheelOpen = !_isEmoteWheelOpen;
-                                });
-                              },
-                            ),
-                            const SizedBox(height: 16),
-                            _buildSideButton(
-                              ref: ref,
-                              icon: Icons.settings_outlined,
-                              onTap: () {
-                                _showSettings(context);
-                              },
-                            ),
-                            const SizedBox(height: 16),
-                            _buildSideButton(
-                              ref: ref,
-                              icon: Icons.logout_rounded,
-                              onTap: () => _confirmLeave(context, ref),
-                              color: Colors.redAccent.withOpacity(0.8),
-                            ),
-                            const SizedBox(height: 16),
-                            _buildSideButton(
-                              ref: ref,
-                              icon: Icons.bug_report_outlined,
-                              onTap: () {
-                                ref.read(unityCommunicationServiceProvider).postMessage(
-                                  'UnityBridge',
-                                  'ToggleConsole',
-                                  '',
-                                );
-                              },
-                              color: Colors.white24,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
                   ],
                 ),
               ),
@@ -663,6 +398,131 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
     ),
   );
 }
+
+
+  Widget _buildTable(BuildContext context, WidgetRef ref, MatchState state,
+      String myUid, bool isLandscape, {required bool isSpectator, required bool show3DHand}) {
+    final myTeam = _getTeamOfPlayer(myUid, state.playerIds);
+    final firstIsA = myTeam != 'teamB';
+    final playing = state.phase == GamePhase.playing;
+    final myTurn = playing && !isSpectator &&
+        state.currentTurnIndex == _getAbsoluteIndex(state, myUid, 0);
+    final firstLabel = (isSpectator ? 'team_a' : 'my_team').tr();
+    final secondLabel = (isSpectator ? 'team_b' : 'opponent_team').tr();
+
+    Widget seat(int offset) {
+      final user = _getAvatarUser(ref, state, myUid, offset);
+      final active = playing && state.currentTurnIndex == _getAbsoluteIndex(state, myUid, offset);
+      final message = ref.watch(lastMessageForUserProvider(user.uid))?.text ??
+          _getPlayerEmoji(state, myUid, offset);
+      return TableSeat(
+        name: user.displayName, avatarUrl: user.avatarUrl,
+        isBot: user.uid.startsWith('bot_'), active: active,
+        detail: active ? 'table_playing'.tr() : 'cards_count'.tr(args: [state.cardsRemainingFor(user.uid).toString()]),
+        turnStarted: state.turnStartTime, turnSeconds: state.timerDurationSeconds,
+        message: message,
+        onPressed: () => _showPlayerProfile(context, ref, state, myUid, offset),
+      );
+    }
+
+    return MatchTableLayout(
+      header: MatchScoreBar(
+        firstLabel: firstLabel, secondLabel: secondLabel,
+        firstScore: firstIsA ? state.teamAScore : state.teamBScore,
+        secondScore: firstIsA ? state.teamBScore : state.teamAScore,
+        details: 'table_round_target'.tr(args: [state.roundCount.toString(), state.maxPoints.toString()]),
+        roomLabel: state.id,
+        onCopyRoom: () {
+          Clipboard.setData(ClipboardData(text: state.id));
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('room_id_copied'.tr())));
+        },
+      ),
+      partner: seat(2), leftOpponent: seat(3), rightOpponent: seat(1),
+      board: SizedBox(key: _boardKey,
+        child: _buildBoardCenter(context, ref, state, myUid, isLandscape, is3DActive: show3DHand)),
+      status: Semantics(liveRegion: true, child: Text(
+        isSpectator ? 'you_are_spectating'.tr() : myTurn ? 'table_tap_to_play'.tr() :
+          playing ? 'table_wait_or_queue'.tr() : _tablePhaseLabel(state.phase),
+        textAlign: TextAlign.center,
+        style: TableStyle.label.copyWith(color: myTurn ? TableStyle.brass : TableStyle.ivory),
+      )),
+      hand: isSpectator || show3DHand || (state.handCards[myUid]?.isEmpty ?? true)
+        ? const SizedBox(height: 24)
+        : FannedHandWidget(
+            cards: state.handCards[myUid] ?? [], isMyTurn: myTurn,
+            interactionEnabled: playing,
+            playHint: 'table_play_card'.tr(), queueHint: 'table_queue_card'.tr(),
+            cardLabelBuilder: (card) => 'table_card_name'.tr(args: [
+              'table_rank_${card.rank.name}'.tr(), 'table_suit_${card.suit.name}'.tr()]),
+            onCardTap: (card, globalOrigin) {
+              final box = _boardKey.currentContext?.findRenderObject() as RenderBox?;
+              final origin = box == null || globalOrigin == Offset.zero ? Offset.zero :
+                  box.globalToLocal(globalOrigin) - box.size.center(Offset.zero);
+              ref.read(matchStateProvider.notifier).playCard(myUid, card, origin: origin);
+            },
+          ),
+      controls: Wrap(alignment: WrapAlignment.center, spacing: 8, children: [
+        IconButton(tooltip: 'chat'.tr(), icon: const Icon(Icons.chat_bubble_outline),
+          color: TableStyle.ivory, constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+          onPressed: () => ref.read(chatStateProvider.notifier).toggleOverlay()),
+        if (!isSpectator) IconButton(tooltip: 'table_reactions'.tr(), icon: const Icon(Icons.emoji_emotions_outlined),
+          color: TableStyle.ivory, constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+          onPressed: () => setState(() => _isEmoteWheelOpen = !_isEmoteWheelOpen)),
+        IconButton(tooltip: 'table_captures'.tr(), icon: const Icon(Icons.layers_outlined),
+          color: TableStyle.ivory, constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+          onPressed: () => _showCaptures(context, state)),
+        IconButton(tooltip: 'settings'.tr(), icon: const Icon(Icons.settings_outlined),
+          color: TableStyle.ivory, constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+          onPressed: () => _showSettings(context)),
+        IconButton(tooltip: 'leave_game_title'.tr(), icon: const Icon(Icons.logout_rounded),
+          color: TableStyle.ivory, constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+          onPressed: () => _confirmLeave(context, ref)),
+      ]),
+    );
+  }
+
+  String _tablePhaseLabel(GamePhase phase) => switch (phase) {
+    GamePhase.waitingForPlayers => 'waiting_for_other_players'.tr(),
+    GamePhase.preRoundCut => 'table_cutting'.tr(),
+    GamePhase.dealingFasha || GamePhase.dealingCards => 'dealing_cards'.tr(),
+    GamePhase.capturing => 'table_capturing'.tr(),
+    GamePhase.roundScoring => 'table_scoring'.tr(),
+    GamePhase.matchOver => 'match_over'.tr(),
+    GamePhase.shuffleVoting || GamePhase.rematchVoting => 'waiting_for_other_players'.tr(),
+    GamePhase.playing => 'table_wait_or_queue'.tr(),
+  };
+
+  void _showCaptures(BuildContext context, MatchState state) {
+    showModalBottomSheet(
+      context: context, backgroundColor: TableStyle.ink, isScrollControlled: true,
+      builder: (context) => SafeArea(child: SizedBox(
+        height: MediaQuery.sizeOf(context).height * 0.65,
+        child: Column(children: [
+          ListTile(title: Text('table_captures'.tr(), style: TableStyle.label),
+            trailing: IconButton(tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
+              icon: const Icon(Icons.close, color: TableStyle.ivory),
+              onPressed: () => Navigator.pop(context))),
+          Expanded(child: ListView(children: [
+            for (final team in ['teamA', 'teamB']) ...[
+              Padding(padding: const EdgeInsets.all(16),
+                child: Text((team == 'teamA' ? 'team_a' : 'team_b').tr(), style: TableStyle.label)),
+              if ((state.harvestStacks[team] ?? []).isEmpty)
+                Padding(padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Text('table_no_captures'.tr(), style: TableStyle.detail)),
+              for (final capture in state.harvestStacks[team] ?? <Capture>[])
+                Padding(padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                  child: Wrap(spacing: 6, runSpacing: 6, children: [
+                    for (final card in capture.capturedCards)
+                      Semantics(label: 'table_card_name'.tr(args: [
+                        'table_rank_${card.rank.name}'.tr(), 'table_suit_${card.suit.name}'.tr()]),
+                        child: CardWidget(card: card, width: 48, height: 68)),
+                  ])),
+            ],
+          ])),
+        ]),
+      )),
+    );
+  }
 
   Path _drawStar(Size size) {
     double degToRad(double deg) => deg * (pi / 180.0);
@@ -766,110 +626,8 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
     );
   }
 
-  Widget _buildSideButton({
-    required WidgetRef ref, 
-    required IconData icon, 
-    required VoidCallback onTap, 
-    bool showBadge = false,
-    Color? color,
-  }) {
-    final unreadCount = ref.watch(unreadMessagesCountProvider);
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        IconButton(
-          icon: Icon(icon, color: color ?? Colors.white, size: 24),
-          onPressed: onTap,
-          visualDensity: VisualDensity.compact,
-        ),
-        if (showBadge && unreadCount > 0)
-          Positioned(
-            right: 4,
-            top: 4,
-            child: Container(
-              padding: const EdgeInsets.all(4),
-              decoration: const BoxDecoration(color: ThemeConfig.accentPink, shape: BoxShape.circle),
-              constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
-              child: Text(
-                unreadCount > 9 ? '9+' : '$unreadCount',
-                style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold),
-                textAlign: TextAlign.center,
-              ),
-            ),
-          ),
-      ],
-    );
-  }
 
-  Widget _buildScoreBadge(MatchState matchState) {
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      decoration: BoxDecoration(
-        color: Colors.black45,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white12),
-      ),
-      child: Center(
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              matchState.teamAScore.toString(),
-              style: const TextStyle(
-                fontWeight: FontWeight.bold, 
-                fontSize: 16, 
-                color: ThemeConfig.primaryTeal,
-                shadows: [Shadow(color: ThemeConfig.primaryTeal, blurRadius: 8)],
-              ),
-            ),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 8.0),
-              child: Text(':', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.bold)),
-            ),
-            Text(
-              matchState.teamBScore.toString(),
-              style: const TextStyle(
-                fontWeight: FontWeight.bold, 
-                fontSize: 16, 
-                color: ThemeConfig.goldAccent,
-                shadows: [Shadow(color: ThemeConfig.goldAccent, blurRadius: 8)],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
-  Widget _buildSpectatorCountBadge(int count) {
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: Colors.black45,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white10),
-      ),
-      child: Center(
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.visibility_outlined, color: ThemeConfig.goldAccent, size: 16),
-            const SizedBox(width: 6),
-            Text(
-              count.toString(),
-              style: const TextStyle(
-                fontWeight: FontWeight.bold, 
-                fontSize: 14, 
-                color: Colors.white,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   Widget _buildRetryButton(BuildContext context, WidgetRef ref) {
     return Container(
@@ -958,44 +716,6 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
     );
   }
 
-  Widget _buildLocalPlayerArea(BuildContext context, WidgetRef ref, MatchState matchState, String myUid) {
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.start, // Align to start (left) for better control with Positioned
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              // Avatar & Reactions
-              Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  GestureDetector(
-                    onTap: () => _showPlayerProfile(context, ref, matchState, myUid, 0),
-                    child: PlayerAvatar(
-                      user: _getAvatarUser(ref, matchState, myUid, 0),
-                      isCurrentTurn: matchState.playerIds.isNotEmpty && matchState.currentTurnIndex == _getAbsoluteIndex(matchState, myUid, 0),
-                      turnStartTime: matchState.turnStartTime,
-                      timerDurationSeconds: matchState.timerDurationSeconds,
-                      activeEmoji: matchState.playerEmojis[myUid],
-                      activeMessage: ref.watch(lastMessageForUserProvider(myUid))?.text,
-                      teamColor: _getTeamColorForOffset(matchState, myUid, 0),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  _buildReactionBar(ref, myUid),
-                ],
-              ),
-              const SizedBox(width: 24),
-              // Hand moved to bottom center of stack for better symmetry
-            ],
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _buildLastCardReveal(game_card.Card card) {
     return TweenAnimationBuilder<double>(
@@ -1047,28 +767,6 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
     );
   }
 
-  Widget _buildReactionBar(WidgetRef ref, String myUid) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: ['😂', '😡', '🤔', '😎'].map((e) => GestureDetector(
-        onTap: () {
-          ref.read(matchStateProvider.notifier).sendEmoji(myUid, e);
-          Future.delayed(const Duration(seconds: 3), () {
-            ref.read(matchStateProvider.notifier).clearEmoji(myUid);
-          });
-        },
-        child: Container(
-          padding: const EdgeInsets.all(6),
-          decoration: BoxDecoration(
-            color: Colors.black26,
-            shape: BoxShape.circle,
-            border: Border.all(color: Colors.white10),
-          ),
-          child: Text(e, style: const TextStyle(fontSize: 16)),
-        ),
-      )).toList(),
-    );
-  }
 
   Widget _buildPhaseOverlay(String text, {Alignment alignment = Alignment.center}) {
     return Align(
@@ -1548,87 +1246,6 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
             Text(
               'spectating_label'.tr().toUpperCase(),
               style: const TextStyle(color: ThemeConfig.goldAccent, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-  Widget _buildTopBar(BuildContext context, WidgetRef ref, MatchState matchState, bool isLandscape) {
-    return Positioned(
-      top: 0,
-      left: 0,
-      right: 0,
-      child: Container(
-        height: 60,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Colors.black.withOpacity(0.8), Colors.transparent],
-          ),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            // Left: App Name & Room ID
-            GestureDetector(
-              onTap: () {
-                Clipboard.setData(ClipboardData(text: matchState.id));
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('room_id_copied'.tr()),
-                    backgroundColor: ThemeConfig.primaryTeal,
-                    duration: const Duration(seconds: 2),
-                  ),
-                );
-              },
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'app_title'.tr().toUpperCase(),
-                    style: const TextStyle(
-                      fontFamily: ThemeConfig.fontHeading,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 12,
-                      letterSpacing: 2,
-                      color: ThemeConfig.primaryTeal,
-                    ),
-                  ),
-                  Row(
-                    children: [
-                      Icon(Icons.hub_outlined, color: Colors.white.withOpacity(0.5), size: 10),
-                      const SizedBox(width: 4),
-                      Text(
-                        matchState.id,
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white.withOpacity(0.8),
-                          letterSpacing: 1,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            
-            // Center: Score & Status
-            _buildScoreBadge(matchState),
-            
-            // Right: Spectators & Match Status
-            Row(
-              children: [
-                if (matchState.spectatorCount > 0)
-                  _buildSpectatorCountBadge(matchState.spectatorCount),
-                const SizedBox(width: 12),
-                if (matchState.phase != GamePhase.waitingForPlayers)
-                  _buildFloatingMatchStatusSmall(matchState),
-              ],
             ),
           ],
         ),

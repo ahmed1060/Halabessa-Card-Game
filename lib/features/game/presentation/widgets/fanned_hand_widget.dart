@@ -1,18 +1,26 @@
+import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:halabessa/features/game/domain/models/card.dart' as game_card;
 import 'package:halabessa/features/game/presentation/widgets/card_widget.dart';
+import 'table_style.dart';
 
+/// Bounded, keyboard-accessible hand. Queued cards use identity, not list index.
 class FannedHandWidget extends StatefulWidget {
   final List<game_card.Card> cards;
-  final Function(game_card.Card, Offset origin) onCardTap;
+  final void Function(game_card.Card, Offset origin) onCardTap;
   final bool isMyTurn;
+  final bool interactionEnabled;
+  final Widget Function(game_card.Card, double, double)? cardBuilder;
+  final String Function(game_card.Card)? cardLabelBuilder;
+  final String playHint;
+  final String queueHint;
 
   const FannedHandWidget({
-    super.key,
-    required this.cards,
-    required this.onCardTap,
-    this.isMyTurn = false,
+    super.key, required this.cards, required this.onCardTap,
+    this.isMyTurn = false, this.interactionEnabled = true, this.cardBuilder,
+    this.cardLabelBuilder, this.playHint = 'Play card',
+    this.queueHint = 'Queue card; tap again to cancel',
   });
 
   @override
@@ -20,269 +28,141 @@ class FannedHandWidget extends StatefulWidget {
 }
 
 class _FannedHandWidgetState extends State<FannedHandWidget> {
-  int? hoveredIndex;
-  int? preSelectedIndex;
-  Offset? preSelectedOrigin;
-  double dragOffsetY = 0.0;
-  bool isDraggingUp = false;
+  game_card.Card? _queued;
+  game_card.Card? _hovered;
+  Offset _queuedOrigin = Offset.zero;
+  Timer? _autoPlay;
+  Timer? _tapGuard;
+  bool _submitting = false;
+  double _dragDistance = 0;
+  Offset _dragOrigin = Offset.zero;
+
+  @override
+  void dispose() {
+    _autoPlay?.cancel();
+    _tapGuard?.cancel();
+    super.dispose();
+  }
 
   @override
   void didUpdateWidget(FannedHandWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
-    
-    // Auto-play pre-selected card when it becomes my turn
-    if (!oldWidget.isMyTurn && widget.isMyTurn && preSelectedIndex != null) {
-      if (preSelectedIndex! < widget.cards.length) {
-        final card = widget.cards[preSelectedIndex!];
-        final origin = preSelectedOrigin ?? Offset.zero;
-        
-        // Use a slight delay to allow the turn transition animation to breathe
-        Future.delayed(const Duration(milliseconds: 300), () {
-          if (mounted && widget.isMyTurn && widget.cards.contains(card)) {
-            widget.onCardTap(card, origin);
-            setState(() {
-              preSelectedIndex = null;
-              preSelectedOrigin = null;
-              dragOffsetY = 0.0;
-              isDraggingUp = false;
-            });
-          }
-        });
-      } else {
-        setState(() {
-          preSelectedIndex = null;
-          preSelectedOrigin = null;
-          dragOffsetY = 0.0;
-          isDraggingUp = false;
-        });
-      }
+    if (!widget.cards.contains(_queued)) {
+      _queued = null;
+      _autoPlay?.cancel();
     }
-
-    // Reset pre-selection if cards change and the index is no longer valid
-    if (widget.cards.length != oldWidget.cards.length) {
-      if (preSelectedIndex != null && preSelectedIndex! >= widget.cards.length) {
-        setState(() {
-          preSelectedIndex = null;
-          preSelectedOrigin = null;
-          dragOffsetY = 0.0;
-          isDraggingUp = false;
-        });
-      }
+    if (!widget.isMyTurn || !widget.interactionEnabled) _autoPlay?.cancel();
+    if ((!oldWidget.isMyTurn || !oldWidget.interactionEnabled) &&
+        widget.isMyTurn && widget.interactionEnabled && _queued != null) {
+      final selected = _queued!;
+      _autoPlay?.cancel();
+      _autoPlay = Timer(const Duration(milliseconds: 300), () {
+        if (mounted && _queued == selected && widget.cards.contains(selected)) {
+          _activate(selected, _queuedOrigin);
+        }
+      });
     }
   }
 
-  void _handleHoverUpdate(Offset localPosition, double fanWidth, double preferredSpacing, int cardCount) {
-    // If finger is too far left/right or too far below, clear hover
-    if (localPosition.dx < -50 || localPosition.dx > (fanWidth + 100) || localPosition.dy > 200) {
-      if (hoveredIndex != null) {
-        setState(() {
-          hoveredIndex = null;
-          dragOffsetY = 0.0;
-          isDraggingUp = false;
-        });
-      }
+  void _activate(game_card.Card card, Offset origin) {
+    if (!widget.interactionEnabled || _submitting || !widget.cards.contains(card)) return;
+    _autoPlay?.cancel();
+    if (!widget.isMyTurn) {
+      setState(() {
+        _queued = _queued == card ? null : card;
+        _queuedOrigin = origin;
+      });
       return;
     }
-
-    // Vertical drag: negative dy means dragging upwards toward the table
-    final double dy = localPosition.dy;
-    final bool draggingUp = dy < -20;
-
-    int newIndex = hoveredIndex ?? (localPosition.dx / preferredSpacing).floor().clamp(0, cardCount - 1);
-    if (!draggingUp) {
-      newIndex = (localPosition.dx / preferredSpacing).floor().clamp(0, cardCount - 1);
-    }
-    
-    if (newIndex != hoveredIndex || draggingUp != isDraggingUp || (dragOffsetY - dy).abs() > 2) {
-      if (newIndex != hoveredIndex) {
-        HapticFeedback.selectionClick();
-      }
-      setState(() {
-        hoveredIndex = newIndex;
-        dragOffsetY = dy.clamp(-150.0, 0.0);
-        isDraggingUp = draggingUp;
-      });
-    }
+    setState(() {
+      _queued = null;
+      _submitting = true;
+    });
+    // Suppress double taps but allow retry after a rejected command.
+    // Server revisions remain the authoritative duplicate protection.
+    _tapGuard?.cancel();
+    _tapGuard = Timer(const Duration(milliseconds: 600), () {
+      if (mounted) setState(() => _submitting = false);
+    });
+    widget.onCardTap(card, origin);
   }
 
   @override
   Widget build(BuildContext context) {
     if (widget.cards.isEmpty) return const SizedBox.shrink();
-    final int cardCount = widget.cards.length;
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final double screenWidth = constraints.maxWidth;
-        final bool isMobile = screenWidth < 500;
-        
-        // Configuration for the fan effect
-        final double cardWidth = isMobile ? 70.0 : 85.0;
-        final double cardHeight = isMobile ? 100.0 : 125.0;
-        
-        // Calculate dynamic spacing to ensure cards are beside each other with a premium "holding" look
-        final double preferredSpacing = isMobile ? 75.0 : 90.0;
-        final double fanWidth = (cardCount - 1) * preferredSpacing;
-        
-        // Stabilize width to prevent "twitching" layout shifts
-        final double totalWidth = fanWidth + cardWidth;
-        
-        // Arc configuration (Disabled for "beside each other" look)
-        final double arcHeight = 0.0;
-        const double maxRotation = 0.0; // radians
-
-        // To ensure the hovered or preselected card is on top, we sort the indices
-        final List<int> buildIndices = List.generate(cardCount, (i) => i);
-        final int? topIndex = hoveredIndex ?? preSelectedIndex;
-        if (topIndex != null && topIndex < cardCount) {
-          buildIndices.remove(topIndex);
-          buildIndices.add(topIndex);
-        }
-
-        return GestureDetector(
-          onPanStart: (details) => _handleHoverUpdate(details.localPosition, fanWidth, preferredSpacing, cardCount),
-          onPanUpdate: (details) => _handleHoverUpdate(details.localPosition, fanWidth, preferredSpacing, cardCount),
-          onPanEnd: (_) {
-            if (hoveredIndex != null) {
-              final RenderBox? box = context.findRenderObject() as RenderBox?;
-              Offset globalOrigin = Offset.zero;
-              
-              if (box != null) {
-                final double normalizedPos = cardCount > 1 
-                    ? (hoveredIndex! / (cardCount - 1)) * 2 - 1 
-                    : 0.0;
-                final double xPos = (hoveredIndex! * preferredSpacing) + (cardWidth / 2);
-                final double yPos = arcHeight * (normalizedPos * normalizedPos);
-                final double yFromBottom = 20 + (arcHeight - yPos) + (cardHeight / 2);
-                
-                final double localX = xPos;
-                final double localY = box.size.height - yFromBottom + dragOffsetY;
-                globalOrigin = box.localToGlobal(Offset(localX, localY));
-              }
-
-              if (widget.isMyTurn) {
-                HapticFeedback.mediumImpact();
-                widget.onCardTap(widget.cards[hoveredIndex!], globalOrigin);
-                setState(() {
-                  preSelectedIndex = null;
-                  preSelectedOrigin = null;
-                });
-              } else {
-                // Pre-selection mode
-                HapticFeedback.lightImpact();
-                setState(() {
-                  if (preSelectedIndex == hoveredIndex && dragOffsetY >= -30) {
-                    preSelectedIndex = null;
-                    preSelectedOrigin = null;
-                  } else {
-                    preSelectedIndex = hoveredIndex;
-                    preSelectedOrigin = globalOrigin;
+    return LayoutBuilder(builder: (context, constraints) {
+      final available = constraints.hasBoundedWidth
+          ? constraints.maxWidth : MediaQuery.sizeOf(context).width;
+      final compact = constraints.hasBoundedHeight && constraints.maxHeight < 145;
+      final width = math.min(compact ? 60.0 : 80.0,
+          math.max(40.0, (available - 32) / math.min(widget.cards.length, 4)));
+      final height = width * 1.43;
+      final spacing = widget.cards.length == 1 ? 0.0 :
+          math.min(width + 8, math.max(0.0, (available - 16 - width) / (widget.cards.length - 1)));
+      final totalWidth = width + spacing * (widget.cards.length - 1);
+      final reducedMotion = MediaQuery.disableAnimationsOf(context);
+      return Center(
+        heightFactor: 1,
+        child: SizedBox(
+          width: totalWidth, height: height + 28,
+          child: Stack(children: [
+            for (var index = 0; index < widget.cards.length; index++)
+              Positioned(
+                key: ValueKey(widget.cards[index].firebaseKey),
+                left: index * spacing, bottom: 8,
+                child: Builder(builder: (cardContext) {
+                  final card = widget.cards[index];
+                  final selected = _queued == card;
+                  void activate() {
+                    final box = cardContext.findRenderObject() as RenderBox?;
+                    _activate(card, box?.localToGlobal(Offset(width / 2, height / 2)) ?? Offset.zero);
                   }
-                });
-              }
-            }
-            setState(() {
-              hoveredIndex = null;
-              dragOffsetY = 0.0;
-              isDraggingUp = false;
-            });
-          },
-          onPanCancel: () => setState(() {
-            hoveredIndex = null;
-            dragOffsetY = 0.0;
-            isDraggingUp = false;
-          }),
-          child: Container(
-            width: totalWidth,
-            height: cardHeight + arcHeight + 60, // Added buffer for hover scaling
-            alignment: Alignment.bottomCenter,
-            decoration: const BoxDecoration(color: Colors.transparent), // Catch gestures
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: buildIndices.map((index) {
-                final double normalizedPos = cardCount > 1 
-                    ? (index / (cardCount - 1)) * 2 - 1 
-                    : 0.0;
-                
-                final double xPos = (index * preferredSpacing);
-                final double yPos = arcHeight * (normalizedPos * normalizedPos);
-                final double rotation = normalizedPos * maxRotation;
-
-                final bool isHovered = hoveredIndex == index;
-                final bool isPreSelected = preSelectedIndex == index;
-                final double dynamicDragOffset = isHovered ? dragOffsetY : 0.0;
-                final double elevationY = (isHovered || isPreSelected) ? (-40.0 + dynamicDragOffset) : 0.0;
-                final double scale = (isHovered || isPreSelected) 
-                    ? (1.25 + (isDraggingUp && isHovered ? 0.08 : 0.0)) 
-                    : 1.0;
-
-                return Positioned(
-                  left: xPos,
-                  bottom: -45 + (arcHeight - yPos),
-                  child: Draggable<game_card.Card>(
-                    data: widget.cards[index],
-                    maxSimultaneousDrags: (widget.isMyTurn && hoveredIndex == index) ? 1 : 0,
-                    feedback: Material(
-                      color: Colors.transparent,
-                      child: CardWidget(
-                        card: widget.cards[index],
-                        width: cardWidth * 1.3,
-                        height: cardHeight * 1.3,
-                      ),
-                    ),
-                    childWhenDragging: const SizedBox.shrink(),
-                    onDragUpdate: (details) {
-                      // Optional: provide haptic feedback when crossing certain areas
-                    },
-                    onDragStarted: () {
-                       HapticFeedback.lightImpact();
-                    },
-                    child: MouseRegion( // Still works for Desktop
-                      onEnter: (_) => setState(() => hoveredIndex = index),
-                      onExit: (_) => setState(() => hoveredIndex = null),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        curve: Curves.easeOutBack,
-                        transform: Matrix4.identity()
-                          ..translate(0.0, elevationY)
-                          ..rotateZ(rotation)
-                          ..scale(scale),
-                        transformAlignment: Alignment.bottomCenter,
-                        child: IgnorePointer( // Let the GestureDetector above handle the logic
-                          child: Stack(
-                            children: [
-                              CardWidget(
-                                card: widget.cards[index],
-                                width: cardWidth,
-                                height: cardHeight,
-                                onTap: null, // Handled by GestureDetector
-                              ),
-                              if (isPreSelected && !isHovered)
-                                Positioned.fill(
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(8),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Colors.tealAccent.withOpacity(0.35),
-                                          blurRadius: 15,
-                                          spreadRadius: 2,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                            ],
+                  return AnimatedPadding(
+                    duration: reducedMotion ? Duration.zero : const Duration(milliseconds: 120),
+                    padding: EdgeInsets.only(bottom: selected ? 12 : (_hovered == card ? 6 : 0)),
+                    child: Semantics(
+                      label: widget.cardLabelBuilder?.call(card) ?? card.toString(),
+                      hint: widget.isMyTurn ? widget.playHint : widget.queueHint,
+                      selected: selected,
+                      child: GestureDetector(
+                        key: ValueKey('hand-card-${card.firebaseKey}'),
+                        onVerticalDragStart: widget.interactionEnabled ? (details) {
+                          _dragDistance = 0;
+                          _dragOrigin = details.globalPosition;
+                        } : null,
+                        onVerticalDragUpdate: widget.interactionEnabled ? (details) {
+                          _dragDistance += details.delta.dy;
+                        } : null,
+                        onVerticalDragEnd: widget.interactionEnabled ? (_) {
+                          if (_dragDistance < -36) _activate(card, _dragOrigin);
+                          _dragDistance = 0;
+                        } : null,
+                        onVerticalDragCancel: () => _dragDistance = 0,
+                        child: Material(
+                          color: Colors.transparent,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            side: BorderSide(color: selected ? TableStyle.brass : Colors.transparent, width: 2),
+                          ),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(8),
+                            focusColor: TableStyle.brass.withOpacity(0.5),
+                            onHover: (value) => setState(() => _hovered = value ? card : null),
+                            onTap: widget.interactionEnabled && !_submitting ? activate : null,
+                            child: ExcludeSemantics(child: IgnorePointer(child:
+                              widget.cardBuilder?.call(card, width, height) ??
+                                  CardWidget(card: card, width: width, height: height),
+                            )),
                           ),
                         ),
                       ),
                     ),
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
-        );
-      },
-    );
+                  );
+                }),
+              ),
+          ]),
+        ),
+      );
+    });
   }
 }
