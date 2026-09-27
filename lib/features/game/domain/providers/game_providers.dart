@@ -62,8 +62,11 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
   // Track last bound match for refresh recovery
   String? lastBoundMatchId;
   
-  // Prevents multiple concurrent bot logic evaluations for the same state change
+  // Bot decisions can span a network write and capture animation. Match updates
+  // received during that window must not be dropped: the final update may be the
+  // only notification that the next bot is now active.
   bool _isHandlingBotLogic = false;
+  bool _botEvaluationQueued = false;
   // Timers for heartbeat and AFK monitoring
   Timer? _heartbeatTimer;
   Timer? _afkWatchdogTimer;
@@ -399,7 +402,10 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
   }
 
   Future<void> _evaluateBotActions(MatchState serverState) async {
-    if (_isHandlingBotLogic) return;
+    if (_isHandlingBotLogic) {
+      _botEvaluationQueued = true;
+      return;
+    }
     _isHandlingBotLogic = true;
 
     if (!_amIHost(serverState)) {
@@ -526,6 +532,17 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
       debugPrint('CRITICAL ASYNC ERROR in _evaluateBotActions: $e');
     } finally {
       _isHandlingBotLogic = false;
+      if (_botEvaluationQueued) {
+        _botEvaluationQueued = false;
+        final latestState = state;
+        if (latestState != null) {
+          // Re-evaluate after releasing the single-flight guard. Without this,
+          // an RTDB echo received while a bot was awaiting its write/animation
+          // could be discarded, leaving the next bot turn idle until another
+          // unrelated match update arrives.
+          scheduleMicrotask(() => _evaluateBotActions(latestState));
+        }
+      }
     }
   }
 
@@ -1181,3 +1198,4 @@ final matchStateProvider = StateNotifierProvider<MatchStateNotifier, MatchState?
   ref.watch(multimediaServiceProvider); 
   return MatchStateNotifier(ref);
 });
+
