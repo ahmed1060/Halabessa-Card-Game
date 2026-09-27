@@ -54,7 +54,10 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
     // Start Room Music
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(multimediaServiceProvider).playRoomMusic('music/room_music.mp3');
-      ref.read(unityLayerVisibilityProvider.notifier).state = true;
+      // Unity is optional. Keep its startup/error screen from covering the
+      // Flutter board when the player has disabled 3D mode.
+      ref.read(unityLayerVisibilityProvider.notifier).state =
+          ref.read(settingsProvider).is3DModeEnabled;
     });
   }
 
@@ -227,6 +230,13 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
   Widget build(BuildContext context) {
     final matchState = ref.watch(matchStateProvider);
     final currentUser = ref.watch(currentUserProvider);
+
+    ref.listen<SettingsState>(settingsProvider, (previous, next) {
+      if (previous?.is3DModeEnabled != next.is3DModeEnabled) {
+        ref.read(unityLayerVisibilityProvider.notifier).state =
+            next.is3DModeEnabled;
+      }
+    });
 
     // Trigger celebration if match is over and we won
     if (currentUser != null) {
