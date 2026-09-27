@@ -363,9 +363,7 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
     final myUid = currentUser.uid;
     final bool isSpectator = matchState.playerIds.indexOf(myUid) == -1;
     final settings = ref.watch(settingsProvider);
-    final isUnityVisible = ref.watch(unityLayerVisibilityProvider);
-    final isUnityInitialized = ref.watch(unityInitializedProvider);
-    final show3DHand = settings.is3DModeEnabled && isUnityVisible && isUnityInitialized;
+    final show3DHand = settings.is3DModeEnabled && ref.watch(unityLayerActiveProvider);
 
 
     return PopScope(
@@ -401,12 +399,10 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
                     builder: (context, ref, child) {
                       final settings = ref.watch(settingsProvider);
                       final activeTable = ref.watch(activeTableSkinProvider);
-                      final isUnityVisible = ref.watch(unityLayerVisibilityProvider);
-                      final isUnityInitialized = ref.watch(unityInitializedProvider);
-                      final is3DActive = settings.is3DModeEnabled && isUnityVisible && isUnityInitialized;
+                      final is3DActive = settings.is3DModeEnabled && ref.watch(unityLayerActiveProvider);
                       
                       return AnimatedOpacity(
-                        duration: const Duration(milliseconds: 500),
+                        duration: is3DActive ? const Duration(milliseconds: 500) : Duration.zero,
                         opacity: is3DActive ? 0.0 : 1.0,
                         child: activeTable.assetPath.startsWith('http')
                           ? Image.network(

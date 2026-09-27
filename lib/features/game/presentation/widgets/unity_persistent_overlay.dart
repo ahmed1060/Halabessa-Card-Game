@@ -1,129 +1,47 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/foundation.dart';
-import 'package:easy_localization/easy_localization.dart';
 import 'unity_game_view.dart';
 import '../providers/unity_layer_provider.dart';
 import '../../../../core/utils/web_registry.dart';
 
-class UnityPersistentOverlay extends ConsumerWidget {
-  const UnityPersistentOverlay({super.key});
+class UnityPersistentOverlay extends ConsumerStatefulWidget {
+  const UnityPersistentOverlay({super.key, this.unityView = const UnityGameView()});
+
+  final Widget unityView;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final isVisible = ref.watch(unityLayerVisibilityProvider);
-    final isInitialized = ref.watch(unityInitializedProvider);
+  ConsumerState<UnityPersistentOverlay> createState() => _UnityPersistentOverlayState();
+}
 
-    // Side effect belongs in a listener, not directly in build(). Calling
-    // setWebUnityPointerEvents() inline here ran as an uncontrolled side
-    // effect during the build phase -- it could fire multiple times per
-    // frame or before the canvas element even existed, so the toggle back
-    // to interactive was unpredictable. ref.listen defers it to after the
-    // build phase and only fires when the value actually changes.
+class _UnityPersistentOverlayState extends ConsumerState<UnityPersistentOverlay> {
+  bool _hasMountedEngine = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final requested = ref.watch(unityLayerVisibilityProvider);
+    final active = ref.watch(unityLayerActiveProvider);
+    final failed = ref.watch(unityFailedProvider);
+
     if (kIsWeb) {
-      ref.listen<bool>(unityLayerVisibilityProvider, (previous, next) {
+      ref.listen<bool>(unityLayerActiveProvider, (_, next) {
         setWebUnityPointerEvents(next);
       });
     }
 
-    // We keep Unity in the background. Clicks are handled by the layers ON TOP of it (Flutter)
-    // unless isVisible is true (e.g. in GameBoardScreen), but even then, 
-    // the GameBoardScreen is likely on top.
-    
+    // Do not allocate a WebGL/native view in the lobby or in 2D mode. Once
+    // mounted, retain the same view so navigation cannot create two engines.
+    _hasMountedEngine = _hasMountedEngine || (requested && !failed);
+    if (!_hasMountedEngine) return const SizedBox.shrink();
+
+    // Keep Flutter's playable board visible throughout loading and failure.
+    // A visible request alone is not evidence that Unity can render a scene.
     return Positioned.fill(
-      child: Stack(
-        children: [
-          // Background Unity view
-          IgnorePointer(
-            ignoring: !isVisible,
-            child: AnimatedOpacity(
-              duration: const Duration(milliseconds: 300),
-              opacity: isVisible ? 1.0 : 0.0,
-              child: const UnityGameView(),
-            ),
-          ),
-          
-          // Background Loading Feedback (Only show when Unity layer is requested to be visible)
-          if (!isInitialized && isVisible)
-            Container(
-              color: Colors.black.withOpacity(0.4),
-              child: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white24,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    const _CyclingLoadingText(),
-                  ],
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class _CyclingLoadingText extends StatefulWidget {
-  const _CyclingLoadingText();
-
-  @override
-  State<_CyclingLoadingText> createState() => _CyclingLoadingTextState();
-}
-
-class _CyclingLoadingTextState extends State<_CyclingLoadingText> {
-  int _currentIndex = 0;
-  late final List<String> _steps;
-  late final Timer _timer;
-
-  @override
-  void initState() {
-    super.initState();
-    _steps = [
-      'loading_step_engine'.tr(),
-      'loading_step_assets'.tr(),
-      'loading_step_physics'.tr(),
-      'loading_step_sync'.tr(),
-      'loading_step_interface'.tr(),
-    ];
-    
-    _timer = Timer.periodic(const Duration(milliseconds: 1500), (timer) {
-      if (!mounted) {
-        timer.cancel();
-        return;
-      }
-      setState(() {
-        _currentIndex = (_currentIndex + 1) % _steps.length;
-      });
-    });
-  }
-
-  @override
-  void dispose() {
-    _timer.cancel();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 500),
-      child: Text(
-        _steps[_currentIndex],
-        key: ValueKey(_currentIndex),
-        style: const TextStyle(
-          color: Colors.white70,
-          fontSize: 12,
-          letterSpacing: 1.1,
-          fontStyle: FontStyle.italic,
+      child: IgnorePointer(
+        ignoring: !active,
+        child: Opacity(
+          opacity: active ? 1 : 0,
+          child: widget.unityView,
         ),
       ),
     );

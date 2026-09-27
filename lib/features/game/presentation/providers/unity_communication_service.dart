@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:halabessa/core/utils/web_utils.dart';
 import 'package:flutter/services.dart';
@@ -9,28 +10,30 @@ import '../../domain/providers/game_providers.dart';
 import 'package:halabessa/features/auth/presentation/providers/auth_providers.dart';
 import 'package:halabessa/core/providers/settings_provider.dart';
 import 'package:halabessa/features/game/presentation/providers/unity_layer_provider.dart';
+import 'unity_startup_state.dart';
 
-final unityCommunicationServiceProvider = Provider((ref) => UnityCommunicationService(ref)..init());
+final unityCommunicationServiceProvider = Provider((ref) {
+  final service = UnityCommunicationService(ref)..init();
+  ref.onDispose(service.dispose);
+  return service;
+});
 
 class UnityCommunicationService {
   final Ref _ref;
   UnityWidgetController? _controller;
   final ValueNotifier<bool> isReady = ValueNotifier<bool>(false);
+  final UnityStartupState _startup = UnityStartupState();
+  Timer? _startupTimer;
+  StreamSubscription<dynamic>? _webMessages;
 
   UnityCommunicationService(this._ref);
 
   void init() {
+    _startupTimer = Timer(const Duration(seconds: 30), () {
+      if (!isReady.value) _fallbackTo2D();
+    });
     if (kIsWeb) {
-      // Graceful fallback: If Unity WebGL does not report ready within 3.5s, fall back to Flutter 2D
-      Future.delayed(const Duration(milliseconds: 3500), () {
-        if (!isReady.value) {
-          debugPrint("Unity WebGL startup timeout - falling back to Flutter 2D.");
-          _ref.read(unityInitializedProvider.notifier).state = false;
-          _ref.read(unityLayerVisibilityProvider.notifier).state = false;
-        }
-      });
-
-      WebUtils.onMessage?.listen((event) {
+      _webMessages = WebUtils.onMessage?.listen((event) {
         try {
           // Unity's WebGL callbacks and Flutter's outbound bridge messages
           // are posted by this document. Ignore messages injected by a
@@ -45,18 +48,7 @@ class UnityCommunicationService {
             // Ignore echoes (messages from Flutter to Unity)
             if (data is Map && data.containsKey('objectName')) return;
             
-            if (data['event'] == 'UNITY_READY') {
-              isReady.value = true;
-              _ref.read(unityInitializedProvider.notifier).state = true;
-              // Initial sync after Unity WebGL is loaded
-              final matchState = _ref.read(matchStateProvider);
-              if (matchState != null) {
-                syncState(matchState);
-                setMode(matchState.mode.name);
-              }
-            } else {
-              handleUnityMessage(message);
-            }
+            handleUnityMessage(message);
           }
         } catch (e) {
           // Non-JSON message or error
@@ -67,12 +59,21 @@ class UnityCommunicationService {
 
   void setController(UnityWidgetController controller) {
     _controller = controller;
-    // Fallback for native: if no handshake received, keep 2D active
-    Future.delayed(const Duration(milliseconds: 2500), () {
-      if (!isReady.value) {
-        debugPrint("Native Unity handshake timeout - keeping Flutter 2D fallback.");
-      }
-    });
+  }
+
+  void _fallbackTo2D() {
+    _startup.handleEvent('UNITY_FAILED');
+    _startupTimer?.cancel();
+    isReady.value = false;
+    _ref.read(unityInitializedProvider.notifier).state = false;
+    _ref.read(unityFailedProvider.notifier).state = true;
+    _ref.read(unityLayerVisibilityProvider.notifier).state = false;
+  }
+
+  void dispose() {
+    _startupTimer?.cancel();
+    _webMessages?.cancel();
+    isReady.dispose();
   }
 
   void postMessage(String objectName, String methodName, String message) {
@@ -146,21 +147,28 @@ class UnityCommunicationService {
   }
 
   void handleUnityMessage(String message) {
-    if (!isReady.value) {
-      isReady.value = true;
-      _ref.read(unityInitializedProvider.notifier).state = true;
-      // Visibility belongs to the screen (GameBoardScreen sets it true in
-      // initState / false in dispose) — a communication service should
-      // never own layout state. This used to hide the Unity layer 2s after
-      // the *first* message of any kind, which fires mid-match on Android
-      // and iOS (every Unity event routes through here), fading the board
-      // out while the game screen is still visible.
-    }
     try {
       final data = jsonDecode(message);
       if (data is! Map) return;
 
       final event = data['event'];
+      if (event == 'UNITY_FAILED') {
+        _fallbackTo2D();
+        return;
+      }
+      if (event == 'UNITY_READY') {
+        if (!_startup.handleEvent('UNITY_READY') || isReady.value) return;
+        _startupTimer?.cancel();
+        isReady.value = true;
+        _ref.read(unityInitializedProvider.notifier).state = true;
+        final match = _ref.read(matchStateProvider);
+        if (match != null) {
+          syncState(match);
+          setMode(match.mode.name);
+        }
+        return;
+      }
+      if (!isReady.value || _startup.hasFailed) return;
       final settings = _ref.read(settingsProvider);
 
       if (event == 'BASRA_EVENT') {

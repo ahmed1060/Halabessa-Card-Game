@@ -40,14 +40,33 @@
   <script src="Build/web.loader.js"></script>
   <script>
     var unityInstance = null;
+    var unityStartupState = 'idle';
+    var unityCanvas = null;
+
+    function failUnityStartup(reason) {
+      if (unityStartupState === 'failed') return;
+      unityStartupState = 'failed';
+      if (unityCanvas) {
+        unityCanvas.style.visibility = 'hidden';
+        unityCanvas.style.pointerEvents = 'none';
+      }
+      window.postMessage(JSON.stringify({ event: 'UNITY_FAILED' }), window.location.origin);
+      console.error('Unity WebGL unavailable; using Flutter 2D:', reason);
+    }
 
     function createUnityInstanceOnCanvas(canvasElement) {
-      if (!canvasElement) return;
+      if (!canvasElement || unityStartupState !== 'idle') return;
+      unityStartupState = 'starting';
+      unityCanvas = canvasElement;
+      canvasElement.style.visibility = 'hidden';
+      canvasElement.addEventListener('webglcontextlost', function () {
+        failUnityStartup('webgl_context_lost');
+      });
 
       var buildUrl = "Build";
       var cacheBuster = "?v=" + Date.now();
 
-      createUnityInstance(canvasElement, {
+      Promise.resolve().then(function () { return createUnityInstance(canvasElement, {
         dataUrl: buildUrl + "/web.data.unityweb" + cacheBuster,
         frameworkUrl: buildUrl + "/web.framework.js.unityweb" + cacheBuster,
         codeUrl: buildUrl + "/web.wasm.unityweb" + cacheBuster,
@@ -62,8 +81,11 @@
           antialias: true,
           premultipliedAlpha: false,
         },
-      }).then((instance) => {
+      }); }).then((instance) => {
+        if (unityStartupState === 'failed') return;
         unityInstance = instance;
+        unityStartupState = 'running';
+        canvasElement.style.visibility = 'visible';
         // Restrict keyboard listening to the canvas element only
         if (instance.Module) {
           instance.Module.keyboardListeningElement = canvasElement;
@@ -79,7 +101,7 @@
           }
         };
       }).catch((message) => {
-        console.error("Unity WebGL build failed to load:", message);
+        failUnityStartup(message);
       });
     }
 

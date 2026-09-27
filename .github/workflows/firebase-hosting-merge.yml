@@ -21,7 +21,7 @@ jobs:
         with:
           node-version: "24"
       - name: Test authoritative match engines and database lifecycle
-        run: node --test functions/test/match_engine.test.js functions/test/edge_match_engine.test.ts functions/test/edge_database.test.ts
+        run: node --test functions/test/match_engine.test.js functions/test/edge_match_engine.test.ts functions/test/edge_database.test.ts functions/test/unity_web_startup.test.js
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: "3.47.2"

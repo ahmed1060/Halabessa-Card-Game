@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:html' as html;
 import 'dart:ui_web' as ui_web;
 import 'dart:js' as js;
@@ -37,12 +38,15 @@ void registerWebUnityView() {
 
       timer.cancel();
       if (!attached) {
-        debugPrint("Unity canvas never attached with a non-zero size after ${timeoutMs}ms; booting anyway.");
+        debugPrint("Unity canvas never attached with a non-zero size; keeping Flutter 2D.");
+        html.window.postMessage(jsonEncode({'event': 'UNITY_FAILED'}), html.window.location.origin);
+        return;
       }
       try {
         js.context.callMethod('initUnityEngine', [canvas]);
       } catch (e) {
         debugPrint("Error initializing Unity engine on canvas: $e");
+        html.window.postMessage(jsonEncode({'event': 'UNITY_FAILED'}), html.window.location.origin);
       }
     });
 
