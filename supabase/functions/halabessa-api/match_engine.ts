@@ -71,6 +71,7 @@ export function startRound(state: MatchState, actorUid: string) {
       currentTurnIndex: (dealerIndex + 1) % playerIds.length,
       phase: "preRoundCut",
       roundCount: firstRound ? 1 : priorRound + 1,
+      handInRound: 0,
       roundsSinceLastShuffle: 0,
       board: [],
       handCards: {},
@@ -123,6 +124,7 @@ export function deal(state: MatchState, deck: Card[], actorUid: string, initial:
   if (!Array.isArray(playerIds) || playerIds.length !== 4) throw new Error("four_players_required");
   if (playerIds[numberValue(state.dealerIndex)] !== actorUid) throw new Error("dealer_required");
   if (initial ? state.phase !== "dealingFasha" : state.phase !== "playing") throw new Error("deal_not_ready");
+  if (!initial && numberValue(state.handInRound) >= 3) throw new Error("hand_limit_reached");
   const hands = objectValue<Card[]>(state.handCards);
   if (!initial && !playerIds.every((id) => (hands[id] ?? []).length === 0)) throw new Error("cards_remain_in_hands");
   const requiredCards = initial ? 20 : 16;
