@@ -456,7 +456,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
           // Check for subsequent deal or round completion (Host authoritative)
           bool allHandsEmpty = currentState.areAllHandsEmpty;
           if (allHandsEmpty) {
-            if (currentState.deckCount > 0) {
+            if (currentState.deckCount >= 16 && currentState.handInRound < 3) {
               await Future.delayed(const Duration(milliseconds: 1000));
               if (state?.phase == GamePhase.playing && state?.deckCount == currentState.deckCount) {
                 await dealSubsequentCards();
@@ -868,6 +868,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
       shuffleVotes: {},
       rematchVotes: {},
       deckCount: _secretDeck?.cards.length ?? 0,
+      handInRound: 0,
       lastCardRevealed: _secretDeck?.lastCardRevealed,
       recentFasha: [],
       lastCaptureTeam: null,
@@ -929,10 +930,11 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
 
     _ensureSecretDeck(currentState);
 
-    if (_secretDeck == null || _secretDeck!.cards.isEmpty) {
-      if (currentState.deckCount == 0) {
-        _handleRoundEnd();
-      }
+    if (currentState.handInRound >= 3 ||
+        _secretDeck == null ||
+        _secretDeck!.cards.length < 16 ||
+        currentState.deckCount < 16) {
+      await _handleRoundEnd();
       return;
     }
 
@@ -1011,7 +1013,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
 
       bool allHandsEmpty = newState.areAllHandsEmpty;
       if (allHandsEmpty && _amIHost(newState)) {
-        if (newState.deckCount > 0) {
+        if (newState.deckCount >= 16 && newState.handInRound < 3) {
           await dealSubsequentCards();
         } else {
           await _handleRoundEnd();
@@ -1203,4 +1205,3 @@ final matchStateProvider = StateNotifierProvider<MatchStateNotifier, MatchState?
   ref.watch(multimediaServiceProvider); 
   return MatchStateNotifier(ref);
 });
-
