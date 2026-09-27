@@ -98,7 +98,10 @@ class FirebaseAuthRepository implements AuthRepository {
   @override
   Stream<AppUser?> get authStateChanges {
     return _firebaseAuth.userChanges().asyncExpand((firebaseUser) {
-      if (firebaseUser == null) return null;
+      // asyncExpand treats a null stream as "emit nothing". Emit null as a
+      // data event so signed-out users leave the loading state and reach the
+      // sign-in / guest entry screen.
+      if (firebaseUser == null) return Stream<AppUser?>.value(null);
       return FirebaseFirestore.instance
           .collection('users')
           .doc(firebaseUser.uid)
@@ -444,3 +447,4 @@ class FirebaseAuthRepository implements AuthRepository {
     return false;
   }
 }
+
