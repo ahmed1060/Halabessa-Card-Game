@@ -182,6 +182,12 @@ class GameEngine {
 
   static GameEngineResult _deal(MatchState state, DealAction action, Deck? secretDeck) {
     if (secretDeck == null) return GameEngineResult(state);
+    // A standard round has three 4-card hands per player. Never turn a short
+    // remainder into a partial fourth hand; the host must score the round.
+    if (!action.isInitial &&
+        (state.handInRound >= 3 || secretDeck.cards.length < 16)) {
+      return GameEngineResult(state);
+    }
     
     final hands = Map<String, List<game_card.Card>>.from(state.handCards);
     final board = List<game_card.Card>.from(state.board);
@@ -263,4 +269,3 @@ class GameEngineResult {
 
   GameEngineResult(this.newState, {this.capturedCards = const [], this.capturingTeam});
 }
-
