@@ -12,6 +12,21 @@ Widget editor({required Future<bool> Function(String) check,
       onSave: save, onSaved: saved ?? () {}, onClose: () {})));
 
 void main() {
+  testWidgets('large text and keyboard leave the form scrollable', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(320, 390));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(MaterialApp(home: MediaQuery(
+      data: const MediaQueryData(textScaler: TextScaler.linear(2), viewInsets: EdgeInsets.only(bottom: 180)),
+      child: Scaffold(body: UsernameEditor(title: 'Choose a username',
+        description: 'Set a name so friends can find you.', fieldLabel: 'Username',
+        saveLabel: 'Save', invalidMessage: 'Invalid name', takenMessage: 'Name taken',
+        failureMessage: 'Try again', retryLabel: 'Retry check', onCheck: (_) async => true,
+        onSave: (_) async {}, onSaved: () {}, onClose: () {})))));
+    expect(tester.takeException(), isNull);
+    await tester.ensureVisible(find.byType(FilledButton));
+    await tester.pump();
+    expect(tester.takeException(), isNull);
+  });
   testWidgets('late availability cannot enable saving a different name', (tester) async {
     final first = Completer<bool>();
     final second = Completer<bool>();
@@ -54,6 +69,7 @@ void main() {
     await tester.pump();
     expect(tester.widget<FilledButton>(find.byType(FilledButton)).onPressed, isNotNull);
     await tester.enterText(find.byType(TextField), 'new_player');
+    await tester.pump(); // Rebuild the button after the input event, before debounce.
     expect(tester.widget<FilledButton>(find.byType(FilledButton)).onPressed, isNull);
     await tester.pumpWidget(const SizedBox());
     await tester.pump(const Duration(seconds: 1));

@@ -53,11 +53,11 @@ class MatchTableLayout extends StatelessWidget {
       child: Column(children: [
         header,
         if (wide)
-          SizedBox(height: arenaHeight, child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              Expanded(child: arena),
+          Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+              Expanded(child: SizedBox(height: arenaHeight, child: arena)),
               SizedBox(width: math.min(340.0, bounds.maxWidth * 0.4),
-                child: Center(child: tray)),
-            ]))
+                child: tray),
+            ])
         else ...[
           SizedBox(height: arenaHeight, child: arena),
           tray,
