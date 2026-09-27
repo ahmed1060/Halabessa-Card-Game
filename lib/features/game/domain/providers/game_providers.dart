@@ -36,6 +36,22 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
 
   MatchStateNotifier(this.ref) : super(null);
 
+  @override
+  void dispose() {
+    // Disposal is not a player leaving: release local resources without
+    // clearing recovery data or applying a forfeit penalty.
+    _matchListener?.cancel();
+    _presenceListener?.cancel();
+    _heartbeatTimer?.cancel();
+    _afkWatchdogTimer?.cancel();
+    _autoplaySubscription?.cancel();
+    for (final subscription in _tafweetSubscriptions.values) {
+      subscription.cancel();
+    }
+    _tafweetSubscriptions.clear();
+    super.dispose();
+  }
+
   MultimediaService get _multimedia => ref.read(multimediaServiceProvider);
   
   // Local secret deck ONLY known by the Host (Anti-Cheat)
@@ -1201,7 +1217,9 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
 }
 
 final matchStateProvider = StateNotifierProvider<MatchStateNotifier, MatchState?>((ref) {
-  // Watch multimedia service to ensure it's available for triggers
-  ref.watch(multimediaServiceProvider); 
+  // Audio is an effect, not a dependency of match identity. Watching this
+  // ChangeNotifier recreates the controller (state = null) on every sound
+  // start/stop, flashing the loading screen and restarting room recovery.
+  // _multimedia reads the service lazily when an effect is actually needed.
   return MatchStateNotifier(ref);
 });
