@@ -1,7 +1,8 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { Pool } from "jsr:@db/postgres@^0";
+import { Client } from "jsr:@db/postgres@0.19.5";
 import { createRemoteJWKSet, importPKCS8, jwtVerify, SignJWT } from "npm:jose@6";
 import { cut, deal, playCard, startRound, type Card, type MatchState } from "./match_engine.ts";
+import { createDatabaseRunner, databaseConnectionString } from "./database.ts";
 
 const firebaseProject = "halabessa-card-game1";
 const firebaseKeys = createRemoteJWKSet(new URL(
@@ -184,7 +185,7 @@ function applyMatchCommand(
   throw new Error("unsupported_command");
 }
 
-async function isAdmin(connection: any, user: { uid: string; email: string | null }) {
+async function isAdmin(connection: Client, user: { uid: string; email: string | null }) {
   if (user.email?.toLowerCase() === primaryAdminEmail) return true;
   const result = await connection.queryObject<{ profile: Record<string, unknown> }>`
     select profile from halabessa.user_profiles where firebase_uid = ${user.uid}
@@ -192,13 +193,13 @@ async function isAdmin(connection: any, user: { uid: string; email: string | nul
   return result.rows[0]?.profile?.isAdmin === true;
 }
 
-const databaseUrl = Deno.env.get("SUPABASE_DB_URL");
-if (!databaseUrl) throw new Error("server_not_configured");
-
 // The schema deliberately stays out of Supabase's Data API. Edge Functions
-// use the platform-provided database connection instead, so no table or RPC
-// becomes reachable with a browser key.
-const databasePool = new Pool(databaseUrl, 1);
+// open a connection only for authenticated work and close it before replying.
+// DATABASE_POOLER_URL can select the shared transaction pooler (port 6543).
+// The platform URL also remains safe from retained per-isolate idle sockets.
+const withDatabase = createDatabaseRunner(() => new Client(databaseConnectionString(
+  Deno.env.get("DATABASE_POOLER_URL") ?? Deno.env.get("SUPABASE_DB_URL"),
+)));
 
 function cairoDate() {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -323,8 +324,7 @@ Deno.serve(async (request) => {
       commandPayload?: unknown;
       actorUid?: unknown;
     };
-    const connection = await databasePool.connect();
-    try {
+    return await withDatabase(async (connection) => {
       await connection.queryObject`
         insert into halabessa.user_profiles (firebase_uid, email, display_name)
         values (${user.uid}, ${user.email}, ${user.name})
@@ -779,12 +779,17 @@ Deno.serve(async (request) => {
         return reply({ ok: true, accepted }, 200, origin);
       }
       return reply({ error: "unsupported_action" }, 400, origin);
-    } finally {
-      connection.release();
-    }
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : "internal_error";
     console.error("halabessa-api", { message });
+    if (message === "database_busy" ||
+        (error && typeof error === "object" && "fields" in error &&
+         (error.fields as { code?: string } | undefined)?.code === "53300")) {
+      return new Response(JSON.stringify({ error: "backend_busy" }), {
+        status: 503, headers: { ...headers(origin), "Retry-After": "1" },
+      });
+    }
     if (message.includes("already_claimed")) return reply({ error: "already_claimed" }, 409, origin);
     return reply({ error: message === "unauthenticated" ? message : "internal_error" }, message === "unauthenticated" ? 401 : 500, origin);
   }
