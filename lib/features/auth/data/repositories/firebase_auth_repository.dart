@@ -1,3 +1,4 @@
+import 'profile_update.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_database/firebase_database.dart';
@@ -371,61 +372,57 @@ class FirebaseAuthRepository implements AuthRepository {
   @override
   Future<void> updateProfile({String? displayName, String? username, String? avatarUrl}) async {
     final user = _firebaseAuth.currentUser;
-    if (user != null) {
-      if (displayName != null) await user.updateDisplayName(displayName);
-      if (avatarUrl != null) await user.updatePhotoURL(avatarUrl);
-      
-      // Reload to get updated info
-      await user.reload();
-      final updatedUser = _firebaseAuth.currentUser;
-      final appUser = _userFromFirebase(updatedUser);
-      
-      if (appUser != null) {
-        // Fetch full record from firestore to preserve other fields
-        final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
-        if (doc.exists && doc.data() != null) {
-          final fullUser = AppUser.fromJson(doc.data()!, user.uid);
-          
-          String? finalUsername = username ?? fullUser.username;
-          Map<String, int> finalInventory = Map.from(fullUser.inventory);
+    if (user == null) throw StateError('unauthenticated');
+    final db = FirebaseFirestore.instance;
+    final profileRef = db.collection('users').doc(user.uid);
+    final requestedUsername = username?.trim();
+    final claims = requestedUsername == null ? null : await user.getIdTokenResult();
+    final canRenameWithoutTicket = claims?.claims?['admin'] == true;
 
-          // Logic for changing username
-          if (username != null && username != fullUser.username) {
-            // 1. Check uniqueness (double check)
-            if (!await isUsernameAvailable(username, currentUid: user.uid)) {
-              throw Exception('Username already taken');
-            }
-
-            // 2. Consume ticket if not admin and NOT first-time change
-            if (!fullUser.isAdmin && fullUser.username != null) {
-              final ticketCount = fullUser.inventory['username_change_ticket'] ?? 0;
-              if (ticketCount <= 0) {
-                throw Exception('You need a Username Change Ticket to change your username');
-              }
-              finalInventory['username_change_ticket'] = ticketCount - 1;
-            }
-
-            // 3. Update usernames collection (swap)
-            final batch = FirebaseFirestore.instance.batch();
-            if (fullUser.username != null) {
-              batch.delete(FirebaseFirestore.instance.collection('usernames').doc(fullUser.username!.toLowerCase()));
-            }
-            batch.set(FirebaseFirestore.instance.collection('usernames').doc(username.toLowerCase()), {'uid': user.uid});
-            await batch.commit();
-          }
-
-          final mergedUser = fullUser.copyWith(
-            displayName: displayName ?? fullUser.displayName,
-            avatarUrl: avatarUrl ?? fullUser.avatarUrl,
-            username: finalUsername,
-            inventory: finalInventory,
-            searchName: (finalUsername ?? displayName ?? fullUser.displayName).toLowerCase(),
-          );
-          await _syncUserToDatabase(mergedUser, isFullUpdate: true);
-        } else {
-          await _syncUserToDatabase(appUser, isFullUpdate: false);
+    // The reservation and the profile either both commit, or neither does.
+    // In particular, never report success after a permission-denied profile write.
+    final savedFields = await db.runTransaction<Map<String, dynamic>>((transaction) async {
+      final snapshot = await transaction.get(profileRef);
+      final current = snapshot.data() ?? _userFromFirebase(user)!.toJson();
+      final update = profileUpdate(current: current, displayName: displayName,
+        username: requestedUsername, avatarUrl: avatarUrl,
+        canRenameWithoutTicket: canRenameWithoutTicket);
+      final oldUsername = current['username'] as String?;
+      DocumentReference<Map<String, dynamic>>? reservationRef;
+      DocumentReference<Map<String, dynamic>>? oldReservationRef;
+      bool deleteOld = false;
+      if (requestedUsername != null) {
+        reservationRef = db.collection('usernames').doc(requestedUsername.toLowerCase());
+        final reservation = await transaction.get(reservationRef);
+        if (reservation.exists && reservation.data()?['uid'] != user.uid) {
+          throw StateError('username_taken');
+        }
+        if (oldUsername != null && oldUsername.isNotEmpty &&
+            oldUsername.toLowerCase() != requestedUsername.toLowerCase()) {
+          oldReservationRef = db.collection('usernames').doc(oldUsername.toLowerCase());
+          final oldReservation = await transaction.get(oldReservationRef);
+          deleteOld = oldReservation.data()?['uid'] == user.uid;
         }
       }
+      // All reads precede writes; Firestore may retry this callback.
+      if (deleteOld) transaction.delete(oldReservationRef!);
+      if (reservationRef != null) transaction.set(reservationRef, {'uid': user.uid});
+      if (snapshot.exists) {
+        transaction.update(profileRef, update);
+      } else {
+        transaction.set(profileRef, {...current, ...update});
+      }
+      return update;
+    });
+
+    // Firestore is the canonical profile. Legacy mirrors must not turn a
+    // committed username into a false failure or overwrite unrelated fields.
+    try {
+      if (displayName != null) await user.updateDisplayName(displayName);
+      if (avatarUrl != null) await user.updatePhotoURL(avatarUrl);
+      await FirebaseDatabase.instance.ref('users').child(user.uid).update(savedFields);
+    } catch (error) {
+      debugPrint('Profile saved; legacy mirror update failed: $error');
     }
   }
 

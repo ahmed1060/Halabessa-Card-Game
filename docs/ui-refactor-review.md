@@ -3,7 +3,55 @@
 Reviewed 27 September 2026. This is a phased refactor, not a claim that every
 screen has been redesigned or every device has been tested.
 
+## First delivery verification
+
+Implementation commits: `9105015` and `a58f580` on main. Firebase Hosting run
+`36319758219` succeeded. Flutter analysis and all 86 Flutter tests passed;
+23 Node engine/lifecycle/startup tests passed. The first CI attempt caught
+side-seat overflow at 200% text scale; the second commit corrected the
+intrinsic-height/arena layout and all 16 layout combinations passed.
+
+Live guest/bot practice checked at 390×844 and 844×390: the full hand was
+visible, a specific card could be tapped, capture phases disabled input,
+the captured-card sheet opened, and scores progressed. No new browser
+error/warning was recorded during these checks. This was not a complete
+end-to-end match or a real Android/iOS device test.
+
+Delivered: extracted table layout, score bar, compact seats and table tokens;
+responsive hand, keyboard/tap/deliberate-swipe input; identity-based queued
+selection; phase gating; removal of production debug toolbar; captured-card
+sheet; Arabic/English labels; one-shot winning celebration trigger.
+The other delivery phases below remain open. Username onboarding repeated
+after refresh during verification; legacy phase overlays remain visually
+intrusive. Neither is claimed fixed by this delivery.
+
 ## Direction: an Egyptian card table, built for reading and playing
+
+## Second slice (verification pending)
+
+The repeated username prompt had a persistence cause: profile creation omits
+`isAdmin`, but its update rule directly accessed that absent field and denied
+the write. The old save helper swallowed the failure after reserving the name.
+The rule now defaults an absent flag to false on both sides, with unchanged
+admin/social protections. Profile edits write targeted fields; username
+reservation, old-name release and ticket consumption share one transaction.
+Canonical write failures reach the form instead of reporting success.
+
+Username setup is an optional lobby action, with a scrollable form, stale-check
+protection, and pending/error feedback. Startup no longer opens reward and
+username sheets automatically. Rewards remain available from the toolbar.
+Cut/deal/scoring status moves into the tray; only the designated cutter sees
+the cut action. Last-card reveal stays on the table. Recovery starts once per
+mounted identity and presents explicit retry/lobby choices after eight seconds.
+
+New tests cover the original rule failure, atomic rollback, protected fields,
+targeted profile edits, stale availability responses, duplicate actions,
+recovery rebuilds/timeouts, and the existing responsive table matrix with a
+phase action. Full match results, votes/rematch, room entry, and supporting
+screens still need the later refactor slices. This does not certify all app
+permissions or native store readiness.
+
+## Visual direction
 
 The cards are the focal point. Use restrained felt and brass, not neon glow,
 photographic table trim, or competing floating panels. Preserve purchased

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:halabessa/features/game/presentation/widgets/match_table_layout.dart';
 import 'package:halabessa/features/game/presentation/widgets/table_seat.dart';
+import 'package:halabessa/features/game/presentation/widgets/match_phase_panel.dart';
 
 void main() {
   for (final size in [const Size(320, 568), const Size(390, 844),
@@ -20,7 +21,8 @@ void main() {
                 roomLabel: 'ABC123', onCopyRoom: () {}),
               partner: seat('Partner'), leftOpponent: seat('Left'), rightOpponent: seat('Right'),
               board: const SizedBox(key: ValueKey('board'), width: 140, height: 100),
-              status: const Text('Your turn — tap a card to play', textAlign: TextAlign.center),
+              status: MatchPhasePanel(title: 'Cut the deck', message: 'Your turn to cut the deck',
+                actionLabel: 'Cut', onAction: () async {}, failureMessage: 'Try again'),
               hand: const SizedBox(key: ValueKey('hand'), height: 140, width: 280),
               controls: IconButton(onPressed: () {}, tooltip: 'Settings', icon: const Icon(Icons.settings)),
             ))),

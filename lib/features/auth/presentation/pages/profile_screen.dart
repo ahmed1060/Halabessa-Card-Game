@@ -10,7 +10,6 @@ import 'package:halabessa/core/services/daily_streak_service.dart';
 import 'package:halabessa/features/home/presentation/widgets/daily_streak_dialog.dart';
 import '../providers/auth_providers.dart';
 import '../widgets/avatar_picker.dart';
-import '../widgets/username_onboarding_overlay.dart';
 import '../../domain/models/app_user.dart';
 
 class ProfileAchievement {
@@ -43,7 +42,6 @@ class ProfileScreen extends ConsumerStatefulWidget {
 }
 
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
-  bool _hasCheckedOnboarding = false;
   DailyStreakStatus? _streakStatus;
 
   @override
@@ -75,22 +73,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     const nextLevelXP = 1000;
     final currentXP = user.points % 1000;
 
-    // Mandatory Username Check — guarded to run only once
-    if (user.username == null && !_hasCheckedOnboarding) {
-      _hasCheckedOnboarding = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        showModalBottomSheet(
-          context: context,
-          isScrollControlled: true,
-          isDismissible: false,
-          enableDrag: false,
-          backgroundColor: Colors.transparent,
-          builder: (context) => const UsernameOnboardingOverlay(),
-        );
-      });
-    }
-
+    // Username editing remains available through the profile actions.
     return Scaffold(
       backgroundColor: ThemeConfig.darkBg,
       appBar: AppBar(

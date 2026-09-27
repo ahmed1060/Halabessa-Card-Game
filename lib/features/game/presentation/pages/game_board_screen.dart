@@ -24,6 +24,8 @@ import '../widgets/board_cards_widget.dart';
 import '../widgets/match_table_layout.dart';
 import '../widgets/table_seat.dart';
 import '../widgets/table_style.dart';
+import '../widgets/match_phase_panel.dart';
+import '../widgets/match_recovery_view.dart';
 import '../widgets/basra_celebration_overlay.dart';
 import '../widgets/emote_wheel_overlay.dart';
 import 'package:flutter/services.dart';
@@ -198,81 +200,18 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
     }
 
     if (matchState == null || currentUser == null) {
-      if (currentUser != null && matchState == null) {
-        Future.microtask(() => ref.read(matchStateProvider.notifier).tryRecoverLastMatch());
-      }
-
-      return Scaffold(
-        body: Container(
-          decoration: const BoxDecoration(
-            gradient: RadialGradient(
-              center: Alignment.center,
-              radius: 1.2,
-              colors: [
-                Color(0xFF1B263B),
-                ThemeConfig.darkBg,
-              ],
-            ),
-          ),
-          child: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // Logo with subtle scale
-                Image.asset(
-                  'assets/images/logo.png',
-                  height: 140,
-                  fit: BoxFit.contain,
-                  errorBuilder: (context, error, stackTrace) => const Icon(Icons.casino, size: 80, color: ThemeConfig.goldAccent),
-                ),
-                const SizedBox(height: 60),
-                // Glowing Loader
-                Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    Container(
-                      width: 60,
-                      height: 60,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: ThemeConfig.goldAccent.withOpacity(0.3),
-                            blurRadius: 25,
-                            spreadRadius: 2,
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(
-                      width: 45,
-                      height: 45,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 3,
-                        valueColor: AlwaysStoppedAnimation<Color>(ThemeConfig.goldAccent),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 40),
-                Text(
-                  'loading_match_environment'.tr(),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 24,
-                    fontFamily: ThemeConfig.fontHeading,
-                    letterSpacing: 1.2,
-                    shadows: [
-                      Shadow(color: Colors.black87, offset: Offset(0, 2), blurRadius: 4),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 64),
-                _buildRetryButton(context, ref),
-              ],
-            ),
-          ),
-        ),
+      return MatchRecoveryView(
+        key: ValueKey(currentUser?.uid ?? 'awaiting-profile'),
+        loadingTitle: 'recovery_loading'.tr(),
+        unavailableTitle: 'recovery_unavailable'.tr(),
+        explanation: 'recovery_explanation'.tr(),
+        retryLabel: 'retry_action'.tr(), exitLabel: 'return_home'.tr(),
+        onRetry: currentUser == null ? null :
+            () => ref.read(matchStateProvider.notifier).tryRecoverLastMatch(),
+        onExit: () {
+          ref.read(matchStateProvider.notifier).leaveMatch();
+          Navigator.of(context).popUntil((route) => route.isFirst);
+        },
       );
     }
 
@@ -348,13 +287,7 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
                     // Overlays
                     if (matchState.phase == GamePhase.waitingForPlayers) _buildLobbyOverlay(context, ref, matchState, myUid),
                     if (isSpectator && matchState.phase != GamePhase.waitingForPlayers) _buildSpectatorIndicator(),
-                    if (matchState.phase == GamePhase.preRoundCut) _buildCutOverlay(context, ref, matchState, myUid),
-                    if (matchState.phase == GamePhase.dealingFasha && matchState.cutLastCard != null)
-                       _buildLastCardReveal(matchState.cutLastCard!),
-                    if (matchState.phase == GamePhase.dealingFasha && matchState.cutLastCard == null) _buildPhaseOverlay('dealing_cards'.tr()),
-                    if (matchState.phase == GamePhase.dealingCards) _buildPhaseOverlay('memorize_fasha'.tr(args: ['5']), alignment: const Alignment(0, -0.4)),
                     if (matchState.phase == GamePhase.shuffleVoting) _buildShuffleVoteOverlay(context, ref, matchState, myUid),
-                    if (matchState.phase == GamePhase.roundScoring) _buildContextualScoringOverlay(matchState, myUid),
                     if (matchState.phase == GamePhase.rematchVoting) _buildRematchVoteOverlay(context, ref, matchState, myUid),
                     if (matchState.phase == GamePhase.matchOver) _buildContextualGameOverOverlay(matchState, myUid),
                     if (matchState.phase == GamePhase.capturing && matchState.board.isEmpty) _buildBasraOverlay(matchState, myUid),
@@ -440,12 +373,7 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
       partner: seat(2), leftOpponent: seat(3), rightOpponent: seat(1),
       board: SizedBox(key: _boardKey,
         child: _buildBoardCenter(context, ref, state, myUid, isLandscape, is3DActive: show3DHand)),
-      status: Semantics(liveRegion: true, child: Text(
-        isSpectator ? 'you_are_spectating'.tr() : myTurn ? 'table_tap_to_play'.tr() :
-          playing ? 'table_wait_or_queue'.tr() : _tablePhaseLabel(state.phase),
-        textAlign: TextAlign.center,
-        style: TableStyle.label.copyWith(color: myTurn ? TableStyle.brass : TableStyle.ivory),
-      )),
+      status: _buildTableStatus(state, myUid, isSpectator, myTurn),
       hand: isSpectator || show3DHand || (state.handCards[myUid]?.isEmpty ?? true)
         ? const SizedBox(height: 24)
         : FannedHandWidget(
@@ -479,6 +407,43 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
           onPressed: () => _confirmLeave(context, ref)),
       ]),
     );
+  }
+
+  Widget _buildTableStatus(MatchState state, String uid, bool spectator, bool myTurn) {
+    if (state.phase == GamePhase.preRoundCut) {
+      final myIndex = state.playerIds.indexOf(uid);
+      final canCut = myIndex >= 0 && state.playerIds.isNotEmpty &&
+          myIndex == (state.dealerIndex + state.playerIds.length - 1) % state.playerIds.length;
+      return MatchPhasePanel(
+        key: ValueKey('${state.id}-${state.roundCount}-cut'),
+        title: 'pre_round_cut'.tr(),
+        message: (canCut ? 'your_turn_cut_deck' : 'waiting_deck_cut').tr(),
+        actionLabel: canCut ? 'cut_the_deck'.tr() : null,
+        onAction: canCut ? () => ref.read(matchStateProvider.notifier).performCut(20) : null,
+        failureMessage: 'match_action_retry'.tr(),
+      );
+    }
+    if (state.phase == GamePhase.dealingCards ||
+        state.phase == GamePhase.dealingFasha ||
+        state.phase == GamePhase.roundScoring) {
+      final title = switch (state.phase) {
+        GamePhase.dealingCards => 'memorize_table_cards',
+        GamePhase.roundScoring => 'round_finished',
+        _ => state.cutLastCard != null ? 'last_card_label' : 'dealing_cards',
+      };
+      return MatchPhasePanel(
+        key: ValueKey('${state.id}-${state.phase.name}'),
+        title: title.tr(), message: (state.phase == GamePhase.roundScoring
+            ? 'round_advances_automatically' : 'next_phase_automatically').tr(),
+        failureMessage: 'match_action_retry'.tr(),
+      );
+    }
+    return Semantics(liveRegion: true, child: Text(
+      spectator ? 'you_are_spectating'.tr() : myTurn ? 'table_tap_to_play'.tr() :
+        state.phase == GamePhase.playing ? 'table_wait_or_queue'.tr() : _tablePhaseLabel(state.phase),
+      textAlign: TextAlign.center,
+      style: TableStyle.label.copyWith(color: myTurn ? TableStyle.brass : TableStyle.ivory),
+    ));
   }
 
   String _tablePhaseLabel(GamePhase phase) => switch (phase) {
@@ -629,49 +594,6 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
 
 
 
-  Widget _buildRetryButton(BuildContext context, WidgetRef ref) {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(30),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.3),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: OutlinedButton(
-        style: OutlinedButton.styleFrom(
-          padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
-          backgroundColor: Colors.white.withOpacity(0.05),
-          foregroundColor: Colors.white,
-          side: BorderSide(color: Colors.white.withOpacity(0.2), width: 1.5),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(30),
-          ),
-          elevation: 0,
-        ),
-        onPressed: () {
-            final lastId = ref.read(matchStateProvider.notifier).lastBoundMatchId;
-            if (lastId != null) {
-               ref.read(matchStateProvider.notifier).rebind(lastId);
-            } else {
-               ref.read(matchStateProvider.notifier).leaveMatch();
-               Navigator.of(context).popUntil((route) => route.isFirst);
-            }
-        },
-        child: Text(
-          'retry_or_exit'.tr().toUpperCase(),
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 1.5,
-          ),
-        ),
-      ),
-    );
-  }
 
   String? _getPlayerEmoji(MatchState matchState, String myUid, int offset) {
     final idx = _getAbsoluteIndex(matchState, myUid, offset);
@@ -693,6 +615,9 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
       return const SizedBox.shrink();
     }
 
+    if (matchState.phase == GamePhase.dealingFasha && matchState.cutLastCard != null) {
+      return Center(child: CardWidget(card: matchState.cutLastCard!, width: 96, height: 138));
+    }
     final isCapturing = matchState.phase == GamePhase.capturing;
 
     return BoardCardsWidget(
@@ -717,175 +642,12 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
   }
 
 
-  Widget _buildLastCardReveal(game_card.Card card) {
-    return TweenAnimationBuilder<double>(
-      duration: const Duration(milliseconds: 600),
-      curve: Curves.elasticOut,
-      tween: Tween(begin: 0.0, end: 1.0),
-      builder: (context, value, child) {
-        return Transform.scale(
-          scale: 0.5 + (0.5 * value),
-          child: Opacity(
-            opacity: value.clamp(0.0, 1.0),
-            child: child,
-          ),
-        );
-      },
-      child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.8),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: ThemeConfig.goldAccent.withOpacity(0.5)),
-                boxShadow: [
-                  BoxShadow(
-                    color: ThemeConfig.goldAccent.withOpacity(0.3),
-                    blurRadius: 20,
-                    spreadRadius: 2,
-                  ),
-                ],
-              ),
-              child: Text(
-                'last_card_label'.tr(),
-                style: const TextStyle(
-                  color: ThemeConfig.goldAccent,
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  fontFamily: ThemeConfig.fontHeading,
-                ),
-              ),
-            ),
-            const SizedBox(height: 24),
-            CardWidget(card: card, width: 140, height: 210),
-          ],
-        ),
-      ),
-    );
-  }
 
 
-  Widget _buildPhaseOverlay(String text, {Alignment alignment = Alignment.center}) {
-    return Align(
-      alignment: alignment,
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: Colors.black87,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.white24, width: 1),
-          boxShadow: const [
-            BoxShadow(color: Colors.black54, blurRadius: 20, spreadRadius: 4)
-          ],
-        ),
-        child: Text(
-          text, 
-          style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold, letterSpacing: 1.2)
-        ),
-      ),
-    );
-  }
-
-  Widget _buildContextualScoringOverlay(MatchState matchState, String myUid) {
-    // Premium Round Summary Overlay
-    return Container(
-      color: Colors.black.withOpacity(0.9),
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text('round_finished'.tr(), style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold, fontFamily: ThemeConfig.fontHeading)),
-            const SizedBox(height: 48),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _buildScoringTeamCard('my_team'.tr(), matchState.harvestStacks['teamA']?.fold<int>(0, (sum, cap) => sum + cap.capturedCards.length + 1) ?? 0, ThemeConfig.primaryTeal),
-                _buildScoringTeamCard('opponent_team'.tr(), matchState.harvestStacks['teamB']?.fold<int>(0, (sum, cap) => sum + cap.capturedCards.length + 1) ?? 0, ThemeConfig.goldAccent),
-              ],
-            ),
-            const SizedBox(height: 64),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: ThemeConfig.primaryTeal,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 20),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              ),
-              onPressed: () => ref.read(matchStateProvider.notifier).startNewRound(),
-              child: Text('next_round'.tr().toUpperCase(), style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 2)),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildScoringTeamCard(String title, int count, Color color) {
-    return Column(
-      children: [
-        Text(title, style: const TextStyle(color: Colors.white70, fontSize: 16)),
-        const SizedBox(height: 12),
-        Container(
-          width: 120,
-          height: 120,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(color: color.withOpacity(0.5), width: 4),
-            boxShadow: [BoxShadow(color: color.withOpacity(0.2), blurRadius: 20, spreadRadius: 5)],
-          ),
-          child: Center(
-            child: Text(
-              count.toString(),
-              style: TextStyle(color: color, fontSize: 48, fontWeight: FontWeight.bold, fontFamily: ThemeConfig.fontHeading),
-            ),
-          ),
-        ),
-        const SizedBox(height: 12),
-        Text('total_cards'.tr(), style: TextStyle(color: color.withOpacity(0.8), fontSize: 12, fontWeight: FontWeight.w600)),
-      ],
-    );
-  }
 
 
-  Widget _buildCutOverlay(BuildContext context, WidgetRef ref, MatchState state, String currentUid) {
-    int myIdx = state.playerIds.indexOf(currentUid);
-    int cutterIdx = (state.dealerIndex + 3) % 4;
-    bool isMyCut = myIdx == cutterIdx;
-    
-    return Center(
-      child: Container(
-        padding: const EdgeInsets.all(32),
-        decoration: BoxDecoration(
-          color: Colors.black.withOpacity(0.9), 
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: Colors.white10),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('pre_round_cut'.tr(), style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 16),
-            Text(isMyCut ? 'your_turn_cut_deck'.tr() : 'waiting_deck_cut'.tr(), 
-              style: const TextStyle(color: Colors.white70, fontSize: 16)
-            ),
-            const SizedBox(height: 32),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: isMyCut ? Colors.teal : Colors.blueGrey,
-                padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              onPressed: () => ref.read(matchStateProvider.notifier).performCut(20),
-              child: Text(isMyCut ? 'cut_the_deck'.tr() : 'wait_for_cut'.tr(), style: const TextStyle(fontWeight: FontWeight.bold)),
-            )
-          ],
-        ),
-      ),
-    );
-  }
+
+
 
   Widget _buildLobbyOverlay(BuildContext context, WidgetRef ref, MatchState state, String currentUid) {
     final isReady = state.botInjectionVotes.containsKey(currentUid);

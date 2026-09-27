@@ -26,7 +26,7 @@ service cloud.firestore {
         && request.resource.data.get('dailyReward', {}) == {};
 
       allow update: if request.auth != null && request.auth.uid == uid
-        && request.resource.data.isAdmin == resource.data.get('isAdmin', false)
+        && request.resource.data.get('isAdmin', false) == resource.data.get('isAdmin', false)
         && request.resource.data.get('friends', []) == resource.data.get('friends', [])
         && request.resource.data.get('pendingFriendRequests', []) == resource.data.get('pendingFriendRequests', [])
         && request.resource.data.get('sentFriendRequests', []) == resource.data.get('sentFriendRequests', [])

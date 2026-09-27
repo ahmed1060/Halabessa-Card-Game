@@ -27,7 +27,6 @@ class HomeScreen extends ConsumerStatefulWidget {
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
-  bool _hasCheckedOnboarding = false;
   bool _isQuickMatching = false;
 
   @override
@@ -37,43 +36,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       if (!mounted) return;
       ref.read(multimediaServiceProvider).playMusic('music/bg_music.mp3');
 
-      // Check onboarding once
-      final user = ref.read(currentUserProvider);
-      if (user != null && user.username == null && !_hasCheckedOnboarding) {
-        _hasCheckedOnboarding = true;
-        showModalBottomSheet(
-          context: context,
-          isScrollControlled: true,
-          isDismissible: false,
-          enableDrag: false,
-          backgroundColor: Colors.transparent,
-          builder: (context) => const UsernameOnboardingOverlay(),
-        );
-      }
-
-      _checkDailyStreakReward();
+      // Rewards and profile setup are opened by the player, never stacked on startup.
     });
   }
 
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(currentUserProvider);
-
-    // Secondary check if user state updates asynchronously
-    if (user != null && user.username == null && !_hasCheckedOnboarding) {
-      _hasCheckedOnboarding = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        showModalBottomSheet(
-          context: context,
-          isScrollControlled: true,
-          isDismissible: false,
-          enableDrag: false,
-          backgroundColor: Colors.transparent,
-          builder: (context) => const UsernameOnboardingOverlay(),
-        );
-      });
-    }
 
     return Scaffold(
       backgroundColor: const Color(0xFF0D1B2A),
@@ -141,6 +110,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           child: Column(
             children: [
               const SizedBox(height: 120),
+              if (user != null && (user.username?.isEmpty ?? true))
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                  child: OutlinedButton.icon(
+                    icon: const Icon(Icons.alternate_email),
+                    label: Text('setup_username_optional'.tr()),
+                    onPressed: () => showModalBottomSheet(
+                      context: context, isScrollControlled: true,
+                      backgroundColor: Colors.transparent,
+                      builder: (_) => const UsernameOnboardingOverlay(),
+                    ),
+                  ),
+                ),
               // User Profile Section
               if (user != null)
                 Padding(
@@ -474,16 +456,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     Navigator.pushNamed(context, '/game');
   }
 
-  void _checkDailyStreakReward() async {
-    final status = await DailyStreakService.checkStatus();
-    if (status.isClaimableToday && mounted) {
-      showDialog(
-        context: context,
-        barrierDismissible: true,
-        builder: (context) => DailyStreakDialog(status: status),
-      );
-    }
-  }
 
   void _showCreateRoomDialog(BuildContext context, String playerId, String displayName) {
     showModalBottomSheet(
