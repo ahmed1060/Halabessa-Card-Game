@@ -37,4 +37,20 @@ void main() {
     expect(state.cardsRemainingFor('one'), 1);
     expect(state.areAllHandsEmpty, isFalse);
   });
+
+  test('participant hand lists override stale public hand counts', () {
+    final state = MatchState.fromJson({
+      'id': 'ABC12345',
+      'mode': 'classic',
+      'playerIds': ['one', 'two'],
+      'dealerIndex': 0,
+      'currentTurnIndex': 0,
+      'handCounts': {'one': 4, 'two': 4},
+      'handCards': {'one': [], 'two': []},
+    });
+
+    expect(state.cardsRemainingFor('one'), 0);
+    expect(state.areAllHandsEmpty, isTrue);
+  });
 }
+

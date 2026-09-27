@@ -68,6 +68,9 @@ class GameEngine {
 
     // 2. Remove card from hand
     hands[playerId]?.removeWhere((c) => c.firebaseKey == card.firebaseKey);
+    final handCounts = {
+      for (final id in state.playerIds) id: hands[id]?.length ?? 0,
+    };
 
     // 3. Calculate capture
     final capturedCards = GameEngineUtils.calculateCapture(card, board);
@@ -83,6 +86,7 @@ class GameEngine {
         state.copyWith(
           board: board,
           handCards: hands,
+          handCounts: handCounts,
           skippedMatches: skipped,
           cardOwnership: ownership,
           currentTurnIndex: nextTurn,
@@ -136,6 +140,7 @@ class GameEngine {
         state.copyWith(
           board: board,
           handCards: hands,
+          handCounts: handCounts,
           harvestStacks: harvest,
           skippedMatches: skipped,
           cardOwnership: ownership,
@@ -196,11 +201,15 @@ class GameEngine {
         }
         hands[id] = playerHand;
       }
+      final handCounts = {
+        for (final id in state.playerIds) id: hands[id]?.length ?? 0,
+      };
       
       return GameEngineResult(
         state.copyWith(
           board: board,
           handCards: hands,
+          handCounts: handCounts,
           deckCount: secretDeck.cards.length,
           recentFasha: List.from(board),
           handInRound: 1,
@@ -217,10 +226,14 @@ class GameEngine {
         }
         hands[id] = playerHand;
       }
+      final handCounts = {
+        for (final id in state.playerIds) id: hands[id]?.length ?? 0,
+      };
       
       return GameEngineResult(
         state.copyWith(
           handCards: hands,
+          handCounts: handCounts,
           deckCount: secretDeck.cards.length,
           handInRound: state.handInRound + 1,
           phase: GamePhase.playing,
@@ -250,3 +263,4 @@ class GameEngineResult {
 
   GameEngineResult(this.newState, {this.capturedCards = const [], this.capturingTeam});
 }
+

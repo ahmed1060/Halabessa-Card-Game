@@ -122,8 +122,15 @@ class MatchState {
       this.earnedCoins = const {},
     });
 
-  int cardsRemainingFor(String playerId) =>
-      handCounts[playerId] ?? handCards[playerId]?.length ?? 0;
+  int cardsRemainingFor(String playerId) {
+    // Participant snapshots contain the authoritative private hand lists.
+    // Prefer them over the denormalized public counts because older clients
+    // may have written a hand update without refreshing handCounts. Keeping
+    // the counts as a fallback still supports lobby/spectator snapshots.
+    final hand = handCards[playerId];
+    if (hand != null) return hand.length;
+    return handCounts[playerId] ?? 0;
+  }
 
   bool get areAllHandsEmpty =>
       playerIds.isNotEmpty && playerIds.every((playerId) => cardsRemainingFor(playerId) == 0);
@@ -516,3 +523,4 @@ class MatchState {
     }
   }
 }
+

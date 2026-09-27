@@ -101,6 +101,35 @@ void main() {
       expect(result.capturedCards, isEmpty);
     });
 
+    test('last played cards clear authoritative counts so the host can redeal', () {
+      const card = Card(Suit.hearts, Rank.two);
+      final state = buildState(
+        currentTurnIndex: 0,
+        handCards: {
+          'p0': [card],
+          'p1': [],
+          'p2': [],
+          'p3': [],
+        },
+      ).copyWith(handCounts: {'p0': 1, 'p1': 0, 'p2': 0, 'p3': 0});
+
+      final afterPlay = GameEngine.apply(state, PlayCardAction('p0', card)).newState;
+
+      expect(afterPlay.handCounts, {'p0': 0, 'p1': 0, 'p2': 0, 'p3': 0});
+      expect(afterPlay.areAllHandsEmpty, isTrue);
+
+      final deck = Deck.standard();
+      final afterRedeal = GameEngine.apply(
+        afterPlay.copyWith(deckCount: deck.cards.length),
+        DealAction('p0', isInitial: false),
+        secretDeck: deck,
+      ).newState;
+
+      expect(afterRedeal.handCards.values.every((hand) => hand.length == 4), isTrue);
+      expect(afterRedeal.handCounts, {'p0': 4, 'p1': 4, 'p2': 4, 'p3': 4});
+      expect(afterRedeal.areAllHandsEmpty, isFalse);
+    });
+
     test('turn wraps around from the last player back to the first', () {
       final card = const Card(Suit.hearts, Rank.two);
       final state = buildState(currentTurnIndex: 3, handCards: {'p3': [card]});
@@ -230,3 +259,4 @@ void main() {
     });
   });
 }
+

@@ -982,10 +982,15 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
         final intermediateBoard = List<game_card.Card>.from(currentState.board)..add(card);
         final intermediateHands = Map<String, List<game_card.Card>>.from(currentState.handCards);
         intermediateHands[playerId]?.removeWhere((c) => c.firebaseKey == card.firebaseKey);
+        final intermediateHandCounts = {
+          for (final id in currentState.playerIds)
+            id: intermediateHands[id]?.length ?? 0,
+        };
         
         await _publishState(currentState.copyWith(
           board: intermediateBoard,
           handCards: intermediateHands,
+          handCounts: intermediateHandCounts,
           phase: GamePhase.capturing,
           capturingCards: result.capturedCards,
           capturingTeam: result.capturingTeam,
