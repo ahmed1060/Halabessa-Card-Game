@@ -21,9 +21,11 @@ class MatchTableLayout extends StatelessWidget {
   Widget build(BuildContext context) => LayoutBuilder(builder: (context, bounds) {
     final wide = bounds.maxWidth >= 700 && bounds.maxWidth > bounds.maxHeight;
     final textScale = MediaQuery.textScalerOf(context).scale(14) / 14;
-    // Exceptional small windows / large text can scroll instead of clipping.
-    final minimumHeight = (wide ? 340.0 : 520.0) * math.max(1.0, textScale * 0.8);
-    final height = math.max(bounds.maxHeight, minimumHeight);
+    // Header and tray keep their intrinsic text height. The arena has its own
+    // minimum; a large header must never steal the side players' layout space.
+    // One outer scroll view handles small windows and accessibility text sizes.
+    final arenaHeight = math.max(260.0 * math.max(1.0, textScale),
+        bounds.maxHeight - (wide ? 140.0 : 310.0) * textScale);
     final arena = Column(children: [
       Padding(padding: const EdgeInsets.only(top: 8), child: partner),
       Expanded(child: Row(children: [
@@ -48,17 +50,20 @@ class MatchTableLayout extends StatelessWidget {
       ),
     );
     return SingleChildScrollView(
-      child: SizedBox(height: height, child: Column(children: [
+      child: Column(children: [
         header,
-        Expanded(child: wide
-          ? Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        if (wide)
+          SizedBox(height: arenaHeight, child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
               Expanded(child: arena),
               SizedBox(width: math.min(340.0, bounds.maxWidth * 0.4),
                 child: Center(child: tray)),
-            ])
-          : Column(children: [Expanded(child: arena), tray])),
+            ]))
+        else ...[
+          SizedBox(height: arenaHeight, child: arena),
+          tray,
+        ],
         Material(color: TableStyle.ink, child: controls),
-      ])),
+      ]),
     );
   });
 }
