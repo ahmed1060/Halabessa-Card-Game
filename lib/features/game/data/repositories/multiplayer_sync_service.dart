@@ -33,6 +33,39 @@ class MultiplayerSyncService {
     return updates;
   }
 
+  /// Merges a participant's private-hand snapshot into the public room state.
+  ///
+  /// Realtime Database removes empty lists instead of retaining empty array
+  /// nodes. Consequently, `matchHands/$roomId` is a sparse map: a missing
+  /// player key means that player's hand is empty, not that their old public
+  /// hand count should be kept. Rebuild counts from the complete private
+  /// snapshot whenever it has been read successfully.
+  @visibleForTesting
+  static Map<String, dynamic> mergePrivateHands(
+    Map<String, dynamic> publicState,
+    Object? privateHands,
+  ) {
+    final merged = Map<String, dynamic>.from(publicState);
+    final hands = privateHands is Map
+        ? Map<String, dynamic>.from(privateHands)
+        : <String, dynamic>{};
+    final playerIds = publicState['playerIds'];
+
+    merged['handCards'] = hands;
+    merged['handCounts'] = {
+      if (playerIds is List)
+        for (final playerId in playerIds)
+          playerId.toString(): _privateHandLength(hands[playerId.toString()]),
+    };
+    return merged;
+  }
+
+  static int _privateHandLength(Object? hand) {
+    if (hand is List) return hand.length;
+    if (hand is Map) return hand.length;
+    return 0;
+  }
+
   /// Lightweight lobby index -- see room_summary.dart and HAL-06.
   DatabaseReference get roomsRef => _db.ref('rooms');
   DatabaseReference get _roomsRef => roomsRef;
@@ -151,6 +184,7 @@ class MultiplayerSyncService {
     Map<String, dynamic>? latestPublic;
     Object? latestHands;
     var havePublic = false;
+    var haveHandsSnapshot = false;
 
     void emit() {
       if (!havePublic || latestPublic == null) {
@@ -158,8 +192,9 @@ class MultiplayerSyncService {
         return;
       }
       try {
-        final merged = Map<String, dynamic>.from(latestPublic!);
-        if (latestHands != null) merged['handCards'] = latestHands;
+        final merged = haveHandsSnapshot
+            ? mergePrivateHands(latestPublic!, latestHands)
+            : Map<String, dynamic>.from(latestPublic!);
         controller.add(MatchState.fromJson(merged));
       } catch (e) {
         if (kDebugMode) debugPrint('CRITICAL: Error parsing match state for $matchId: $e');
@@ -180,6 +215,7 @@ class MultiplayerSyncService {
     final handsSub = _handsRef(matchId).onValue.listen((event) {
       final value = event.snapshot.value;
       latestHands = (value is Map) ? value : null;
+      haveHandsSnapshot = true;
       if (havePublic) emit();
     }, onError: (error) {
       // Expected before you've joined a match (matchHands read is
@@ -399,3 +435,4 @@ class MultiplayerSyncService {
       });
   }
 }
+
