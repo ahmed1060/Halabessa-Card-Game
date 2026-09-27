@@ -29,6 +29,7 @@ test("starts a round with one complete unique hidden deck", () => {
 
   assert.equal(result.state.phase, "preRoundCut");
   assert.equal(result.state.deckCount, 52);
+  assert.equal(result.state.handInRound, 0);
   assert.equal(result.deck.length, 52);
   assert.equal(new Set(keys).size, 52);
   assert.deepEqual(result.state.handCards, {});
@@ -118,4 +119,17 @@ test("subsequent deal requires every hand to be empty", () => {
   };
 
   assert.throws(() => deal(state, deck, players[0], false), /cards_remain_in_hands/);
+});
+
+test("subsequent deal rejects a fourth hand even if cards remain", () => {
+  const deck = startRound(waitingState(), players[0]).deck;
+  const state: MatchState = {
+    phase: "playing",
+    playerIds: players,
+    dealerIndex: 0,
+    handInRound: 3,
+    handCards: Object.fromEntries(players.map((player) => [player, []])),
+  };
+
+  assert.throws(() => deal(state, deck, players[0], false), /hand_limit_reached/);
 });
