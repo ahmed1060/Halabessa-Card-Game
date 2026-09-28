@@ -26,6 +26,7 @@ import '../widgets/table_style.dart';
 import '../widgets/match_phase_panel.dart';
 import '../widgets/match_choice_panel.dart';
 import '../widgets/match_result_view.dart';
+import '../widgets/match_waiting_room_panel.dart';
 import '../widgets/match_recovery_view.dart';
 import '../widgets/basra_celebration_overlay.dart';
 import '../widgets/emote_wheel_overlay.dart';
@@ -286,7 +287,9 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
                       )),
 
                     // Overlays
-                    if (matchState.phase == GamePhase.waitingForPlayers) _buildLobbyOverlay(context, ref, matchState, myUid),
+                    if (matchState.phase == GamePhase.waitingForPlayers &&
+                        !matchState.id.startsWith('OFFLINE_'))
+                      _buildLobbyOverlay(context, ref, matchState, myUid),
                     if (isSpectator && matchState.phase != GamePhase.waitingForPlayers) _buildSpectatorIndicator(),
                     if (matchState.phase == GamePhase.capturing && matchState.board.isEmpty) _buildBasraOverlay(matchState, myUid),
                       
@@ -673,97 +676,31 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
 
 
   Widget _buildLobbyOverlay(BuildContext context, WidgetRef ref, MatchState state, String currentUid) {
-    final isReady = state.botInjectionVotes.containsKey(currentUid);
-    final readyCount = state.botInjectionVotes.length;
-    // Count only real humans (not placeholders)
-    final myIdx = state.playerIds.indexOf(currentUid);
-    final isSpectator = myIdx == -1;
-    final humanCount = state.playerIds.where((id) => !id.startsWith('waiting_')).length;
-
-    
-    return Center(
-      child: Container(
-        padding: const EdgeInsets.all(32),
-        width: 340,
-        decoration: BoxDecoration(
-          color: Colors.black.withOpacity(0.9), 
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: Colors.white10),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(isSpectator ? 'spectating_label'.tr() : 'waiting_for_players'.tr(), 
-              style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)
-            ),
-            const SizedBox(height: 24),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.black26,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                children: [
-                   const Icon(Icons.hub, color: Colors.orangeAccent, size: 20),
-                   const SizedBox(width: 12),
-                   Text('room_id_label'.tr(args: [state.id]), 
-                     style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w500)
-                   ),
-                   const Spacer(),
-                   if (!isSpectator)
-                     IconButton(
-                       icon: const Icon(Icons.share, color: Colors.tealAccent, size: 20),
-                       onPressed: () => _showInviteFriendDialog(context, ref, state, currentUid),
-                     ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 32),
-            ...state.playerIds.map((id) => Padding(
-              padding: const EdgeInsets.symmetric(vertical: 6.0),
-              child: Row(
-                children: [
-                   CircleAvatar(
-                     radius: 12,
-                     backgroundColor: id == currentUid ? Colors.green : Colors.white10,
-                     child: Icon(id.startsWith('waiting_') ? Icons.hourglass_empty : Icons.person, size: 14, color: id == currentUid ? Colors.white : Colors.white38),
-                   ),
-                   const SizedBox(width: 12),
-                   Text(id == currentUid ? "you".tr() : (id.startsWith('waiting_') ? "waiting_label".tr() : (state.playerNames[id] ?? "player_default_name".tr())), 
-                     style: TextStyle(color: id == currentUid ? Colors.green : Colors.white70)
-                   ),
-                   const Spacer(),
-                   if (state.botInjectionVotes.containsKey(id))
-                     const Icon(Icons.check_circle, color: Colors.green, size: 18),
-                ],
-              ),
-            )),
-            const SizedBox(height: 32),
-            if (!isSpectator) ...[
-              if (humanCount < 4) ...[
-                if (!isReady)
-                  ElevatedButton.icon(
-                    onPressed: () => ref.read(matchStateProvider.notifier).voteForBots(currentUid),
-                    icon: const Icon(Icons.smart_toy),
-                    label: Text('ready_fill_bots'.tr()),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.teal,
-                      foregroundColor: Colors.white,
-                      minimumSize: const Size(double.infinity, 50),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                  )
-                else
-                  Text('waiting_human_consent'.tr(args: [readyCount.toString(), humanCount.toString()]), 
-                    style: const TextStyle(color: Colors.orangeAccent, fontStyle: FontStyle.italic, fontSize: 13),
-                    textAlign: TextAlign.center,
-                  ),
-              ] else
-                Text('room_full_starting'.tr(), style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
-            ] else 
-              Text('you_are_spectating'.tr(), style: const TextStyle(color: ThemeConfig.goldAccent, fontStyle: FontStyle.italic)),
-          ],
+    final humans = state.playerIds.where((id) =>
+      !id.startsWith('waiting_') && !id.startsWith('bot_')).toList();
+    final ready = humans.where((id) => state.botInjectionVotes[id] == true).length;
+    return Align(alignment: Alignment.bottomCenter,
+      child: Padding(padding: const EdgeInsets.all(12),
+        child: ConstrainedBox(constraints: BoxConstraints(maxWidth: 520,
+          maxHeight: MediaQuery.sizeOf(context).height * 0.82),
+          child: SingleChildScrollView(child: MatchWaitingRoomPanel(
+            roomId: state.id, currentUid: currentUid,
+            title: 'waiting_for_players'.tr(),
+            roomLabel: 'room_id_label'.tr(args: ['']).trim(),
+            waitingLabel: 'waiting_label'.tr(), youLabel: 'you'.tr(),
+            botLabel: 'bot_name'.tr(), playerLabel: 'player_default_name'.tr(),
+            readyLabel: 'ready_fill_bots'.tr(),
+            consentLabel: 'waiting_human_consent'.tr(args: [
+              ready.toString(), humans.length.toString()]),
+            fullLabel: 'room_full_starting'.tr(),
+            spectatorLabel: 'you_are_spectating'.tr(),
+            inviteLabel: 'invite_friends'.tr(),
+            failureLabel: 'match_action_retry'.tr(),
+            playerIds: state.playerIds, playerNames: state.playerNames,
+            botVotes: state.botInjectionVotes,
+            onInvite: () => _showInviteFriendDialog(context, ref, state, currentUid),
+            onReady: () => ref.read(matchStateProvider.notifier).voteForBots(currentUid),
+          )),
         ),
       ),
     );
