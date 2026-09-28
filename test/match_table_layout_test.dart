@@ -43,4 +43,50 @@ void main() {
       }
     }
   }
+
+  testWidgets('scores stay visible when the play area scrolls', (tester) async {
+    const size = Size(320, 568);
+    await tester.binding.setSurfaceSize(size);
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(MaterialApp(home: MediaQuery(
+      data: const MediaQueryData(size: size, textScaler: TextScaler.linear(2)),
+      child: Scaffold(body: MatchTableLayout(
+        header: const SizedBox(height: 80, child: Text('Score: 10')),
+        partner: const SizedBox(height: 60), leftOpponent: const SizedBox(),
+        rightOpponent: const SizedBox(),
+        board: const SizedBox(height: 200, width: 230),
+        status: const Text('Your turn'),
+        hand: const SizedBox(height: 140),
+        controls: const SizedBox(height: 48),
+      )),
+    )));
+    final headerBefore = tester.getRect(find.text('Score: 10'));
+    await tester.dragFrom(const Offset(160, 300), const Offset(0, -300));
+    await tester.pumpAndSettle();
+    expect(tester.state<ScrollableState>(find.byType(Scrollable)).position.pixels,
+        greaterThan(0));
+    expect(tester.getRect(find.text('Score: 10')), headerBefore);
+  });
+
+  testWidgets('the hand tray does not collapse between deal and turn', (tester) async {
+    const size = Size(390, 844);
+    await tester.binding.setSurfaceSize(size);
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    Widget table(Widget hand) => MaterialApp(home: MediaQuery(
+      data: const MediaQueryData(size: size),
+      child: Scaffold(body: MatchTableLayout(
+        header: const SizedBox(height: 80), partner: const SizedBox(),
+        leftOpponent: const SizedBox(), rightOpponent: const SizedBox(),
+        board: const SizedBox(height: 200, width: 230),
+        status: const Text('Phase'), hand: hand,
+        controls: const SizedBox(height: 48),
+      )),
+    ));
+    await tester.pumpWidget(table(const SizedBox(height: 110)));
+    final before = tester.getSize(find.byKey(const ValueKey('table-hand-tray'))).height;
+    await tester.pumpWidget(table(const SizedBox.shrink()));
+    final after = tester.getSize(find.byKey(const ValueKey('table-hand-tray'))).height;
+    expect(before, 168);
+    expect(after, before);
+  });
 }

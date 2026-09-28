@@ -23,7 +23,7 @@ class MatchTableLayout extends StatelessWidget {
     final textScale = MediaQuery.textScalerOf(context).scale(14) / 14;
     // Header and tray keep their intrinsic text height. The arena has its own
     // minimum; a large header must never steal the side players' layout space.
-    // One outer scroll view handles small windows and accessibility text sizes.
+    // Only the play area scrolls on small windows and at larger text sizes.
     final arenaHeight = math.max(260.0 * math.max(1.0, textScale),
         bounds.maxHeight - (wide ? 140.0 : 310.0) * textScale);
     final arena = Column(children: [
@@ -40,31 +40,40 @@ class MatchTableLayout extends StatelessWidget {
     final tray = ColoredBox(
       key: const ValueKey('table-hand-tray'),
       color: TableStyle.ink.withOpacity(0.96),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(8, 10, 8, 4),
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          status,
-          const SizedBox(height: 4),
-          hand,
-        ]),
+      child: ConstrainedBox(
+        // Dealing, capture, and turn changes must not collapse the hand region
+        // and move the rest of the table each time the cards disappear.
+        constraints: const BoxConstraints(minHeight: 168),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(8, 10, 8, 4),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            status,
+            const SizedBox(height: 4),
+            hand,
+          ]),
+        ),
       ),
     );
-    return SingleChildScrollView(
-      child: Column(children: [
-        header,
-        if (wide)
-          Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+    return Column(children: [
+      // Keep scores and round context visible while a short viewport scrolls
+      // through the arena, phase action, hand, and controls.
+      header,
+      Expanded(child: SingleChildScrollView(
+        child: Column(children: [
+          if (wide)
+            Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
               Expanded(child: SizedBox(height: arenaHeight, child: arena)),
               SizedBox(width: math.min(340.0, bounds.maxWidth * 0.4),
                 child: tray),
             ])
-        else ...[
-          SizedBox(height: arenaHeight, child: arena),
-          tray,
-        ],
-        Material(color: TableStyle.ink, child: controls),
-      ]),
-    );
+          else ...[
+            SizedBox(height: arenaHeight, child: arena),
+            tray,
+          ],
+          Material(color: TableStyle.ink, child: controls),
+        ]),
+      )),
+    ]);
   });
 }
 
