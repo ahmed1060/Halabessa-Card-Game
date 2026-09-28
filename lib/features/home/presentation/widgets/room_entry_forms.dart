@@ -117,8 +117,8 @@ class _RoomCreationFormState extends State<RoomCreationForm> {
             onSelected: (value) => _timer = value),
       ]),
       const SizedBox(height: 20),
-      DecoratedBox(decoration: BoxDecoration(color: TableStyle.felt,
-        borderRadius: BorderRadius.circular(12)),
+      Material(color: TableStyle.felt,
+        borderRadius: BorderRadius.circular(12),
         child: SwitchListTile.adaptive(
           title: Text(widget.text('public_room'), style: TableStyle.label),
           subtitle: Text(widget.text('public_room_desc'), style: TableStyle.detail),
