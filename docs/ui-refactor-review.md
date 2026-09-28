@@ -27,7 +27,7 @@ intrusive. Neither is claimed fixed by this delivery.
 
 ## Direction: an Egyptian card table, built for reading and playing
 
-## Second slice (verification pending)
+## Second slice (verified)
 
 The repeated username prompt had a persistence cause: profile creation omits
 `isAdmin`, but its update rule directly accessed that absent field and denied
@@ -50,6 +50,31 @@ recovery rebuilds/timeouts, and the existing responsive table matrix with a
 phase action. Full match results, votes/rematch, room entry, and supporting
 screens still need the later refactor slices. This does not certify all app
 permissions or native store readiness.
+
+Commit `b871b3b` deployed via Hosting run `36322569079`; Android run
+`36322569080` and iOS run `36322569084` passed. The web gate passed 101 Flutter,
+5 isolated Firestore rules, and 23 Node tests. Live guest verification saved
+the username across refresh, played through a bot deal and into the next one,
+and returned to the lobby. The several-second blank Flutter bootstrap after
+refresh remains a separate startup-performance finding.
+
+## Third slice: voting and final results (verification pending)
+
+The previous match-over phase both opened `MatchSummaryDialog` and built a
+separate full-board results overlay. A second Results action opened another
+dialog, while the online Play Again action could attempt to vote after the
+rematch phase was already finished. These are presentation-flow conflicts,
+not scoring-rule defects. The new design uses one scrollable result screen for
+the terminal phase. Only offline practice offers immediate replay, preserving
+the match mode and target score. An online player who declined or lost the
+rematch vote returns to the lobby and can start a new match there.
+
+Shuffle/rematch decisions now appear in the hand tray, preserving the table
+and scoreboard. Spectators and players who already voted receive status but
+no vote buttons. A pending choice disables both actions; failures expose a
+retry without raw server exceptions. Responsive widget tests cover final
+results, voting, duplicate taps, 320px portrait and short landscape at 2x
+text. The authoritative vote and score logic is unchanged.
 
 ## Visual direction
 
