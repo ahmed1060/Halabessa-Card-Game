@@ -391,33 +391,37 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Widget _buildJoinCodeBar(BuildContext context, dynamic user) {
-    return GestureDetector(
-      onTap: () => _showJoinRoomDialog(context, user?.uid ?? '', user?.displayName ?? ''),
-      child: Container(
-        height: 48,
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.06),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: Colors.white.withOpacity(0.12), width: 1),
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Row(
-          children: [
-            Icon(Icons.pin_outlined, color: ThemeConfig.goldAccent.withOpacity(0.9), size: 20),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                'join_room'.tr(),
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13),
+    return Material(
+      type: MaterialType.transparency,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: () => _showJoinRoomDialog(context, user?.uid ?? '', user?.displayName ?? ''),
+        child: Container(
+          height: 48,
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.06),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: Colors.white.withOpacity(0.12), width: 1),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            children: [
+              Icon(Icons.pin_outlined, color: ThemeConfig.goldAccent.withOpacity(0.9), size: 20),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'join_room'.tr(),
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13),
+                ),
               ),
-            ),
-            Text(
-              'enter_code'.tr(),
-              style: TextStyle(color: Colors.white.withOpacity(0.45), fontSize: 11),
-            ),
-            const SizedBox(width: 6),
-            Icon(Icons.arrow_forward_ios_rounded, color: Colors.white.withOpacity(0.35), size: 13),
-          ],
+              Text(
+                'enter_code'.tr(),
+                style: TextStyle(color: Colors.white.withOpacity(0.45), fontSize: 11),
+              ),
+              const SizedBox(width: 6),
+              Icon(Icons.arrow_forward_ios_rounded, color: Colors.white.withOpacity(0.35), size: 13),
+            ],
+          ),
         ),
       ),
     );
