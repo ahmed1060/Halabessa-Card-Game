@@ -27,7 +27,7 @@ void main() {
     await tester.pumpWidget(room(ready: () async {}));
     expect(find.text('Bot 1'), findsOneWidget);
     expect(find.text('bot_name_template'), findsNothing);
-    expect(find.text('1/1'), findsOneWidget);
+    expect(find.text('0/1'), findsOneWidget);
     expect(find.text('Ready with bots'), findsOneWidget);
   });
   testWidgets('spectator and ready player have no bot vote action', (tester) async {
