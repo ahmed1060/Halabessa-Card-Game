@@ -33,6 +33,7 @@ void main() {
     await tester.pumpWidget(result(home: () => homeCalls++));
     expect(find.text('Play again'), findsNothing);
     await tester.tap(find.text('Return home'));
+    await tester.pump();
     expect(homeCalls, 1);
     expect(tester.widget<OutlinedButton>(find.byType(OutlinedButton)).onPressed, isNull);
   });

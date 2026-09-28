@@ -76,16 +76,17 @@ class _MatchResultViewState extends State<MatchResultView> {
 
   Widget _score(String label, int score) => Semantics(
     label: '$label: $score', excludeSemantics: true,
-    child: Row(children: [
-      Expanded(child: Text(label, style: TableStyle.label)),
-      Text('$score', style: TableStyle.label.copyWith(fontSize: 24, fontWeight: FontWeight.bold)),
-    ]),
+    child: Text.rich(TextSpan(children: [
+      TextSpan(text: '$label  ', style: TableStyle.label),
+      TextSpan(text: '$score', style: TableStyle.label.copyWith(
+        fontSize: 24, fontWeight: FontWeight.bold)),
+    ]), textAlign: TextAlign.center),
   );
   Widget _reward(IconData icon, String label, int value) => Semantics(
     label: '$label: $value', excludeSemantics: true,
-    child: Row(mainAxisSize: MainAxisSize.min, children: [
+    child: Wrap(crossAxisAlignment: WrapCrossAlignment.center,
+      alignment: WrapAlignment.center, spacing: 6, children: [
       Icon(icon, size: 20, color: TableStyle.brass),
-      const SizedBox(width: 6),
       Text('$label $value', style: TableStyle.label),
     ]),
   );
