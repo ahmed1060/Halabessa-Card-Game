@@ -10,7 +10,8 @@ import 'package:halabessa/core/widgets/settings_overlay.dart';
 import 'package:halabessa/core/widgets/user_avatar.dart';
 import 'package:halabessa/core/theme/theme_config.dart';
 import 'package:halabessa/features/home/presentation/widgets/overlays/create_room_overlay.dart';
-import 'package:halabessa/features/home/presentation/widgets/overlays/join_room_overlay.dart';
+import 'package:halabessa/features/home/presentation/widgets/room_entry_forms.dart';
+import 'package:halabessa/features/game/presentation/widgets/table_style.dart';
 
 import 'package:halabessa/core/services/multimedia_service.dart';
 import 'package:halabessa/core/services/asset_preloader_service.dart';
@@ -198,7 +199,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
               const SizedBox(height: 12),
 
-              // 3. Join with Code Bar
+              // 3. Join with a code directly; no sheet or extra tap is required.
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24.0),
                 child: _buildJoinCodeBar(context, user),
@@ -392,36 +393,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   Widget _buildJoinCodeBar(BuildContext context, dynamic user) {
     return Material(
-      type: MaterialType.transparency,
-      child: InkWell(
+      color: TableStyle.ink,
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
-        onTap: () => _showJoinRoomDialog(context, user?.uid ?? '', user?.displayName ?? ''),
-        child: Container(
-          height: 48,
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.06),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: Colors.white.withOpacity(0.12), width: 1),
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Row(
-            children: [
-              Icon(Icons.pin_outlined, color: ThemeConfig.goldAccent.withOpacity(0.9), size: 20),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  'join_room'.tr(),
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13),
-                ),
-              ),
-              Text(
-                'enter_code'.tr(),
-                style: TextStyle(color: Colors.white.withOpacity(0.45), fontSize: 11),
-              ),
-              const SizedBox(width: 6),
-              Icon(Icons.arrow_forward_ios_rounded, color: Colors.white.withOpacity(0.35), size: 13),
-            ],
-          ),
+        side: BorderSide(color: Colors.white.withOpacity(0.12)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: RoomJoinForm(
+          text: (key) => key.tr(),
+          onJoin: (code) => ref.read(matchStateProvider.notifier).joinMatch(
+            code, user?.uid ?? '', user?.displayName ?? ''),
+          onJoined: () => Navigator.pushNamed(context, '/game'),
         ),
       ),
     );
@@ -473,15 +456,4 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  void _showJoinRoomDialog(BuildContext context, String playerId, String displayName) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => JoinRoomOverlay(
-        playerId: playerId,
-        displayName: displayName,
-      ),
-    );
-  }
 }
