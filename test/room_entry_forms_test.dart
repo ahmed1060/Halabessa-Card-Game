@@ -94,6 +94,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('join_room_submit')));
     await tester.pump();
     expect(find.byKey(const ValueKey('join_room_error')), findsOneWidget);
+    expect(find.text('room_code_format'), findsOneWidget);
     expect(sent, isNull);
     await tester.enterText(find.byKey(const ValueKey('room_code_input')), 'abc12345');
     await tester.tap(find.byKey(const ValueKey('join_room_submit')));

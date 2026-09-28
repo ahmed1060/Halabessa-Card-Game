@@ -47,7 +47,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFF0D1B2A),
-      extendBodyBehindAppBar: true,
+      extendBodyBehindAppBar: false,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -110,7 +110,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         child: SingleChildScrollView(
           child: Column(
             children: [
-              const SizedBox(height: 120),
+              const SizedBox(height: 32),
               if (user != null && (user.username?.isEmpty ?? true))
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),

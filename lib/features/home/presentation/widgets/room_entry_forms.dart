@@ -211,7 +211,7 @@ class _RoomJoinFormState extends State<RoomJoinForm> {
           labelStyle: TableStyle.detail,
           hintText: 'ABC12345',
           hintStyle: TableStyle.detail,
-          helperText: widget.text('room_code_format'),
+          helperText: _errorKey == null ? widget.text('room_code_format') : null,
           helperStyle: TableStyle.detail,
           counterText: '',
           filled: true, fillColor: TableStyle.felt,
