@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:halabessa/features/game/presentation/widgets/match_table_layout.dart';
 import 'package:halabessa/features/game/presentation/widgets/table_seat.dart';
 import 'package:halabessa/features/game/presentation/widgets/match_phase_panel.dart';
+import 'package:halabessa/features/game/presentation/widgets/table_style.dart';
 
 void main() {
   for (final size in [const Size(320, 568), const Size(390, 844),
@@ -156,6 +157,49 @@ void main() {
     expect(after.width, before.width);
     expect(after.center.dx, before.center.dx);
   });
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('partner activity and messages do not move the board at ${scale}x',
+        (tester) async {
+      const size = Size(390, 844);
+      await tester.binding.setSurfaceSize(size);
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      Widget table({required bool active, String? message}) => MaterialApp(
+        home: MediaQuery(
+          data: MediaQueryData(size: size, textScaler: TextScaler.linear(scale)),
+          child: Scaffold(body: MatchTableLayout(
+            header: const SizedBox(height: 80),
+            partner: TableSeat(key: const ValueKey('partner'), name: 'Bot 2',
+              detail: active ? 'Playing now' : 'Cards: 4',
+              active: active, message: message),
+            leftOpponent: const TableSeat(name: 'Bot 3', detail: 'Cards: 4'),
+            rightOpponent: const TableSeat(name: 'Bot 1', detail: 'Cards: 4'),
+            board: const SizedBox(key: ValueKey('board'), width: 230, height: 200),
+            status: const Text('Your turn'),
+            hand: const SizedBox(height: 110),
+            controls: const SizedBox(height: 48),
+          )),
+        ),
+      );
+
+      await tester.pumpWidget(table(active: false));
+      final boardBefore = tester.getRect(find.byKey(const ValueKey('board')));
+      final seatBefore = tester.getRect(find.byKey(const ValueKey('partner')));
+      final surface = find.descendant(
+        of: find.byKey(const ValueKey('partner')),
+        matching: find.byKey(const ValueKey('seat-active-surface')),
+      );
+      BoxDecoration decoration() =>
+          tester.widget<DecoratedBox>(surface).decoration as BoxDecoration;
+      expect((decoration().border! as Border).top.color, Colors.transparent);
+      await tester.pumpWidget(table(active: true, message: '🔥'));
+      expect(tester.getRect(find.byKey(const ValueKey('board'))), boardBefore);
+      expect(tester.getRect(find.byKey(const ValueKey('partner'))), seatBefore);
+      expect((decoration().border! as Border).top.color,
+          TableStyle.brass.withOpacity(0.8));
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   testWidgets('solo-practice label has no room-code copy affordance', (tester) async {
     await tester.pumpWidget(const MaterialApp(home: Scaffold(body: MatchScoreBar(

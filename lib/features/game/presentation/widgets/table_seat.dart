@@ -45,39 +45,53 @@ class _TableSeatState extends State<TableSeat> {
   @override
   Widget build(BuildContext context) {
     final url = widget.avatarUrl;
+    final textScale = MediaQuery.textScalerOf(context).scale(12) / 12;
+    final lineHeight = 16.0 * textScale;
     final remaining = widget.turnStarted == null || widget.turnSeconds <= 0 ? 0.0 :
         (1 - DateTime.now().difference(widget.turnStarted!).inMilliseconds /
           (widget.turnSeconds * 1000)).clamp(0.0, 1.0);
-    return SizedBox(width: 110, child: Tooltip(
+    return SizedBox(width: 110, height: 60 + 4 * lineHeight, child: Tooltip(
       message: [widget.name, widget.detail, if (widget.message != null) widget.message!].join('\n'),
       child: Material(color: Colors.transparent, child: InkWell(
         onTap: widget.onPressed, borderRadius: BorderRadius.circular(12),
         focusColor: TableStyle.brass.withOpacity(0.4),
-        child: Padding(padding: const EdgeInsets.all(4), child: Column(
-          mainAxisSize: MainAxisSize.min, children: [
-            Stack(alignment: Alignment.center, children: [
-              SizedBox(width: 44, height: 44, child: CircularProgressIndicator(
-                value: widget.active ? (widget.turnSeconds > 0 ? remaining : 1) : 0,
-                backgroundColor: TableStyle.muted.withOpacity(0.15),
-                color: TableStyle.brass, strokeWidth: 2,
-              )),
-              CircleAvatar(radius: 18, backgroundColor: TableStyle.ink,
-                foregroundImage: url == null || url.isEmpty ? null :
-                  (url.startsWith('assets/') ? AssetImage(url) : NetworkImage(url)) as ImageProvider,
-                onForegroundImageError: url == null || url.isEmpty ? null : (_, __) {},
-                child: Icon(widget.isBot ? Icons.smart_toy_outlined : Icons.person_outline,
-                  color: TableStyle.ivory, size: 22)),
-            ]),
-            const SizedBox(height: 4),
-            Text(widget.name, maxLines: 1, overflow: TextOverflow.ellipsis,
-              style: TableStyle.detail.copyWith(color: TableStyle.ivory, fontWeight: FontWeight.w600)),
-            Text(widget.detail, maxLines: 2, overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-              style: TableStyle.detail.copyWith(color: widget.active ? TableStyle.brass : TableStyle.muted)),
-            if (widget.message != null)
-              Text(widget.message!, maxLines: 1, overflow: TextOverflow.ellipsis, style: TableStyle.detail),
-          ],
-        )),
+        child: DecoratedBox(
+          key: const ValueKey('seat-active-surface'),
+          decoration: BoxDecoration(
+            color: widget.active ? TableStyle.ink.withOpacity(0.82) : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: widget.active
+                ? TableStyle.brass.withOpacity(0.8) : Colors.transparent),
+          ),
+          child: Padding(padding: const EdgeInsets.all(4), child: Column(
+            mainAxisSize: MainAxisSize.min, children: [
+              Stack(alignment: Alignment.center, children: [
+                SizedBox(width: 44, height: 44, child: CircularProgressIndicator(
+                  value: widget.active ? (widget.turnSeconds > 0 ? remaining : 1) : 0,
+                  backgroundColor: TableStyle.muted.withOpacity(0.15),
+                  color: TableStyle.brass, strokeWidth: 2,
+                )),
+                CircleAvatar(radius: 18, backgroundColor: TableStyle.ink,
+                  foregroundImage: url == null || url.isEmpty ? null :
+                    (url.startsWith('assets/') ? AssetImage(url) : NetworkImage(url)) as ImageProvider,
+                  onForegroundImageError: url == null || url.isEmpty ? null : (_, __) {},
+                  child: Icon(widget.isBot ? Icons.smart_toy_outlined : Icons.person_outline,
+                    color: TableStyle.ivory, size: 22)),
+              ]),
+              const SizedBox(height: 4),
+              SizedBox(height: lineHeight, child: Text(widget.name,
+                maxLines: 1, overflow: TextOverflow.ellipsis,
+                style: TableStyle.detail.copyWith(color: TableStyle.ivory, fontWeight: FontWeight.w600))),
+              SizedBox(height: lineHeight * 2, child: Text(widget.detail,
+                maxLines: 2, overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: TableStyle.detail.copyWith(color: widget.active ? TableStyle.brass : TableStyle.muted))),
+              SizedBox(height: lineHeight, child: widget.message == null
+                ? const SizedBox.shrink() : Text(widget.message!, maxLines: 1,
+                    overflow: TextOverflow.ellipsis, style: TableStyle.detail)),
+            ],
+          )),
+        ),
       )),
     ));
   }
