@@ -110,7 +110,7 @@ class _FannedHandWidgetState extends State<FannedHandWidget> {
         heightFactor: 1,
         child: SizedBox(
           width: fanWidth, height: height + 28,
-          child: Stack(children: [
+          child: Stack(clipBehavior: Clip.none, children: [
             for (var index = 0; index < widget.cards.length; index++)
               AnimatedPositioned(
                 key: ValueKey('hand-slot-${widget.cards[index].firebaseKey}'),
@@ -159,9 +159,16 @@ class _FannedHandWidgetState extends State<FannedHandWidget> {
                             onTap: widget.interactionEnabled && !_submitting ? activate : null,
                             child: BoardCardMotion(
                               key: ValueKey('hand-visual-${card.firebaseKey}'),
-                              origin: const Offset(0, -42),
-                              delay: Duration(milliseconds: index * 55),
-                              initialOpacity: 0,
+                              // New cards leave one point above the hand and
+                              // fan out; the card's hit target never moves.
+                              origin: Offset(
+                                fanWidth / 2 -
+                                    (firstCardLeft + index * spacing + width / 2),
+                                compact ? -72 : -108,
+                              ),
+                              delay: Duration(milliseconds: index * 70),
+                              travelDuration: const Duration(milliseconds: 380),
+                              initialOpacity: 0.65,
                               // Keep the hit target fixed while only the
                               // dealt card artwork travels into the hand.
                               child: ExcludeSemantics(child: IgnorePointer(child:

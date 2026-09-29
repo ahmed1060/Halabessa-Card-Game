@@ -6,10 +6,13 @@ class BoardCardMotion extends StatefulWidget {
   final Offset origin;
   final Widget child;
   final Duration delay;
+  final Duration travelDuration;
   final double initialOpacity;
 
   const BoardCardMotion({super.key, required this.origin,
-    this.delay = Duration.zero, this.initialOpacity = 0.75,
+    this.delay = Duration.zero,
+    this.travelDuration = const Duration(milliseconds: 320),
+    this.initialOpacity = 0.75,
     required this.child});
 
   @override
@@ -20,7 +23,7 @@ class _BoardCardMotionState extends State<BoardCardMotion>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller = AnimationController(
     vsync: this,
-    duration: Duration(milliseconds: 320 + widget.delay.inMilliseconds),
+    duration: widget.travelDuration + widget.delay,
   );
 
   @override
@@ -44,8 +47,10 @@ class _BoardCardMotionState extends State<BoardCardMotion>
     animation: _controller,
     child: widget.child,
     builder: (context, child) {
-      final elapsed = _controller.value * (320 + widget.delay.inMilliseconds);
-      final travel = ((elapsed - widget.delay.inMilliseconds) / 320)
+      final travelMs = widget.travelDuration.inMilliseconds;
+      final elapsed = _controller.value *
+          (travelMs + widget.delay.inMilliseconds);
+      final travel = ((elapsed - widget.delay.inMilliseconds) / travelMs)
           .clamp(0.0, 1.0).toDouble();
       final progress = Curves.easeOutCubic.transform(travel);
       return Transform.translate(

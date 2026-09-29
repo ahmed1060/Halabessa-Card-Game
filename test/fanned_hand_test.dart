@@ -95,11 +95,36 @@ void main() {
     final last = find.byKey(ValueKey('visual-${cards.last.firebaseKey}'));
     final firstStart = tester.getRect(first).center;
     final lastStart = tester.getRect(last).center;
+    expect(firstStart.dx, closeTo(lastStart.dx, 1));
     await tester.pump(const Duration(milliseconds: 80));
     expect(tester.getRect(first).center.dy, greaterThan(firstStart.dy));
     expect(tester.getRect(last).center.dy, lastStart.dy);
     await tester.pumpAndSettle();
-    expect(tester.getRect(last).center.dy, greaterThan(lastStart.dy));
+    final firstSettled = tester.getRect(first).center;
+    final lastSettled = tester.getRect(last).center;
+    expect(firstSettled.dy - firstStart.dy, greaterThan(80));
+    expect(lastSettled.dy, greaterThan(lastStart.dy));
+    expect(lastSettled.dx - firstSettled.dx, greaterThan(100));
+  });
+
+  testWidgets('reduced motion deals directly into the final hand', (tester) async {
+    final first = find.byKey(ValueKey('visual-${cards.first.firebaseKey}'));
+    await tester.pumpWidget(MaterialApp(home: MediaQuery(
+      data: const MediaQueryData(disableAnimations: true),
+      child: Scaffold(body: SizedBox(width: 390, child: FannedHandWidget(
+        cards: cards, isMyTurn: true, onCardTap: (_, __) {},
+        cardBuilder: (card, width, height) => SizedBox(
+          key: ValueKey('visual-${card.firebaseKey}'),
+          width: width, height: height),
+      ))),
+    )));
+    final start = tester.getRect(first).center;
+    await tester.pumpAndSettle();
+    expect(tester.getRect(first).center, start);
+    expect(tester.widget<Opacity>(find.descendant(
+      of: find.byKey(ValueKey('hand-visual-${cards.first.firebaseKey}')),
+      matching: find.byType(Opacity),
+    )).opacity, 1);
   });
 
   testWidgets('remaining cards glide into place after a play', (tester) async {
