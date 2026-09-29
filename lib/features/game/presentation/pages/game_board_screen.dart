@@ -163,6 +163,11 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
     // Effects occur on transition, not on each results rebuild.
     ref.listen<MatchState?>(matchStateProvider, (previous, next) {
       if (next == null) return;
+      if (previous?.id != next.id || previous?.roundCount != next.roundCount) {
+        // Card IDs repeat on the next deck. Old local tap coordinates must not
+        // make a bot's future card appear to arrive from the human's hand.
+        ref.read(localPlayOriginsProvider.notifier).state = {};
+      }
 
       // Sync turn timer to Unity when turn or phase changes
       if (next.currentTurnIndex != previous?.currentTurnIndex || next.phase != previous?.phase) {
@@ -645,13 +650,38 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
       return Center(child: CardWidget(card: matchState.cutLastCard!, width: 96, height: 138));
     }
     final isCapturing = matchState.phase == GamePhase.capturing;
+    final localOrigins = ref.watch(localPlayOriginsProvider);
+    final myIndex = matchState.playerIds.indexOf(myUid);
+    final baseIndex = myIndex < 0 ? 0 : myIndex;
+    Offset seatOrigin(game_card.Card card) {
+      final recorded = localOrigins[card.firebaseKey];
+      if (recorded != null && recorded != Offset.zero) return recorded;
+      final owner = matchState.cardOwnership[card.firebaseKey];
+      final ownerIndex = owner == null ? -1 : matchState.playerIds.indexOf(owner);
+      final relative = ownerIndex < 0
+          ? (isCapturing ? (matchState.currentTurnIndex - baseIndex + 4) % 4 : 2)
+          : (ownerIndex - baseIndex + 4) % 4;
+      return switch (relative) {
+        0 => const Offset(0, 150),
+        1 => const Offset(150, 0),
+        2 => const Offset(0, -140),
+        _ => const Offset(-150, 0),
+      };
+    }
 
     return BoardCardsWidget(
+      key: ValueKey('board-${matchState.id}'),
       cards: matchState.board,
       isLandscape: isLandscape,
       isCapturing: isCapturing,
       capturingTeam: matchState.capturingTeam,
       capturingStage: matchState.capturingStage,
+      arrivalOffsets: {
+        for (final card in matchState.board) card.firebaseKey: seatOrigin(card),
+      },
+      captureToBottom: matchState.capturingTeam ==
+          (_getTeamOfPlayer(myUid, matchState.playerIds).isEmpty
+              ? 'teamA' : _getTeamOfPlayer(myUid, matchState.playerIds)),
     );
   }
 

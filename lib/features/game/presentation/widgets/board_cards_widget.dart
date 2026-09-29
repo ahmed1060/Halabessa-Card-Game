@@ -5,6 +5,7 @@ import '../../domain/models/card.dart' as game_card;
 import '../../domain/models/match_state.dart';
 import '../../../../core/theme/theme_config.dart';
 import 'card_widget.dart';
+import 'board_card_motion.dart';
 
 class BoardCardsWidget extends StatelessWidget {
   final List<game_card.Card> cards;
@@ -12,6 +13,9 @@ class BoardCardsWidget extends StatelessWidget {
   final bool isCapturing;
   final String? capturingTeam;
   final int capturingStage;
+  final Map<String, Offset> arrivalOffsets;
+  final bool captureToBottom;
+  final Widget Function(game_card.Card, double, double)? cardBuilder;
 
   const BoardCardsWidget({
     super.key,
@@ -20,6 +24,9 @@ class BoardCardsWidget extends StatelessWidget {
     this.isCapturing = false,
     this.capturingTeam,
     this.capturingStage = 0,
+    this.arrivalOffsets = const {},
+    this.captureToBottom = false,
+    this.cardBuilder,
   });
 
   @override
@@ -56,11 +63,13 @@ class BoardCardsWidget extends StatelessWidget {
     final cardWidth = isLandscape ? 72.0 : 64.0;
     final cardHeight = isLandscape ? 104.0 : 92.0;
 
+    final reducedMotion = MediaQuery.disableAnimationsOf(context);
+    final captureFlight = isCapturing && capturingStage > 0;
+    final motionDuration = reducedMotion ? Duration.zero :
+        const Duration(milliseconds: 300);
+
     return Center(
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOutCubic,
-        child: Stack(
+      child: Stack(
           alignment: Alignment.center,
           clipBehavior: Clip.none,
           children: [
@@ -82,8 +91,31 @@ class BoardCardsWidget extends StatelessWidget {
               ),
             ),
 
-            // Card stack layout
-            ..._buildCardStack(cardWidth, cardHeight),
+            // The pile compresses on capture, then travels toward the winning
+            // team. New cards independently arrive from their player's seat.
+            AnimatedSlide(
+              duration: motionDuration,
+              curve: Curves.easeInOutCubic,
+              offset: captureFlight
+                  ? Offset(0, captureToBottom ? 1.3 : -1.3)
+                  : Offset.zero,
+              child: AnimatedScale(
+                duration: motionDuration,
+                curve: Curves.easeOutCubic,
+                scale: isCapturing ? 0.84 : 1,
+                child: AnimatedOpacity(
+                  duration: motionDuration,
+                  opacity: captureFlight ? 0.12 : 1,
+                  child: SizedBox(
+                    width: cardWidth * 2.2,
+                    height: cardHeight * 1.6,
+                    child: Stack(alignment: Alignment.center,
+                      clipBehavior: Clip.none,
+                      children: _buildCardStack(cardWidth, cardHeight)),
+                  ),
+                ),
+              ),
+            ),
 
             // Card Count Badge (if more than 3 cards on table)
             if (cards.length > 3)
@@ -121,10 +153,15 @@ class BoardCardsWidget extends StatelessWidget {
                 ),
               ),
           ],
-        ),
       ),
     );
   }
+
+  Widget _arrivingCard(game_card.Card card, Widget child) => BoardCardMotion(
+    key: ValueKey('board-${card.firebaseKey}'),
+    origin: arrivalOffsets[card.firebaseKey] ?? const Offset(0, -95),
+    child: child,
+  );
 
   List<Widget> _buildCardStack(double width, double height) {
     // If 4 or fewer cards, fan them out horizontally with nice spacing
@@ -143,13 +180,14 @@ class BoardCardsWidget extends StatelessWidget {
         final angle = (i - (count - 1) / 2) * 0.08;
 
         cardWidgets.add(
-          Transform.translate(
+          KeyedSubtree(key: ValueKey('board-slot-${card.firebaseKey}'), child: Transform.translate(
             offset: Offset(xOffset, 0),
             child: Transform.rotate(
               angle: angle,
-              child: _buildCardWithHighlight(card, width, height, isTop),
+              child: _arrivingCard(card,
+                _buildCardWithHighlight(card, width, height, isTop)),
             ),
-          ),
+          )),
         );
       }
     } else {
@@ -165,30 +203,27 @@ class BoardCardsWidget extends StatelessWidget {
         final pseudoRandomY = (((i * 11) % 15) - 7) * 1.2;
 
         cardWidgets.add(
-          Transform.translate(
+          KeyedSubtree(key: ValueKey('board-slot-${card.firebaseKey}'), child: Transform.translate(
             offset: Offset(pseudoRandomX, pseudoRandomY),
             child: Transform.rotate(
               angle: pseudoRandomAngle,
-              child: Opacity(
+              child: _arrivingCard(card, Opacity(
                 opacity: 0.85,
-                child: CardWidget(
-                  card: card,
-                  width: width,
-                  height: height,
-                ),
-              ),
+                child: _card(card, width, height),
+              )),
             ),
-          ),
+          )),
         );
       }
 
       // Top card (active card to match)
       final topCard = cards.last;
       cardWidgets.add(
-        Transform.translate(
+        KeyedSubtree(key: ValueKey('board-slot-${topCard.firebaseKey}'), child: Transform.translate(
           offset: const Offset(0, 0),
-          child: _buildCardWithHighlight(topCard, width, height, true),
-        ),
+          child: _arrivingCard(topCard,
+            _buildCardWithHighlight(topCard, width, height, true)),
+        )),
       );
     }
 
@@ -218,11 +253,11 @@ class BoardCardsWidget extends StatelessWidget {
             ),
         ],
       ),
-      child: CardWidget(
-        card: card,
-        width: width,
-        height: height,
-      ),
+      child: _card(card, width, height),
     );
   }
+
+  Widget _card(game_card.Card card, double width, double height) =>
+      cardBuilder?.call(card, width, height) ??
+      CardWidget(card: card, width: width, height: height);
 }
