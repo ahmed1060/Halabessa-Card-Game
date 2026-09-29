@@ -371,8 +371,8 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
         firstScore: firstIsA ? state.teamAScore : state.teamBScore,
         secondScore: firstIsA ? state.teamBScore : state.teamAScore,
         details: 'table_round_target'.tr(args: [state.roundCount.toString(), state.maxPoints.toString()]),
-        roomLabel: state.id,
-        onCopyRoom: () {
+        roomLabel: state.id.startsWith('OFFLINE_') ? 'practice_bots'.tr() : state.id,
+        onCopyRoom: state.id.startsWith('OFFLINE_') ? null : () {
           Clipboard.setData(ClipboardData(text: state.id));
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('room_id_copied'.tr())));
         },

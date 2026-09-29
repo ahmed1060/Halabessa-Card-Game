@@ -89,4 +89,35 @@ void main() {
     expect(before, 168);
     expect(after, before);
   });
+
+  testWidgets('roomy landscape centers board and hand on the same table axis', (tester) async {
+    const size = Size(1280, 720);
+    await tester.binding.setSurfaceSize(size);
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(const MaterialApp(home: Scaffold(body: MatchTableLayout(
+      header: SizedBox(height: 80), partner: SizedBox(height: 60),
+      leftOpponent: SizedBox(), rightOpponent: SizedBox(),
+      board: SizedBox(key: ValueKey('board'), width: 230, height: 200),
+      status: Text('Your turn'),
+      hand: SizedBox(key: ValueKey('hand'), width: 280, height: 110),
+      controls: SizedBox(height: 48),
+    ))));
+    await tester.pump();
+    final board = tester.getRect(find.byKey(const ValueKey('board')));
+    final hand = tester.getRect(find.byKey(const ValueKey('hand')));
+    expect(board.center.dx, closeTo(size.width / 2, 1));
+    expect(hand.center.dx, closeTo(size.width / 2, 1));
+    expect(board.bottom, lessThan(hand.top));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('solo-practice label has no room-code copy affordance', (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: Scaffold(body: MatchScoreBar(
+      firstLabel: 'Our team', secondLabel: 'Their team',
+      firstScore: 0, secondScore: 0, details: 'Round 1',
+      roomLabel: 'Solo Practice', onCopyRoom: null,
+    ))));
+    expect(find.text('Solo Practice'), findsOneWidget);
+    expect(find.byIcon(Icons.copy_outlined), findsNothing);
+  });
 }
