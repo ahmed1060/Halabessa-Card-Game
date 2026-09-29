@@ -95,22 +95,29 @@ class _FannedHandWidgetState extends State<FannedHandWidget> {
       final available = constraints.hasBoundedWidth
           ? constraints.maxWidth : MediaQuery.sizeOf(context).width;
       final compact = constraints.hasBoundedHeight && constraints.maxHeight < 145;
+      // Reserve a four-card fan even after a play. Otherwise the Stack itself
+      // recenters immediately and every remaining card appears to jump.
       final width = math.min(compact ? 60.0 : 80.0,
-          math.max(40.0, (available - 32) / math.min(widget.cards.length, 4)));
+          math.max(40.0, (available - 32) / 4));
       final height = width * 1.43;
-      final spacing = widget.cards.length == 1 ? 0.0 :
-          math.min(width + 8, math.max(0.0, (available - 16 - width) / (widget.cards.length - 1)));
+      final spacing = math.min(width + 8,
+          math.max(0.0, (available - 16 - width) / 3));
+      final fanWidth = width + spacing * 3;
       final totalWidth = width + spacing * (widget.cards.length - 1);
+      final firstCardLeft = (fanWidth - totalWidth) / 2;
       final reducedMotion = MediaQuery.disableAnimationsOf(context);
       return Center(
         heightFactor: 1,
         child: SizedBox(
-          width: totalWidth, height: height + 28,
+          width: fanWidth, height: height + 28,
           child: Stack(children: [
             for (var index = 0; index < widget.cards.length; index++)
-              Positioned(
-                key: ValueKey(widget.cards[index].firebaseKey),
-                left: index * spacing, bottom: 8,
+              AnimatedPositioned(
+                key: ValueKey('hand-slot-${widget.cards[index].firebaseKey}'),
+                duration: reducedMotion ? Duration.zero :
+                    const Duration(milliseconds: 180),
+                curve: Curves.easeOutCubic,
+                left: firstCardLeft + index * spacing, bottom: 8,
                 child: Builder(builder: (cardContext) {
                   final card = widget.cards[index];
                   final selected = _queued == card;

@@ -102,6 +102,22 @@ void main() {
     expect(tester.getRect(last).center.dy, greaterThan(lastStart.dy));
   });
 
+  testWidgets('remaining cards glide into place after a play', (tester) async {
+    await tester.pumpWidget(hand(true, (_, __) {}));
+    await tester.pumpAndSettle();
+    final before = tester.getRect(card(1)).center;
+    await tester.pumpWidget(hand(true, (_, __) {},
+      values: [cards[0], cards[1], cards[3]]));
+    final atStart = tester.getRect(card(1)).center;
+    await tester.pump(const Duration(milliseconds: 90));
+    final midway = tester.getRect(card(1)).center;
+    await tester.pumpAndSettle();
+    final settled = tester.getRect(card(1)).center;
+    expect(atStart.dx, closeTo(before.dx, 1));
+    expect(midway.dx, greaterThan(atStart.dx));
+    expect(midway.dx, lessThan(settled.dx));
+  });
+
   testWidgets('keyboard focus and Enter play a card', (tester) async {
     final played = <game.Card>[];
     await tester.pumpWidget(hand(true, (value, _) => played.add(value)));
