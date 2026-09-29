@@ -55,6 +55,7 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
   void initState() {
     super.initState();
     _confettiController = ConfettiController(duration: const Duration(seconds: 5));
+    ref.read(localPlayOriginsProvider.notifier).state = {};
     
     // Start Room Music
     WidgetsBinding.instance.addPostFrameCallback((_) {

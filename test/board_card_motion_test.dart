@@ -16,14 +16,14 @@ void main() {
 
   testWidgets('card arrives once from its seat and settles on the table', (tester) async {
     await tester.pumpWidget(scene());
-    final start = tester.getTopLeft(find.byKey(const ValueKey('card')));
+    final start = tester.getRect(find.byKey(const ValueKey('card'))).center;
     await tester.pumpAndSettle();
-    final settled = tester.getTopLeft(find.byKey(const ValueKey('card')));
+    final settled = tester.getRect(find.byKey(const ValueKey('card'))).center;
     expect(start.dx - settled.dx, closeTo(100, 1));
     expect(start.dy - settled.dy, closeTo(-80, 1));
 
     await tester.pumpWidget(scene());
-    expect(tester.getTopLeft(find.byKey(const ValueKey('card'))), settled);
+    expect(tester.getRect(find.byKey(const ValueKey('card'))).center, settled);
   });
 
   testWidgets('reduced motion places the card immediately', (tester) async {

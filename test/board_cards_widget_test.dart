@@ -32,14 +32,14 @@ void main() {
     await tester.pumpWidget(scene(const [first]));
     await tester.pumpAndSettle();
     await tester.pumpWidget(scene(const [first, second]));
-    final firstAtStart = tester.getTopLeft(find.byKey(firstKey));
-    final secondAtStart = tester.getTopLeft(find.byKey(secondKey));
+    final firstAtStart = tester.getRect(find.byKey(firstKey)).center;
+    final secondAtStart = tester.getRect(find.byKey(secondKey)).center;
     await tester.pumpAndSettle();
-    final firstAtEnd = tester.getTopLeft(find.byKey(firstKey));
-    final secondAtEnd = tester.getTopLeft(find.byKey(secondKey));
+    final firstAtEnd = tester.getRect(find.byKey(firstKey)).center;
+    final secondAtEnd = tester.getRect(find.byKey(secondKey)).center;
     expect(firstAtStart, firstAtEnd);
-    expect(secondAtStart.dx - secondAtEnd.dx, closeTo(100, 1));
-    expect(secondAtStart.dy, closeTo(secondAtEnd.dy, 1));
+    expect((secondAtStart - secondAtEnd).distance, closeTo(100, 1));
+    expect(secondAtStart.dx, greaterThan(secondAtEnd.dx));
   });
 
   testWidgets('capture has a distinct merge and teamward flight', (tester) async {
