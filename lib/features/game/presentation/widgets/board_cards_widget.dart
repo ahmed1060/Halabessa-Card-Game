@@ -67,6 +67,8 @@ class BoardCardsWidget extends StatelessWidget {
     final captureFlight = isCapturing && capturingStage > 0;
     final motionDuration = reducedMotion ? Duration.zero :
         const Duration(milliseconds: 300);
+    final reflowDuration = reducedMotion ? Duration.zero :
+        const Duration(milliseconds: 240);
 
     return Center(
       child: Stack(
@@ -94,6 +96,7 @@ class BoardCardsWidget extends StatelessWidget {
             // The pile compresses on capture, then travels toward the winning
             // team. New cards independently arrive from their player's seat.
             AnimatedSlide(
+              key: const ValueKey('capture-flight'),
               duration: motionDuration,
               curve: Curves.easeInOutCubic,
               offset: captureFlight
@@ -111,7 +114,7 @@ class BoardCardsWidget extends StatelessWidget {
                     height: cardHeight * 1.6,
                     child: Stack(alignment: Alignment.center,
                       clipBehavior: Clip.none,
-                      children: _buildCardStack(cardWidth, cardHeight)),
+                      children: _buildCardStack(cardWidth, cardHeight, reflowDuration)),
                   ),
                 ),
               ),
@@ -163,7 +166,25 @@ class BoardCardsWidget extends StatelessWidget {
     child: child,
   );
 
-  List<Widget> _buildCardStack(double width, double height) {
+  Widget _positionedCard(game_card.Card card, double width, double height,
+      Offset position, double angle, Widget child, Duration duration) =>
+    KeyedSubtree(
+      key: ValueKey('board-slot-${card.firebaseKey}'),
+      child: AnimatedSlide(
+        key: ValueKey('board-position-${card.firebaseKey}'),
+        duration: duration,
+        curve: Curves.easeOutCubic,
+        offset: Offset(position.dx / width, position.dy / height),
+        child: AnimatedRotation(
+          duration: duration,
+          curve: Curves.easeOutCubic,
+          turns: angle / (2 * pi),
+          child: _arrivingCard(card, child),
+        ),
+      ),
+    );
+
+  List<Widget> _buildCardStack(double width, double height, Duration reflowDuration) {
     // If 4 or fewer cards, fan them out horizontally with nice spacing
     final count = cards.length;
     final List<Widget> cardWidgets = [];
@@ -179,16 +200,9 @@ class BoardCardsWidget extends StatelessWidget {
         // Pre-defined subtle angles for natural Egyptian card table feel
         final angle = (i - (count - 1) / 2) * 0.08;
 
-        cardWidgets.add(
-          KeyedSubtree(key: ValueKey('board-slot-${card.firebaseKey}'), child: Transform.translate(
-            offset: Offset(xOffset, 0),
-            child: Transform.rotate(
-              angle: angle,
-              child: _arrivingCard(card,
-                _buildCardWithHighlight(card, width, height, isTop)),
-            ),
-          )),
-        );
+        cardWidgets.add(_positionedCard(card, width, height,
+          Offset(xOffset, 0), angle,
+          _buildCardWithHighlight(card, width, height, isTop), reflowDuration));
       }
     } else {
       // Pile of cards: show previous cards clustered, and the top card cleanly on top
@@ -202,29 +216,18 @@ class BoardCardsWidget extends StatelessWidget {
         final pseudoRandomX = (((i * 13) % 21) - 10) * 1.5;
         final pseudoRandomY = (((i * 11) % 15) - 7) * 1.2;
 
-        cardWidgets.add(
-          KeyedSubtree(key: ValueKey('board-slot-${card.firebaseKey}'), child: Transform.translate(
-            offset: Offset(pseudoRandomX, pseudoRandomY),
-            child: Transform.rotate(
-              angle: pseudoRandomAngle,
-              child: _arrivingCard(card, Opacity(
-                opacity: 0.85,
-                child: _card(card, width, height),
-              )),
-            ),
-          )),
-        );
+        cardWidgets.add(_positionedCard(card, width, height,
+          Offset(pseudoRandomX, pseudoRandomY), pseudoRandomAngle,
+          Opacity(opacity: 0.85, child: _card(card, width, height)),
+          reflowDuration));
       }
 
       // Top card (active card to match)
       final topCard = cards.last;
-      cardWidgets.add(
-        KeyedSubtree(key: ValueKey('board-slot-${topCard.firebaseKey}'), child: Transform.translate(
-          offset: const Offset(0, 0),
-          child: _arrivingCard(topCard,
-            _buildCardWithHighlight(topCard, width, height, true)),
-        )),
-      );
+      cardWidgets.add(_positionedCard(topCard, width, height,
+        Offset.zero, 0,
+        _buildCardWithHighlight(topCard, width, height, true),
+        reflowDuration));
     }
 
     return cardWidgets;

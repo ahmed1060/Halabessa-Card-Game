@@ -6,9 +6,11 @@ class BoardCardMotion extends StatefulWidget {
   final Offset origin;
   final Widget child;
   final Duration delay;
+  final double initialOpacity;
 
   const BoardCardMotion({super.key, required this.origin,
-    this.delay = Duration.zero, required this.child});
+    this.delay = Duration.zero, this.initialOpacity = 0.75,
+    required this.child});
 
   @override
   State<BoardCardMotion> createState() => _BoardCardMotionState();
@@ -50,7 +52,11 @@ class _BoardCardMotionState extends State<BoardCardMotion>
         offset: widget.origin * (1 - progress),
         child: Transform.scale(
           scale: 0.84 + 0.16 * progress,
-          child: Opacity(opacity: progress, child: child),
+          child: Opacity(
+            opacity: widget.initialOpacity +
+                (1 - widget.initialOpacity) * progress,
+            child: child,
+          ),
         ),
       );
     },

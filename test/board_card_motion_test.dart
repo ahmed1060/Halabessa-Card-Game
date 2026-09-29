@@ -16,6 +16,9 @@ void main() {
 
   testWidgets('card arrives once from its seat and settles on the table', (tester) async {
     await tester.pumpWidget(scene());
+    expect(tester.widget<Opacity>(find.descendant(
+      of: find.byType(BoardCardMotion), matching: find.byType(Opacity),
+    )).opacity, closeTo(0.75, 0.01));
     final start = tester.getRect(find.byKey(const ValueKey('card'))).center;
     await tester.pumpAndSettle();
     final settled = tester.getRect(find.byKey(const ValueKey('card'))).center;

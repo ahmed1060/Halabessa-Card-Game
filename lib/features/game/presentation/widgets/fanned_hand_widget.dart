@@ -154,6 +154,7 @@ class _FannedHandWidgetState extends State<FannedHandWidget> {
                               key: ValueKey('hand-visual-${card.firebaseKey}'),
                               origin: const Offset(0, -42),
                               delay: Duration(milliseconds: index * 55),
+                              initialOpacity: 0,
                               // Keep the hit target fixed while only the
                               // dealt card artwork travels into the hand.
                               child: ExcludeSemantics(child: IgnorePointer(child:

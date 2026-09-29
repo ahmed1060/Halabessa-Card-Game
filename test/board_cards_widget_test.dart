@@ -28,18 +28,35 @@ void main() {
     ))),
   ));
 
-  testWidgets('a new play moves in without replaying settled cards', (tester) async {
+  testWidgets('a new play arrives while settled cards glide into the new fan', (tester) async {
     await tester.pumpWidget(scene(const [first]));
     await tester.pumpAndSettle();
+    final firstBefore = tester.getRect(find.byKey(firstKey)).center;
     await tester.pumpWidget(scene(const [first, second]));
     final firstAtStart = tester.getRect(find.byKey(firstKey)).center;
     final secondAtStart = tester.getRect(find.byKey(secondKey)).center;
+    expect(firstAtStart.dx, closeTo(firstBefore.dx, 1));
+    await tester.pump(const Duration(milliseconds: 120));
+    final firstMidway = tester.getRect(find.byKey(firstKey)).center;
     await tester.pumpAndSettle();
     final firstAtEnd = tester.getRect(find.byKey(firstKey)).center;
     final secondAtEnd = tester.getRect(find.byKey(secondKey)).center;
-    expect(firstAtStart, firstAtEnd);
+    expect(firstMidway.dx, lessThan(firstAtStart.dx));
+    expect(firstMidway.dx, greaterThan(firstAtEnd.dx));
+    expect((firstAtStart - firstAtEnd).distance, closeTo(64 * 0.225, 1));
     expect((secondAtStart - secondAtEnd).distance, closeTo(100, 1));
     expect(secondAtStart.dx, greaterThan(secondAtEnd.dx));
+  });
+
+  testWidgets('reduced motion settles the fan immediately', (tester) async {
+    await tester.pumpWidget(scene(const [first], reduceMotion: true));
+    await tester.pumpWidget(scene(const [first, second], reduceMotion: true));
+    final firstAtStart = tester.getRect(find.byKey(firstKey)).center;
+    await tester.pump(const Duration(milliseconds: 120));
+    expect(tester.getRect(find.byKey(firstKey)).center, firstAtStart);
+    expect(tester.widget<AnimatedSlide>(
+      find.byKey(const ValueKey('board-position-hearts_two'))).duration,
+      Duration.zero);
   });
 
   testWidgets('capture has a distinct merge and teamward flight', (tester) async {
@@ -47,7 +64,8 @@ void main() {
     expect(tester.widget<AnimatedScale>(find.byType(AnimatedScale)).scale, 0.84);
     await tester.pumpAndSettle();
     await tester.pumpWidget(scene(const [first, second], capture: true, stage: 1));
-    expect(tester.widget<AnimatedSlide>(find.byType(AnimatedSlide)).offset,
+    expect(tester.widget<AnimatedSlide>(
+      find.byKey(const ValueKey('capture-flight'))).offset,
         const Offset(0, 1.3));
     await tester.pumpAndSettle();
     expect(tester.widget<AnimatedOpacity>(find.byType(AnimatedOpacity)).opacity,
