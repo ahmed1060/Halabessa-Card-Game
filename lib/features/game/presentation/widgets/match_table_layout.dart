@@ -70,9 +70,8 @@ class MatchTableLayout extends StatelessWidget {
               constraints: const BoxConstraints(maxWidth: 980),
               child: SizedBox(height: arenaHeight, child: arena),
             )),
-            Center(child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 980),
-              child: tray,
+            Center(child: SizedBox(
+              width: math.min(980, bounds.maxWidth), child: tray,
             )),
           ] else if (wide)
             Row(crossAxisAlignment: CrossAxisAlignment.center, children: [

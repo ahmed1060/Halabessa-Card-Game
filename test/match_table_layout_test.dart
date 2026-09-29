@@ -111,6 +111,29 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('landscape tray keeps its width before and after dealing', (tester) async {
+    const size = Size(1280, 720);
+    await tester.binding.setSurfaceSize(size);
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    Widget table(Widget hand) => MaterialApp(home: MediaQuery(
+      data: const MediaQueryData(size: size),
+      child: Scaffold(body: MatchTableLayout(
+        header: const SizedBox(height: 80), partner: const SizedBox(),
+        leftOpponent: const SizedBox(), rightOpponent: const SizedBox(),
+        board: const SizedBox(height: 200, width: 230),
+        status: const Text('Waiting'), hand: hand,
+        controls: const SizedBox(height: 48),
+      )),
+    ));
+    await tester.pumpWidget(table(const SizedBox.shrink()));
+    final before = tester.getRect(find.byKey(const ValueKey('table-hand-tray')));
+    await tester.pumpWidget(table(const SizedBox(height: 110, width: 280)));
+    final after = tester.getRect(find.byKey(const ValueKey('table-hand-tray')));
+    expect(before.width, 980);
+    expect(after.width, before.width);
+    expect(after.center.dx, before.center.dx);
+  });
+
   testWidgets('solo-practice label has no room-code copy affordance', (tester) async {
     await tester.pumpWidget(const MaterialApp(home: Scaffold(body: MatchScoreBar(
       firstLabel: 'Our team', secondLabel: 'Their team',
