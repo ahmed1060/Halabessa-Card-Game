@@ -81,7 +81,7 @@ class MatchTableLayout extends StatelessWidget {
             ])
           else ...[
             SizedBox(height: arenaHeight, child: arena),
-            tray,
+            SizedBox(width: bounds.maxWidth, child: tray),
           ],
           Material(color: TableStyle.ink, child: controls),
         ]),
