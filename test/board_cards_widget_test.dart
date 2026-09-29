@@ -10,12 +10,14 @@ void main() {
   const secondKey = ValueKey('card-clubs_king');
 
   Widget scene(List<game_card.Card> cards, {bool capture = false,
-      int stage = 0, bool reduceMotion = false}) => MaterialApp(home: MediaQuery(
+      int stage = 0, bool reduceMotion = false, String? captureLabel}) =>
+      MaterialApp(home: MediaQuery(
     data: MediaQueryData(disableAnimations: reduceMotion),
     child: Scaffold(body: Center(child: SizedBox(width: 230, height: 200,
       child: BoardCardsWidget(
         cards: cards, isCapturing: capture, capturingStage: stage,
         captureToBottom: true,
+        captureLabel: captureLabel,
         arrivalOffsets: const {
           'hearts_two': Offset(0, 100),
           'clubs_king': Offset(100, 0),
@@ -70,5 +72,29 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.widget<AnimatedOpacity>(find.byType(AnimatedOpacity)).opacity,
         0.12);
+  });
+
+  testWidgets('capture names the collector and card count once', (tester) async {
+    const label = 'My Team · Cards: 3';
+    await tester.pumpWidget(scene(const [first, second], capture: true,
+      captureLabel: label));
+    expect(find.text(label), findsOneWidget);
+    await tester.pumpAndSettle();
+    await tester.pumpWidget(scene(const [first, second], capture: true,
+      stage: 1, captureLabel: label));
+    final cue = find.byKey(ValueKey('capture-cue-$label'));
+    expect(tester.widget<Opacity>(find.descendant(
+      of: cue, matching: find.byType(Opacity))).opacity, 1);
+    await tester.pumpWidget(scene(const [first, second],
+      captureLabel: label));
+    expect(find.text(label), findsNothing);
+  });
+
+  testWidgets('capture cue respects reduced motion', (tester) async {
+    await tester.pumpWidget(scene(const [first, second], capture: true,
+      captureLabel: 'Cards: 3', reduceMotion: true));
+    expect(tester.widget<TweenAnimationBuilder<double>>(
+      find.byKey(const ValueKey('capture-cue-Cards: 3'))).duration,
+      Duration.zero);
   });
 }

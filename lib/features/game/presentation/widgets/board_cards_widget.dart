@@ -1,11 +1,11 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:easy_localization/easy_localization.dart';
 import '../../domain/models/card.dart' as game_card;
 import '../../domain/models/match_state.dart';
 import '../../../../core/theme/theme_config.dart';
 import 'card_widget.dart';
 import 'board_card_motion.dart';
+import 'table_style.dart';
 
 class BoardCardsWidget extends StatelessWidget {
   final List<game_card.Card> cards;
@@ -15,6 +15,7 @@ class BoardCardsWidget extends StatelessWidget {
   final int capturingStage;
   final Map<String, Offset> arrivalOffsets;
   final bool captureToBottom;
+  final String? captureLabel;
   final Widget Function(game_card.Card, double, double)? cardBuilder;
 
   const BoardCardsWidget({
@@ -26,6 +27,7 @@ class BoardCardsWidget extends StatelessWidget {
     this.capturingStage = 0,
     this.arrivalOffsets = const {},
     this.captureToBottom = false,
+    this.captureLabel,
     this.cardBuilder,
   });
 
@@ -119,6 +121,39 @@ class BoardCardsWidget extends StatelessWidget {
                 ),
               ),
             ),
+
+            if (isCapturing && captureLabel != null && captureLabel!.isNotEmpty)
+              Positioned(
+                top: -48,
+                child: TweenAnimationBuilder<double>(
+                  key: ValueKey('capture-cue-$captureLabel'),
+                  tween: Tween(begin: 0, end: 1),
+                  duration: reducedMotion ? Duration.zero :
+                      const Duration(milliseconds: 180),
+                  builder: (context, progress, child) => Transform.translate(
+                    offset: Offset(0, 8 * (1 - progress)),
+                    child: Opacity(opacity: progress, child: child),
+                  ),
+                  child: Semantics(
+                    liveRegion: true,
+                    label: captureLabel,
+                    excludeSemantics: true,
+                    child: Container(
+                      constraints: const BoxConstraints(maxWidth: 220),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                      decoration: BoxDecoration(
+                        color: TableStyle.ink,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: TableStyle.brass.withOpacity(0.7)),
+                      ),
+                      child: Text(captureLabel!, textAlign: TextAlign.center,
+                        maxLines: 2, overflow: TextOverflow.ellipsis,
+                        style: TableStyle.detail.copyWith(color: TableStyle.ivory,
+                          fontWeight: FontWeight.w600)),
+                    ),
+                  ),
+                ),
+              ),
 
             // Card Count Badge (if more than 3 cards on table)
             if (cards.length > 3)

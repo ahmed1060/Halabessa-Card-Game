@@ -651,6 +651,14 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
       return Center(child: CardWidget(card: matchState.cutLastCard!, width: 96, height: 138));
     }
     final isCapturing = matchState.phase == GamePhase.capturing;
+    final collector = matchState.capturingTeam;
+    final viewerTeam = _getTeamOfPlayer(myUid, matchState.playerIds);
+    final collectorLabel = collector == null ? null :
+        (viewerTeam.isEmpty
+          ? (collector == 'teamA' ? 'team_a' : 'team_b')
+          : (collector == viewerTeam ? 'my_team' : 'opponent_team')).tr();
+    final capturedCount = matchState.capturingCards.isNotEmpty
+        ? matchState.capturingCards.length : matchState.board.length;
     final localOrigins = ref.watch(localPlayOriginsProvider);
     final myIndex = matchState.playerIds.indexOf(myUid);
     final baseIndex = myIndex < 0 ? 0 : myIndex;
@@ -683,6 +691,9 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
       captureToBottom: matchState.capturingTeam ==
           (_getTeamOfPlayer(myUid, matchState.playerIds).isEmpty
               ? 'teamA' : _getTeamOfPlayer(myUid, matchState.playerIds)),
+      captureLabel: isCapturing && collectorLabel != null
+          ? '$collectorLabel · ${'cards_count'.tr(args: [capturedCount.toString()])}'
+          : null,
     );
   }
 
