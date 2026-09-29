@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:halabessa/features/game/domain/models/card.dart' as game_card;
 import 'package:halabessa/features/game/presentation/widgets/card_widget.dart';
 import 'table_style.dart';
+import 'board_card_motion.dart';
 
 /// Bounded, keyboard-accessible hand. Queued cards use identity, not list index.
 class FannedHandWidget extends StatefulWidget {
@@ -149,10 +150,17 @@ class _FannedHandWidgetState extends State<FannedHandWidget> {
                             focusColor: TableStyle.brass.withOpacity(0.5),
                             onHover: (value) => setState(() => _hovered = value ? card : null),
                             onTap: widget.interactionEnabled && !_submitting ? activate : null,
-                            child: ExcludeSemantics(child: IgnorePointer(child:
-                              widget.cardBuilder?.call(card, width, height) ??
-                                  CardWidget(card: card, width: width, height: height),
-                            )),
+                            child: BoardCardMotion(
+                              key: ValueKey('hand-visual-${card.firebaseKey}'),
+                              origin: const Offset(0, -42),
+                              delay: Duration(milliseconds: index * 55),
+                              // Keep the hit target fixed while only the
+                              // dealt card artwork travels into the hand.
+                              child: ExcludeSemantics(child: IgnorePointer(child:
+                                widget.cardBuilder?.call(card, width, height) ??
+                                    CardWidget(card: card, width: width, height: height),
+                              )),
+                            ),
                           ),
                         ),
                       ),

@@ -18,7 +18,9 @@ void main() {
     child: Align(alignment: Alignment.bottomCenter,
       child: SizedBox(width: width, child: FannedHandWidget(
         cards: values, isMyTurn: myTurn, onCardTap: onTap, interactionEnabled: enabled,
-        cardBuilder: (_, width, height) => SizedBox(width: width, height: height),
+        cardBuilder: (card, width, height) => SizedBox(
+          key: ValueKey('visual-${card.firebaseKey}'),
+          width: width, height: height),
       )),
     ),
   )));
@@ -85,6 +87,19 @@ void main() {
     await tester.tap(card(0));
     await tester.drag(card(0), const Offset(0, -70));
     expect(played, isEmpty);
+  });
+
+  testWidgets('dealt cards enter the hand in a short sequence', (tester) async {
+    await tester.pumpWidget(hand(true, (_, __) {}));
+    final first = find.byKey(ValueKey('visual-${cards.first.firebaseKey}'));
+    final last = find.byKey(ValueKey('visual-${cards.last.firebaseKey}'));
+    final firstStart = tester.getRect(first).center;
+    final lastStart = tester.getRect(last).center;
+    await tester.pump(const Duration(milliseconds: 80));
+    expect(tester.getRect(first).center.dy, greaterThan(firstStart.dy));
+    expect(tester.getRect(last).center.dy, lastStart.dy);
+    await tester.pumpAndSettle();
+    expect(tester.getRect(last).center.dy, greaterThan(lastStart.dy));
   });
 
   testWidgets('keyboard focus and Enter play a card', (tester) async {

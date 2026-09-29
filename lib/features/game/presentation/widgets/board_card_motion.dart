@@ -5,8 +5,10 @@ import 'package:flutter/material.dart';
 class BoardCardMotion extends StatefulWidget {
   final Offset origin;
   final Widget child;
+  final Duration delay;
 
-  const BoardCardMotion({super.key, required this.origin, required this.child});
+  const BoardCardMotion({super.key, required this.origin,
+    this.delay = Duration.zero, required this.child});
 
   @override
   State<BoardCardMotion> createState() => _BoardCardMotionState();
@@ -16,7 +18,7 @@ class _BoardCardMotionState extends State<BoardCardMotion>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 320),
+    duration: Duration(milliseconds: 320 + widget.delay.inMilliseconds),
   );
 
   @override
@@ -40,7 +42,10 @@ class _BoardCardMotionState extends State<BoardCardMotion>
     animation: _controller,
     child: widget.child,
     builder: (context, child) {
-      final progress = Curves.easeOutCubic.transform(_controller.value);
+      final elapsed = _controller.value * (320 + widget.delay.inMilliseconds);
+      final travel = ((elapsed - widget.delay.inMilliseconds) / 320)
+          .clamp(0.0, 1.0).toDouble();
+      final progress = Curves.easeOutCubic.transform(travel);
       return Transform.translate(
         offset: widget.origin * (1 - progress),
         child: Transform.scale(
