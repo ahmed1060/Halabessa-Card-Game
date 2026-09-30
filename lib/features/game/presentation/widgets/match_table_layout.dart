@@ -108,8 +108,8 @@ class MatchScoreBar extends StatelessWidget {
     child: Padding(padding: const EdgeInsets.fromLTRB(12, 8, 12, 2), child: Column(children: [
       Row(children: [
         Expanded(child: _score(firstLabel, firstScore)),
-        const Padding(padding: EdgeInsets.symmetric(horizontal: 12),
-          child: Text(':', style: TableStyle.label)),
+        Container(width: 1, height: 36, margin: const EdgeInsets.symmetric(horizontal: 10),
+          color: TableStyle.brass.withOpacity(0.45)),
         Expanded(child: _score(secondLabel, secondScore)),
       ]),
       Row(children: [
@@ -130,10 +130,12 @@ class MatchScoreBar extends StatelessWidget {
 
   Widget _score(String label, int score) => Semantics(
     label: '$label: $score', excludeSemantics: true,
-    child: Wrap(alignment: WrapAlignment.center, crossAxisAlignment: WrapCrossAlignment.center,
-      spacing: 10, children: [
-        Text(label, style: TableStyle.label, textAlign: TextAlign.center),
-        Text('$score', style: TableStyle.label.copyWith(fontSize: 24, fontWeight: FontWeight.bold)),
+    child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Text(label, maxLines: 1, overflow: TextOverflow.ellipsis,
+          style: TableStyle.detail.copyWith(color: TableStyle.muted),
+          textAlign: TextAlign.center),
+        Text('$score', style: TableStyle.label.copyWith(fontSize: 26,
+          fontWeight: FontWeight.bold, color: TableStyle.ivory)),
       ]),
   );
 }

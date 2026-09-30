@@ -52,6 +52,10 @@ class _TableSeatState extends State<TableSeat> {
           (widget.turnSeconds * 1000)).clamp(0.0, 1.0);
     return SizedBox(width: 110, height: 60 + 4 * lineHeight, child: Tooltip(
       message: [widget.name, widget.detail, if (widget.message != null) widget.message!].join('\n'),
+      decoration: BoxDecoration(color: TableStyle.ink,
+        border: Border.all(color: TableStyle.brass.withOpacity(0.5)),
+        borderRadius: BorderRadius.circular(8)),
+      textStyle: TableStyle.detail.copyWith(color: TableStyle.ivory),
       child: Material(color: Colors.transparent, child: InkWell(
         onTap: widget.onPressed, borderRadius: BorderRadius.circular(12),
         focusColor: TableStyle.brass.withOpacity(0.4),

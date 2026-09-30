@@ -210,4 +210,29 @@ void main() {
     expect(find.text('Solo Practice'), findsOneWidget);
     expect(find.byIcon(Icons.copy_outlined), findsNothing);
   });
+
+  testWidgets('scoreboard separates labelled scores without punctuation', (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: Scaffold(body: MatchScoreBar(
+      firstLabel: 'Our team', secondLabel: 'Their team',
+      firstScore: 12, secondScore: 8, details: 'Round 2',
+      roomLabel: 'Solo Practice', onCopyRoom: null,
+    ))));
+    expect(find.text(':'), findsNothing);
+    expect(find.text('12'), findsOneWidget);
+    expect(find.text('8'), findsOneWidget);
+    final firstScore = tester.getRect(find.text('12'));
+    final secondScore = tester.getRect(find.text('8'));
+    expect(firstScore.center.dx, lessThan(secondScore.center.dx));
+    expect(firstScore.center.dy, secondScore.center.dy);
+  });
+
+  testWidgets('seat tooltip uses table colors', (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: Scaffold(body: TableSeat(
+      name: 'Bot 1', detail: 'Playing now', active: true,
+    ))));
+    final tooltip = tester.widget<Tooltip>(find.byType(Tooltip));
+    final decoration = tooltip.decoration! as BoxDecoration;
+    expect(decoration.color, TableStyle.ink);
+    expect(tooltip.textStyle!.color, TableStyle.ivory);
+  });
 }
