@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:halabessa/core/services/multimedia_service.dart';
 import 'package:halabessa/features/game/domain/models/match_state.dart';
 import 'package:halabessa/features/game/domain/providers/game_providers.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class _AudioEvents extends ChangeNotifier implements MultimediaService {
   void playbackChanged() => notifyListeners();
@@ -58,5 +59,20 @@ void main() {
       expect(active.lastBoundMatchId, match.id);
     }
     expect(observed, isEmpty);
+  });
+
+  test('stale solo practice ID is rejected without binding to a server room', () async {
+    SharedPreferences.setMockInitialValues({'last_match_id': 'OFFLINE_123'});
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+    final notifier = container.read(matchStateProvider.notifier);
+
+    expect(await notifier.tryRecoverLastMatch(),
+        MatchRecoveryStart.offlinePracticeNotSaved);
+    expect(container.read(matchStateProvider), isNull);
+    expect(notifier.lastBoundMatchId, isNull);
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getString('last_match_id'), isNull);
+    expect(await notifier.tryRecoverLastMatch(), MatchRecoveryStart.noSavedMatch);
   });
 }

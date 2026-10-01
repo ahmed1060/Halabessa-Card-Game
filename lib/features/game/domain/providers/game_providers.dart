@@ -31,6 +31,8 @@ final multiplayerSyncServiceProvider = Provider<MultiplayerSyncService>((ref) {
 
 final localPlayOriginsProvider = StateProvider<Map<String, Offset>>((ref) => {});
 
+enum MatchRecoveryStart { listening, noSavedMatch, offlinePracticeNotSaved }
+
 class MatchStateNotifier extends StateNotifier<MatchState?> {
   final Ref ref;
 
@@ -184,13 +186,20 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     await prefs.remove(_matchIdKey);
   }
 
-  Future<void> tryRecoverLastMatch() async {
+  Future<MatchRecoveryStart> tryRecoverLastMatch() async {
     final prefs = await SharedPreferences.getInstance();
     final lastId = prefs.getString(_matchIdKey);
-    if (lastId != null && state == null) {
-      if (kDebugMode) debugPrint('RECOVERY: Attempting to recover match $lastId');
-       bindToMatch(lastId);
+    if (state != null) return MatchRecoveryStart.listening;
+    if (lastId == null) return MatchRecoveryStart.noSavedMatch;
+    // Solo Practice lives only in memory. Its ID is not a server room and
+    // binding it after a browser reload can never produce a match state.
+    if (lastId.startsWith('OFFLINE_')) {
+      await prefs.remove(_matchIdKey);
+      return MatchRecoveryStart.offlinePracticeNotSaved;
     }
+    if (kDebugMode) debugPrint('RECOVERY: Attempting to recover match $lastId');
+    bindToMatch(lastId);
+    return MatchRecoveryStart.listening;
   }
 
   void leaveMatch() {

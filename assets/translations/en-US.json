@@ -10,6 +10,8 @@
 "recovery_loading": "Reconnecting to your match",
 "recovery_unavailable": "The match has not loaded",
 "recovery_explanation": "You can retry the connection or return to the lobby.",
+"recovery_practice_restart": "Solo Practice can't resume after a refresh. Start a new match.",
+"recovery_no_saved_match": "No match is available to reconnect. Start a new match.",
 "table_playing": "Playing now",
 "table_round_target": "Round {} · First to {}",
 "table_tap_to_play": "Your turn — tap a card to play",

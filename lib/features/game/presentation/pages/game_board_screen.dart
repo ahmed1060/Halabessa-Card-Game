@@ -33,6 +33,7 @@ import '../widgets/emote_wheel_overlay.dart';
 import 'package:flutter/services.dart';
 import 'package:halabessa/core/services/multimedia_service.dart';
 import 'package:halabessa/core/utils/error_handler.dart';
+import 'package:halabessa/core/routes/app_routes.dart';
 import '../widgets/unity_game_view.dart';
 import '../providers/unity_communication_service.dart';
 import '../providers/unity_layer_provider.dart';
@@ -50,6 +51,10 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
   late ConfettiController _confettiController;
   final GlobalKey _boardKey = GlobalKey();
   bool _isEmoteWheelOpen = false;
+
+  void _returnToHome() {
+    Navigator.of(context).pushNamedAndRemoveUntil(AppRoutes.initial, (_) => false);
+  }
 
   @override
   void initState() {
@@ -198,7 +203,7 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
              SnackBar(content: Text('room_expired'.tr()))
            );
            ref.read(matchStateProvider.notifier).leaveMatch();
-           Navigator.of(context).popUntil((route) => route.isFirst);
+           _returnToHome();
          }
        });
        return const Scaffold(body: Center(child: CircularProgressIndicator()));
@@ -211,11 +216,18 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
         unavailableTitle: 'recovery_unavailable'.tr(),
         explanation: 'recovery_explanation'.tr(),
         retryLabel: 'retry_action'.tr(), exitLabel: 'return_home'.tr(),
-        onRetry: currentUser == null ? null :
-            () => ref.read(matchStateProvider.notifier).tryRecoverLastMatch(),
+        onRetry: currentUser == null ? null : () async {
+          final result = await ref.read(matchStateProvider.notifier).tryRecoverLastMatch();
+          if (!mounted || result == MatchRecoveryStart.listening) return;
+          ref.read(matchStateProvider.notifier).leaveMatch();
+          final messenger = ScaffoldMessenger.of(context);
+          _returnToHome();
+          messenger.showSnackBar(SnackBar(content: Text((result == MatchRecoveryStart.offlinePracticeNotSaved
+              ? 'recovery_practice_restart' : 'recovery_no_saved_match').tr())));
+        },
         onExit: () {
           ref.read(matchStateProvider.notifier).leaveMatch();
-          Navigator.of(context).popUntil((route) => route.isFirst);
+          _returnToHome();
         },
       );
     }
@@ -770,7 +782,7 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
           mode: state.mode, maxPoints: state.maxPoints) : null,
       onHome: () {
         ref.read(matchStateProvider.notifier).leaveMatch();
-        Navigator.of(context).popUntil((route) => route.isFirst);
+        _returnToHome();
       },
     );
   }

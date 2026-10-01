@@ -10,6 +10,8 @@
 "recovery_loading": "جارٍ إعادة الاتصال بالمباراة",
 "recovery_unavailable": "لم تُحمّل المباراة بعد",
 "recovery_explanation": "يمكنك إعادة المحاولة أو العودة إلى القائمة الرئيسية.",
+"recovery_practice_restart": "التمرين الفردي مش بيرجع بعد تحديث الصفحة. ابدأ مباراة جديدة.",
+"recovery_no_saved_match": "مفيش مباراة محفوظة ترجع لها. ابدأ مباراة جديدة.",
 "table_playing": "يلعب الآن",
 "table_round_target": "الجولة {} · الفوز عند {}",
 "table_tap_to_play": "دورك — اضغط على ورقة للعب",
