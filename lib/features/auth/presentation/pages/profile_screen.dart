@@ -75,7 +75,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final currentXP = user.points % 1000;
 
     // Username editing remains available through the profile actions.
-    return Scaffold(
+    return LanternPageFrame(child: Scaffold(
       backgroundColor: Colors.transparent,
       appBar: AppBar(
         toolbarHeight: 116,
@@ -293,7 +293,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   showDialog(
                     context: context,
                     builder: (ctx) => AlertDialog(
-                      backgroundColor: Colors.transparent,
+                      backgroundColor: const Color(0xFF192638),
                       title: Text('log_out'.tr(), style: const TextStyle(color: Colors.white)),
                       content: Text('log_out_confirm'.tr(), style: const TextStyle(color: Colors.white70)),
                       actions: [
@@ -317,7 +317,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           ),
         ),
       ),
-    );
+    ));
   }
 
   Widget _buildDailyStreakBanner(BuildContext context, DailyStreakStatus? status) {
