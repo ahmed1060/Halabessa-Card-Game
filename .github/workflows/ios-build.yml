@@ -127,6 +127,29 @@ jobs:
               # Note: Codesigning requires certificates/profiles in GitHub Secrets.
               # This step verifies the code compiles for iOS in a CI environment.
 
+            - name: Package unsigned IPA for personal device testing
+              # Package on macOS before uploading: artifact ZIPs do not retain
+              # executable permissions. This IPA still needs device signing
+              # using the tester's own Apple account; it is not a store upload.
+              run: |
+                  set -euo pipefail
+                  test -f build/ios/iphoneos/Runner.app/Runner
+                  mkdir -p build/ios/ipa-staging/Payload
+                  ditto build/ios/iphoneos/Runner.app build/ios/ipa-staging/Payload/Runner.app
+                  cd build/ios/ipa-staging
+                  zip -q -r -y ../Halabessa-unsigned.ipa Payload
+                  unzip -tq ../Halabessa-unsigned.ipa
+                  unzip -Z1 ../Halabessa-unsigned.ipa | grep -Fx 'Payload/Runner.app/Runner'
+                  unzip -Z1 ../Halabessa-unsigned.ipa | grep -Fx 'Payload/Runner.app/Info.plist'
+
+            - name: Upload unsigned IPA
+              uses: actions/upload-artifact@v4
+              with:
+                  name: halabessa-ios-unsigned-ipa
+                  path: build/ios/Halabessa-unsigned.ipa
+                  if-no-files-found: error
+                  retention-days: 7
+
             - name: Upload iOS Build
               uses: actions/upload-artifact@v4
               with:
