@@ -3,30 +3,30 @@
     "short_name": "Halabessa",
     "start_url": ".",
     "display": "fullscreen",
-    "background_color": "#0D1B2A",
-    "theme_color": "#0D1B2A",
+    "background_color": "#3B274C",
+    "theme_color": "#3B274C",
     "description": "Halabessa - The ultimate Egyptian card game experience.",
     "orientation": "any",
     "prefer_related_applications": false,
     "icons": [
         {
-            "src": "icons/Icon-192.png",
+            "src": "icons/halabessa-lantern-192-v1.png",
             "sizes": "192x192",
             "type": "image/png"
         },
         {
-            "src": "icons/Icon-512.png",
+            "src": "icons/halabessa-lantern-512-v1.png",
             "sizes": "512x512",
             "type": "image/png"
         },
         {
-            "src": "icons/Icon-maskable-192.png",
+            "src": "icons/halabessa-lantern-maskable-192-v1.png",
             "sizes": "192x192",
             "type": "image/png",
             "purpose": "maskable"
         },
         {
-            "src": "icons/Icon-maskable-512.png",
+            "src": "icons/halabessa-lantern-maskable-512-v1.png",
             "sizes": "512x512",
             "type": "image/png",
             "purpose": "maskable"
