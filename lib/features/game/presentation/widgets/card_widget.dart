@@ -4,6 +4,7 @@ import 'package:playing_cards/playing_cards.dart';
 
 import '../../domain/models/card.dart' as game_card;
 import '../../../home/presentation/providers/store_provider.dart';
+import 'lantern_card_art.dart';
 
 class CardWidget extends ConsumerWidget {
   final game_card.Card card;
@@ -42,6 +43,9 @@ class CardWidget extends ConsumerWidget {
     final notifier = ref.watch(storeProvider.notifier);
     
     final targetSkinId = skinId ?? store.activeCardBackId;
+    if (targetSkinId == 'default_card' && customBackPath == null && customFrontPath == null && customAceSkinPath == null && customSevenDiamondSkinPath == null && faceIllustrations == null && customSuitIcons == null) {
+      return GestureDetector(onTap: onTap, child: LanternCardArt(card: card, faceUp: isFaceUp, width: width, height: height));
+    }
     final activeCard = notifier.allItems.firstWhere(
       (i) => i.id == targetSkinId, 
       orElse: () => notifier.allItems[0]

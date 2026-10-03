@@ -112,11 +112,13 @@ flutter:
 
   # To add assets to your application, add an assets section, like this:
   assets:
+    - assets/fonts/OFL-notices.txt
     - assets/translations/
     - assets/images/logo.png
     - assets/images/cards/premium/
     - assets/images/cards/neon/
     - assets/images/cards/royal/
+    - assets/images/cards/lantern/
     - assets/images/tables/
     - assets/images/items/
     - assets/images/avatars/
@@ -125,4 +127,13 @@ flutter:
     # asset directory -- assets/unity/ was a stale export target from the
     # old Halabessa/Export/WebGL (Brotli) command (see BuildScripts.cs).
 
-  # Fonts are provided via Google Fonts CDN in web/index.html to ensure Safari compatibility and avoid duplication errors.
+  fonts:
+    - family: LanternText
+      fonts:
+        - asset: assets/fonts/Cairo.ttf
+    - family: LanternArabic
+      fonts:
+        - asset: assets/fonts/Cairo.ttf
+    - family: LanternDisplay
+      fonts:
+        - asset: assets/fonts/Righteous-Regular.ttf

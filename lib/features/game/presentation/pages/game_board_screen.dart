@@ -23,6 +23,8 @@ import '../widgets/board_cards_widget.dart';
 import '../widgets/match_table_layout.dart';
 import '../widgets/table_seat.dart';
 import '../widgets/table_style.dart';
+import '../widgets/dealer_seat.dart';
+import '../widgets/team_capture_stack.dart';
 import '../widgets/match_phase_panel.dart';
 import '../widgets/match_choice_panel.dart';
 import '../widgets/match_result_view.dart';
@@ -267,7 +269,13 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
                         duration: is3DActive ? const Duration(milliseconds: 500) : Duration.zero,
                         opacity: is3DActive ? 0.0 : 1.0,
                         child: activeTable.id == 'default_table'
-                          ? const ColoredBox(color: TableStyle.felt)
+                          ? Image.asset(
+                              MediaQuery.sizeOf(context).width < MediaQuery.sizeOf(context).height
+                                  ? 'assets/images/tables/lantern_nights_portrait_v2.png'
+                                  : 'assets/images/tables/lantern_nights_v1.png',
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => const ColoredBox(color: TableStyle.felt),
+                            )
                           : activeTable.assetPath.startsWith('http')
                           ? Image.network(
                               activeTable.assetPath,
@@ -367,13 +375,21 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
       final active = playing && state.currentTurnIndex == _getAbsoluteIndex(state, myUid, offset);
       final message = ref.watch(lastMessageForUserProvider(user.uid))?.text ??
           _getPlayerEmoji(state, myUid, offset);
-      return TableSeat(
+      final seatWidget = TableSeat(
         name: user.displayName, avatarUrl: user.avatarUrl,
         isBot: user.uid.startsWith('bot_'), active: active,
         detail: active ? 'table_playing'.tr() : 'cards_count'.tr(args: [state.cardsRemainingFor(user.uid).toString()]),
         turnStarted: state.turnStartTime, turnSeconds: state.timerDurationSeconds,
         message: message,
         onPressed: () => _showPlayerProfile(context, ref, state, myUid, offset),
+      );
+      return DealerSeat(
+        seat: seatWidget,
+        isDealer: _getAbsoluteIndex(state, myUid, offset) == state.dealerIndex,
+        remaining: state.deckCount,
+        label: 'table_dealer'.tr(),
+        compact: offset == 1 || offset == 3,
+        backBuilder: _lanternCardBack,
       );
     }
 
@@ -390,8 +406,20 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
         },
       ),
       partner: seat(2), leftOpponent: seat(3), rightOpponent: seat(1),
-      board: SizedBox(key: _boardKey,
-        child: _buildBoardCenter(context, ref, state, myUid, isLandscape, is3DActive: show3DHand)),
+      board: SizedBox(
+        key: _boardKey,
+        child: Stack(fit: StackFit.expand, children: [
+          _buildBoardCenter(context, ref, state, myUid, isLandscape, is3DActive: show3DHand),
+          if (!show3DHand) ...[
+            Align(alignment: AlignmentDirectional.topStart, child: _buildTeamCaptureStack(
+              context, state, _getTeamOfPlayer(myUid, state.playerIds).isEmpty ? 'teamA' : _getTeamOfPlayer(myUid, state.playerIds),
+              'table_my_team'.tr(), TableStyle.mint)),
+            Align(alignment: AlignmentDirectional.topEnd, child: _buildTeamCaptureStack(
+              context, state, _getTeamOfPlayer(myUid, state.playerIds) == 'teamA' ? 'teamB' : 'teamA',
+              'table_rivals'.tr(), TableStyle.red, showLatest: false)),
+          ],
+        ]),
+      ),
       status: _buildTableStatus(state, myUid, isSpectator, myTurn),
       hand: isSpectator || show3DHand || (state.handCards[myUid]?.isEmpty ?? true)
         ? const SizedBox(height: 24)
@@ -488,6 +516,54 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
       textAlign: TextAlign.center,
       style: TableStyle.label.copyWith(color: myTurn ? TableStyle.brass : TableStyle.ivory),
     ));
+  }
+
+  Widget _lanternCardBack(double width, double height) => CardWidget(
+    card: const game_card.Card(game_card.Suit.hearts, game_card.Rank.ace),
+    isFaceUp: false,
+    width: width,
+    height: height,
+  );
+
+  Widget _buildTeamCaptureStack(BuildContext context, MatchState state,
+      String team, String label, Color accent, {bool showLatest = true}) {
+    final captures = state.harvestStacks[team] ?? const <Capture>[];
+    return Padding(
+      padding: const EdgeInsets.all(8),
+      child: TeamCaptureStack(
+        captures: captures,
+        label: label,
+        countLabel: 'table_capture_count'.tr(args: [captures.fold<int>(0, (sum, item) => sum + item.capturedCards.length).toString()]),
+        latestLabel: 'table_capture_card'.tr(),
+        historyLabel: 'table_capture_history'.tr(),
+        showLatest: showLatest,
+        accent: accent,
+        faceBuilder: (card, width, height) => CardWidget(card: card, width: width, height: height),
+        backBuilder: _lanternCardBack,
+        onHistory: showLatest ? () => _showTeamCaptureHistory(context, captures, label) : null,
+      ),
+    );
+  }
+
+  void _showTeamCaptureHistory(BuildContext context, List<Capture> captures, String label) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => SafeArea(
+        child: SizedBox(
+          height: MediaQuery.sizeOf(sheetContext).height * .7,
+          child: CaptureCardHistory(
+            captures: captures,
+            title: 'table_capture_cards'.tr(args: [label]),
+            explanation: 'table_capture_history_help'.tr(),
+            emptyLabel: 'table_no_round_captures'.tr(),
+            faceBuilder: (card, width, height) => CardWidget(card: card, width: width, height: height),
+            cardLabel: (card) => card.toString(),
+          ),
+        ),
+      ),
+    );
   }
 
   String _tablePhaseLabel(GamePhase phase) => switch (phase) {
