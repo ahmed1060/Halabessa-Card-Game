@@ -1,3 +1,4 @@
+import 'package:halabessa/core/widgets/lantern_page_frame.dart';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -62,10 +63,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final user = ref.watch(currentUserProvider);
 
     if (user == null) {
-      return Scaffold(
-        backgroundColor: ThemeConfig.darkBg,
+      return LanternPageFrame(child: Scaffold(
+        backgroundColor: Colors.transparent,
         body: Center(child: Text('not_logged_in'.tr(), style: const TextStyle(color: Colors.white))),
-      );
+      ));
     }
 
     final winRate = user.gamesPlayed > 0 ? (user.wins / user.gamesPlayed * 100).toStringAsFixed(1) : "0.0";
@@ -75,9 +76,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
     // Username editing remains available through the profile actions.
     return Scaffold(
-      backgroundColor: ThemeConfig.darkBg,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
-        title: Text('player_profile'.tr(), style: const TextStyle(fontFamily: ThemeConfig.fontHeading)),
+        toolbarHeight: 116,
+        title: LanternPageTitle(title: 'player_profile'.tr()),
         backgroundColor: Colors.transparent,
         elevation: 0,
       ),
@@ -87,8 +89,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              ThemeConfig.darkBg,
-              Colors.black.withOpacity(0.85),
+              Colors.transparent,
+              Colors.transparent,
             ],
           ),
         ),
@@ -291,7 +293,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   showDialog(
                     context: context,
                     builder: (ctx) => AlertDialog(
-                      backgroundColor: ThemeConfig.darkBg,
+                      backgroundColor: Colors.transparent,
                       title: Text('log_out'.tr(), style: const TextStyle(color: Colors.white)),
                       content: Text('log_out_confirm'.tr(), style: const TextStyle(color: Colors.white70)),
                       actions: [
@@ -510,7 +512,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1B263B),
+        backgroundColor: const Color(0x00192638),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(24),
           side: BorderSide(color: item.color.withOpacity(item.isUnlocked ? 0.6 : 0.2), width: 1.5),
@@ -593,7 +595,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          backgroundColor: ThemeConfig.darkBg,
+          backgroundColor: Colors.transparent,
           title: Text('change_password_btn'.tr(), style: const TextStyle(color: Colors.white)),
           content: Column(
             mainAxisSize: MainAxisSize.min,
@@ -669,7 +671,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          backgroundColor: ThemeConfig.darkBg,
+          backgroundColor: Colors.transparent,
           title: Text('edit_display_name'.tr(), style: const TextStyle(color: Colors.white)),
           content: TextField(
             controller: nameController,
@@ -742,7 +744,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          backgroundColor: ThemeConfig.darkBg,
+          backgroundColor: Colors.transparent,
           title: Text('change_username_btn'.tr(), style: const TextStyle(color: Colors.white)),
           content: Column(
             mainAxisSize: MainAxisSize.min,
@@ -823,7 +825,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: ThemeConfig.darkBg,
+        backgroundColor: Colors.transparent,
         title: Text('username_change_ticket'.tr(), style: const TextStyle(color: Colors.white)),
         content: Text('no_tickets_message'.tr(), style: const TextStyle(color: Colors.white70)),
         actions: [

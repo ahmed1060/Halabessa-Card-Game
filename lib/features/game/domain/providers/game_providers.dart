@@ -1060,7 +1060,8 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
       // 1. Last Capture Rule
       if (board.isNotEmpty && currentState.lastCaptureTeam != null) {
          harvest[currentState.lastCaptureTeam!]?.add(Capture(
-           leadingCard: board.first, 
+           leadingCard: board.first,
+           isRoundAward: true,
            capturedCards: board.skip(1).toList(),
          ));
       }

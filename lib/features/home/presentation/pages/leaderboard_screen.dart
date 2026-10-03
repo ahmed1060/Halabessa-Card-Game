@@ -1,3 +1,4 @@
+import 'package:halabessa/core/widgets/lantern_page_frame.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -22,111 +23,109 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
     final leaderboardAsync = ref.watch(leaderboardProvider(_selectedCategory));
     final currentUser = ref.watch(currentUserProvider);
 
-    return Scaffold(
-      backgroundColor: const Color(0xFF0D1B2A),
-      appBar: AppBar(
+    return LanternPageFrame(
+      child: Scaffold(
         backgroundColor: Colors.transparent,
-        elevation: 0,
-        centerTitle: true,
-        title: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.emoji_events_rounded, color: ThemeConfig.goldAccent, size: 24),
-            const SizedBox(width: 8),
-            Text(
-              'leaderboard_title'.tr(),
-              style: const TextStyle(
-                fontFamily: ThemeConfig.fontHeading,
-                fontWeight: FontWeight.bold,
-                fontSize: 20,
-                letterSpacing: 1.2,
-                color: Colors.white,
-              ),
-            ),
-          ],
+        appBar: AppBar(
+          toolbarHeight: 116,
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          centerTitle: true,
+          title: LanternPageTitle(title: 'leaderboard_title'.tr()),
         ),
-      ),
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              const Color(0xFF0D1B2A),
-              const Color(0xFF1B263B).withOpacity(0.95),
+        body: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                const Color(0x003B274C),
+                const Color(0x00192638).withOpacity(0.95),
+              ],
+            ),
+          ),
+          child: Column(
+            children: [
+              const SizedBox(height: 8),
+              // Category Tabs
+              _buildCategoryTabs(),
+              const SizedBox(height: 14),
+
+              // Content: Podium + Scrollable List
+              Expanded(
+                child: leaderboardAsync.when(
+                  loading: () => const Center(
+                    child: CircularProgressIndicator(
+                      color: ThemeConfig.goldAccent,
+                    ),
+                  ),
+                  error: (err, stack) => Center(
+                    child: Text(
+                      'error_prefix'.tr(args: [err.toString()]),
+                      style: const TextStyle(color: Colors.white70),
+                    ),
+                  ),
+                  data: (users) {
+                    if (users.isEmpty) {
+                      return Center(
+                        child: Text(
+                          'no_results'.tr(),
+                          style: const TextStyle(color: Colors.white60),
+                        ),
+                      );
+                    }
+
+                    final top3 = users.take(3).toList();
+                    final rest = users.skip(3).toList();
+
+                    // Find user rank
+                    int myRank = -1;
+                    if (currentUser != null) {
+                      final idx = users.indexWhere(
+                        (u) => u.uid == currentUser.uid,
+                      );
+                      if (idx != -1) myRank = idx + 1;
+                    }
+
+                    return RefreshIndicator(
+                      color: ThemeConfig.goldAccent,
+                      onRefresh: () async {
+                        ref.invalidate(leaderboardProvider(_selectedCategory));
+                      },
+                      child: ListView(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
+                        physics: const BouncingScrollPhysics(),
+                        children: [
+                          // Top 3 Podium
+                          if (top3.isNotEmpty) _buildPodium(top3),
+                          const SizedBox(height: 24),
+
+                          // Ranked List (4..N)
+                          ...rest.asMap().entries.map((entry) {
+                            final rank = entry.key + 4;
+                            final player = entry.value;
+                            final isMe = currentUser?.uid == player.uid;
+                            return _buildPlayerRow(player, rank, isMe);
+                          }),
+                          const SizedBox(
+                            height: 90,
+                          ), // Spacing for sticky footer
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
             ],
           ),
         ),
-        child: Column(
-          children: [
-            const SizedBox(height: 8),
-            // Category Tabs
-            _buildCategoryTabs(),
-            const SizedBox(height: 14),
-
-            // Content: Podium + Scrollable List
-            Expanded(
-              child: leaderboardAsync.when(
-                loading: () => const Center(
-                  child: CircularProgressIndicator(color: ThemeConfig.goldAccent),
-                ),
-                error: (err, stack) => Center(
-                  child: Text(
-                    'error_prefix'.tr(args: [err.toString()]),
-                    style: const TextStyle(color: Colors.white70),
-                  ),
-                ),
-                data: (users) {
-                  if (users.isEmpty) {
-                    return Center(
-                      child: Text(
-                        'no_results'.tr(),
-                        style: const TextStyle(color: Colors.white60),
-                      ),
-                    );
-                  }
-
-                  final top3 = users.take(3).toList();
-                  final rest = users.skip(3).toList();
-
-                  // Find user rank
-                  int myRank = -1;
-                  if (currentUser != null) {
-                    final idx = users.indexWhere((u) => u.uid == currentUser.uid);
-                    if (idx != -1) myRank = idx + 1;
-                  }
-
-                  return RefreshIndicator(
-                    color: ThemeConfig.goldAccent,
-                    onRefresh: () async {
-                      ref.invalidate(leaderboardProvider(_selectedCategory));
-                    },
-                    child: ListView(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      physics: const BouncingScrollPhysics(),
-                      children: [
-                        // Top 3 Podium
-                        if (top3.isNotEmpty) _buildPodium(top3),
-                        const SizedBox(height: 24),
-
-                        // Ranked List (4..N)
-                        ...rest.asMap().entries.map((entry) {
-                          final rank = entry.key + 4;
-                          final player = entry.value;
-                          final isMe = currentUser?.uid == player.uid;
-                          return _buildPlayerRow(player, rank, isMe);
-                        }),
-                        const SizedBox(height: 90), // Spacing for sticky footer
-                      ],
-                    ),
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
+        bottomSheet: currentUser != null
+            ? _buildStickyUserRank(currentUser)
+            : null,
       ),
-      bottomSheet: currentUser != null ? _buildStickyUserRank(currentUser) : null,
     );
   }
 
@@ -141,15 +140,35 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
       ),
       child: Row(
         children: [
-          _buildTabButton(LeaderboardCategory.stars, 'tab_stars'.tr(), Icons.stars_rounded, ThemeConfig.goldAccent),
-          _buildTabButton(LeaderboardCategory.wins, 'tab_wins'.tr(), Icons.emoji_events_rounded, Colors.amber),
-          _buildTabButton(LeaderboardCategory.bestScore, 'tab_best_score'.tr(), Icons.local_fire_department_rounded, Colors.deepOrangeAccent),
+          _buildTabButton(
+            LeaderboardCategory.stars,
+            'tab_stars'.tr(),
+            Icons.stars_rounded,
+            ThemeConfig.goldAccent,
+          ),
+          _buildTabButton(
+            LeaderboardCategory.wins,
+            'tab_wins'.tr(),
+            Icons.emoji_events_rounded,
+            Colors.amber,
+          ),
+          _buildTabButton(
+            LeaderboardCategory.bestScore,
+            'tab_best_score'.tr(),
+            Icons.local_fire_department_rounded,
+            Colors.deepOrangeAccent,
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildTabButton(LeaderboardCategory category, String title, IconData icon, Color activeColor) {
+  Widget _buildTabButton(
+    LeaderboardCategory category,
+    String title,
+    IconData icon,
+    Color activeColor,
+  ) {
     final isSelected = _selectedCategory == category;
     return Expanded(
       child: GestureDetector(
@@ -163,17 +182,25 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
           duration: const Duration(milliseconds: 200),
           padding: const EdgeInsets.symmetric(vertical: 8),
           decoration: BoxDecoration(
-            color: isSelected ? activeColor.withOpacity(0.18) : Colors.transparent,
+            color: isSelected
+                ? activeColor.withOpacity(0.18)
+                : Colors.transparent,
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: isSelected ? activeColor.withOpacity(0.5) : Colors.transparent,
+              color: isSelected
+                  ? activeColor.withOpacity(0.5)
+                  : Colors.transparent,
               width: 1.2,
             ),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 16, color: isSelected ? activeColor : Colors.white54),
+              Icon(
+                icon,
+                size: 16,
+                color: isSelected ? activeColor : Colors.white54,
+              ),
               const SizedBox(width: 6),
               Text(
                 title,
@@ -289,7 +316,10 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
             ),
             Positioned(
               top: -16,
-              child: Text(crown, style: TextStyle(fontSize: isChampion ? 22 : 18)),
+              child: Text(
+                crown,
+                style: TextStyle(fontSize: isChampion ? 22 : 18),
+              ),
             ),
           ],
         ),
@@ -323,10 +353,7 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [
-                color.withOpacity(0.35),
-                color.withOpacity(0.08),
-              ],
+              colors: [color.withOpacity(0.35), color.withOpacity(0.08)],
             ),
             borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
             border: Border.all(color: color.withOpacity(0.4), width: 1.2),
@@ -353,13 +380,13 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: isMe 
+        color: isMe
             ? ThemeConfig.goldAccent.withOpacity(0.12)
             : Colors.white.withOpacity(0.04),
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: isMe 
-              ? ThemeConfig.goldAccent.withOpacity(0.5) 
+          color: isMe
+              ? ThemeConfig.goldAccent.withOpacity(0.5)
               : Colors.white.withOpacity(0.08),
           width: isMe ? 1.5 : 1,
         ),
@@ -403,14 +430,21 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
                     if (isMe) ...[
                       const SizedBox(width: 6),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 1,
+                        ),
                         decoration: BoxDecoration(
                           color: ThemeConfig.goldAccent,
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
                           'you_label'.tr(args: ['']),
-                          style: const TextStyle(color: Colors.black, fontSize: 9, fontWeight: FontWeight.bold),
+                          style: const TextStyle(
+                            color: Colors.black,
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                     ],
@@ -419,7 +453,10 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
                 if (player.username != null)
                   Text(
                     '@${player.username}',
-                    style: TextStyle(color: Colors.white.withOpacity(0.45), fontSize: 11),
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.45),
+                      fontSize: 11,
+                    ),
                   ),
               ],
             ),
@@ -438,7 +475,10 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
               ),
               Text(
                 '${(player.winRate * 100).toStringAsFixed(0)}% Win',
-                style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 10),
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.4),
+                  fontSize: 10,
+                ),
               ),
             ],
           ),
@@ -452,9 +492,12 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
 
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF1B263B),
+        color: const Color(0x00192638),
         border: Border(
-          top: BorderSide(color: ThemeConfig.goldAccent.withOpacity(0.4), width: 1.5),
+          top: BorderSide(
+            color: ThemeConfig.goldAccent.withOpacity(0.4),
+            width: 1.5,
+          ),
         ),
         boxShadow: [
           BoxShadow(
@@ -502,7 +545,9 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
               decoration: BoxDecoration(
                 color: ThemeConfig.goldAccent.withOpacity(0.15),
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: ThemeConfig.goldAccent.withOpacity(0.5)),
+                border: Border.all(
+                  color: ThemeConfig.goldAccent.withOpacity(0.5),
+                ),
               ),
               child: Text(
                 scoreStr,

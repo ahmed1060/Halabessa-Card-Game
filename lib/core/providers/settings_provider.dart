@@ -7,6 +7,7 @@ class SettingsState {
   final bool isMusicEnabled;
   final bool isHapticsEnabled;
   final bool is3DModeEnabled;
+  final bool reducedMotion;
   final double musicVolume;
   final double soundVolume;
   final String languageCode;
@@ -17,6 +18,7 @@ class SettingsState {
     this.isMusicEnabled = true,
     this.isHapticsEnabled = true,
     this.is3DModeEnabled = true,
+    this.reducedMotion = false,
     this.musicVolume = 1.0,
     this.soundVolume = 1.0,
     this.languageCode = 'en',
@@ -28,6 +30,7 @@ class SettingsState {
     bool? isMusicEnabled,
     bool? isHapticsEnabled,
     bool? is3DModeEnabled,
+    bool? reducedMotion,
     double? musicVolume,
     double? soundVolume,
     String? languageCode,
@@ -38,6 +41,7 @@ class SettingsState {
       isMusicEnabled: isMusicEnabled ?? this.isMusicEnabled,
       isHapticsEnabled: isHapticsEnabled ?? this.isHapticsEnabled,
       is3DModeEnabled: is3DModeEnabled ?? this.is3DModeEnabled,
+      reducedMotion: reducedMotion ?? this.reducedMotion,
       musicVolume: musicVolume ?? this.musicVolume,
       soundVolume: soundVolume ?? this.soundVolume,
       languageCode: languageCode ?? this.languageCode,
@@ -59,6 +63,7 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
       isMusicEnabled: _prefs.getBool('isMusicEnabled') ?? true,
       isHapticsEnabled: _prefs.getBool('isHapticsEnabled') ?? true,
       is3DModeEnabled: _prefs.getBool('is3DModeEnabled') ?? true,
+      reducedMotion: _prefs.getBool('reducedMotion') ?? false,
       musicVolume: _prefs.getDouble('musicVolume') ?? 1.0,
       soundVolume: _prefs.getDouble('soundVolume') ?? 1.0,
       languageCode: _prefs.getString('languageCode') ?? 'en',
@@ -94,6 +99,11 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
   Future<void> toggle3DMode(bool value) async {
     state = state.copyWith(is3DModeEnabled: value);
     await _prefs.setBool('is3DModeEnabled', value);
+  }
+
+  Future<void> setReducedMotion(bool value) async {
+    state = state.copyWith(reducedMotion: value);
+    await _prefs.setBool('reducedMotion', value);
   }
 
   Future<void> setLanguage(String langCode) async {

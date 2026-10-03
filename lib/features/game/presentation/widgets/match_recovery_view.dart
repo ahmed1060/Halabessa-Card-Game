@@ -1,16 +1,32 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'table_style.dart';
+import 'match_table_layout.dart';
+import 'lantern_card_art.dart';
+import '../../domain/models/card.dart' as game;
+import '../../../../core/widgets/lantern_page_frame.dart';
 
 /// Starts one recovery attempt per mounted identity, never from a build loop.
 class MatchRecoveryView extends StatefulWidget {
   final Future<void> Function()? onRetry;
   final VoidCallback onExit;
-  final String loadingTitle, unavailableTitle, explanation, retryLabel, exitLabel;
+  final String loadingTitle,
+      unavailableTitle,
+      explanation,
+      retryLabel,
+      exitLabel;
   final Duration timeout;
-  const MatchRecoveryView({super.key, required this.onRetry, required this.onExit,
-    required this.loadingTitle, required this.unavailableTitle, required this.explanation,
-    required this.retryLabel, required this.exitLabel, this.timeout = const Duration(seconds: 8)});
+  const MatchRecoveryView({
+    super.key,
+    required this.onRetry,
+    required this.onExit,
+    required this.loadingTitle,
+    required this.unavailableTitle,
+    required this.explanation,
+    required this.retryLabel,
+    required this.exitLabel,
+    this.timeout = const Duration(seconds: 8),
+  });
   @override
   State<MatchRecoveryView> createState() => _MatchRecoveryViewState();
 }
@@ -22,10 +38,17 @@ class _MatchRecoveryViewState extends State<MatchRecoveryView> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) _recover(); });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _recover();
+    });
   }
+
   @override
-  void dispose() { _timeout?.cancel(); super.dispose(); }
+  void dispose() {
+    _timeout?.cancel();
+    super.dispose();
+  }
+
   Future<void> _recover() async {
     final attempt = ++_attempt;
     _timeout?.cancel();
@@ -44,27 +67,72 @@ class _MatchRecoveryViewState extends State<MatchRecoveryView> {
       }
     }
   }
+
   @override
-  Widget build(BuildContext context) => Scaffold(
-    backgroundColor: TableStyle.ink,
-    body: SafeArea(child: Center(child: SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 440),
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          if (_pending) const Padding(padding: EdgeInsets.only(bottom: 24),
-            child: CircularProgressIndicator(color: TableStyle.brass)),
-          Semantics(liveRegion: true, child: Text(_pending ? widget.loadingTitle : widget.unavailableTitle,
-            textAlign: TextAlign.center, style: TableStyle.label.copyWith(fontSize: 22))),
-          const SizedBox(height: 16),
-          Text(widget.explanation, textAlign: TextAlign.center, style: TableStyle.label),
-          const SizedBox(height: 24),
-          Wrap(spacing: 12, runSpacing: 12, alignment: WrapAlignment.center, children: [
-            FilledButton(onPressed: _pending || widget.onRetry == null ? null : _recover,
-              child: Text(widget.retryLabel)),
-            OutlinedButton(onPressed: widget.onExit, child: Text(widget.exitLabel)),
-          ]),
-        ]),
+  Widget build(BuildContext context) => LanternPageFrame(
+    child: Scaffold(
+      backgroundColor: Colors.transparent,
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 440),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const LanternWordmark(),
+                  const SizedBox(height: 32),
+                  const LanternCardArt(
+                    card: game.Card(game.Suit.spades, game.Rank.ace),
+                    faceUp: false,
+                    width: 76,
+                    height: 110,
+                  ),
+                  const SizedBox(height: 24),
+                  if (_pending)
+                    const Padding(
+                      padding: EdgeInsets.only(bottom: 24),
+                      child: CircularProgressIndicator(color: TableStyle.brass),
+                    ),
+                  Semantics(
+                    liveRegion: true,
+                    child: Text(
+                      _pending ? widget.loadingTitle : widget.unavailableTitle,
+                      textAlign: TextAlign.center,
+                      style: TableStyle.label.copyWith(fontSize: 22),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    widget.explanation,
+                    textAlign: TextAlign.center,
+                    style: TableStyle.label,
+                  ),
+                  const SizedBox(height: 24),
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 12,
+                    alignment: WrapAlignment.center,
+                    children: [
+                      FilledButton(
+                        onPressed: _pending || widget.onRetry == null
+                            ? null
+                            : _recover,
+                        child: Text(widget.retryLabel),
+                      ),
+                      OutlinedButton(
+                        onPressed: widget.onExit,
+                        child: Text(widget.exitLabel),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
-    ))),
+    ),
   );
 }

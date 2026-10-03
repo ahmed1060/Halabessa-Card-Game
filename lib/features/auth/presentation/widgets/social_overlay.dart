@@ -1,3 +1,4 @@
+import 'package:halabessa/features/game/presentation/widgets/match_table_layout.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easy_localization/easy_localization.dart';
@@ -59,7 +60,7 @@ class _SocialOverlayState extends ConsumerState<SocialOverlay> {
         expand: false,
         builder: (context, scrollController) => Container(
           decoration: BoxDecoration(
-            color: Colors.black.withOpacity(0.95),
+            color: const Color(0xFF3B274C),
             borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
             border: Border.all(color: Colors.white10),
             boxShadow: [
@@ -68,6 +69,8 @@ class _SocialOverlayState extends ConsumerState<SocialOverlay> {
           ),
           child: Column(
           children: [
+            const Padding(padding: EdgeInsets.only(top: 12),
+              child: SizedBox(height: 52, child: FittedBox(child: LanternWordmark()))),
             // Drag Handle
             Container(
               margin: const EdgeInsets.only(top: 12),

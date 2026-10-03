@@ -18,14 +18,23 @@ class _ChatOverlayState extends ConsumerState<ChatOverlay> {
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
 
+  @override
+  void dispose() {
+    _controller.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
   void _sendMessage(String text, {bool isQuickChat = false}) {
     final safeText = text.trim();
     if (safeText.isEmpty) return;
-    final limitedText = safeText.length > 60 ? safeText.substring(0, 60) : safeText;
+    final limitedText = safeText.length > 60
+        ? safeText.substring(0, 60)
+        : safeText;
 
     final matchState = ref.read(matchStateProvider);
     final currentUser = ref.read(currentUserProvider);
-    
+
     if (matchState == null || currentUser == null) return;
 
     final message = ChatMessage(
@@ -37,9 +46,11 @@ class _ChatOverlayState extends ConsumerState<ChatOverlay> {
       isQuickChat: isQuickChat,
     );
 
-    ref.read(multiplayerSyncServiceProvider).sendChatMessage(matchState.id, message);
+    ref
+        .read(multiplayerSyncServiceProvider)
+        .sendChatMessage(matchState.id, message);
     _controller.clear();
-    
+
     // Auto-close overlay if it was a quick chat
     if (isQuickChat) {
       ref.read(chatStateProvider.notifier).setOverlayOpen(false);
@@ -53,18 +64,20 @@ class _ChatOverlayState extends ConsumerState<ChatOverlay> {
     final size = MediaQuery.of(context).size;
     final panelWidth = size.width * 0.8 > 350 ? 350.0 : size.width * 0.8;
 
-    return AnimatedPositioned(
-      duration: const Duration(milliseconds: 300),
+    return AnimatedPositionedDirectional(
+      duration: MediaQuery.disableAnimationsOf(context)
+          ? Duration.zero
+          : const Duration(milliseconds: 300),
       curve: Curves.easeInOut,
-      left: chatState.isOverlayOpen ? 0 : -panelWidth,
+      start: chatState.isOverlayOpen ? 0 : -panelWidth,
       top: 0,
       bottom: 0,
       child: Container(
         width: panelWidth,
         decoration: const BoxDecoration(
-          color: Colors.black87,
+          color: Color(0xFF3B274C),
           boxShadow: [
-            BoxShadow(color: Colors.black54, blurRadius: 20, spreadRadius: 5)
+            BoxShadow(color: Colors.black54, blurRadius: 20, spreadRadius: 5),
           ],
         ),
         child: SafeArea(
@@ -75,7 +88,10 @@ class _ChatOverlayState extends ConsumerState<ChatOverlay> {
                 padding: const EdgeInsets.all(16.0),
                 child: Row(
                   children: [
-                    const Icon(Icons.chat_bubble_outline, color: ThemeConfig.primaryTeal),
+                    const Icon(
+                      Icons.chat_bubble_outline,
+                      color: ThemeConfig.primaryTeal,
+                    ),
                     const SizedBox(width: 12),
                     Text(
                       'chat'.tr(),
@@ -88,12 +104,14 @@ class _ChatOverlayState extends ConsumerState<ChatOverlay> {
                     const Spacer(),
                     IconButton(
                       icon: const Icon(Icons.close, color: Colors.white54),
-                      onPressed: () => ref.read(chatStateProvider.notifier).setOverlayOpen(false),
+                      onPressed: () => ref
+                          .read(chatStateProvider.notifier)
+                          .setOverlayOpen(false),
                     ),
                   ],
                 ),
               ),
-              
+
               const Divider(color: Colors.white10),
 
               // Quick Chat Presets
@@ -101,7 +119,10 @@ class _ChatOverlayState extends ConsumerState<ChatOverlay> {
                 height: 50,
                 child: ListView(
                   scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
                   children: [
                     _buildQuickChatChip('msg_gg'.tr()),
                     _buildQuickChatChip('msg_nice_play'.tr()),
@@ -116,66 +137,94 @@ class _ChatOverlayState extends ConsumerState<ChatOverlay> {
 
               // Message List
               Expanded(
-                child: messagesAsync.when(
-                  data: (messages) {
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                      if (_scrollController.hasClients) {
-                        _scrollController.animateTo(
-                          _scrollController.position.maxScrollExtent,
-                          duration: const Duration(milliseconds: 200),
-                          curve: Curves.easeOut,
-                        );
-                      }
-                      
-                      // If open, immediately mark everything as seen
-                      if (chatState.isOverlayOpen && messages.isNotEmpty) {
-                        final latest = messages.last.timestamp;
-                        if (latest.isAfter(chatState.lastSeenTimestamp)) {
-                          ref.read(chatStateProvider.notifier).markAllSeen();
+                child: ColoredBox(
+                  color: const Color(0xFFFFF0D1),
+                  child: messagesAsync.when(
+                    data: (messages) {
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (!mounted) return;
+                        if (_scrollController.hasClients) {
+                          _scrollController.animateTo(
+                            _scrollController.position.maxScrollExtent,
+                            duration: MediaQuery.disableAnimationsOf(context)
+                                ? Duration.zero
+                                : const Duration(milliseconds: 200),
+                            curve: Curves.easeOut,
+                          );
                         }
-                      }
-                    });
 
-                    return ListView.builder(
-                      controller: _scrollController,
-                      padding: const EdgeInsets.all(16),
-                      itemCount: messages.length,
-                      itemBuilder: (context, index) {
-                        final msg = messages[index];
-                        final isMe = msg.senderId == ref.read(currentUserProvider)?.uid;
-                        
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 12.0),
-                          child: Column(
-                            crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                msg.senderName,
-                                style: TextStyle(color: isMe ? ThemeConfig.primaryTeal : Colors.white54, fontSize: 11),
-                              ),
-                              const SizedBox(height: 4),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                decoration: BoxDecoration(
-                                  color: isMe ? ThemeConfig.primaryTeal.withOpacity(0.2) : Colors.white10,
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                    color: isMe ? ThemeConfig.primaryTeal.withOpacity(0.3) : Colors.white12,
+                        // If open, immediately mark everything as seen
+                        if (chatState.isOverlayOpen && messages.isNotEmpty) {
+                          final latest = messages.last.timestamp;
+                          if (latest.isAfter(chatState.lastSeenTimestamp)) {
+                            ref.read(chatStateProvider.notifier).markAllSeen();
+                          }
+                        }
+                      });
+
+                      return ListView.builder(
+                        controller: _scrollController,
+                        padding: const EdgeInsets.all(16),
+                        itemCount: messages.length,
+                        itemBuilder: (context, index) {
+                          final msg = messages[index];
+                          final isMe =
+                              msg.senderId ==
+                              ref.read(currentUserProvider)?.uid;
+
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 12.0),
+                            child: Column(
+                              crossAxisAlignment: isMe
+                                  ? CrossAxisAlignment.end
+                                  : CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  msg.senderName,
+                                  style: const TextStyle(
+                                    color: Color(0xFF192638),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
                                   ),
                                 ),
-                                child: Text(
-                                  msg.text,
-                                  style: const TextStyle(color: Colors.white, fontSize: 14),
+                                const SizedBox(height: 4),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 8,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: isMe
+                                        ? ThemeConfig.primaryTeal
+                                        : Colors.white,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: const Color(0x33192638),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    msg.text,
+                                    style: const TextStyle(
+                                      color: Color(0xFF192638),
+                                      fontSize: 14,
+                                    ),
+                                  ),
                                 ),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    );
-                  },
-                  loading: () => const Center(child: CircularProgressIndicator()),
-                  error: (e, _) => Center(child: Text('chat_error'.tr(), style: const TextStyle(color: Colors.red))),
+                              ],
+                            ),
+                          );
+                        },
+                      );
+                    },
+                    loading: () =>
+                        const Center(child: CircularProgressIndicator()),
+                    error: (e, _) => Center(
+                      child: Text(
+                        'chat_error'.tr(),
+                        style: const TextStyle(color: Colors.red),
+                      ),
+                    ),
+                  ),
                 ),
               ),
 
@@ -207,7 +256,10 @@ class _ChatOverlayState extends ConsumerState<ChatOverlay> {
                     ),
                     const SizedBox(width: 8),
                     IconButton(
-                      icon: const Icon(Icons.send, color: ThemeConfig.primaryTeal),
+                      icon: const Icon(
+                        Icons.send,
+                        color: ThemeConfig.primaryTeal,
+                      ),
                       onPressed: () => _sendMessage(_controller.text),
                     ),
                   ],
@@ -224,9 +276,15 @@ class _ChatOverlayState extends ConsumerState<ChatOverlay> {
     return Padding(
       padding: const EdgeInsets.only(right: 8.0),
       child: ActionChip(
-        label: Text(label, style: const TextStyle(color: Colors.white, fontSize: 12)),
+        label: Text(
+          label,
+          style: const TextStyle(color: Colors.white, fontSize: 12),
+        ),
         backgroundColor: Colors.white10,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: const BorderSide(color: Colors.white24)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: const BorderSide(color: Colors.white24),
+        ),
         onPressed: () => _sendMessage(label, isQuickChat: true),
       ),
     );

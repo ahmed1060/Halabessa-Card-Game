@@ -1,3 +1,4 @@
+import 'package:halabessa/features/game/presentation/widgets/match_table_layout.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -18,11 +19,12 @@ class DailyStreakDialog extends ConsumerStatefulWidget {
 
 class _DailyStreakDialogState extends ConsumerState<DailyStreakDialog> {
   bool _isClaimed = false;
+  bool _isClaiming = false;
 
   void _claim() async {
-    if (_isClaimed || !widget.status.isClaimableToday) return;
+    if (_isClaimed || _isClaiming || !widget.status.isClaimableToday) return;
 
-    setState(() => _isClaimed = true);
+    setState(() => _isClaiming = true);
     HapticFeedback.heavyImpact();
     ref.read(multimediaServiceProvider).playSfx('sfx/purchase.mp3');
 
@@ -34,23 +36,35 @@ class _DailyStreakDialogState extends ConsumerState<DailyStreakDialog> {
       );
     } on SupabaseBackendException catch (e) {
       if (mounted) {
-        setState(() => _isClaimed = false);
+        setState(() => _isClaiming = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.code == 'already_claimed' ? 'Today\'s reward was already claimed.' : 'Unable to claim the reward. Please try again.')),
+          SnackBar(
+            content: Text(
+              e.code == 'already_claimed'
+                  ? 'Today\'s reward was already claimed.'
+                  : 'Unable to claim the reward. Please try again.',
+            ),
+          ),
         );
       }
       return;
     } catch (_) {
       if (mounted) {
-        setState(() => _isClaimed = false);
+        setState(() => _isClaiming = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Unable to claim the reward. Please try again.')),
+          const SnackBar(
+            content: Text('Unable to claim the reward. Please try again.'),
+          ),
         );
       }
       return;
     }
 
     if (mounted) {
+      setState(() {
+        _isClaiming = false;
+        _isClaimed = true;
+      });
       Future.delayed(const Duration(milliseconds: 700), () {
         if (mounted) Navigator.pop(context, true);
       });
@@ -69,10 +83,13 @@ class _DailyStreakDialogState extends ConsumerState<DailyStreakDialog> {
           gradient: const LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [Color(0xFF1B263B), Color(0xFF0D1B2A)],
+            colors: [Color(0xFF192638), Color(0xFF3B274C)],
           ),
           borderRadius: BorderRadius.circular(28),
-          border: Border.all(color: ThemeConfig.goldAccent.withOpacity(0.4), width: 1.5),
+          border: Border.all(
+            color: ThemeConfig.goldAccent.withOpacity(0.4),
+            width: 1.5,
+          ),
           boxShadow: [
             BoxShadow(
               color: ThemeConfig.goldAccent.withOpacity(0.2),
@@ -85,6 +102,11 @@ class _DailyStreakDialogState extends ConsumerState<DailyStreakDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            const SizedBox(
+              height: 52,
+              child: FittedBox(child: LanternWordmark()),
+            ),
+            const SizedBox(height: 16),
             // Header
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -97,7 +119,11 @@ class _DailyStreakDialogState extends ConsumerState<DailyStreakDialog> {
                         color: ThemeConfig.goldAccent.withOpacity(0.15),
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.stars_rounded, color: ThemeConfig.goldAccent, size: 28),
+                      child: const Icon(
+                        Icons.stars_rounded,
+                        color: ThemeConfig.goldAccent,
+                        size: 28,
+                      ),
                     ),
                     const SizedBox(width: 12),
                     Column(
@@ -113,7 +139,9 @@ class _DailyStreakDialogState extends ConsumerState<DailyStreakDialog> {
                           ),
                         ),
                         Text(
-                          'streak_bonus'.tr(args: [status.currentStreak.toString()]),
+                          'streak_bonus'.tr(
+                            args: [status.currentStreak.toString()],
+                          ),
                           style: TextStyle(
                             color: ThemeConfig.goldAccent.withOpacity(0.9),
                             fontSize: 12,
@@ -148,33 +176,50 @@ class _DailyStreakDialogState extends ConsumerState<DailyStreakDialog> {
                   decoration: BoxDecoration(
                     color: isCurrent
                         ? ThemeConfig.goldAccent.withOpacity(0.2)
-                        : (isPast ? Colors.white.withOpacity(0.04) : Colors.black.withOpacity(0.25)),
+                        : (isPast
+                              ? Colors.white.withOpacity(0.04)
+                              : Colors.black.withOpacity(0.25)),
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
                       color: isCurrent
                           ? ThemeConfig.goldAccent
-                          : (isPast ? Colors.green.withOpacity(0.5) : Colors.white10),
+                          : (isPast
+                                ? Colors.green.withOpacity(0.5)
+                                : Colors.white10),
                       width: isCurrent ? 2.0 : 1.0,
                     ),
                   ),
-                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 8,
+                    horizontal: 4,
+                  ),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
                         'day_label'.tr(args: [reward.day.toString()]),
                         style: TextStyle(
-                          color: isCurrent ? ThemeConfig.goldAccent : Colors.white70,
+                          color: isCurrent
+                              ? ThemeConfig.goldAccent
+                              : Colors.white70,
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                       if (isPast)
-                        const Icon(Icons.check_circle_rounded, color: Colors.green, size: 28)
+                        const Icon(
+                          Icons.check_circle_rounded,
+                          color: Colors.green,
+                          size: 28,
+                        )
                       else ...[
                         Icon(
-                          reward.diamonds > 0 ? Icons.diamond : Icons.monetization_on_rounded,
-                          color: reward.diamonds > 0 ? ThemeConfig.primaryTeal : ThemeConfig.goldAccent,
+                          reward.diamonds > 0
+                              ? Icons.diamond
+                              : Icons.monetization_on_rounded,
+                          color: reward.diamonds > 0
+                              ? ThemeConfig.primaryTeal
+                              : ThemeConfig.goldAccent,
                           size: 26,
                         ),
                         Text(
@@ -189,7 +234,10 @@ class _DailyStreakDialogState extends ConsumerState<DailyStreakDialog> {
                       if (reward.diamonds > 0 && !isPast)
                         Text(
                           '+${reward.diamonds} 💎',
-                          style: const TextStyle(color: ThemeConfig.primaryTeal, fontSize: 10),
+                          style: const TextStyle(
+                            color: ThemeConfig.primaryTeal,
+                            fontSize: 10,
+                          ),
                         ),
                     ],
                   ),
@@ -201,17 +249,22 @@ class _DailyStreakDialogState extends ConsumerState<DailyStreakDialog> {
 
             // Claim button
             GestureDetector(
-              onTap: status.isClaimableToday && !_isClaimed ? _claim : null,
+              onTap: status.isClaimableToday && !_isClaimed && !_isClaiming
+                  ? _claim
+                  : null,
               child: Container(
                 width: double.infinity,
                 height: 52,
                 decoration: BoxDecoration(
                   gradient: status.isClaimableToday && !_isClaimed
                       ? const LinearGradient(
-                          colors: [Color(0xFFD4AF37), Color(0xFF996515)],
+                          colors: [Color(0xFFFFC65B), Color(0xFFFFC65B)],
                         )
                       : LinearGradient(
-                          colors: [Colors.white.withOpacity(0.1), Colors.white.withOpacity(0.05)],
+                          colors: [
+                            Colors.white.withOpacity(0.1),
+                            Colors.white.withOpacity(0.05),
+                          ],
                         ),
                   borderRadius: BorderRadius.circular(18),
                   boxShadow: [
@@ -224,17 +277,28 @@ class _DailyStreakDialogState extends ConsumerState<DailyStreakDialog> {
                   ],
                 ),
                 alignment: Alignment.center,
-                child: Text(
-                  _isClaimed || !status.isClaimableToday
-                      ? 'claimed'.tr()
-                      : '${'claim_reward'.tr()} (+${status.todayReward.coins} 🪙)',
-                  style: TextStyle(
-                    color: status.isClaimableToday && !_isClaimed ? Colors.white : Colors.white38,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 15,
-                    letterSpacing: 0.5,
-                  ),
-                ),
+                child: _isClaiming
+                    ? const SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Color(0xFF192638),
+                        ),
+                      )
+                    : Text(
+                        _isClaimed || !status.isClaimableToday
+                            ? 'claimed'.tr()
+                            : '${'claim_reward'.tr()} (+${status.todayReward.coins} 🪙)',
+                        style: TextStyle(
+                          color: status.isClaimableToday && !_isClaimed
+                              ? const Color(0xFF192638)
+                              : Colors.white38,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
               ),
             ),
           ],

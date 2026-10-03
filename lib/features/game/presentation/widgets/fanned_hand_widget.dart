@@ -5,6 +5,7 @@ import 'package:halabessa/features/game/domain/models/card.dart' as game_card;
 import 'package:halabessa/features/game/presentation/widgets/card_widget.dart';
 import 'table_style.dart';
 import 'board_card_motion.dart';
+import 'deal_card_motion.dart';
 
 /// Bounded, keyboard-accessible hand. Queued cards use identity, not list index.
 class FannedHandWidget extends StatefulWidget {
@@ -16,12 +17,19 @@ class FannedHandWidget extends StatefulWidget {
   final String Function(game_card.Card)? cardLabelBuilder;
   final String playHint;
   final String queueHint;
+  final GlobalKey? dealerDeckKey;
 
   const FannedHandWidget({
-    super.key, required this.cards, required this.onCardTap,
-    this.isMyTurn = false, this.interactionEnabled = true, this.cardBuilder,
-    this.cardLabelBuilder, this.playHint = 'Play card',
+    super.key,
+    required this.cards,
+    required this.onCardTap,
+    this.isMyTurn = false,
+    this.interactionEnabled = true,
+    this.cardBuilder,
+    this.cardLabelBuilder,
+    this.playHint = 'Play card',
     this.queueHint = 'Queue card; tap again to cancel',
+    this.dealerDeckKey,
   });
 
   @override
@@ -54,7 +62,9 @@ class _FannedHandWidgetState extends State<FannedHandWidget> {
     }
     if (!widget.isMyTurn || !widget.interactionEnabled) _autoPlay?.cancel();
     if ((!oldWidget.isMyTurn || !oldWidget.interactionEnabled) &&
-        widget.isMyTurn && widget.interactionEnabled && _queued != null) {
+        widget.isMyTurn &&
+        widget.interactionEnabled &&
+        _queued != null) {
       final selected = _queued!;
       _autoPlay?.cancel();
       _autoPlay = Timer(const Duration(milliseconds: 300), () {
@@ -66,7 +76,11 @@ class _FannedHandWidgetState extends State<FannedHandWidget> {
   }
 
   void _activate(game_card.Card card, Offset origin) {
-    if (!widget.interactionEnabled || _submitting || !widget.cards.contains(card)) return;
+    if (!widget.interactionEnabled ||
+        _submitting ||
+        !widget.cards.contains(card)) {
+      return;
+    }
     _autoPlay?.cancel();
     if (!widget.isMyTurn) {
       setState(() {
@@ -91,101 +105,211 @@ class _FannedHandWidgetState extends State<FannedHandWidget> {
   @override
   Widget build(BuildContext context) {
     if (widget.cards.isEmpty) return const SizedBox.shrink();
-    return LayoutBuilder(builder: (context, constraints) {
-      final available = constraints.hasBoundedWidth
-          ? constraints.maxWidth : MediaQuery.sizeOf(context).width;
-      final compact = constraints.hasBoundedHeight && constraints.maxHeight < 145;
-      // Reserve a four-card fan even after a play. Otherwise the Stack itself
-      // recenters immediately and every remaining card appears to jump.
-      final width = math.min(compact ? 60.0 : 80.0,
-          math.max(40.0, (available - 32) / 4));
-      final height = width * 1.43;
-      final spacing = math.min(width + 8,
-          math.max(0.0, (available - 16 - width) / 3));
-      final fanWidth = width + spacing * 3;
-      final totalWidth = width + spacing * (widget.cards.length - 1);
-      final firstCardLeft = (fanWidth - totalWidth) / 2;
-      final reducedMotion = MediaQuery.disableAnimationsOf(context);
-      return Center(
-        heightFactor: 1,
-        child: SizedBox(
-          width: fanWidth, height: height + 28,
-          child: Stack(clipBehavior: Clip.none, children: [
-            for (var index = 0; index < widget.cards.length; index++)
-              AnimatedPositioned(
-                key: ValueKey('hand-slot-${widget.cards[index].firebaseKey}'),
-                duration: reducedMotion ? Duration.zero :
-                    const Duration(milliseconds: 180),
-                curve: Curves.easeOutCubic,
-                left: firstCardLeft + index * spacing, bottom: 8,
-                child: Builder(builder: (cardContext) {
-                  final card = widget.cards[index];
-                  final selected = _queued == card;
-                  void activate() {
-                    final box = cardContext.findRenderObject() as RenderBox?;
-                    _activate(card, box?.localToGlobal(Offset(width / 2, height / 2)) ?? Offset.zero);
-                  }
-                  return AnimatedPadding(
-                    duration: reducedMotion ? Duration.zero : const Duration(milliseconds: 120),
-                    padding: EdgeInsets.only(bottom: selected ? 12 : (_hovered == card ? 6 : 0)),
-                    child: Semantics(
-                      label: widget.cardLabelBuilder?.call(card) ?? card.toString(),
-                      hint: widget.isMyTurn ? widget.playHint : widget.queueHint,
-                      selected: selected,
-                      child: GestureDetector(
-                        key: ValueKey('hand-card-${card.firebaseKey}'),
-                        onVerticalDragStart: widget.interactionEnabled ? (details) {
-                          _dragDistance = 0;
-                          _dragOrigin = details.globalPosition;
-                        } : null,
-                        onVerticalDragUpdate: widget.interactionEnabled ? (details) {
-                          _dragDistance += details.delta.dy;
-                        } : null,
-                        onVerticalDragEnd: widget.interactionEnabled ? (_) {
-                          if (_dragDistance < -36) _activate(card, _dragOrigin);
-                          _dragDistance = 0;
-                        } : null,
-                        onVerticalDragCancel: () => _dragDistance = 0,
-                        child: Material(
-                          color: Colors.transparent,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            side: BorderSide(color: selected ? TableStyle.brass : Colors.transparent, width: 2),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final available = constraints.hasBoundedWidth
+            ? constraints.maxWidth
+            : MediaQuery.sizeOf(context).width;
+        final compact =
+            constraints.hasBoundedHeight && constraints.maxHeight < 145;
+        // Reserve a four-card fan even after a play. Otherwise the Stack itself
+        // recenters immediately and every remaining card appears to jump.
+        final width = math.min(
+          compact ? 60.0 : 94.0,
+          math.max(40.0, (available - 24) / 3.5),
+        );
+        final height = width * 1.43;
+        final spacing = math.min(
+          width + 8,
+          math.max(0.0, (available - 16 - width) / 3),
+        );
+        final fanWidth = width + spacing * 3;
+        final totalWidth = width + spacing * (widget.cards.length - 1);
+        final firstCardLeft = (fanWidth - totalWidth) / 2;
+        final reducedMotion = MediaQuery.disableAnimationsOf(context);
+        return Center(
+          heightFactor: 1,
+          child: SizedBox(
+            width: fanWidth,
+            height: height + 28,
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                for (var index = 0; index < widget.cards.length; index++)
+                  AnimatedPositioned(
+                    key: ValueKey(
+                      'hand-slot-${widget.cards[index].firebaseKey}',
+                    ),
+                    duration: reducedMotion
+                        ? Duration.zero
+                        : const Duration(milliseconds: 180),
+                    curve: Curves.easeOutCubic,
+                    left: firstCardLeft + index * spacing,
+                    bottom: 8,
+                    child: Builder(
+                      builder: (cardContext) {
+                        final card = widget.cards[index];
+                        final selected = _queued == card;
+                        void activate() {
+                          final box =
+                              cardContext.findRenderObject() as RenderBox?;
+                          _activate(
+                            card,
+                            box?.localToGlobal(Offset(width / 2, height / 2)) ??
+                                Offset.zero,
+                          );
+                        }
+
+                        return AnimatedPadding(
+                          duration: reducedMotion
+                              ? Duration.zero
+                              : const Duration(milliseconds: 120),
+                          padding: EdgeInsets.only(
+                            bottom: selected ? 12 : (_hovered == card ? 6 : 0),
                           ),
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(8),
-                            focusColor: TableStyle.brass.withOpacity(0.5),
-                            onHover: (value) => setState(() => _hovered = value ? card : null),
-                            onTap: widget.interactionEnabled && !_submitting ? activate : null,
-                            child: BoardCardMotion(
-                              key: ValueKey('hand-visual-${card.firebaseKey}'),
-                              // New cards leave one point above the hand and
-                              // fan out; the card's hit target never moves.
-                              origin: Offset(
-                                fanWidth / 2 -
-                                    (firstCardLeft + index * spacing + width / 2),
-                                compact ? -72 : -108,
+                          child: Semantics(
+                            label:
+                                widget.cardLabelBuilder?.call(card) ??
+                                card.toString(),
+                            hint: widget.isMyTurn
+                                ? widget.playHint
+                                : widget.queueHint,
+                            selected: selected,
+                            child: GestureDetector(
+                              key: ValueKey('hand-card-${card.firebaseKey}'),
+                              onVerticalDragStart: widget.interactionEnabled
+                                  ? (details) {
+                                      _dragDistance = 0;
+                                      _dragOrigin = details.globalPosition;
+                                    }
+                                  : null,
+                              onVerticalDragUpdate: widget.interactionEnabled
+                                  ? (details) {
+                                      _dragDistance += details.delta.dy;
+                                    }
+                                  : null,
+                              onVerticalDragEnd: widget.interactionEnabled
+                                  ? (_) {
+                                      if (_dragDistance < -36) {
+                                        _activate(card, _dragOrigin);
+                                      }
+                                      _dragDistance = 0;
+                                    }
+                                  : null,
+                              onVerticalDragCancel: () => _dragDistance = 0,
+                              child: Material(
+                                color: Colors.transparent,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                  side: BorderSide(
+                                    color: selected
+                                        ? TableStyle.brass
+                                        : Colors.transparent,
+                                    width: 2,
+                                  ),
+                                ),
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(8),
+                                  focusColor: TableStyle.brass.withValues(
+                                    alpha: 0.5,
+                                  ),
+                                  onHover: (value) => setState(
+                                    () => _hovered = value ? card : null,
+                                  ),
+                                  onTap:
+                                      widget.interactionEnabled && !_submitting
+                                      ? activate
+                                      : null,
+                                  child: widget.dealerDeckKey != null
+                                      ? DealCardMotion(
+                                          key: ValueKey(
+                                            'hand-deal-${card.firebaseKey}',
+                                          ),
+                                          sourceKey: widget.dealerDeckKey!,
+                                          delay: Duration(
+                                            milliseconds: index * 70,
+                                          ),
+                                          child: Transform.rotate(
+                                            angle:
+                                                (index -
+                                                    (widget.cards.length - 1) /
+                                                        2) *
+                                                .035,
+                                            child: ExcludeSemantics(
+                                              child: IgnorePointer(
+                                                child:
+                                                    widget.cardBuilder?.call(
+                                                      card,
+                                                      width,
+                                                      height,
+                                                    ) ??
+                                                    CardWidget(
+                                                      card: card,
+                                                      width: width,
+                                                      height: height,
+                                                    ),
+                                              ),
+                                            ),
+                                          ),
+                                        )
+                                      : BoardCardMotion(
+                                          key: ValueKey(
+                                            'hand-visual-${card.firebaseKey}',
+                                          ),
+                                          // New cards leave one point above the hand and
+                                          // fan out; the card's hit target never moves.
+                                          origin: Offset(
+                                            fanWidth / 2 -
+                                                (firstCardLeft +
+                                                    index * spacing +
+                                                    width / 2),
+                                            compact ? -72 : -108,
+                                          ),
+                                          delay: Duration(
+                                            milliseconds: index * 70,
+                                          ),
+                                          travelDuration: const Duration(
+                                            milliseconds: 380,
+                                          ),
+                                          initialOpacity: 0.65,
+                                          // Keep the hit target fixed while only the
+                                          // dealt card artwork travels into the hand.
+                                          child: Transform.rotate(
+                                            angle:
+                                                (index -
+                                                    (widget.cards.length - 1) /
+                                                        2) *
+                                                .035,
+                                            child: ExcludeSemantics(
+                                              child: IgnorePointer(
+                                                child:
+                                                    widget.cardBuilder?.call(
+                                                      card,
+                                                      width,
+                                                      height,
+                                                    ) ??
+                                                    CardWidget(
+                                                      card: card,
+                                                      width: width,
+                                                      height: height,
+                                                    ),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                ),
                               ),
-                              delay: Duration(milliseconds: index * 70),
-                              travelDuration: const Duration(milliseconds: 380),
-                              initialOpacity: 0.65,
-                              // Keep the hit target fixed while only the
-                              // dealt card artwork travels into the hand.
-                              child: ExcludeSemantics(child: IgnorePointer(child:
-                                widget.cardBuilder?.call(card, width, height) ??
-                                    CardWidget(card: card, width: width, height: height),
-                              )),
                             ),
                           ),
-                        ),
-                      ),
+                        );
+                      },
                     ),
-                  );
-                }),
-              ),
-          ]),
-        ),
-      );
-    });
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 }

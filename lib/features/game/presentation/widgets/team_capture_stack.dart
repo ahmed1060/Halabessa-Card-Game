@@ -139,13 +139,11 @@ class TeamCaptureStack extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // A capture is stored only when a player wins a pile. This is already a
-    // current-round collection, so no rival or collected-card detail is shown.
-    final played = captures;
+    final played = captures.where((capture) => !capture.isRoundAward).toList();
     final latest = played.isEmpty ? null : played.last.leadingCard;
     final count = captures.fold<int>(
       0,
-      (total, capture) => total + capture.capturedCards.length,
+      (total, capture) => total + capture.cardCount,
     );
     return Semantics(
       button: onHistory != null,
@@ -283,6 +281,7 @@ class CaptureCardHistory extends StatelessWidget {
   final String emptyLabel;
   final String latestLabel;
   final String backLabel;
+  final String statusLabel;
   final TableCardBuilder faceBuilder;
   final String Function(game_card.Card) cardLabel;
   const CaptureCardHistory({
@@ -293,17 +292,30 @@ class CaptureCardHistory extends StatelessWidget {
     required this.emptyLabel,
     this.latestLabel = 'Latest',
     this.backLabel = 'Back to table',
+    this.statusLabel = '',
     required this.faceBuilder,
     required this.cardLabel,
   });
 
   @override
   Widget build(BuildContext context) {
-    final played = captures;
+    final played = captures.where((capture) => !capture.isRoundAward).toList();
     return ColoredBox(
       color: TableStyle.ivory,
       child: Column(
         children: [
+          if (statusLabel.isNotEmpty)
+            Semantics(
+              liveRegion: true,
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Text(
+                  statusLabel,
+                  textAlign: TextAlign.center,
+                  style: TableStyle.label.copyWith(color: TableStyle.ink),
+                ),
+              ),
+            ),
           ListTile(
             title: Text(
               title,

@@ -26,7 +26,7 @@ class LanternCardArt extends StatelessWidget {
         Positioned.fill(
           child: CustomPaint(painter: _CardPainter(card, faceUp)),
         ),
-        if (faceUp && card.rank.value > 10)
+        if (faceUp && card.rank != game.Rank.ace && card.rank.value > 10)
           Positioned(
             left: width * .19,
             top: height * .04,
@@ -42,7 +42,7 @@ class LanternCardArt extends StatelessWidget {
               ),
             ),
           ),
-        if (faceUp && card.rank.value > 10)
+        if (faceUp && card.rank != game.Rank.ace && card.rank.value > 10)
           Positioned.fill(
             child: CustomPaint(
               painter: _CardPainter(card, true, indicesOnly: true),
@@ -145,13 +145,29 @@ class _CardPainter extends CustomPainter {
         Paint()..color = TableStyle.felt,
       );
       canvas.drawCircle(const Offset(35, 50), 12, line);
-      _suit(
-        canvas,
-        const Offset(35, 50),
-        16,
-        game.Suit.diamonds,
-        TableStyle.brass,
+      // A miniature hanging lantern, rather than a generic suit medallion.
+      canvas.drawLine(const Offset(35, 32), const Offset(35, 39), line);
+      canvas.drawPath(
+        Path()
+          ..moveTo(29, 42)
+          ..lineTo(35, 38)
+          ..lineTo(41, 42)
+          ..lineTo(39, 57)
+          ..lineTo(35, 61)
+          ..lineTo(31, 57)
+          ..close(),
+        Paint()..color = TableStyle.brass,
       );
+      canvas.drawPath(
+        Path()
+          ..moveTo(32, 44)
+          ..lineTo(38, 44)
+          ..lineTo(37, 55)
+          ..lineTo(33, 55)
+          ..close(),
+        Paint()..color = TableStyle.felt,
+      );
+      canvas.drawLine(const Offset(35, 44), const Offset(35, 55), line);
     } else {
       final red =
           card.suit == game.Suit.hearts || card.suit == game.Suit.diamonds;

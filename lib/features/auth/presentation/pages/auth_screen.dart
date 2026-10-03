@@ -1,4 +1,5 @@
-import 'dart:math';
+import 'package:halabessa/core/widgets/lantern_page_frame.dart';
+import 'package:halabessa/features/game/presentation/widgets/match_table_layout.dart';
 import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -18,7 +19,7 @@ class AuthScreen extends ConsumerStatefulWidget {
   ConsumerState<AuthScreen> createState() => _AuthScreenState();
 }
 
-class _AuthScreenState extends ConsumerState<AuthScreen> with TickerProviderStateMixin {
+class _AuthScreenState extends ConsumerState<AuthScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _nameController = TextEditingController();
@@ -27,47 +28,10 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with TickerProviderStat
   bool _isLogin = true;
   bool _isLoading = false;
 
-  late AnimationController _logoController;
-  late AnimationController _particleController;
-  final List<Particle> _particles = [];
-  final Random _random = Random();
-
   @override
   void initState() {
     super.initState();
-    _logoController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 3),
-    )..repeat(reverse: true);
-
-    // Set up immersive mode trigger for mobile browsers
     WebPlatformService.setupOneTimeFullscreenTrigger();
-
-    _particleController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 10),
-    )..addListener(() {
-        _updateParticles();
-      })..repeat();
-
-    for (int i = 0; i < 30; i++) {
-      _particles.add(Particle(
-        position: Offset(_random.nextDouble(), _random.nextDouble()),
-        velocity: Offset((_random.nextDouble() - 0.5) * 0.002, (_random.nextDouble() - 0.5) * 0.002),
-        size: _random.nextDouble() * 3 + 1,
-        opacity: _random.nextDouble() * 0.5 + 0.1,
-      ));
-    }
-  }
-
-  void _updateParticles() {
-    for (var p in _particles) {
-      p.position += p.velocity;
-      if (p.position.dx < 0) p.position = Offset(1.0, p.position.dy);
-      if (p.position.dx > 1) p.position = Offset(0.0, p.position.dy);
-      if (p.position.dy < 0) p.position = Offset(p.position.dx, 1.0);
-      if (p.position.dy > 1) p.position = Offset(p.position.dx, 0.0);
-    }
   }
 
   @override
@@ -76,8 +40,6 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with TickerProviderStat
     _passwordController.dispose();
     _nameController.dispose();
     _guestNameController.dispose();
-    _logoController.dispose();
-    _particleController.dispose();
     super.dispose();
   }
 
@@ -96,7 +58,9 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with TickerProviderStat
         await authRepo.signUpWithEmail(
           _emailController.text.trim(),
           _passwordController.text.trim(),
-          _nameController.text.trim().isEmpty ? 'new_player_default'.tr() : _nameController.text.trim(),
+          _nameController.text.trim().isEmpty
+              ? 'new_player_default'.tr()
+              : _nameController.text.trim(),
         );
       }
     } catch (e) {
@@ -113,9 +77,9 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with TickerProviderStat
     if (_isLoading) return;
     final guestName = _guestNameController.text.trim();
     if (guestName.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('enter_nickname_error'.tr())),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('enter_nickname_error'.tr())));
       return;
     }
 
@@ -150,25 +114,42 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with TickerProviderStat
   }
 
   void _showForgotPasswordDialog(BuildContext context, WidgetRef ref) {
-    final resetEmailController = TextEditingController(text: _emailController.text);
+    final resetEmailController = TextEditingController(
+      text: _emailController.text,
+    );
     showDialog(
       context: context,
       builder: (dialogContext) => BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
         child: AlertDialog(
           backgroundColor: const Color(0xFF1A1A2E).withOpacity(0.9),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24), side: BorderSide(color: ThemeConfig.goldAccent.withOpacity(0.3))),
-          title: Text('reset_password'.tr(), style: const TextStyle(color: Colors.white, fontFamily: ThemeConfig.fontHeading)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+            side: BorderSide(color: ThemeConfig.goldAccent.withOpacity(0.3)),
+          ),
+          title: Text(
+            'reset_password'.tr(),
+            style: const TextStyle(
+              color: Colors.white,
+              fontFamily: ThemeConfig.fontHeading,
+            ),
+          ),
           content: TextField(
             controller: resetEmailController,
             style: const TextStyle(color: Colors.white),
-            decoration: _inputDecoration('email_address'.tr(), Icons.email_rounded),
+            decoration: _inputDecoration(
+              'email_address'.tr(),
+              Icons.email_rounded,
+            ),
             keyboardType: TextInputType.emailAddress,
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(dialogContext),
-              child: Text('cancel'.tr(), style: const TextStyle(color: Colors.white54)),
+              child: Text(
+                'cancel'.tr(),
+                style: const TextStyle(color: Colors.white54),
+              ),
             ),
             ElevatedButton(
               onPressed: () async {
@@ -178,13 +159,22 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with TickerProviderStat
                 try {
                   await ref.read(authRepositoryProvider).resetPassword(email);
                   if (!mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('verification_sent'.tr())));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('verification_sent'.tr())),
+                  );
                 } catch (e) {
                   if (!mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(ErrorHandler.getAuthErrorMessage(e))));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(ErrorHandler.getAuthErrorMessage(e)),
+                    ),
+                  );
                 }
               },
-              style: ElevatedButton.styleFrom(backgroundColor: ThemeConfig.goldAccent, foregroundColor: Colors.black),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: ThemeConfig.goldAccent,
+                foregroundColor: Colors.black,
+              ),
               child: Text('send_link'.tr()),
             ),
           ],
@@ -197,7 +187,11 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with TickerProviderStat
     return InputDecoration(
       labelText: label,
       labelStyle: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 14),
-      prefixIcon: Icon(icon, color: ThemeConfig.primaryTeal.withOpacity(0.7), size: 20),
+      prefixIcon: Icon(
+        icon,
+        color: ThemeConfig.primaryTeal.withOpacity(0.7),
+        size: 20,
+      ),
       filled: true,
       fillColor: Colors.white.withOpacity(0.05),
       enabledBorder: OutlineInputBorder(
@@ -206,282 +200,227 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with TickerProviderStat
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: ThemeConfig.primaryTeal, width: 1.5),
+        borderSide: const BorderSide(
+          color: ThemeConfig.primaryTeal,
+          width: 1.5,
+        ),
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
     );
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF0D1B2A),
-      body: Stack(
-        children: [
-          // Background Layer
-          Positioned.fill(
-            child: Image.asset(
-              'assets/images/gaming/login_bg.png',
-              fit: BoxFit.cover,
-            ),
-          ),
-          // Gradient Overlay
-          Positioned.fill(
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.black.withOpacity(0.3),
-                    const Color(0xFF0D1B2A).withOpacity(0.8),
-                    const Color(0xFF0D1B2A),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          // Animated Particles
-          Positioned.fill(
-            child: CustomPaint(
-              painter: ParticlePainter(_particles, repaint: _particleController),
-            ),
-          ),
-          
-          // Content
-          SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 40),
+  Widget build(BuildContext context) => LanternPageFrame(
+    child: Scaffold(
+      backgroundColor: Colors.transparent,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 520),
               child: Column(
                 children: [
-                  // Logo with breathing animation
-                  ScaleTransition(
-                    scale: Tween<double>(begin: 1.0, end: 1.05).animate(
-                      CurvedAnimation(parent: _logoController, curve: Curves.easeInOut),
-                    ),
-                    child: Image.asset(
-                      'assets/images/gaming/game_logo.png',
-                      height: 180,
+                  Align(
+                    alignment: AlignmentDirectional.centerEnd,
+                    child: _languageSelector(context),
+                  ),
+                  const LanternWordmark(),
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    height: 150,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        for (final asset in const [
+                          'lantern_rival_man_v1.png',
+                          'lantern_partner_v1.png',
+                          'lantern_rival_woman_v1.png',
+                        ])
+                          Flexible(
+                            child: Image.asset(
+                              'assets/images/avatars/$asset',
+                              height: 140,
+                              excludeFromSemantics: true,
+                            ),
+                          ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 40),
-
-                  // Glassmorphism Login Card
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(32),
-                    child: BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
-                      child: Container(
-                        padding: const EdgeInsets.all(32),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.05),
-                          borderRadius: BorderRadius.circular(32),
-                          border: Border.all(color: Colors.white.withOpacity(0.1), width: 1.5),
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: ThemeConfig.surfaceGlass,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: ThemeConfig.goldAccent,
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        TextField(
+                          controller: _guestNameController,
+                          style: const TextStyle(color: Color(0xFFFFF6E7)),
+                          decoration: _inputDecoration(
+                            'guest_nickname'.tr(),
+                            Icons.badge_outlined,
+                          ),
                         ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Text(
-                              _isLogin ? 'welcome_back'.tr() : 'create_account'.tr(),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 24,
-                                fontFamily: ThemeConfig.fontHeading,
-                                letterSpacing: 1.2,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                            const SizedBox(height: 32),
-                            
-                            if (!_isLogin) ...[
-                              TextField(
-                                controller: _nameController,
-                                style: const TextStyle(color: Colors.white),
-                                decoration: _inputDecoration('display_name'.tr(), Icons.person_rounded),
-                              ),
-                              const SizedBox(height: 16),
-                            ],
-                            TextField(
-                              key: const ValueKey('login_email_field'),
-                              controller: _emailController,
-                              style: const TextStyle(color: Colors.white),
-                              decoration: _inputDecoration('email_address'.tr(), Icons.email_rounded),
-                              keyboardType: TextInputType.emailAddress,
-                            ),
-                            const SizedBox(height: 16),
-                            TextField(
-                              key: const ValueKey('login_password_field'),
-                              controller: _passwordController,
-                              style: const TextStyle(color: Colors.white),
-                              decoration: _inputDecoration('password'.tr(), Icons.lock_rounded),
-                              obscureText: true,
-                            ),
-                            
-                            if (_isLogin)
-                              Align(
-                                alignment: AlignmentDirectional.centerEnd,
-                                child: TextButton(
-                                  onPressed: () => _showForgotPasswordDialog(context, ref),
-                                  child: Text('forgot_password'.tr(), style: const TextStyle(color: Colors.white54, fontSize: 13)),
-                                ),
-                              )
-                            else
-                              const SizedBox(height: 24),
-
-                            const SizedBox(height: 8),
-                            
-                            ElevatedButton(
-                              key: const ValueKey('login_submit_btn'),
-                              onPressed: _isLoading ? null : _submit,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: ThemeConfig.goldAccent,
-                                foregroundColor: Colors.black,
-                                padding: const EdgeInsets.symmetric(vertical: 18),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                                elevation: 8,
-                                shadowColor: ThemeConfig.goldAccent.withOpacity(0.4),
-                              ),
-                              child: _isLoading 
-                                ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
-                                : Text(
-                                    (_isLogin ? 'login_btn'.tr() : 'sign_up'.tr()).toUpperCase(),
-                                    style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.5),
+                        const SizedBox(height: 16),
+                        FilledButton.icon(
+                          onPressed: _isLoading ? null : _signInAnonymously,
+                          icon: _isLoading
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
                                   ),
-                            ),
-                            
-                            const SizedBox(height: 16),
-                            
-                            TextButton(
-                              onPressed: () => setState(() => _isLogin = !_isLogin),
-                              child: Text(
-                                _isLogin ? 'dont_have_account'.tr() : 'already_have_account'.tr(),
-                                style: TextStyle(color: ThemeConfig.primaryTeal.withOpacity(0.9), fontWeight: FontWeight.w600),
-                              ),
-                            ),
-                          ],
+                                )
+                              : const Icon(Icons.play_arrow_rounded),
+                          label: Text('play_as_guest'.tr()),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: ThemeConfig.goldAccent,
+                            foregroundColor: const Color(0xFF192638),
+                            minimumSize: const Size(48, 56),
+                          ),
                         ),
-                      ),
+                      ],
                     ),
                   ),
-
-                  const SizedBox(height: 32),
-                  
-                  // Social Login Section
-                  Row(
-                    children: [
-                      Expanded(child: Divider(color: Colors.white.withOpacity(0.1))),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                        child: Text(
-                          'or_connect_with'.tr().toUpperCase(),
-                          style: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 2),
-                        ),
-                      ),
-                      Expanded(child: Divider(color: Colors.white.withOpacity(0.1))),
-                    ],
+                  const SizedBox(height: 16),
+                  Text(
+                    'or_connect_with'.tr(),
+                    style: const TextStyle(color: Color(0xFFFFF6E7)),
                   ),
-                  
-                  const SizedBox(height: 24),
-                  
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                  const SizedBox(height: 12),
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: 12,
+                    runSpacing: 12,
                     children: [
-                      _socialButton(
-                        icon: Icons.g_mobiledata,
-                        color: Colors.redAccent,
-                        onTap: () => _signInWithSocial(() => ref.read(authRepositoryProvider).signInWithGoogle()),
-                      ),
-                      const SizedBox(width: 20),
-                      _socialButton(
-                        icon: Icons.facebook_rounded,
-                        color: Colors.blueAccent,
-                        onTap: () => _signInWithSocial(() => ref.read(authRepositoryProvider).signInWithFacebook()),
-                      ),
-                    ],
-                  ),
-                  if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) ...[
-                    const SizedBox(height: 20),
-                    SizedBox(
-                      width: 260,
-                      height: 50,
-                      child: SignInWithAppleButton(
-                        style: SignInWithAppleButtonStyle.white,
-                        onPressed: () => _signInWithSocial(
-                          () => ref.read(authRepositoryProvider).signInWithApple(),
-                        ),
-                      ),
-                    ),
-                  ],
-
-                  const SizedBox(height: 40),
-
-                  // Guest Login Section
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(24),
-                    child: BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                      child: Container(
-                        padding: const EdgeInsets.all(24),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.03),
-                          borderRadius: BorderRadius.circular(24),
-                          border: Border.all(color: Colors.white.withOpacity(0.05)),
-                        ),
-                        child: Column(
-                          children: [
-                            TextField(
-                              controller: _guestNameController,
-                              style: const TextStyle(color: Colors.white),
-                              decoration: _inputDecoration('guest_nickname'.tr(), Icons.badge_outlined),
-                            ),
-                            const SizedBox(height: 16),
-                            OutlinedButton(
-                              onPressed: _isLoading ? null : _signInAnonymously,
-                              style: OutlinedButton.styleFrom(
-                                side: BorderSide(color: ThemeConfig.primaryTeal.withOpacity(0.5)),
-                                foregroundColor: ThemeConfig.primaryTeal,
-                                padding: const EdgeInsets.symmetric(vertical: 16),
-                                minimumSize: const Size(double.infinity, 0),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      OutlinedButton.icon(
+                        onPressed: _isLoading
+                            ? null
+                            : () => _signInWithSocial(
+                                () => ref
+                                    .read(authRepositoryProvider)
+                                    .signInWithGoogle(),
                               ),
-                              child: Text('login'.tr().toUpperCase(), style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2)),
-                            ),
-                          ],
-                        ),
+                        icon: const Icon(Icons.g_mobiledata, size: 28),
+                        label: const Text('Google'),
                       ),
+                      OutlinedButton.icon(
+                        onPressed: _isLoading
+                            ? null
+                            : () => _signInWithSocial(
+                                () => ref
+                                    .read(authRepositoryProvider)
+                                    .signInWithFacebook(),
+                              ),
+                        icon: const Icon(Icons.facebook_rounded),
+                        label: const Text('Facebook'),
+                      ),
+                      if (!kIsWeb &&
+                          defaultTargetPlatform == TargetPlatform.iOS)
+                        SizedBox(
+                          width: 260,
+                          height: 50,
+                          child: SignInWithAppleButton(
+                            style: SignInWithAppleButtonStyle.white,
+                            onPressed: () {
+                              if (!_isLoading) {
+                                _signInWithSocial(
+                                  () => ref
+                                      .read(authRepositoryProvider)
+                                      .signInWithApple(),
+                                );
+                              }
+                            },
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  Material(
+                    color: ThemeConfig.surfaceGlass,
+                    borderRadius: BorderRadius.circular(20),
+                    child: ExpansionTile(
+                      title: Text(
+                        (_isLogin ? 'welcome_back' : 'create_account').tr(),
+                      ),
+                      textColor: const Color(0xFFFFF6E7),
+                      collapsedTextColor: const Color(0xFFFFF6E7),
+                      childrenPadding: const EdgeInsets.all(20),
+                      children: [
+                        if (!_isLogin) ...[
+                          TextField(
+                            controller: _nameController,
+                            decoration: _inputDecoration(
+                              'display_name'.tr(),
+                              Icons.person_rounded,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                        ],
+                        TextField(
+                          key: const ValueKey('login_email_field'),
+                          controller: _emailController,
+                          keyboardType: TextInputType.emailAddress,
+                          decoration: _inputDecoration(
+                            'email_address'.tr(),
+                            Icons.email_rounded,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          key: const ValueKey('login_password_field'),
+                          controller: _passwordController,
+                          obscureText: true,
+                          decoration: _inputDecoration(
+                            'password'.tr(),
+                            Icons.lock_rounded,
+                          ),
+                        ),
+                        if (_isLogin)
+                          Align(
+                            alignment: AlignmentDirectional.centerEnd,
+                            child: TextButton(
+                              onPressed: () =>
+                                  _showForgotPasswordDialog(context, ref),
+                              child: Text('forgot_password'.tr()),
+                            ),
+                          ),
+                        FilledButton(
+                          key: const ValueKey('login_submit_btn'),
+                          onPressed: _isLoading ? null : _submit,
+                          child: Text(
+                            (_isLogin ? 'login_btn' : 'sign_up').tr(),
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () => setState(() => _isLogin = !_isLogin),
+                          child: Text(
+                            (_isLogin
+                                    ? 'dont_have_account'
+                                    : 'already_have_account')
+                                .tr(),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
             ),
           ),
-          
-          // Language Selector (Top Right)
-          Positioned(
-            top: 50,
-            right: 16,
-            child: _languageSelector(context),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _socialButton({required IconData icon, required Color color, required VoidCallback onTap}) {
-    return InkWell(
-      onTap: _isLoading ? null : onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color.withOpacity(0.3)),
         ),
-        child: Icon(icon, color: color, size: 28),
       ),
-    );
-  }
+    ),
+  );
 
   Widget _languageSelector(BuildContext context) {
     return PopupMenuButton<Locale>(
@@ -492,42 +431,42 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with TickerProviderStat
           shape: BoxShape.circle,
           border: Border.all(color: Colors.white10),
         ),
-        child: const Icon(Icons.language_rounded, color: Colors.white70, size: 20),
+        child: const Icon(
+          Icons.language_rounded,
+          color: Colors.white70,
+          size: 20,
+        ),
       ),
       offset: const Offset(0, 45),
       color: const Color(0xFF1A1A2E),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: Colors.white10)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: Colors.white10),
+      ),
       onSelected: (locale) => context.setLocale(locale),
       itemBuilder: (context) => [
-        PopupMenuItem(value: const Locale('en', 'US'), child: Text('english'.tr(), style: const TextStyle(color: Colors.white70))),
-        PopupMenuItem(value: const Locale('ar', 'EG'), child: Text('arabic_eg'.tr(), style: const TextStyle(color: Colors.white70))),
-        PopupMenuItem(value: const Locale('ar', 'SA'), child: Text('arabic_sa'.tr(), style: const TextStyle(color: Colors.white70))),
+        PopupMenuItem(
+          value: const Locale('en', 'US'),
+          child: Text(
+            'english'.tr(),
+            style: const TextStyle(color: Colors.white70),
+          ),
+        ),
+        PopupMenuItem(
+          value: const Locale('ar', 'EG'),
+          child: Text(
+            'arabic_eg'.tr(),
+            style: const TextStyle(color: Colors.white70),
+          ),
+        ),
+        PopupMenuItem(
+          value: const Locale('ar', 'SA'),
+          child: Text(
+            'arabic_sa'.tr(),
+            style: const TextStyle(color: Colors.white70),
+          ),
+        ),
       ],
     );
   }
-}
-
-class Particle {
-  Offset position;
-  Offset velocity;
-  double size;
-  double opacity;
-  Particle({required this.position, required this.velocity, required this.size, required this.opacity});
-}
-
-class ParticlePainter extends CustomPainter {
-  final List<Particle> particles;
-  ParticlePainter(this.particles, {super.repaint});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = ThemeConfig.primaryTeal;
-    for (var p in particles) {
-      paint.color = ThemeConfig.primaryTeal.withOpacity(p.opacity);
-      canvas.drawCircle(Offset(p.position.dx * size.width, p.position.dy * size.height), p.size, paint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }

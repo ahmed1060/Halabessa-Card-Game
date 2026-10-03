@@ -1,4 +1,4 @@
-﻿import 'package:easy_localization/easy_localization.dart';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -27,7 +27,7 @@ void main() async {
   ]);
 
   final sharedPrefs = await SharedPreferences.getInstance();
-  
+
   try {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
@@ -38,12 +38,14 @@ void main() async {
 
   runApp(
     ProviderScope(
-      overrides: [
-        sharedPreferencesProvider.overrideWithValue(sharedPrefs),
-      ],
+      overrides: [sharedPreferencesProvider.overrideWithValue(sharedPrefs)],
       child: EasyLocalization(
-        supportedLocales: const [Locale('ar', 'EG'), Locale('ar', 'SA'), Locale('en', 'US')],
-        path: 'assets/translations', 
+        supportedLocales: const [
+          Locale('ar', 'EG'),
+          Locale('ar', 'SA'),
+          Locale('en', 'US'),
+        ],
+        path: 'assets/translations',
         fallbackLocale: const Locale('en', 'US'),
         child: const HalabessaApp(),
       ),
@@ -70,16 +72,24 @@ class HalabessaApp extends ConsumerWidget {
       routes: AppRoutes.routes,
       debugShowCheckedModeBanner: false,
       builder: (context, child) {
-        return Stack(
-          children: [
-            const UnityPersistentOverlay(), // Move to background
-            if (child != null) 
-              Listener(
-                behavior: HitTestBehavior.translucent,
-                onPointerDown: (_) => ref.read(multimediaServiceProvider).handleInteraction(),
-                child: child,
-              ),
-          ],
+        return MediaQuery(
+          data: MediaQuery.of(context).copyWith(
+            disableAnimations:
+                settings.reducedMotion ||
+                MediaQuery.disableAnimationsOf(context),
+          ),
+          child: Stack(
+            children: [
+              const UnityPersistentOverlay(), // Move to background
+              if (child != null)
+                Listener(
+                  behavior: HitTestBehavior.translucent,
+                  onPointerDown: (_) =>
+                      ref.read(multimediaServiceProvider).handleInteraction(),
+                  child: child,
+                ),
+            ],
+          ),
         );
       },
     );

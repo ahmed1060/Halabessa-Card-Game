@@ -23,6 +23,8 @@ import '../widgets/board_cards_widget.dart';
 import '../widgets/match_table_layout.dart';
 import '../widgets/table_seat.dart';
 import '../widgets/table_style.dart';
+import '../widgets/lantern_controls.dart';
+import '../widgets/table_motion_geometry.dart';
 import '../widgets/dealer_seat.dart';
 import '../widgets/team_capture_stack.dart';
 import '../widgets/match_phase_panel.dart';
@@ -36,11 +38,8 @@ import 'package:flutter/services.dart';
 import 'package:halabessa/core/services/multimedia_service.dart';
 import 'package:halabessa/core/utils/error_handler.dart';
 import 'package:halabessa/core/routes/app_routes.dart';
-import '../widgets/unity_game_view.dart';
 import '../providers/unity_communication_service.dart';
 import '../providers/unity_layer_provider.dart';
-import 'package:flutter_unity_widget/flutter_unity_widget.dart';
-import 'dart:convert';
 
 class GameBoardScreen extends ConsumerStatefulWidget {
   const GameBoardScreen({super.key});
@@ -52,6 +51,10 @@ class GameBoardScreen extends ConsumerStatefulWidget {
 class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
   late ConfettiController _confettiController;
   final GlobalKey _boardKey = GlobalKey();
+  final GlobalKey _dealerDeckKey = GlobalKey();
+  final GlobalKey _ourPileKey = GlobalKey();
+  final GlobalKey _rivalPileKey = GlobalKey();
+  final List<GlobalKey> _seatKeys = List.generate(4, (_) => GlobalKey());
   bool _isEmoteWheelOpen = false;
 
   void _returnToHome() {
@@ -368,29 +371,36 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
     final myTurn = playing && !isSpectator &&
         state.currentTurnIndex == _getAbsoluteIndex(state, myUid, 0);
     final firstLabel = (isSpectator ? 'team_a' : 'my_team').tr();
-    final secondLabel = (isSpectator ? 'team_b' : 'opponent_team').tr();
+    final secondLabel = (isSpectator ? 'team_b' : 'table_rivals').tr();
 
     Widget seat(int offset) {
       final user = _getAvatarUser(ref, state, myUid, offset);
       final active = playing && state.currentTurnIndex == _getAbsoluteIndex(state, myUid, offset);
       final message = ref.watch(lastMessageForUserProvider(user.uid))?.text ??
           _getPlayerEmoji(state, myUid, offset);
-      final seatWidget = TableSeat(
-        name: user.displayName, avatarUrl: user.avatarUrl,
+      final avatar = TableSeat(
+        name: user.uid.startsWith('bot_') ? user.displayName.replaceAll('🤖', '').trim() : user.displayName,
+        avatarUrl: user.avatarUrl,
+        portraitAsset: offset == 2 ? 'assets/images/avatars/lantern_partner_v1.png' :
+          offset == 3 ? 'assets/images/avatars/lantern_rival_man_v1.png' : 'assets/images/avatars/lantern_rival_woman_v1.png',
+        accent: offset == 2 ? TableStyle.mint : TableStyle.red,
+        dealerLabel: _getAbsoluteIndex(state, myUid, offset) == state.dealerIndex ? 'table_dealer'.tr() : null,
         isBot: user.uid.startsWith('bot_'), active: active,
         detail: active ? 'table_playing'.tr() : 'cards_count'.tr(args: [state.cardsRemainingFor(user.uid).toString()]),
         turnStarted: state.turnStartTime, turnSeconds: state.timerDurationSeconds,
         message: message,
+        hiddenHandCount: offset == 0 ? null : state.cardsRemainingFor(user.uid),
+        dealIdentity: '${state.id}-${state.roundCount}-${state.handInRound}-${user.uid}',
+        dealerDeckKey: _dealerDeckKey, backBuilder: _cardBack,
         onPressed: () => _showPlayerProfile(context, ref, state, myUid, offset),
       );
-      return DealerSeat(
-        seat: seatWidget,
+      return KeyedSubtree(key: _seatKeys[offset], child: DealerSeat(seat: avatar,
         isDealer: _getAbsoluteIndex(state, myUid, offset) == state.dealerIndex,
-        remaining: state.deckCount,
-        label: 'table_dealer'.tr(),
         compact: offset == 1 || offset == 3,
-        backBuilder: _lanternCardBack,
-      );
+        remaining: state.deckCount, label: 'table_deal_deck'.tr(),
+        deckKey: _getAbsoluteIndex(state, myUid, offset) == state.dealerIndex ? _dealerDeckKey : null,
+        backBuilder: _cardBack,
+      ));
     }
 
     return MatchTableLayout(
@@ -406,24 +416,44 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
         },
       ),
       partner: seat(2), leftOpponent: seat(3), rightOpponent: seat(1),
-      board: SizedBox(
-        key: _boardKey,
-        child: Stack(fit: StackFit.expand, children: [
-          _buildBoardCenter(context, ref, state, myUid, isLandscape, is3DActive: show3DHand),
-          if (!show3DHand) ...[
-            Align(alignment: AlignmentDirectional.topStart, child: _buildTeamCaptureStack(
-              context, state, _getTeamOfPlayer(myUid, state.playerIds).isEmpty ? 'teamA' : _getTeamOfPlayer(myUid, state.playerIds),
-              'table_my_team'.tr(), TableStyle.mint)),
-            Align(alignment: AlignmentDirectional.topEnd, child: _buildTeamCaptureStack(
-              context, state, _getTeamOfPlayer(myUid, state.playerIds) == 'teamA' ? 'teamB' : 'teamA',
-              'table_rivals'.tr(), TableStyle.red, showLatest: false)),
-          ],
-        ]),
-      ),
+      localSeat: state.dealerIndex == _getAbsoluteIndex(state, myUid, 0)
+        ? Semantics(key: _seatKeys[0], label: 'table_deal_deck'.tr(), child: Column(
+            mainAxisSize: MainAxisSize.min, children: [
+              FaceDownStack(key: _dealerDeckKey, count: state.deckCount, backBuilder: _cardBack,
+                width: 38, height: 54),
+              Text('${state.deckCount}', style: TableStyle.detail.copyWith(color: TableStyle.brass)),
+              Text('table_dealer'.tr(), textAlign: TextAlign.center,
+                style: TableStyle.detail.copyWith(color: TableStyle.brass, fontWeight: FontWeight.w700)),
+            ]))
+        : const SizedBox(height: 84),
+      collections: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Expanded(flex: 2, child: TeamCaptureStack(
+          captures: state.harvestStacks[firstIsA ? 'teamA' : 'teamB'] ?? const [],
+          label: firstLabel,
+          countLabel: 'cards_count'.tr(args: [_captureCount(state, firstIsA ? 'teamA' : 'teamB').toString()]),
+          latestLabel: 'table_last_capture'.tr(), historyLabel: 'table_view_history'.tr(),
+          showLatest: !isSpectator, pileKey: _ourPileKey,
+          faceBuilder: _cardFace, backBuilder: _cardBack,
+          onHistory: isSpectator ? null : () => _showCaptures(context),
+        )),
+        const SizedBox(width: 8),
+        Expanded(child: TeamCaptureStack(
+          captures: state.harvestStacks[firstIsA ? 'teamB' : 'teamA'] ?? const [],
+          label: secondLabel,
+          countLabel: 'cards_count'.tr(args: [_captureCount(state, firstIsA ? 'teamB' : 'teamA').toString()]),
+          latestLabel: '', historyLabel: '', showLatest: false,
+          pileKey: _rivalPileKey, accent: TableStyle.red,
+          faceBuilder: _cardFace, backBuilder: _cardBack,
+        )),
+      ]),
+      board: SizedBox(key: _boardKey,
+        child: _buildBoardCenter(context, ref, state, myUid, isLandscape, is3DActive: show3DHand)),
       status: _buildTableStatus(state, myUid, isSpectator, myTurn),
       hand: isSpectator || show3DHand || (state.handCards[myUid]?.isEmpty ?? true)
         ? const SizedBox(height: 24)
         : FannedHandWidget(
+            key: ValueKey('hand-${state.id}-${state.roundCount}-${state.handInRound}'),
+            dealerDeckKey: _dealerDeckKey,
             cards: state.handCards[myUid] ?? [], isMyTurn: myTurn,
             interactionEnabled: playing,
             playHint: 'table_play_card'.tr(), queueHint: 'table_queue_card'.tr(),
@@ -436,23 +466,31 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
               ref.read(matchStateProvider.notifier).playCard(myUid, card, origin: origin);
             },
           ),
-      controls: Wrap(alignment: WrapAlignment.center, spacing: 8, children: [
-        IconButton(tooltip: 'chat'.tr(), icon: const Icon(Icons.chat_bubble_outline),
-          color: TableStyle.ivory, constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+      controls: Padding(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        child: Wrap(alignment: WrapAlignment.center, spacing: 8, children: [
+        LanternControlButton(label: 'chat'.tr(), icon: Icons.chat_bubble_rounded,
           onPressed: () => ref.read(chatStateProvider.notifier).toggleOverlay()),
-        if (!isSpectator) IconButton(tooltip: 'table_reactions'.tr(), icon: const Icon(Icons.emoji_emotions_outlined),
-          color: TableStyle.ivory, constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
-          onPressed: () => setState(() => _isEmoteWheelOpen = !_isEmoteWheelOpen)),
-        IconButton(tooltip: 'table_captures'.tr(), icon: const Icon(Icons.layers_outlined),
-          color: TableStyle.ivory, constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
-          onPressed: () => _showCaptures(context, state)),
-        IconButton(tooltip: 'settings'.tr(), icon: const Icon(Icons.settings_outlined),
-          color: TableStyle.ivory, constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+        LanternControlButton(label: (ref.watch(settingsProvider).isSoundEnabled ? 'table_sound_on' : 'table_sound_off').tr(),
+          icon: ref.watch(settingsProvider).isSoundEnabled ? Icons.volume_up_rounded : Icons.volume_off_rounded,
+          onPressed: () => ref.read(settingsProvider.notifier).toggleSound(!ref.read(settingsProvider).isSoundEnabled)),
+        LanternControlButton(label: 'settings'.tr(), icon: Icons.settings_rounded,
           onPressed: () => _showSettings(context)),
-        IconButton(tooltip: 'leave_game_title'.tr(), icon: const Icon(Icons.logout_rounded),
-          color: TableStyle.ivory, constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
-          onPressed: () => _confirmLeave(context, ref)),
-      ]),
+        PopupMenuButton<String>(tooltip: 'table_more'.tr(), color: TableStyle.ink,
+          icon: const Icon(Icons.more_horiz, color: TableStyle.ivory),
+          constraints: const BoxConstraints(minWidth: 160),
+          onSelected: (action) {
+            switch (action) {
+              case 'reactions': setState(() => _isEmoteWheelOpen = !_isEmoteWheelOpen);
+              case 'captures': _showCaptures(context);
+              case 'leave': _confirmLeave(context, ref);
+            }
+          },
+          itemBuilder: (_) => [
+            if (!isSpectator) PopupMenuItem(value: 'reactions', child: Text('table_reactions'.tr(), style: TableStyle.label)),
+            if (!isSpectator) PopupMenuItem(value: 'captures', child: Text('table_captures'.tr(), style: TableStyle.label)),
+            PopupMenuItem(value: 'leave', child: Text('leave_game_title'.tr(), style: TableStyle.label)),
+          ]),
+      ])),
     );
   }
 
@@ -510,60 +548,11 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
         failureMessage: 'match_action_retry'.tr(),
       );
     }
-    return Semantics(liveRegion: true, child: Text(
-      spectator ? 'you_are_spectating'.tr() : myTurn ? 'table_tap_to_play'.tr() :
-        state.phase == GamePhase.playing ? 'table_wait_or_queue'.tr() : _tablePhaseLabel(state.phase),
-      textAlign: TextAlign.center,
-      style: TableStyle.label.copyWith(color: myTurn ? TableStyle.brass : TableStyle.ivory),
-    ));
-  }
-
-  Widget _lanternCardBack(double width, double height) => CardWidget(
-    card: const game_card.Card(game_card.Suit.hearts, game_card.Rank.ace),
-    isFaceUp: false,
-    width: width,
-    height: height,
-  );
-
-  Widget _buildTeamCaptureStack(BuildContext context, MatchState state,
-      String team, String label, Color accent, {bool showLatest = true}) {
-    final captures = state.harvestStacks[team] ?? const <Capture>[];
-    return Padding(
-      padding: const EdgeInsets.all(8),
-      child: TeamCaptureStack(
-        captures: captures,
-        label: label,
-        countLabel: 'table_capture_count'.tr(args: [captures.fold<int>(0, (sum, item) => sum + item.capturedCards.length).toString()]),
-        latestLabel: 'table_capture_card'.tr(),
-        historyLabel: 'table_capture_history'.tr(),
-        showLatest: showLatest,
-        accent: accent,
-        faceBuilder: (card, width, height) => CardWidget(card: card, width: width, height: height),
-        backBuilder: _lanternCardBack,
-        onHistory: showLatest ? () => _showTeamCaptureHistory(context, captures, label) : null,
-      ),
-    );
-  }
-
-  void _showTeamCaptureHistory(BuildContext context, List<Capture> captures, String label) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (sheetContext) => SafeArea(
-        child: SizedBox(
-          height: MediaQuery.sizeOf(sheetContext).height * .7,
-          child: CaptureCardHistory(
-            captures: captures,
-            title: 'table_capture_cards'.tr(args: [label]),
-            explanation: 'table_capture_history_help'.tr(),
-            emptyLabel: 'table_no_round_captures'.tr(),
-            faceBuilder: (card, width, height) => CardWidget(card: card, width: width, height: height),
-            cardLabel: (card) => card.toString(),
-          ),
-        ),
-      ),
-    );
+    return LanternTurnBadge(active: myTurn,
+      title: spectator ? 'you_are_spectating'.tr() : myTurn ? 'table_your_turn'.tr() :
+        state.phase == GamePhase.playing ? 'table_waiting'.tr() : _tablePhaseLabel(state.phase),
+      hint: spectator || state.phase != GamePhase.playing ? '' :
+        (myTurn ? 'table_play_hint' : 'table_wait_or_queue').tr());
   }
 
   String _tablePhaseLabel(GamePhase phase) => switch (phase) {
@@ -577,34 +566,41 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
     GamePhase.playing => 'table_wait_or_queue'.tr(),
   };
 
-  void _showCaptures(BuildContext context, MatchState state) {
+  Widget _cardFace(game_card.Card card, double width, double height) =>
+    CardWidget(card: card, width: width, height: height);
+
+  Widget _cardBack(double width, double height) => CardWidget(
+    card: const game_card.Card(game_card.Suit.spades, game_card.Rank.ace),
+    isFaceUp: false, width: width, height: height);
+
+  int _captureCount(MatchState state, String team) =>
+    (state.harvestStacks[team] ?? const <Capture>[])
+      .fold<int>(0, (count, capture) => count + capture.cardCount);
+
+  void _showCaptures(BuildContext context) {
     showModalBottomSheet(
-      context: context, backgroundColor: TableStyle.ink, isScrollControlled: true,
+      context: context, backgroundColor: TableStyle.ivory, isScrollControlled: true,
       builder: (context) => SafeArea(child: SizedBox(
         height: MediaQuery.sizeOf(context).height * 0.65,
-        child: Column(children: [
-          ListTile(title: Text('table_captures'.tr(), style: TableStyle.label),
-            trailing: IconButton(tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
-              icon: const Icon(Icons.close, color: TableStyle.ivory),
-              onPressed: () => Navigator.pop(context))),
-          Expanded(child: ListView(children: [
-            for (final team in ['teamA', 'teamB']) ...[
-              Padding(padding: const EdgeInsets.all(16),
-                child: Text((team == 'teamA' ? 'team_a' : 'team_b').tr(), style: TableStyle.label)),
-              if ((state.harvestStacks[team] ?? []).isEmpty)
-                Padding(padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Text('table_no_captures'.tr(), style: TableStyle.detail)),
-              for (final capture in state.harvestStacks[team] ?? <Capture>[])
-                Padding(padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                  child: Wrap(spacing: 6, runSpacing: 6, children: [
-                    for (final card in capture.capturedCards)
-                      Semantics(label: 'table_card_name'.tr(args: [
-                        'table_rank_${card.rank.name}'.tr(), 'table_suit_${card.suit.name}'.tr()]),
-                        child: CardWidget(card: card, width: 48, height: 68)),
-                  ])),
-            ],
-          ])),
-        ]),
+        // Read live state: an open sheet must clear when the next round starts.
+        child: Consumer(builder: (context, ref, _) {
+          final current = ref.watch(matchStateProvider);
+          final uid = ref.watch(currentUserProvider)?.uid;
+          final team = current == null || uid == null ? '' :
+            _getTeamOfPlayer(uid, current.playerIds);
+          return CaptureCardHistory(
+            captures: current?.harvestStacks[team] ?? const [],
+            title: 'table_capture_cards'.tr(),
+            explanation: 'table_capture_history_help'.tr(),
+            emptyLabel: 'table_no_captures'.tr(), faceBuilder: _cardFace,
+            statusLabel: current?.phase == GamePhase.playing &&
+                    current!.playerIds.indexOf(uid ?? '') == current.currentTurnIndex
+                ? 'table_your_turn'.tr() : 'table_waiting'.tr(),
+            latestLabel: 'table_latest'.tr(), backLabel: 'table_back_to_table'.tr(),
+            cardLabel: (card) => 'table_card_name'.tr(args: [
+              'table_rank_${card.rank.name}'.tr(), 'table_suit_${card.suit.name}'.tr()]),
+          );
+        }),
       )),
     );
   }
@@ -692,29 +688,6 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
     );
   }
 
-  Widget _buildMiniBadge(String text) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Text(
-        text,
-        style: TextStyle(
-          color: Colors.white.withOpacity(0.9),
-          fontSize: 9,
-          fontWeight: FontWeight.w600,
-          fontFamily: ThemeConfig.fontBody,
-        ),
-      ),
-    );
-  }
-
-
-
-
-
   String? _getPlayerEmoji(MatchState matchState, String myUid, int offset) {
     final idx = _getAbsoluteIndex(matchState, myUid, offset);
     if (matchState.playerIds.length > idx) {
@@ -758,6 +731,10 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
       final relative = ownerIndex < 0
           ? (isCapturing ? (matchState.currentTurnIndex - baseIndex + 4) % 4 : 2)
           : (ownerIndex - baseIndex + 4) % 4;
+      final measured = _seatOffset(relative);
+      if (measured != null) {
+        return measured;
+      }
       return switch (relative) {
         0 => const Offset(0, 150),
         1 => const Offset(150, 0),
@@ -779,10 +756,24 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
       captureToBottom: matchState.capturingTeam ==
           (_getTeamOfPlayer(myUid, matchState.playerIds).isEmpty
               ? 'teamA' : _getTeamOfPlayer(myUid, matchState.playerIds)),
+      backBuilder: _cardBack,
+      captureOffset: _captureDestination(matchState, myUid),
       captureLabel: isCapturing && collectorLabel != null
           ? '$collectorLabel · ${'cards_count'.tr(args: [capturedCount.toString()])}'
           : null,
     );
+  }
+
+  Offset? _seatOffset(int relative) => _offsetFromBoard(_seatKeys[relative]);
+
+  Offset? _offsetFromBoard(GlobalKey key) {
+    return tableMotionOffset(key, _boardKey);
+  }
+
+  Offset? _captureDestination(MatchState state, String uid) {
+    final viewer = _getTeamOfPlayer(uid, state.playerIds);
+    return _offsetFromBoard(state.capturingTeam == (viewer.isEmpty ? 'teamA' : viewer)
+        ? _ourPileKey : _rivalPileKey);
   }
 
   Widget _buildBasraOverlay(MatchState matchState, String myUid) {

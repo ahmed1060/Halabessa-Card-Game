@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/lantern_help_screen.dart';
 
 import '../../features/auth/presentation/pages/auth_wrapper.dart';
 import '../../features/home/presentation/pages/home_screen.dart';
@@ -17,6 +18,7 @@ class AppRoutes {
   static const String profile = '/profile';
   static const String store = '/store';
   static const String leaderboard = '/leaderboard';
+  static const String help = '/help';
   static const String adminMusic = '/admin/music';
   static const String adminSfx = '/admin/sfx';
   static const String adminUsers = '/admin/users';
@@ -28,6 +30,7 @@ class AppRoutes {
         profile: (context) => const ProfileScreen(),
         store: (context) => const StoreScreen(),
         leaderboard: (context) => const LeaderboardScreen(),
+        help: (context) => const LanternHelpScreen(),
         adminMusic: (context) => const AdminMusicManagementScreen(),
         adminSfx: (context) => const AdminSfxManagementScreen(),
         adminUsers: (context) => const AdminUserManagementScreen(),

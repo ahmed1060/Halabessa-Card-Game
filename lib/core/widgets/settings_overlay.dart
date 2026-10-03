@@ -1,3 +1,4 @@
+import 'package:halabessa/features/game/presentation/widgets/match_table_layout.dart';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -26,7 +27,7 @@ class SettingsOverlay extends ConsumerWidget {
       child: Container(
         constraints: const BoxConstraints(maxWidth: 600),
         decoration: BoxDecoration(
-          color: const Color(0xFF1A1A2E).withOpacity(0.95),
+          color: const Color(0xFF3B274C).withOpacity(0.95),
           borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
           border: Border.all(color: Colors.white.withOpacity(0.1), width: 1.5),
           boxShadow: [
@@ -55,6 +56,8 @@ class SettingsOverlay extends ConsumerWidget {
                   ),
                 ),
                   // Header
+                  const Padding(padding: EdgeInsets.only(top: 12),
+                    child: SizedBox(height: 52, child: FittedBox(child: LanternWordmark()))),
                   _buildHeader(context),
                   
                   // Scrollable Content
@@ -127,6 +130,12 @@ class SettingsOverlay extends ConsumerWidget {
                               HapticFeedback.mediumImpact();
                             },
                           ),
+                          _buildToggleTile(
+                            'reduced_motion'.tr(),
+                            settings.reducedMotion,
+                            Icons.animation_rounded,
+                            notifier.setReducedMotion,
+                          ),
                           
                           const SizedBox(height: 24),
                           _buildSectionTitle('language'.tr()),
@@ -138,6 +147,12 @@ class SettingsOverlay extends ConsumerWidget {
 
                           const SizedBox(height: 24),
                           _buildSectionTitle('graphics'.tr()),
+                          ListTile(leading: const Icon(Icons.help_outline, color: ThemeConfig.goldAccent),
+                            title: Text('help_title'.tr(), style: const TextStyle(color: Colors.white)),
+                            onTap: () {
+                              Navigator.pop(context);
+                              Navigator.pushNamed(context, AppRoutes.help);
+                            }),
                           _buildToggleTile(
                             'mode_3d'.tr(),
                             settings.is3DModeEnabled,
