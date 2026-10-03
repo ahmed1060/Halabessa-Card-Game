@@ -47,3 +47,17 @@ illustrative/mock data in the design boards.
 This is not a claim of pixel-identical raster reproduction: mockup artwork,
 dynamic player content and text sizes differ. Nor does browser/widget verification
 certify Apple/Google store acceptance or replace native-device testing.
+
+## Final verification pass
+
+The initial refactor and signed-in profile correction were deployed successfully
+via Hosting run `37131554933`. Live guest practice progressed across deals and
+captures; the cream capture history contained only played capture cards and
+chat used the new cream reading pane. Profile, leaderboard, create-room form,
+welcome and reward sheet were also visually checked in portrait.
+
+That pass found a remaining legacy animated/cycling startup screen. It is now
+static and reports only real asset progress. Reward cards grow with their text,
+the sheet scrolls on short screens, and claiming uses an accessible native
+button. The full local suite passes **190 tests**, including eight reward
+layout combinations and a static/bounded startup-progress regression test.
