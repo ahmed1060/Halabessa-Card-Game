@@ -67,9 +67,17 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
     _confettiController = ConfettiController(duration: const Duration(seconds: 5));
     ref.read(localPlayOriginsProvider.notifier).state = {};
     
+    final multimedia = ref.read(multimediaServiceProvider);
+    final unityVisibility = ref.read(unityLayerVisibilityProvider.notifier);
+    _restoreLobbyPresentation = () {
+      if (!unityVisibility.mounted) return;
+      multimedia.playMusic('music/bg_music.mp3');
+      unityVisibility.state = false;
+    };
     // Start Room Music
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(multimediaServiceProvider).playRoomMusic('music/room_music.mp3');
+      if (!mounted) return;
+      multimedia.playRoomMusic('music/room_music.mp3');
       // Unity is optional. Keep its startup/error screen from covering the
       // Flutter board when the player has disabled 3D mode.
       ref.read(unityLayerVisibilityProvider.notifier).state =
@@ -77,14 +85,14 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
     });
   }
 
+  late final VoidCallback _restoreLobbyPresentation;
+
   @override
   void dispose() {
     _confettiController.dispose();
     // Resume Background Music when leaving room
-    Future.microtask(() {
-      ref.read(multimediaServiceProvider).playMusic('music/bg_music.mp3');
-      ref.read(unityLayerVisibilityProvider.notifier).state = false;
-    });
+    // Cache dependencies while mounted: WidgetRef is invalid after disposal.
+    Future.microtask(_restoreLobbyPresentation);
     super.dispose();
   }
 
