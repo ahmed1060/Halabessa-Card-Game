@@ -36,7 +36,7 @@ command endpoint but not the production gameplay controller yet**: deadline-gate
 play, three accepted timeout removals, explicit leave, inherited replacement
 hands/team, waiting-room vacancy reopening, non-host phase advancement,
 round conservation, capture phases, scoring and bounded rematch votes.
-The full backend regression gate currently passes 61 tests. A complete-round
+The full backend regression gate currently passes 72 tests. A complete-round
 simulation caught and fixed an inconsistent subsequent-hand turn timestamp.
 Accepted plays append immutable play history for presentation; capture animation
 cannot harvest the same cards twice or consume the next player's countdown.
@@ -84,6 +84,35 @@ The updated private-room live concurrency smoke test passed again against
 revision 17, including the five-second dealing gate; its temporary accounts,
 Firebase match and SQL room/profile/command records were removed afterward.
 Released-seat joining is regression-tested but not yet exercised in a live UI.
+
+Reward settlement integration deployed (222 Flutter / 72 backend tests pass):
+only explicitly created protocol-1 rooms qualify; existing client-controlled
+rooms remain on the legacy path. The server freezes reward roster/scores at
+completion and derives awards itself, ignoring caller-provided balances or
+award maps. An atomic Firestore commit conditionally creates one private receipt
+and updates only existing profile statistics with update-time preconditions.
+Purchases, diamonds and other profile fields remain untouched. Lost responses,
+concurrent settlement requests and SQL rollback after a Firestore commit can be
+retried without double-credit. Receipt IDs include the immutable room creation
+instant and match sequence to distinguish rematches and reused room IDs.
+Pending settlement blocks a unanimous rematch from discarding awards.
+
+Approved private live test passed: four new anonymous accounts and profiles
+completed a real four-round/192-play match using protocol-1 commands. Competing
+settlement requests and a later retry credited each wallet once, preserved
+purchases/diamonds/best scores, and cleared pending settlement. The test's
+Firestore profiles/receipt, Firebase match, anonymous accounts and SQL records
+were removed. The temporary cleanup action was bound to those exact fixture
+IDs, removed immediately afterward, and confirmed absent from the permanent
+function (revision 20). No existing players or balances were changed.
+
+Client model/transport now preserves protocol, match sequence and pending
+settlement flags. Legacy whole-state publication rejects server-controlled
+rooms before changing optimistic local state. A retry-safe settlement transport
+is available, but not called by the gameplay controller yet. Normal room
+creation still defaults to legacy mode. Private-hand rules and client wallet
+writes remain unchanged. Do not claim normal gameplay or full-plan migration
+complete from the separate protocol-1 QA test.
 
 - Connect online play to the versioned, idempotent server command ledger.
 - Complete server round/deal/scoring/rematch and reward settlement before removing legacy writes.

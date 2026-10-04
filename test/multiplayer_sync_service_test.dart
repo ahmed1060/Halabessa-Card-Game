@@ -3,6 +3,17 @@ import 'package:halabessa/features/game/data/repositories/multiplayer_sync_servi
 import 'package:halabessa/features/game/domain/models/match_state.dart';
 
 void main() {
+  test('whole-state writes reject server protocols and retain legacy behavior', () {
+    final legacy = MatchState.fromJson({
+      'id': 'ABC12345', 'mode': 'classic', 'playerIds': ['one'],
+      'serverVersion': 8,
+    });
+    expect(() => MultiplayerSyncService.validateLegacyWrite(legacy), returnsNormally);
+    for (final protocol in [1, 2]) {
+      expect(() => MultiplayerSyncService.validateLegacyWrite(
+        legacy.copyWith(protocolVersion: protocol)), throwsA(isA<Exception>()));
+    }
+  });
   test('command snapshot keeps public opponent counts and only caller cards', () {
     final state = MultiplayerSyncService.commandSnapshot({
       'state': {'id': 'ABC12345', 'mode': 'classic', 'serverVersion': 8,

@@ -26,7 +26,8 @@ function nextRound(state: MatchState, shuffle: boolean, now: number): Transition
   }
   started.state = { ...started.state, roundsSinceLastShuffle: shuffle ? 0 : integer(state.roundsSinceLastShuffle) + 1,
     turnStartTime: new Date(now).toISOString(), capturingCards: [], capturingTeam: null,
-    capturingStage: 0, playHistory: [], earnedStars: {}, earnedCoins: {}, expireAt: null };
+    capturingStage: 0, playHistory: [], earnedStars: {}, earnedCoins: {}, expireAt: null,
+    settlementPending: false, rewardRoster: [], rewardScores: null, rewardReceiptId: null };
   return stamp(started, now);
 }
 function finishRound(state: MatchState, deck: Card[], now: number): Transition {
@@ -109,7 +110,8 @@ export function advanceMatch(state: MatchState, deck: Card[], now = Date.now()):
           stars[uid] = seat % 2 === winner ? 50 : -30; coins[uid] = seat % 2 === winner ? 100 : 20;
         }});
         return stamp({ state: { ...state, phase: "rematchVoting", rematchVotes: {},
-          earnedStars: stars, earnedCoins: coins, settlementPending: true }, deck }, now);
+          earnedStars: stars, earnedCoins: coins, settlementPending: true,
+          rewardRoster: [...ids], rewardScores: { teamA: integer(state.teamAScore), teamB: integer(state.teamBScore) } }, deck }, now);
       }
       const rounds = integer(state.roundsSinceLastShuffle);
       if (rounds >= 5) return nextRound(state, true, now);

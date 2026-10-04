@@ -31,6 +31,12 @@ class MatchState {
   final Map<String, int> handCounts;
   // Monotonic server revision used for optimistic command concurrency.
   final int serverVersion;
+  // Explicit protocol identity; a revision alone does not migrate a legacy room.
+  final int protocolVersion;
+  final bool settlementPending;
+  final int matchSequence;
+
+  bool get usesServerCommands => protocolVersion > 0;
   
   // Harvested cards per team grouped by capture event
   final Map<String, List<Capture>> harvestStacks;
@@ -86,6 +92,9 @@ class MatchState {
       this.handCards = const {},
       this.handCounts = const {},
       this.serverVersion = 0,
+      this.protocolVersion = 0,
+      this.settlementPending = false,
+      this.matchSequence = 0,
       this.harvestStacks = const {'teamA': [], 'teamB': []},
       this.teamAScore = 0,
       this.teamBScore = 0,
@@ -145,6 +154,9 @@ class MatchState {
     Map<String, List<game_card.Card>>? handCards,
     Map<String, int>? handCounts,
     int? serverVersion,
+    int? protocolVersion,
+    bool? settlementPending,
+    int? matchSequence,
     Map<String, List<Capture>>? harvestStacks,
     int? teamAScore,
     int? teamBScore,
@@ -192,6 +204,9 @@ class MatchState {
       handCards: handCards ?? this.handCards,
       handCounts: handCounts ?? this.handCounts,
       serverVersion: serverVersion ?? this.serverVersion,
+      protocolVersion: protocolVersion ?? this.protocolVersion,
+      settlementPending: settlementPending ?? this.settlementPending,
+      matchSequence: matchSequence ?? this.matchSequence,
       harvestStacks: harvestStacks ?? this.harvestStacks,
       teamAScore: teamAScore ?? this.teamAScore,
       teamBScore: teamBScore ?? this.teamBScore,
@@ -249,6 +264,9 @@ class MatchState {
       'recentFasha': recentFasha.map((c) => c.toJson()).toList(),
       'handCounts': handCounts,
       'serverVersion': serverVersion,
+      'protocolVersion': protocolVersion,
+      'settlementPending': settlementPending,
+      'matchSequence': matchSequence,
       // handCards is deliberately NOT written here -- MultiplayerSyncService
       // writes it separately to the matchHands/$matchId tree, which
       // database.rules.json restricts to this match's own participants.
@@ -468,6 +486,9 @@ class MatchState {
         handCards: handCards,
         handCounts: handCounts,
         serverVersion: json['serverVersion'] is num ? (json['serverVersion'] as num).toInt() : 0,
+        protocolVersion: json['protocolVersion'] is num ? (json['protocolVersion'] as num).toInt() : 0,
+        settlementPending: json['settlementPending'] == true,
+        matchSequence: json['matchSequence'] is num ? (json['matchSequence'] as num).toInt() : 0,
         harvestStacks: parseCaptureMap(json['harvestStacks'] ?? {}),
         teamAScore: json['teamAScore'] is int ? json['teamAScore'] as int : 0,
         teamBScore: json['teamBScore'] is int ? json['teamBScore'] as int : 0,

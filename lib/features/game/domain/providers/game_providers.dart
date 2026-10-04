@@ -101,6 +101,9 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
   static const String _matchIdKey = 'last_match_id';
 
   Future<void> _publishState(MatchState newState) async {
+    // Never optimistically replace a server-owned room with a locally computed
+    // snapshot. Its next state must come from an accepted command/snapshot.
+    MultiplayerSyncService.validateLegacyWrite(newState);
     final previousState = state;
     state = newState;
     if (!newState.id.startsWith('OFFLINE_')) {

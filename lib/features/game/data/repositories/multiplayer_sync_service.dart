@@ -128,6 +128,18 @@ class MultiplayerSyncService {
     return commandSnapshot(data, callerUid);
   }
 
+  /// Only completed server-protocol rooms can award trusted profile changes.
+  /// The server's immutable match receipt makes a lost response safe to retry.
+  Future<MatchState> settleMatchRewards(MatchState matchState, String callerUid) async {
+    if (matchState.protocolVersion != 1) {
+      throw const SupabaseBackendException('rewards_not_ready');
+    }
+    final data = await sendIdempotentMatchRequest({'roomId': matchState.id},
+      (intent) => SupabaseBackendService.call('settleMatchRewards', data: intent,
+        timeout: const Duration(seconds: 40)));
+    return commandSnapshot(data, callerUid);
+  }
+
   String _newCommandId() {
     final random = Random.secure();
     final bytes = List<int>.generate(16, (_) => random.nextInt(256));
@@ -140,6 +152,7 @@ class MultiplayerSyncService {
 
   /// Update an entire existing match state
   Future<void> updateMatchState(MatchState matchState, {bool refreshRoomIndex = false}) async {
+    validateLegacyWrite(matchState);
     // The public state and private hands must change in the same RTDB update.
     // Two sequential writes briefly exposed a new turn with old cards and
     // made reconnects vulnerable to observing a mismatched snapshot.
@@ -160,6 +173,12 @@ class MultiplayerSyncService {
       // Index refresh must not roll back a successfully persisted move; the
       // next state update or scheduled cleanup will reconcile it.
       if (kDebugMode) debugPrint('Could not refresh room index for ${matchState.id}: $e');
+    }
+  }
+
+  static void validateLegacyWrite(MatchState matchState) {
+    if (matchState.usesServerCommands) {
+      throw const SupabaseBackendException('server_match_requires_command');
     }
   }
 

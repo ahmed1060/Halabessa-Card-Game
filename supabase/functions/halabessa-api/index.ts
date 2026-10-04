@@ -4,6 +4,8 @@ import { createRemoteJWKSet, importPKCS8, jwtVerify, SignJWT } from "npm:jose@6"
 import { waitingSeatIndex, type Card, type MatchState } from "./match_engine.ts";
 import { executeMatchIntent, matchCommandTypes } from "./match_commands.ts";
 import { joinCommandRoom } from "./room_seating.ts";
+import { rewardPlan } from "./match_rewards.ts";
+import { createFirestoreRewardStore } from "./firestore_rewards.ts";
 import { createDatabaseRunner, databaseConnectionString } from "./database.ts";
 import { commitAndDeliver, deliverLatestRoom, matchMirrorUpdates, participantSnapshot, publicMatchState } from "./match_delivery.ts";
 
@@ -73,7 +75,7 @@ async function firebaseAccessToken() {
   const now = Math.floor(Date.now() / 1000);
   const key = await importPKCS8(account.private_key, "RS256");
   const assertion = await new SignJWT({
-    scope: "https://www.googleapis.com/auth/firebase.database https://www.googleapis.com/auth/userinfo.email",
+    scope: "https://www.googleapis.com/auth/firebase.database https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/datastore",
   })
     .setProtectedHeader({ alg: "RS256", typ: "JWT" })
     .setIssuer(account.client_email)
@@ -536,9 +538,62 @@ Deno.serve(async (request) => {
         if (!(room.state.playerIds ?? []).includes(user.uid)) return reply({ error: "not_room_participant" }, 403, origin);
         return reply(participantSnapshot({ state: room.state, version: Number(room.version), hands: room.hands ?? {} }, user.uid), 200, origin);
       }
+      if (body.action === "settleMatchRewards") {
+        const id = validRoomId(body.roomId);
+        if (!id) return reply({ error: "invalid_room_id" }, 400, origin);
+        let transactionOpen = false;
+        try {
+          await connection.queryObject`begin`; transactionOpen = true;
+          const result = await connection.queryObject<{ state: MatchState; version: string;
+            hands: Record<string, Card[]>; created_at: string }>`
+            select r.state, r.version::text as version, extract(epoch from r.created_at)::text as created_at, s.hands
+            from halabessa.rooms r join halabessa.room_secrets s on s.room_id = r.room_id
+            where r.room_id = ${id} for update of r, s
+          `;
+          const room = result.rows[0];
+          if (!room || !(room.state.playerIds ?? []).includes(user.uid)) {
+            await connection.queryObject`rollback`; transactionOpen = false;
+            return reply({ error: "not_room_participant" }, 403, origin);
+          }
+          if (room.state.protocolVersion !== 1 || !["rematchVoting", "matchOver"].includes(String(room.state.phase))) {
+            await connection.queryObject`rollback`; transactionOpen = false;
+            return reply({ error: "rewards_not_ready" }, 409, origin);
+          }
+          let state = room.state, version = Number(room.version);
+          let duplicate = true;
+          if (state.settlementPending !== true && !/^[a-f0-9]{64}$/.test(String(state.rewardReceiptId ?? ""))) {
+            throw new Error("rewards_not_ready");
+          }
+          if (state.settlementPending === true) {
+            const plan = await rewardPlan(state, room.created_at);
+            const settled = await createFirestoreRewardStore(firebaseProject, firebaseAccessToken).settle(plan);
+            duplicate = settled.duplicate;
+            state = { ...state, settlementPending: false, rewardReceiptId: plan.receiptId };
+            version++;
+            await connection.queryObject`update halabessa.rooms
+              set state = ${JSON.stringify(publicMatchState({ ...state, handCards: room.hands ?? {} }, version))}::jsonb,
+                  version = ${version}, updated_at = now() where room_id = ${id}`;
+          }
+          const delivery = await commitAndDeliver(async () => {
+            await connection.queryObject`commit`; transactionOpen = false;
+          }, () => mirrorDurableRoom(connection, id));
+          return reply({ ok: true, settled: true, duplicate,
+            ...participantSnapshot(delivery.snapshot ?? { state, version, hands: room.hands ?? {} }, user.uid),
+            mirrorPending: delivery.mirrorPending }, 200, origin);
+        } catch (error) {
+          if (transactionOpen) await connection.queryObject`rollback`;
+          const safeReasons = new Set(["rewards_not_ready", "invalid_reward_state", "invalid_reward_profile",
+            "reward_profile_missing", "reward_access_denied", "reward_store_failed", "reward_transport_failed",
+            "reward_receipt_conflict", "reward_settlement_retry_required"]);
+          const reason = error instanceof Error && safeReasons.has(error.message) ? error.message : "reward_store_failed";
+          console.warn("halabessa-match: reward settlement remains pending", { reason });
+          return reply({ error: "reward_settlement_pending", reason }, 503, origin);
+        }
+      }
       if (body.action === "createRoom") {
         if (!roomModes.has(body.mode as string) || !roomPoints.has(body.maxPoints as number) ||
-            !roomTimers.has(body.timerDurationSeconds as number) || typeof body.isPublic !== "boolean") {
+            !roomTimers.has(body.timerDurationSeconds as number) || typeof body.isPublic !== "boolean" ||
+            (body.protocolVersion != null && body.protocolVersion !== 0 && body.protocolVersion !== 1)) {
           return reply({ error: "invalid_room_configuration" }, 400, origin);
         }
         const displayName = optionalText(body.displayName, 64) || user.name;
@@ -554,7 +609,7 @@ Deno.serve(async (request) => {
             playerSkins: { [user.uid]: cardBackId }, playerAvatars: { [user.uid]: avatarUrl },
             dealerIndex: 0, currentTurnIndex: 1, phase: "waitingForPlayers",
             timerDurationSeconds: body.timerDurationSeconds, isPublic: body.isPublic, expireAt: expiresAt,
-            serverVersion: 0,
+            serverVersion: 0, protocolVersion: body.protocolVersion === 1 ? 1 : 0,
           };
           let transactionOpen = false;
           let firebaseCreated = false;
@@ -622,7 +677,7 @@ Deno.serve(async (request) => {
             where r.room_id = ${id} for update of r, s
           `;
           const room = locked.rows[0];
-          if (room && Number(room.version) > 0) {
+          if (room && (Number(room.version) > 0 || room.state.protocolVersion === 1)) {
             let joined;
             try {
               joined = joinCommandRoom({ ...room.state, handCards: room.hands ?? {} }, user.uid,
@@ -678,22 +733,23 @@ Deno.serve(async (request) => {
             try {
               await connection.queryObject`begin`;
               transactionOpen = true;
-              const authoritative = await connection.queryObject<{ version: string }>`
-                select version::text as version from halabessa.rooms where room_id = ${id} for update
+              const authoritative = await connection.queryObject<{ version: string; protocol_version: unknown }>`
+                select version::text as version, state->'protocolVersion' as protocol_version
+                from halabessa.rooms where room_id = ${id} for update
               `;
               if (!authoritative.rows[0]) {
                 await connection.queryObject`rollback`;
                 transactionOpen = false;
                 return reply({ error: "room_not_authoritative" }, 409, origin);
               }
-              if (Number(authoritative.rows[0].version) > 0) {
+              if (Number(authoritative.rows[0].version) > 0 || authoritative.rows[0].protocol_version === 1) {
                 await connection.queryObject`rollback`;
                 transactionOpen = false;
                 return reply({ error: "room_changed_retry" }, 409, origin);
               }
               await connection.queryObject`
                 update halabessa.rooms
-                set state = ${JSON.stringify(match)}::jsonb,
+                set state = ${JSON.stringify({ ...match, protocolVersion: 0 })}::jsonb,
                     expires_at = ${typeof match.expireAt === "string" ? match.expireAt : null}::timestamptz,
                     updated_at = now()
                 where room_id = ${id}

@@ -2,6 +2,29 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:halabessa/features/game/domain/models/match_state.dart';
 
 void main() {
+  test('preserves protocol and settlement identity across JSON and copies', () {
+    final state = MatchState.fromJson({
+      'id': 'ABC12345', 'mode': 'classic', 'playerIds': ['one'],
+      'protocolVersion': 1, 'serverVersion': 8,
+      'settlementPending': true, 'matchSequence': 2,
+    });
+    final copy = state.copyWith(teamAScore: 42);
+    expect(copy.usesServerCommands, isTrue);
+    expect(copy.protocolVersion, 1);
+    expect(copy.settlementPending, isTrue);
+    expect(copy.matchSequence, 2);
+    expect(MatchState.fromJson(copy.toJson()).settlementPending, isTrue);
+    expect(copy.copyWith(settlementPending: false).settlementPending, isFalse);
+  });
+
+  test('a nonzero revision alone does not switch legacy room protocols', () {
+    final state = MatchState.fromJson({
+      'id': 'ABC12345', 'mode': 'classic', 'playerIds': ['one'],
+      'serverVersion': 8,
+    });
+    expect(state.usesServerCommands, isFalse);
+    expect(state.protocolVersion, 0);
+  });
   test('preserves authoritative version and public hand counts', () {
     final state = MatchState.fromJson({
       'id': 'ABC12345',
