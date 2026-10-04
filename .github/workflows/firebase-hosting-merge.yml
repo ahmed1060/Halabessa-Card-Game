@@ -21,7 +21,7 @@ jobs:
         with:
           node-version: "24"
       - name: Test authoritative match engines and database lifecycle
-        run: node --test functions/test/match_engine.test.js functions/test/edge_match_engine.test.ts functions/test/edge_match_lifecycle.test.ts functions/test/edge_turn_policy.test.ts functions/test/edge_match_delivery.test.ts functions/test/edge_database.test.ts functions/test/unity_web_startup.test.js functions/test/web_build_versioning.test.mjs
+        run: node --test functions/test/match_engine.test.js functions/test/edge_match_engine.test.ts functions/test/edge_match_lifecycle.test.ts functions/test/edge_match_commands.test.ts functions/test/edge_room_seating.test.ts functions/test/edge_turn_policy.test.ts functions/test/edge_match_delivery.test.ts functions/test/edge_database.test.ts functions/test/unity_web_startup.test.js functions/test/web_build_versioning.test.mjs
       - uses: actions/setup-java@v4
         with:
           distribution: temurin

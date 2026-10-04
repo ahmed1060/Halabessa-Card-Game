@@ -31,18 +31,18 @@ Reward patching is NOT server-side exactly-once reward settlement.
 
 ## Batch 2 — authoritative online lifecycle
 
-Server-policy foundation implemented and regression-tested, **not connected to
-the production client/server command path yet**: deadline-gated manual/timeout
+Server-policy foundation implemented and regression-tested, **connected to the
+command endpoint but not the production gameplay controller yet**: deadline-gated manual/timeout
 play, three accepted timeout removals, explicit leave, inherited replacement
 hands/team, waiting-room vacancy reopening, non-host phase advancement,
 round conservation, capture phases, scoring and bounded rematch votes.
-The full backend regression gate currently passes 42 tests. A complete-round
+The full backend regression gate currently passes 61 tests. A complete-round
 simulation caught and fixed an inconsistent subsequent-hand turn timestamp.
 Accepted plays append immutable play history for presentation; capture animation
 cannot harvest the same cards twice or consume the next player's countdown.
 Reward values remain a preview with `settlementPending`; no reward settlement
-or production rules migration is claimed. Keep this foundation inactive until
-the command/mirror/privacy/reward migration is verified end to end.
+or production rules migration is claimed. Do not switch normal gameplay to this
+protocol until the command/mirror/privacy/reward migration is verified end to end.
 
 Command delivery integration (219 Flutter / 48 backend tests): commit the SQL
 state/ledger before delivery; repair reads the latest committed room while
@@ -56,7 +56,8 @@ network retry, and does not retry version/validation rejection as another move.
 `getMatchSnapshot` is for the SQL command protocol, **not legacy RTDB recovery**.
 Production read-only verification found zero accepted commands/versioned rooms
 before this change: the existing gameplay controller still needs migration.
-No new timeout/takeover activation or private-hand rules rollout is claimed here.
+No timeout/takeover activation in normal gameplay or private-hand rules rollout
+is claimed here.
 
 Approved live private-room verification passed on 4 October: four temporary
 guest accounts filled seats 0, 2, 1, 3; two simultaneous card commands accepted
@@ -66,6 +67,23 @@ applied revision 5, without replaying it. Chat and presence survived delivery.
 The temporary Firebase accounts/match data and SQL room/profile records were
 removed afterward; an expired private lobby-index entry may await cleanup.
 This verifies the command transport, not migration of the existing controller.
+
+Lifecycle command endpoint integration (Supabase function revision 17): the JWT
+caller cannot proxy another human or bot. `advance` lets any seated human request
+server-timed preparation, bot moves, timeout moves, capture completion, scoring
+and voting progression. Manual plays/cuts use deadline checks; compatibility
+phase commands cannot skip delays. Leave and bot/shuffle/rematch votes use the
+same command ledger. Active rounds clear the waiting-lobby expiry. Reward
+settlement remains pending and cannot be bypassed by a unanimous rematch vote.
+
+Versioned room joins lock SQL state/secrets, never import the Firebase mirror,
+preserve reconnect identity, and atomically claim eligible released public seats.
+Waiting joins keep opposite-teammate priority and invalidate old bot votes.
+A legacy join racing the first command cannot overwrite the new SQL revision.
+The updated private-room live concurrency smoke test passed again against
+revision 17, including the five-second dealing gate; its temporary accounts,
+Firebase match and SQL room/profile/command records were removed afterward.
+Released-seat joining is regression-tested but not yet exercised in a live UI.
 
 - Connect online play to the versioned, idempotent server command ledger.
 - Complete server round/deal/scoring/rematch and reward settlement before removing legacy writes.

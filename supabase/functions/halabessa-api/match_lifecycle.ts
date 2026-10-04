@@ -26,7 +26,7 @@ function nextRound(state: MatchState, shuffle: boolean, now: number): Transition
   }
   started.state = { ...started.state, roundsSinceLastShuffle: shuffle ? 0 : integer(state.roundsSinceLastShuffle) + 1,
     turnStartTime: new Date(now).toISOString(), capturingCards: [], capturingTeam: null,
-    capturingStage: 0, playHistory: [], earnedStars: {}, earnedCoins: {} };
+    capturingStage: 0, playHistory: [], earnedStars: {}, earnedCoins: {}, expireAt: null };
   return stamp(started, now);
 }
 function finishRound(state: MatchState, deck: Card[], now: number): Transition {
@@ -150,7 +150,13 @@ export function lifecycleCommand(type: string, state: MatchState, deck: Card[], 
   if (type === "advance") return advanceMatch(state, deck, now);
   if (type === "playCard") return animateCapture(state, manualPlay(state, uid, payload.card, now), deck, now);
   if (type === "leave") return { state: releasePlayer(state, uid, "left"), deck };
-  if (type === "cut") return stamp(cut(state, deck, uid, payload.position), now);
+  if (type === "cut") {
+    if (state.phase !== "preRoundCut") throw new Error("cut_not_ready");
+    // The timer-free gameplay option still has a bounded preparation phase.
+    const seconds = integer(state.timerDurationSeconds) || 15;
+    if (elapsed(state, now) >= seconds * 1000) throw new Error("cut_deadline_reached");
+    return stamp(cut(state, deck, uid, payload.position), now);
+  }
   if (type === "voteShuffle" || type === "voteRematch") {
     const rematch = type === "voteRematch";
     if (state.phase !== (rematch ? "rematchVoting" : "shuffleVoting") || typeof payload.vote !== "boolean") {

@@ -1,7 +1,9 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { Client } from "jsr:@db/postgres@0.19.5";
 import { createRemoteJWKSet, importPKCS8, jwtVerify, SignJWT } from "npm:jose@6";
-import { cut, deal, playCard, startRound, waitingSeatIndex, type Card, type MatchState } from "./match_engine.ts";
+import { waitingSeatIndex, type Card, type MatchState } from "./match_engine.ts";
+import { executeMatchIntent, matchCommandTypes } from "./match_commands.ts";
+import { joinCommandRoom } from "./room_seating.ts";
 import { createDatabaseRunner, databaseConnectionString } from "./database.ts";
 import { commitAndDeliver, deliverLatestRoom, matchMirrorUpdates, participantSnapshot, publicMatchState } from "./match_delivery.ts";
 
@@ -22,7 +24,6 @@ const roomPoints = new Set([21, 41, 61]);
 const roomTimers = new Set([0, 5, 10, 15]);
 const assetBucket = "game-assets";
 const assetKinds = new Set(["avatar", "storeItem", "music", "sfx"]);
-const matchCommandTypes = new Set(["startRound", "cut", "dealInitial", "beginPlay", "dealSubsequent", "playCard"]);
 const assetExtensions = new Map([
   ["image/jpeg", "jpg"],
   ["image/png", "png"],
@@ -174,33 +175,6 @@ async function mirrorDurableRoom(connection: Client, id: string) {
     const mirrored = await firebaseRequest("", "PATCH", matchMirrorUpdates(id, room, roomSummary));
     if (mirrored.status < 200 || mirrored.status >= 300) throw new Error("match_mirror_failed");
   });
-}
-
-function applyMatchCommand(
-  commandType: string,
-  state: MatchState,
-  deck: Card[],
-  actorUid: string,
-  payload: Record<string, unknown>,
-) {
-  if (commandType === "startRound") return startRound(state, actorUid);
-  if (commandType === "cut") return cut(state, deck, actorUid, payload.position);
-  if (commandType === "dealInitial") return deal(state, deck, actorUid, true);
-  if (commandType === "dealSubsequent") return deal(state, deck, actorUid, false);
-  if (commandType === "beginPlay") {
-    if (state.phase !== "dealingCards") throw new Error("play_not_ready");
-    const playerIds = state.playerIds;
-    const dealerIndex = Number.isInteger(state.dealerIndex) ? state.dealerIndex as number : -1;
-    if (!Array.isArray(playerIds) || playerIds[dealerIndex] !== actorUid) {
-      throw new Error("dealer_required");
-    }
-    return {
-      state: { ...state, phase: "playing", turnStartTime: new Date().toISOString() } as MatchState,
-      deck,
-    };
-  }
-  if (commandType === "playCard") return { state: playCard(state, actorUid, payload.card), deck };
-  throw new Error("unsupported_command");
 }
 
 async function isAdmin(connection: Client, user: { uid: string; email: string | null }) {
@@ -441,13 +415,7 @@ Deno.serve(async (request) => {
           }
           const currentVersion = Number(room.version);
           const playerIds = Array.isArray(room.state.playerIds) ? room.state.playerIds : [];
-          const ownerProxy = room.owner_uid === user.uid && (
-            requestedActor.startsWith("bot_") ||
-            commandType === "dealInitial" ||
-            commandType === "dealSubsequent" ||
-            commandType === "beginPlay"
-          );
-          if (requestedActor !== user.uid && (!ownerProxy || !playerIds.includes(requestedActor))) {
+          if (requestedActor !== user.uid) {
             await connection.queryObject`rollback`;
             transactionOpen = false;
             return reply({ error: "invalid_command_actor" }, 403, origin);
@@ -500,7 +468,7 @@ Deno.serve(async (request) => {
           const fullState = { ...room.state, handCards: room.hands ?? {} } as MatchState;
           let transition: { state: MatchState; deck: Card[] };
           try {
-            transition = applyMatchCommand(commandType, fullState, room.deck ?? [], requestedActor, payload);
+            transition = executeMatchIntent(commandType, fullState, room.deck ?? [], user.uid, requestedActor, payload);
           } catch (error) {
             await connection.queryObject`rollback`;
             transactionOpen = false;
@@ -642,6 +610,51 @@ Deno.serve(async (request) => {
         const displayName = optionalText(body.displayName, 64) || user.name;
         const cardBackId = optionalText(body.cardBackId, 64);
         const avatarUrl = optionalText(body.avatarUrl, 2048);
+        // Versioned rooms never import a potentially stale/mutable Firebase
+        // mirror. Joining/replacement and command application share SQL locks.
+        let joinTransactionOpen = false;
+        try {
+          await connection.queryObject`begin`;
+          joinTransactionOpen = true;
+          const locked = await connection.queryObject<{ state: MatchState; version: string; hands: Record<string, Card[]> }>`
+            select r.state, r.version::text as version, s.hands
+            from halabessa.rooms r join halabessa.room_secrets s on s.room_id = r.room_id
+            where r.room_id = ${id} for update of r, s
+          `;
+          const room = locked.rows[0];
+          if (room && Number(room.version) > 0) {
+            let joined;
+            try {
+              joined = joinCommandRoom({ ...room.state, handCards: room.hands ?? {} }, user.uid,
+                { displayName, cardBackId, avatarUrl });
+            } catch (error) {
+              await connection.queryObject`rollback`; joinTransactionOpen = false;
+              return reply({ error: error instanceof Error ? error.message : "room_not_joinable" }, 409, origin);
+            }
+            const version = Number(room.version) + (joined.alreadyJoined ? 0 : 1);
+            const publicState = publicMatchState(joined.state, version);
+            const hands = joined.state.handCards ?? {};
+            if (!joined.alreadyJoined) {
+              await connection.queryObject`update halabessa.rooms
+                set state = ${JSON.stringify(publicState)}::jsonb, version = ${version}, updated_at = now()
+                where room_id = ${id}`;
+              await connection.queryObject`update halabessa.room_secrets
+                set hands = ${JSON.stringify(hands)}::jsonb where room_id = ${id}`;
+            }
+            await connection.queryObject`delete from halabessa.room_invites where room_id = ${id} and recipient_uid = ${user.uid}`;
+            const delivery = await commitAndDeliver(async () => {
+              await connection.queryObject`commit`; joinTransactionOpen = false;
+            }, () => mirrorDurableRoom(connection, id));
+            const snapshot = participantSnapshot(delivery.snapshot ?? { state: publicState, version, hands }, user.uid);
+            return reply({ roomId: id, match: snapshot.state, ...snapshot,
+              seatIndex: joined.seatIndex, alreadyJoined: joined.alreadyJoined,
+              mirrorPending: delivery.mirrorPending }, 200, origin);
+          }
+          await connection.queryObject`rollback`; joinTransactionOpen = false;
+        } catch (error) {
+          if (joinTransactionOpen) await connection.queryObject`rollback`;
+          throw error;
+        }
         for (let attempt = 0; attempt < 5; attempt += 1) {
           const current = await firebaseRequest(`matches/${id}`);
           const match = current.data as Record<string, unknown> | null;
@@ -672,6 +685,11 @@ Deno.serve(async (request) => {
                 await connection.queryObject`rollback`;
                 transactionOpen = false;
                 return reply({ error: "room_not_authoritative" }, 409, origin);
+              }
+              if (Number(authoritative.rows[0].version) > 0) {
+                await connection.queryObject`rollback`;
+                transactionOpen = false;
+                return reply({ error: "room_changed_retry" }, 409, origin);
               }
               await connection.queryObject`
                 update halabessa.rooms

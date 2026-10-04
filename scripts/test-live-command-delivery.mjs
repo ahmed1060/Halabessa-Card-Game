@@ -68,6 +68,7 @@ try {
   assert.equal(retry.duplicate, true); assert.equal(retry.version, 1);
   await api(seats[3], 'submitMatchCommand', command('cut', 1, { position: 20 }));
   await api(seats[0], 'submitMatchCommand', command('dealInitial', 2));
+  await new Promise(resolve => setTimeout(resolve, 5100)); // Server dealing-animation gate.
   await api(seats[0], 'submitMatchCommand', command('beginPlay', 3));
   stage = 'simultaneous plays';
   const turn = (await api(seats[1], 'getMatchSnapshot', { roomId })).data;
@@ -80,18 +81,25 @@ try {
   const acceptedIndex = responses.findIndex(result => result.status === 200);
   const after = (await api(seats[1], 'getMatchSnapshot', { roomId })).data;
   assert.equal(after.version, 5); assert.equal(after.hand.length, 3);
+  let current = after;
+  async function finishCapture() {
+    if (current.state.phase !== 'capturing') return;
+    await new Promise(resolve => setTimeout(resolve, 1300));
+    current = (await api(seats[2], 'submitMatchCommand', command('advance', current.version))).data;
+  }
+  await finishCapture();
   stage = 'retry after a later turn';
   const next = (await api(seats[2], 'getMatchSnapshot', { roomId })).data;
-  await api(seats[2], 'submitMatchCommand', command('playCard', 5, { card: next.hand[0] }));
+  current = (await api(seats[2], 'submitMatchCommand', command('playCard', next.version, { card: next.hand[0] }))).data;
   const lateRetry = (await api(seats[1], 'submitMatchCommand', competing[acceptedIndex])).data;
-  assert.equal(lateRetry.duplicate, true); assert.equal(lateRetry.version, 6);
+  assert.equal(lateRetry.duplicate, true); assert.equal(lateRetry.version, current.version);
   assert.equal(lateRetry.appliedVersion, 5); assert.equal(lateRetry.hand.length, 3);
   const mirrored = await firebase(accounts[0], `matches/${roomId}`, 'GET');
-  assert.equal(mirrored.serverVersion, 6);
+  assert.equal(mirrored.serverVersion, current.version);
   assert.equal(mirrored.presence[accounts[0].uid], true);
   assert.equal(mirrored.chat.qa.text, 'delivery preservation check');
   console.log(JSON.stringify({ passed: true, simultaneousAccepted: 1, simultaneousRejected: 1,
-    latestRetryVersion: 6, chatAndPresencePreserved: true }));
+    latestRetryVersion: current.version, chatAndPresencePreserved: true }));
 } catch (error) {
   console.error(JSON.stringify({ passed: false, stage, message: error.message }));
   process.exitCode = 1;
