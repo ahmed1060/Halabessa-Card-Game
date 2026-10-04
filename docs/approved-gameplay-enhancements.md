@@ -36,8 +36,10 @@ the production client/server command path yet**: deadline-gated manual/timeout
 play, three accepted timeout removals, explicit leave, inherited replacement
 hands/team, waiting-room vacancy reopening, non-host phase advancement,
 round conservation, capture phases, scoring and bounded rematch votes.
-The full backend regression gate currently passes 39 tests. A complete-round
+The full backend regression gate currently passes 42 tests. A complete-round
 simulation caught and fixed an inconsistent subsequent-hand turn timestamp.
+Accepted plays append immutable play history for presentation; capture animation
+cannot harvest the same cards twice or consume the next player's countdown.
 Reward values remain a preview with `settlementPending`; no reward settlement
 or production rules migration is claimed. Keep this foundation inactive until
 the command/mirror/privacy/reward migration is verified end to end.

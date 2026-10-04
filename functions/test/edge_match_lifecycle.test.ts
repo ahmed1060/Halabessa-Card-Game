@@ -38,6 +38,7 @@ test("complete server round conserves all 52 cards and reaches visible results",
     }
   }
   assert.equal(plays, 48);
+  assert.equal((state.playHistory as Card[]).length, 48);
   assert.equal(state.phase, "rematchVoting");
   assert.equal(state.settlementPending, true);
   assert.equal(Object.keys(state.earnedCoins as Record<string, number>).length, 4);
@@ -70,4 +71,43 @@ test("rematch expires rather than waiting forever; duplicate or invalid votes ar
 test("nonparticipants and bot identities cannot issue lifecycle commands", () => {
   assert.throws(() => lifecycleCommand("advance", room(), [], "stranger", {}, now), /human_participant_required/);
   assert.throws(() => lifecycleCommand("advance", { ...room(), playerIds: ["a", "b", "c", "bot_4"] }, [], "bot_4", {}, now), /human_participant_required/);
+});
+
+test("unlimited gameplay still has a bounded cut phase", () => {
+  const round = advanceMatch({ ...room(), timerDurationSeconds: 0 }, [], now);
+  assert.throws(() => advanceMatch(round.state, round.deck, now + 14999), /no_transition_due/);
+  assert.equal(advanceMatch(round.state, round.deck, now + 15000).state.phase, "dealingFasha");
+});
+
+test("capture animation has one harvest record and grants the next turn a fresh deadline", () => {
+  const state: MatchState = { ...room(), phase: "playing", currentTurnIndex: 0,
+    turnStartTime: new Date(now).toISOString(), handCards: {
+      a: [{ suit: "hearts", rank: "ace" }], b: [], c: [], d: [] },
+    board: [{ suit: "diamonds", rank: "ace" }] };
+  const captured = lifecycleCommand("playCard", state, [], "a", { card: state.handCards!.a[0] }, now);
+  const harvest = JSON.stringify(captured.state.harvestStacks);
+  assert.equal(captured.state.phase, "capturing");
+  assert.deepEqual(captured.state.playHistory, [state.handCards!.a[0]]);
+  assert.throws(() => lifecycleCommand("playCard", captured.state, [], "b", { card: state.handCards!.a[0] }, now + 1), /play_not_ready/);
+  const flying = advanceMatch(captured.state, [], now + 600);
+  assert.equal(flying.state.capturingStage, 1);
+  const finished = advanceMatch(flying.state, [], now + 1200);
+  assert.equal(finished.state.phase, "playing");
+  assert.deepEqual(finished.state.board, []);
+  assert.equal(JSON.stringify(finished.state.harvestStacks), harvest);
+  assert.equal(finished.state.turnStartTime, new Date(now + 1200).toISOString());
+});
+
+test("unanimous rematch cannot discard pending rewards; settled rematch resets scores", () => {
+  const state = { ...room(), phase: "rematchVoting", phaseStartedAt: new Date(now).toISOString(),
+    teamAScore: 41, teamBScore: 20, settlementPending: true,
+    rematchVotes: { a: true, b: true, c: true, d: true } };
+  assert.throws(() => advanceMatch(state, [], now + 1000), /settlement_pending/);
+  const restarted = advanceMatch({ ...state, settlementPending: false }, [], now + 1000);
+  assert.equal(restarted.state.teamAScore, 0);
+  assert.equal(restarted.state.teamBScore, 0);
+  assert.equal(restarted.state.roundCount, 1);
+  assert.equal(restarted.state.matchSequence, 1);
+  assert.equal(restarted.deck.length, 52);
+  assert.deepEqual(restarted.state.earnedCoins, {});
 });

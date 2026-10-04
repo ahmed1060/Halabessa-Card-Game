@@ -208,6 +208,7 @@ export function playCard(state: MatchState, actorUid: string, value: unknown) {
       cardOwnership: ownership,
       skippedMatches: skipped,
       currentTurnIndex: nextTurn,
+      playHistory: [...(Array.isArray(state.playHistory) ? state.playHistory : []), card],
       turnStartTime: new Date().toISOString(),
     } as MatchState;
   }
@@ -249,6 +250,7 @@ export function playCard(state: MatchState, actorUid: string, value: unknown) {
     teamAScore: numberValue(state.teamAScore) + (team === "teamA" ? points : 0),
     teamBScore: numberValue(state.teamBScore) + (team === "teamB" ? points : 0),
     lastCaptureTeam: team,
+    playHistory: [...(Array.isArray(state.playHistory) ? state.playHistory : []), card],
     turnStartTime: new Date().toISOString(),
   } as MatchState;
 }
