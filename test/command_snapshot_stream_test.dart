@@ -25,6 +25,7 @@ void main() {
     errors = [];
     subscription = watchCommandSnapshots(
       notifications: events.stream, roomId: 'ROOM1234',
+      callerUid: 'human',
       fetchSnapshot: () {
         final request = Completer<MatchState>();
         requests.add(request);
@@ -121,5 +122,15 @@ void main() {
     await flush();
     expect(received, isEmpty);
     expect(errors, hasLength(1));
+  });
+
+  test('kick delivers public removal without fetching forbidden former hand', () async {
+    events.add({'id': 'ROOM1234', 'mode': 'classic', 'protocolVersion': 1,
+      'serverVersion': 4, 'playerIds': ['bot_0', 'bot_1', 'bot_2', 'bot_3'],
+      'handCards': {'human': [{'suit': 'hearts', 'rank': 'ace'}]}});
+    await flush();
+    expect(requests, isEmpty);
+    expect(received.single!.playerIds, isNot(contains('human')));
+    expect(received.single!.handCards, isEmpty);
   });
 }

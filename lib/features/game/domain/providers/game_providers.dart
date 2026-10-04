@@ -16,6 +16,8 @@ import '../../domain/logic/game_engine.dart';
 import '../../domain/logic/match_lifecycle.dart';
 import '../../domain/logic/bot_brain.dart';
 import '../../domain/logic/score_config.dart';
+import '../../domain/logic/server_match_progress.dart';
+import 'package:halabessa/core/services/supabase_backend_service.dart';
 import '../../data/repositories/multiplayer_sync_service.dart';
 import 'package:halabessa/features/auth/presentation/providers/auth_providers.dart';
 import 'package:halabessa/features/home/presentation/providers/store_provider.dart';
@@ -41,6 +43,8 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
 
   @override
   void dispose() {
+    _bindingGeneration++;
+    _serverProgressTimer?.cancel();
     // Disposal is not a player leaving: release local resources without
     // clearing recovery data or applying a forfeit penalty.
     _matchListener?.cancel();
@@ -65,6 +69,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
   /// the remaining undealt cards from all visible cards (board + hands + harvest)
   /// and preserves the bottom cut card if known.
   void _ensureSecretDeck(MatchState s) {
+    if (s.usesServerCommands) return;
     if (s.deckCount > 0 && (_secretDeck == null || _secretDeck!.cards.isEmpty)) {
       _secretDeck = Deck.reconstructRemaining(
         s.board,
@@ -88,6 +93,100 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
   bool _botEvaluationQueued = false;
   bool _playInFlight = false;
   bool _roundEnding = false;
+  int _bindingGeneration = 0;
+  Timer? _serverProgressTimer;
+  bool _serverCommandBusy = false;
+  Completer<void>? _serverIdle;
+  DateTime? _serverRetryAfter;
+
+  void _adoptServerSnapshot(MatchState incoming) {
+    if (!mounted || lastBoundMatchId != incoming.id ||
+        !canAdoptServerSnapshot(state, incoming)) {
+      return;
+    }
+    final ownUid = ref.read(currentUserProvider)?.uid;
+    if (ownUid != null && !incoming.playerIds.contains(ownUid)) {
+      // Removal is already committed. Do not send another leave or penalty.
+      leaveMatch(notifyServer: false);
+      return;
+    }
+    state = incoming;
+  }
+
+  Future<void> _sendServerIntent(String type, {Map<String, dynamic> payload = const {}}) async {
+    final generation = _bindingGeneration;
+    // Human votes/cuts must not disappear while a timed transition or reward
+    // request is pending. Wait, then use the freshly accepted revision.
+    while (_serverCommandBusy && generation == _bindingGeneration) {
+      if (type == 'advance') return;
+      final idle = _serverIdle;
+      if (idle == null) return;
+      await idle.future;
+    }
+    if (!mounted || generation != _bindingGeneration) return;
+    final current = state;
+    final uid = ref.read(currentUserProvider)?.uid;
+    if (current == null || !current.usesServerCommands || uid == null ||
+        !current.playerIds.contains(uid)) {
+      return;
+    }
+    final idle = Completer<void>();
+    _serverIdle = idle;
+    _serverCommandBusy = true;
+    try {
+      final result = await ref.read(multiplayerSyncServiceProvider).submitMatchCommand(
+        matchState: current, commandType: type, callerUid: uid, payload: payload);
+      if (generation == _bindingGeneration) _adoptServerSnapshot(result);
+    } on SupabaseBackendException catch (error) {
+      if (generation != _bindingGeneration) return;
+      if (error.code == 'version_conflict' && error.details['state'] is Map) {
+        _adoptServerSnapshot(MultiplayerSyncService.commandSnapshot(error.details, uid));
+      } else if (kDebugMode) {
+        debugPrint('Server intent $type rejected: ${error.code}');
+      }
+      _serverRetryAfter = DateTime.now().add(const Duration(seconds: 2));
+    } catch (error) {
+      if (generation == _bindingGeneration) {
+        _serverRetryAfter = DateTime.now().add(const Duration(seconds: 2));
+        if (kDebugMode) debugPrint('Server intent $type unavailable: $error');
+      }
+    } finally {
+      if (generation == _bindingGeneration) _serverCommandBusy = false;
+      idle.complete();
+    }
+  }
+
+  Future<void> _tickServerProgress() async {
+    final s = state;
+    final uid = ref.read(currentUserProvider)?.uid;
+    final now = DateTime.now();
+    if (s == null || !s.usesServerCommands || uid == null ||
+        !s.playerIds.contains(uid) || _serverCommandBusy ||
+        (_serverRetryAfter != null && now.isBefore(_serverRetryAfter!))) {
+      return;
+    }
+    if (s.settlementPending &&
+        (s.phase == GamePhase.rematchVoting || s.phase == GamePhase.matchOver)) {
+      final generation = _bindingGeneration;
+      final idle = Completer<void>();
+      _serverIdle = idle;
+      _serverCommandBusy = true;
+      try {
+        final settled = await ref.read(multiplayerSyncServiceProvider).settleMatchRewards(s, uid);
+        if (generation == _bindingGeneration) _adoptServerSnapshot(settled);
+      } catch (error) {
+        if (generation == _bindingGeneration) {
+          _serverRetryAfter = DateTime.now().add(const Duration(seconds: 10));
+          if (kDebugMode) debugPrint('Settlement pending: $error');
+        }
+      } finally {
+        if (generation == _bindingGeneration) _serverCommandBusy = false;
+        idle.complete();
+      }
+    } else if (serverProgressDue(s, now)) {
+      await _sendServerIntent('advance');
+    }
+  }
   // Timers for heartbeat and AFK monitoring
   Timer? _heartbeatTimer;
   Timer? _afkWatchdogTimer;
@@ -208,13 +307,21 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     return MatchRecoveryStart.listening;
   }
 
-  void leaveMatch() {
+  void leaveMatch({bool notifyServer = true}) {
     if (lastBoundMatchId != null && !lastBoundMatchId!.startsWith('OFFLINE_')) {
       final currentUser = ref.read(currentUserProvider);
       if (currentUser != null) {
         // Apply forfeit penalty if leaving during active play
         final s = state;
-        if (s != null && 
+        if (notifyServer && s != null && s.usesServerCommands) {
+          // Capture the immutable room intent before clearing local state.
+          ref.read(multiplayerSyncServiceProvider).leaveServerMatch(
+            s, currentUser.uid,
+          ).catchError((Object error) {
+            if (kDebugMode) debugPrint('Leave intent failed: $error');
+          });
+        }
+        if (notifyServer && s != null && !s.usesServerCommands &&
             s.phase != GamePhase.waitingForPlayers && 
             s.phase != GamePhase.matchOver &&
             s.phase != GamePhase.rematchVoting) {
@@ -225,6 +332,10 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
       }
     }
     _matchListener?.cancel();
+    _bindingGeneration++;
+    _serverProgressTimer?.cancel();
+    _serverProgressTimer = null;
+    _serverCommandBusy = false;
     _presenceListener?.cancel();
     _heartbeatTimer?.cancel();
     _heartbeatTimer = null;
@@ -262,6 +373,19 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
   }
 
   void bindToMatch(String matchId) {
+    final generation = ++_bindingGeneration;
+    _serverCommandBusy = false;
+    _serverRetryAfter = null;
+    _serverProgressTimer?.cancel();
+    _serverProgressTimer = null;
+    _afkWatchdogTimer?.cancel();
+    _afkWatchdogTimer = null;
+    _autoplaySubscription?.cancel();
+    _autoplaySubscription = null;
+    for (final subscription in _tafweetSubscriptions.values) {
+      subscription.cancel();
+    }
+    _tafweetSubscriptions.clear();
     lastBoundMatchId = matchId;
     _saveMatchId(matchId);
     _matchListener?.cancel(); 
@@ -277,13 +401,22 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     }
 
     _startHeartbeat();
+    _serverProgressTimer = Timer.periodic(const Duration(milliseconds: 250), (_) {
+      unawaited(_tickServerProgress());
+    });
 
     _matchListener = ref.read(multiplayerSyncServiceProvider).watchMatch(
       matchId, callerUid: ref.read(currentUserProvider)?.uid,
     ).listen(
       (serverState) {
+        if (!mounted || generation != _bindingGeneration) return;
         if (serverState != null) {
           try {
+            if (serverState.usesServerCommands) {
+              if (state == null) state = serverState;
+              _adoptServerSnapshot(serverState);
+              return;
+            }
             state = serverState;
             if (_amIHost(serverState)) {
               _ensureSecretDeck(serverState);
@@ -298,7 +431,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
             if (kDebugMode) debugPrint('ERROR in match listener callback: $e');
           }
         } else if (lastBoundMatchId != null) {
-          leaveMatch();
+          leaveMatch(notifyServer: false);
         }
       },
       onError: (error) {
@@ -328,6 +461,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     _presenceListener = ref.read(multiplayerSyncServiceProvider).watchPresence(matchId).listen((presence) {
        final serverState = state;
        if (serverState == null) return;
+       if (serverState.usesServerCommands) return;
        
        // Host Transition: We use the ACTUAL presence map from RTDB during this transition to avoid circular locks.
        // If I am the first human online according to the presence map, I take over the state-update duties.
@@ -396,6 +530,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
   }
 
   void _syncProfileWithMatch(MatchState s) {
+    if (s.usesServerCommands) return;
     final user = ref.read(currentUserProvider);
     if (user == null) return;
     
@@ -435,6 +570,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
   }
 
   Future<void> _evaluateBotActions(MatchState serverState) async {
+    if (serverState.usesServerCommands) return;
     if (_isHandlingBotLogic) {
       _botEvaluationQueued = true;
       return;
@@ -636,6 +772,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
   void _manageAutoplayTimer(MatchState matchState) {
     _autoplaySubscription?.cancel();
     _autoplaySubscription = null;
+    if (matchState.usesServerCommands) return;
     
     if (matchState.phase != GamePhase.playing) return;
     
@@ -824,6 +961,10 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
   Future<void> voteForBots(String playerId) async {
     final currentState = state;
     if (currentState == null || currentState.phase != GamePhase.waitingForPlayers) return;
+    if (currentState.usesServerCommands) {
+      await _sendServerIntent('voteForBots');
+      return;
+    }
     
     final votes = Map<String, bool>.from(currentState.botInjectionVotes);
     votes[playerId] = true;
@@ -866,6 +1007,10 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
   Future<void> startNewRound({bool isFirstRound = false, bool forceShuffle = false}) async {
     final currentState = state;
     if (currentState == null) return;
+    if (currentState.usesServerCommands) {
+      await _sendServerIntent('advance');
+      return;
+    }
     
     // CRITICAL: Ensure we don't start with placeholders
     if (currentState.playerIds.any((id) => id.startsWith('waiting_'))) {
@@ -911,6 +1056,10 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
   Future<void> performCut(int index) async {
     final currentState = state;
     if (currentState == null) return;
+    if (currentState.usesServerCommands) {
+      await _sendServerIntent('cut', payload: {'position': index});
+      return;
+    }
     
     _ensureSecretDeck(currentState);
 
@@ -927,6 +1076,10 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
   Future<void> dealInitialCards() async {
     final currentState = state;
     if (currentState == null || currentState.playerIds.isEmpty) return;
+    if (currentState.usesServerCommands) {
+      await _sendServerIntent('advance');
+      return;
+    }
 
     _ensureSecretDeck(currentState);
 
@@ -957,6 +1110,10 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
   Future<void> dealSubsequentCards() async {
     final currentState = state;
     if (currentState == null || currentState.playerIds.isEmpty) return;
+    if (currentState.usesServerCommands) {
+      await _sendServerIntent('advance');
+      return;
+    }
 
     _ensureSecretDeck(currentState);
 
@@ -982,6 +1139,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
   Future<void> sendEmoji(String playerId, String emoji) async {
     final currentState = state;
     if (currentState == null) return;
+    if (currentState.usesServerCommands) return; // Cosmetic intent migration pending.
     final emojis = Map<String, String>.from(currentState.playerEmojis);
     emojis[playerId] = emoji;
     _multimedia.vibrate();
@@ -993,6 +1151,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
   Future<void> clearEmoji(String playerId) async {
     final currentState = state;
     if (currentState == null) return;
+    if (currentState.usesServerCommands) return;
     final emojis = Map<String, String>.from(currentState.playerEmojis);
     emojis.remove(playerId);
     await _publishState(currentState.copyWith(playerEmojis: emojis));
@@ -1007,6 +1166,12 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
 
       if (origin != null) {
         ref.read(localPlayOriginsProvider.notifier).update((m) => {...m, card.firebaseKey: origin});
+      }
+
+      if (currentState.usesServerCommands) {
+        if (playerId != ref.read(currentUserProvider)?.uid) return;
+        await _sendServerIntent('playCard', payload: {'card': card.toJson()});
+        return;
       }
 
       final result = GameEngine.apply(currentState, PlayCardAction(playerId, card));
@@ -1067,6 +1232,10 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
   }
 
   Future<void> _handleRoundEnd() async {
+    if (state?.usesServerCommands == true) {
+      await _sendServerIntent('advance');
+      return;
+    }
     if (_roundEnding) return;
     _roundEnding = true;
     try {
@@ -1153,6 +1322,10 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
   Future<void> voteShuffle(String playerId, bool wantsShuffle) async {
     final currentState = state;
     if (currentState == null) return;
+    if (currentState.usesServerCommands) {
+      await _sendServerIntent('voteShuffle', payload: {'vote': wantsShuffle});
+      return;
+    }
     final result = GameEngine.apply(currentState, VoteAction(playerId, wantsShuffle, isRematch: false));
     await _publishState(result.newState);
     if (_amIHost(result.newState)) {
@@ -1163,6 +1336,10 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
   Future<void> voteRematch(String playerId, bool wantsRematch) async {
     final currentState = state;
     if (currentState == null) return;
+    if (currentState.usesServerCommands) {
+      await _sendServerIntent('voteRematch', payload: {'vote': wantsRematch});
+      return;
+    }
     final result = GameEngine.apply(currentState, VoteAction(playerId, wantsRematch, isRematch: true));
     await _publishState(result.newState);
     if (_amIHost(result.newState)) {

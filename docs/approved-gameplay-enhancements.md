@@ -126,6 +126,24 @@ tests cover these read races and cancellation paths. Normal creation remains
 legacy until controller command routing and private-hand rules are complete;
 this client change alone does not enforce hand privacy on the server.
 
+Controller command routing follow-up (248 Flutter tests pass): protocol-1 plays,
+cuts, bot-fill votes, shuffle/rematch votes and timed progression now submit
+intent instead of publishing locally computed snapshots. A due-time scheduler
+asks the server to advance; it never selects a bot/timeout card. Server rooms
+skip client deck reconstruction, host presence mutation, local autoplay and
+bot decision logic. Settlement uses the trusted receipt endpoint; delayed
+responses cannot roll back newer revisions or another binding. Pending human
+intents wait for the current request and use its accepted revision. Explicit
+leave retries definite version conflicts at most twice; removed seats clear
+local recovery without sending a second leave/penalty. Stream removal delivers
+only public state and never fetches a kicked player's former private hand.
+Legacy rooms/offline practice retain their existing execution path.
+
+Still gated: private-hand/state-write rules, active public room index, cosmetic
+profile/emoji intents, error/leave feedback and end-to-end server-room UI tests.
+Profile/emoji full-snapshot writes are disabled in protocol-1 rooms until their
+intent routes are ready. Do not enable normal protocol-1 creation yet.
+
 - Connect online play to the versioned, idempotent server command ledger.
 - Complete server round/deal/scoring/rematch and reward settlement before removing legacy writes.
 - Single accepted move per turn across manual, timeout and bot requests.

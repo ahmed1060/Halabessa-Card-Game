@@ -111,7 +111,6 @@ class MultiplayerSyncService {
   }
 
   /// Private/public state in a command response belongs to one SQL revision.
-  @visibleForTesting
   static MatchState commandSnapshot(Map<String, dynamic> data, String callerUid) {
     final publicValue = data['state'];
     if (publicValue is! Map) {
@@ -127,6 +126,25 @@ class MultiplayerSyncService {
     final data = await SupabaseBackendService.call('getMatchSnapshot',
       data: {'roomId': matchId}, timeout: const Duration(seconds: 20));
     return commandSnapshot(data, callerUid);
+  }
+
+  /// Leaving may race a bot/timeout. Retry only a definite version rejection;
+  /// ambiguous transport failures already reuse their original command ID.
+  Future<void> leaveServerMatch(MatchState matchState, String callerUid) async {
+    var current = matchState;
+    for (var attempt = 0; attempt < 3; attempt++) {
+      try {
+        await submitMatchCommand(matchState: current,
+          commandType: 'leave', callerUid: callerUid);
+        return;
+      } on SupabaseBackendException catch (error) {
+        if (error.code == 'not_room_participant' || error.code == 'room_not_found') return;
+        if (error.code != 'version_conflict' || error.details['state'] is! Map) rethrow;
+        current = commandSnapshot(error.details, callerUid);
+        if (!current.playerIds.contains(callerUid)) return;
+        if (attempt == 2) rethrow;
+      }
+    }
   }
 
   /// Only completed server-protocol rooms can award trusted profile changes.
@@ -230,6 +248,7 @@ class MultiplayerSyncService {
       }
       yield* watchCommandSnapshots(
         roomId: matchId,
+        callerUid: callerUid,
         notifications: matchRef.child(matchId).onValue.map((event) {
           final value = event.snapshot.value;
           return value is Map ? Map<String, dynamic>.from(value) : null;

@@ -8,6 +8,7 @@ Stream<MatchState?> watchCommandSnapshots({
   required Stream<Map<String, dynamic>?> notifications,
   required Future<MatchState> Function() fetchSnapshot,
   required String roomId,
+  String? callerUid,
 }) {
   late StreamController<MatchState?> controller;
   StreamSubscription<Map<String, dynamic>?>? subscription;
@@ -61,6 +62,15 @@ Stream<MatchState?> watchCommandSnapshots({
           return;
         }
         final version = (publicState['serverVersion'] as num?)?.toInt() ?? 0;
+        if (callerUid != null && publicState['playerIds'] is List &&
+            !(publicState['playerIds'] as List).contains(callerUid)) {
+          generation++;
+          wantedVersion = -1;
+          // A released seat can no longer fetch its old private hand. Deliver
+          // the public removal immediately so the controller clears recovery.
+          controller.add(MatchState.fromJson({...publicState, 'handCards': {}}));
+          return;
+        }
         if (version > wantedVersion) wantedVersion = version;
         unawaited(refresh());
       }, onError: controller.addError);

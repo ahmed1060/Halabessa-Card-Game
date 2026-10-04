@@ -59,6 +59,7 @@ class MatchState {
 
   // Turn Timers & Reactions
   final DateTime? turnStartTime;
+  final DateTime? phaseStartedAt;
   final int timerDurationSeconds;
   final Map<String, String> playerEmojis;
   final Map<String, bool> shuffleVotes;
@@ -107,6 +108,7 @@ class MatchState {
       this.roundsSinceLastShuffle = 0,
       this.consecutiveTafweetCount = 0,
       this.turnStartTime,
+      this.phaseStartedAt,
       this.timerDurationSeconds = 10,
       this.playerEmojis = const {},
       this.shuffleVotes = const {},
@@ -169,6 +171,7 @@ class MatchState {
     int? roundsSinceLastShuffle,
     int? consecutiveTafweetCount,
     DateTime? turnStartTime,
+    DateTime? phaseStartedAt,
     int? timerDurationSeconds,
     Map<String, String>? playerEmojis,
     Map<String, bool>? shuffleVotes,
@@ -219,6 +222,7 @@ class MatchState {
       roundsSinceLastShuffle: roundsSinceLastShuffle ?? this.roundsSinceLastShuffle,
       consecutiveTafweetCount: consecutiveTafweetCount ?? this.consecutiveTafweetCount,
       turnStartTime: turnStartTime ?? this.turnStartTime,
+      phaseStartedAt: phaseStartedAt ?? this.phaseStartedAt,
       timerDurationSeconds: timerDurationSeconds ?? this.timerDurationSeconds,
       playerEmojis: playerEmojis ?? this.playerEmojis,
       shuffleVotes: shuffleVotes ?? this.shuffleVotes,
@@ -286,6 +290,7 @@ class MatchState {
       'roundsSinceLastShuffle': roundsSinceLastShuffle,
       'consecutiveTafweetCount': consecutiveTafweetCount,
       'turnStartTime': turnStartTime?.toIso8601String(),
+      'phaseStartedAt': phaseStartedAt?.toIso8601String(),
       'timerDurationSeconds': timerDurationSeconds,
       'playerEmojis': playerEmojis,
       'shuffleVotes': shuffleVotes,
@@ -504,6 +509,7 @@ class MatchState {
         roundsSinceLastShuffle: json['roundsSinceLastShuffle'] is int ? json['roundsSinceLastShuffle'] as int : 0,
         consecutiveTafweetCount: json['consecutiveTafweetCount'] is int ? json['consecutiveTafweetCount'] as int : 0,
         turnStartTime: json['turnStartTime'] != null ? DateTime.tryParse(json['turnStartTime'].toString()) : null,
+        phaseStartedAt: json['phaseStartedAt'] != null ? DateTime.tryParse(json['phaseStartedAt'].toString()) : null,
         timerDurationSeconds: json['timerDurationSeconds'] is int ? json['timerDurationSeconds'] as int : 10,
         playerEmojis: playerEmojis,
         shuffleVotes: shuffleVotes,
