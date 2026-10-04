@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+enum GameOrientation { landscape, portrait }
+
 class SettingsState {
   final bool isSoundEnabled;
   final bool isMusicEnabled;
@@ -12,6 +14,7 @@ class SettingsState {
   final double soundVolume;
   final String languageCode;
   final ThemeMode themeMode;
+  final GameOrientation gameOrientation;
 
   SettingsState({
     this.isSoundEnabled = true,
@@ -23,6 +26,7 @@ class SettingsState {
     this.soundVolume = 1.0,
     this.languageCode = 'en',
     this.themeMode = ThemeMode.system,
+    this.gameOrientation = GameOrientation.landscape,
   });
 
   SettingsState copyWith({
@@ -35,6 +39,7 @@ class SettingsState {
     double? soundVolume,
     String? languageCode,
     ThemeMode? themeMode,
+    GameOrientation? gameOrientation,
   }) {
     return SettingsState(
       isSoundEnabled: isSoundEnabled ?? this.isSoundEnabled,
@@ -46,6 +51,7 @@ class SettingsState {
       soundVolume: soundVolume ?? this.soundVolume,
       languageCode: languageCode ?? this.languageCode,
       themeMode: themeMode ?? this.themeMode,
+      gameOrientation: gameOrientation ?? this.gameOrientation,
     );
   }
 }
@@ -68,6 +74,9 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
       soundVolume: _prefs.getDouble('soundVolume') ?? 1.0,
       languageCode: _prefs.getString('languageCode') ?? 'en',
       themeMode: ThemeMode.values[_prefs.getInt('themeMode') ?? 0],
+      gameOrientation: _prefs.getString('gameOrientation') == 'portrait'
+          ? GameOrientation.portrait
+          : GameOrientation.landscape,
     );
   }
 
@@ -106,6 +115,11 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
     await _prefs.setBool('reducedMotion', value);
   }
 
+  Future<void> setGameOrientation(GameOrientation value) async {
+    state = state.copyWith(gameOrientation: value);
+    await _prefs.setString('gameOrientation', value.name);
+  }
+
   Future<void> setLanguage(String langCode) async {
     state = state.copyWith(languageCode: langCode);
     await _prefs.setString('languageCode', langCode);
@@ -121,7 +135,9 @@ final sharedPreferencesProvider = Provider<SharedPreferences>((ref) {
   throw UnimplementedError(); // Should be overridden in ProviderScope
 });
 
-final settingsProvider = StateNotifierProvider<SettingsNotifier, SettingsState>((ref) {
-  final prefs = ref.watch(sharedPreferencesProvider);
-  return SettingsNotifier(prefs);
-});
+final settingsProvider = StateNotifierProvider<SettingsNotifier, SettingsState>(
+  (ref) {
+    final prefs = ref.watch(sharedPreferencesProvider);
+    return SettingsNotifier(prefs);
+  },
+);

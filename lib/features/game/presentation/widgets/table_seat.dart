@@ -119,11 +119,7 @@ class _TableSeatState extends State<TableSeat> {
               decoration: BoxDecoration(
                 color: Colors.transparent,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: widget.active
-                      ? TableStyle.brass.withValues(alpha: .8)
-                      : Colors.transparent,
-                ),
+                border: Border.all(color: Colors.transparent),
               ),
               child: Padding(
                 padding: const EdgeInsets.all(4),

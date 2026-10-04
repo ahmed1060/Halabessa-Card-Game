@@ -1,4 +1,7 @@
 {
+  "skin_lantern_nights": "Lantern Nights",
+  "game_landscape": "Landscape gameplay",
+  "game_orientation_help": "Turn off for portrait. On the mobile website, rotate your phone; your browser controls orientation.",
     "username_format_hint": "Use 3–20 letters, numbers or underscores.",
     "profile_save_retry": "Your profile could not be saved or checked. Please try again.",
     "retry_action": "Try again",

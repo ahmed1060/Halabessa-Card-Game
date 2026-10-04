@@ -3,6 +3,22 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:halabessa/core/providers/settings_provider.dart';
 
 void main() {
+  test(
+    'game orientation defaults to landscape and persists portrait',
+    () async {
+      SharedPreferences.setMockInitialValues({});
+      final prefs = await SharedPreferences.getInstance();
+      final settings = SettingsNotifier(prefs);
+      expect(settings.state.gameOrientation, GameOrientation.landscape);
+      await settings.setGameOrientation(GameOrientation.portrait);
+      final restored = SettingsNotifier(prefs);
+      expect(restored.state.gameOrientation, GameOrientation.portrait);
+      await restored.setGameOrientation(GameOrientation.landscape);
+      expect(prefs.getString('gameOrientation'), 'landscape');
+      settings.dispose();
+      restored.dispose();
+    },
+  );
   test('reduced motion persists without changing audio or haptics', () async {
     SharedPreferences.setMockInitialValues({'isMusicEnabled': false});
     final prefs = await SharedPreferences.getInstance();

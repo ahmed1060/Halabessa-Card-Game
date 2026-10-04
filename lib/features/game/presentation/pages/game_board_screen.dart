@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easy_localization/easy_localization.dart';
@@ -65,6 +66,7 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
   void initState() {
     super.initState();
     _confettiController = ConfettiController(duration: const Duration(seconds: 5));
+    _applyGameOrientation(ref.read(settingsProvider).gameOrientation);
     ref.read(localPlayOriginsProvider.notifier).state = {};
     
     final multimedia = ref.read(multimediaServiceProvider);
@@ -93,7 +95,20 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
     // Resume Background Music when leaving room
     // Cache dependencies while mounted: WidgetRef is invalid after disposal.
     Future.microtask(_restoreLobbyPresentation);
+    if (!kIsWeb) {
+      SystemChrome.setPreferredOrientations(const [DeviceOrientation.portraitUp,
+        DeviceOrientation.landscapeLeft, DeviceOrientation.landscapeRight]);
+    }
     super.dispose();
+  }
+
+  void _applyGameOrientation(GameOrientation orientation) {
+    // Browsers own device rotation. Never rotate the Flutter canvas with a
+    // transform: that separates painted controls from pointer coordinates.
+    if (kIsWeb) return;
+    SystemChrome.setPreferredOrientations(orientation == GameOrientation.landscape
+      ? const [DeviceOrientation.landscapeLeft, DeviceOrientation.landscapeRight]
+      : const [DeviceOrientation.portraitUp]);
   }
 
   AppUser _getAvatarUser(WidgetRef ref, MatchState matchState, String currentUserUid, int relativeOffset) {
@@ -169,6 +184,11 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(settingsProvider, (previous, next) {
+      if (previous?.gameOrientation != next.gameOrientation) {
+        _applyGameOrientation(next.gameOrientation);
+      }
+    });
     final matchState = ref.watch(matchStateProvider);
     final currentUser = ref.watch(currentUserProvider);
 
@@ -558,6 +578,7 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
       );
     }
     return LanternTurnBadge(active: myTurn,
+      turnStarted: state.turnStartTime, turnSeconds: state.timerDurationSeconds,
       title: spectator ? 'you_are_spectating'.tr() : myTurn ? 'table_your_turn'.tr() :
         state.phase == GamePhase.playing ? 'table_waiting'.tr() : _tablePhaseLabel(state.phase),
       hint: spectator || state.phase != GamePhase.playing ? '' :

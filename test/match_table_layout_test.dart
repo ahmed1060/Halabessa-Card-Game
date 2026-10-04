@@ -371,7 +371,7 @@ void main() {
         );
         expect(
           (decoration().border! as Border).top.color,
-          TableStyle.brass.withOpacity(0.8),
+          Colors.transparent,
         );
         expect(tester.takeException(), isNull);
       },

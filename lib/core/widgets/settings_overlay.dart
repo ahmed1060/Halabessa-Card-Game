@@ -147,6 +147,15 @@ class SettingsOverlay extends ConsumerWidget {
 
                           const SizedBox(height: 24),
                           _buildSectionTitle('graphics'.tr()),
+                          _buildToggleTile(
+                            'game_landscape'.tr(),
+                            settings.gameOrientation == GameOrientation.landscape,
+                            Icons.screen_rotation_rounded,
+                            (value) => notifier.setGameOrientation(value
+                                ? GameOrientation.landscape : GameOrientation.portrait),
+                          ),
+                          Text('game_orientation_help'.tr(),
+                            style: const TextStyle(color: Colors.white70)),
                           ListTile(leading: const Icon(Icons.help_outline, color: ThemeConfig.goldAccent),
                             title: Text('help_title'.tr(), style: const TextStyle(color: Colors.white)),
                             onTap: () {

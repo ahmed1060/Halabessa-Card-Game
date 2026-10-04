@@ -297,6 +297,51 @@ class MatchTableLayout extends StatelessWidget {
         ),
       ),
     );
+    if (wide && bounds.maxHeight < 600 && scale <= 1.2) {
+      // Fit one complete table into the live viewport. Do not scroll seats out
+      // from under the scoreboard or clip the player's playable card faces.
+      // FittedBox applies the same transform to painting and hit testing.
+      return Column(
+        children: [
+          header,
+          Expanded(
+            child: LayoutBuilder(
+              builder: (context, available) => Row(
+                textDirection: TextDirection.ltr,
+                children: [
+                  Expanded(
+                    child: FittedBox(
+                      fit: BoxFit.contain,
+                      child: SizedBox(width: 520, height: 285, child: arena),
+                    ),
+                  ),
+                  SizedBox(
+                    width: math.min(360, bounds.maxWidth * .36),
+                    child: FittedBox(
+                      fit: BoxFit.contain,
+                      child: SizedBox(
+                        width: 340,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.all(6),
+                              child: collections!,
+                            ),
+                            handArea,
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          controls,
+        ],
+      );
+    }
     if (wide && bounds.maxHeight < 600) {
       return Column(
         children: [
@@ -387,46 +432,75 @@ class MatchScoreBar extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(12, 8, 12, 2),
-    child: Column(
-      children: [
-        if (MediaQuery.sizeOf(context).width >= 700)
-          Row(
-            children: [
-              const SizedBox(width: 160, child: LanternWordmark()),
-              const SizedBox(width: 12),
-              Expanded(child: _scoreRow()),
-            ],
-          )
-        else ...[
-          const LanternWordmark(),
-          const SizedBox(height: 4),
-          _scoreRow(),
-        ],
-        Row(
+  Widget build(BuildContext context) {
+    if (MediaQuery.sizeOf(context).width >= 700 &&
+        MediaQuery.sizeOf(context).height < 500 &&
+        MediaQuery.textScalerOf(context).scale(14) <= 16.8) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
+        child: Row(
           children: [
-            const Spacer(),
-            if (onCopyRoom == null)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 2),
-                child: Text(roomLabel, style: TableStyle.detail),
-              )
-            else
-              TextButton.icon(
-                style: TextButton.styleFrom(
-                  foregroundColor: TableStyle.muted,
-                  minimumSize: const Size(48, 48),
-                ),
+            const SizedBox(
+              width: 100,
+              child: FittedBox(child: LanternWordmark()),
+            ),
+            const SizedBox(width: 8),
+            Expanded(child: _scoreRow()),
+            if (onCopyRoom != null)
+              IconButton(
                 onPressed: onCopyRoom,
-                icon: const Icon(Icons.copy_outlined, size: 16),
-                label: Text(roomLabel, style: TableStyle.detail),
+                tooltip: roomLabel,
+                icon: const Icon(
+                  Icons.copy_outlined,
+                  color: TableStyle.ivory,
+                  size: 18,
+                ),
               ),
           ],
         ),
-      ],
-    ),
-  );
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 2),
+      child: Column(
+        children: [
+          if (MediaQuery.sizeOf(context).width >= 700)
+            Row(
+              children: [
+                const SizedBox(width: 160, child: LanternWordmark()),
+                const SizedBox(width: 12),
+                Expanded(child: _scoreRow()),
+              ],
+            )
+          else ...[
+            const LanternWordmark(),
+            const SizedBox(height: 4),
+            _scoreRow(),
+          ],
+          Row(
+            children: [
+              const Spacer(),
+              if (onCopyRoom == null)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  child: Text(roomLabel, style: TableStyle.detail),
+                )
+              else
+                TextButton.icon(
+                  style: TextButton.styleFrom(
+                    foregroundColor: TableStyle.muted,
+                    minimumSize: const Size(48, 48),
+                  ),
+                  onPressed: onCopyRoom,
+                  icon: const Icon(Icons.copy_outlined, size: 16),
+                  label: Text(roomLabel, style: TableStyle.detail),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _scoreRow() => Row(
     children: [

@@ -8,6 +8,17 @@ import '../../../auth/domain/models/app_user.dart';
 
 enum ShopItemType { cardBack, tableSkin, consumable, avatar }
 
+const lanternTableAsset = 'assets/images/tables/lantern_nights_v1.png';
+
+ShopItem defaultTableSkin() => ShopItem(id: 'default_table',
+  name: 'skin_lantern_nights'.tr(), assetPath: lanternTableAsset,
+  type: ShopItemType.tableSkin, price: 0);
+
+ShopItem resolveTableSkin(List<ShopItem> items, String selectedId) =>
+  items.firstWhere((item) => item.id == selectedId && item.type == ShopItemType.tableSkin,
+    orElse: () => items.firstWhere((item) => item.id == 'default_table' &&
+      item.type == ShopItemType.tableSkin, orElse: defaultTableSkin));
+
 class ShopItem {
   final String id;
   final String name;
@@ -230,7 +241,7 @@ class StoreNotifier extends StateNotifier<StoreState> {
   }
 
   ShopItem get activeTableSkin {
-    return allItems.firstWhere((i) => i.id == state.activeTableSkinId, orElse: () => allItems[3]);
+    return resolveTableSkin(allItems, state.activeTableSkinId);
   }
 
   static final _defaultItems = [
@@ -297,7 +308,8 @@ class StoreNotifier extends StateNotifier<StoreState> {
       price: 0,
     ),
     
-    ShopItem(id: 'default_table', name: 'skin_casino'.tr(), assetPath: 'assets/images/tables/table_skin_emerald.png', type: ShopItemType.tableSkin, price: 0),
+    defaultTableSkin(),
+    ShopItem(id: 'emerald_table', name: 'skin_casino'.tr(), assetPath: 'assets/images/tables/table_skin_emerald.png', type: ShopItemType.tableSkin, price: 0),
     ShopItem(id: 'galaxy_table', name: 'skin_galaxy'.tr(), assetPath: 'assets/images/tables/table_skin_galaxy.png', type: ShopItemType.tableSkin, price: 0),
     ShopItem(id: 'midnight_table', name: 'skin_midnight_cyber'.tr(), assetPath: 'assets/images/tables/table_skin_midnight_cyber.png', type: ShopItemType.tableSkin, price: 500),
     ShopItem(id: 'royal_velvet_table', name: 'skin_royal_velvet'.tr(), assetPath: 'assets/images/tables/table_skin_royal_velvet.png', type: ShopItemType.tableSkin, price: 1500, diamondPrice: 50),
@@ -330,7 +342,7 @@ final storeProvider = StateNotifierProvider<StoreNotifier, StoreState>((ref) {
 
 final activeTableSkinProvider = Provider<ShopItem>((ref) {
   final store = ref.watch(storeProvider);
-  return ref.watch(storeProvider.notifier).allItems.firstWhere((i) => i.id == store.activeTableSkinId, orElse: () => ref.watch(storeProvider.notifier).allItems[3]);
+  return resolveTableSkin(ref.watch(storeProvider.notifier).allItems, store.activeTableSkinId);
 });
 
 final activeCardBackProvider = Provider<ShopItem>((ref) {

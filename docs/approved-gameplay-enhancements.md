@@ -43,6 +43,14 @@ Reward patching is NOT server-side exactly-once reward settlement.
 
 ## Batch 3 — mobile layout and input
 
+Implemented (207 Flutter tests pass; physical-device verification remains):
+visible own-turn countdown, saved landscape-default/native orientation preference,
+non-scrolling standard-text phone-landscape table, removal of the rectangular
+seat highlight, RTL/LTR card-center hit testing at three landscape phone sizes.
+The countdown currently reads the existing turn timestamp; the server-deadline
+migration remains part of Batch 2. Browser orientation remains browser-controlled.
+The reported Safari-wide tap offset has not yet been reproduced on a real device.
+
 - Visible local-player countdown using the authoritative deadline.
 - Remove rectangular active-player border; retain circular countdown.
 - Persist landscape/portrait preference; native orientation request and supported web fallback.
@@ -52,6 +60,12 @@ Reward patching is NOT server-side exactly-once reward settlement.
 - Validate safe areas, toolbar changes, rotation, keyboard, larger text and reduced motion.
 
 ## Batch 4 — authentication and store
+
+Implemented: existing `default_table` now has the Lantern Nights name and asset
+in the store; the emerald theme remains available separately. Table fallback
+selects by type/ID, never a fragile list index. Existing equipped/ownership IDs
+are preserved. Native Facebook App ID/configuration is still missing; requested
+from the user. Provider sign-in is not verified as fixed.
 
 - Capture actual Google/Facebook errors on mobile web and Android before changing flows.
 - Verify provider enablement, authorized domains, callbacks and actual APK signing fingerprints.
