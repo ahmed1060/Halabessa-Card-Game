@@ -1,7 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { Client } from "jsr:@db/postgres@0.19.5";
 import { createRemoteJWKSet, importPKCS8, jwtVerify, SignJWT } from "npm:jose@6";
-import { cut, deal, playCard, startRound, type Card, type MatchState } from "./match_engine.ts";
+import { cut, deal, playCard, startRound, waitingSeatIndex, type Card, type MatchState } from "./match_engine.ts";
 import { createDatabaseRunner, databaseConnectionString } from "./database.ts";
 
 const firebaseProject = "halabessa-card-game1";
@@ -611,7 +611,7 @@ Deno.serve(async (request) => {
           const playerIds = Array.isArray(match.playerIds) ? [...match.playerIds] : [];
           if (playerIds.length !== 4) return reply({ error: "invalid_room_state" }, 409, origin);
           const existing = playerIds.indexOf(user.uid);
-          const seat = existing >= 0 ? existing : playerIds.findIndex((value) => typeof value === "string" && value.startsWith("waiting_"));
+          const seat = existing >= 0 ? existing : waitingSeatIndex(playerIds);
           if (seat < 0) return reply({ error: "room_full" }, 409, origin);
           if (existing < 0) {
             playerIds[seat] = user.uid;

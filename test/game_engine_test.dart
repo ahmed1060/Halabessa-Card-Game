@@ -75,6 +75,35 @@ void main() {
   });
 
   group('GameEngine.apply(PlayCardAction)', () {
+    test('rejects a card absent from the acting hand without changing state', () {
+      const owned = Card(Suit.hearts, Rank.two);
+      const missing = Card(Suit.spades, Rank.ace);
+      final state = buildState(handCards: {'p0': [owned]});
+      final result = GameEngine.apply(state, PlayCardAction('p0', missing));
+      expect(result.newState, same(state));
+      expect(state.handCards['p0'], [owned]);
+      expect(state.board, isEmpty);
+    });
+
+    test('accepted play preserves the previous immutable hand snapshot', () {
+      const card = Card(Suit.hearts, Rank.two);
+      final state = buildState(handCards: const {'p0': [card]});
+      final next = GameEngine.apply(state, PlayCardAction('p0', card)).newState;
+      expect(state.handCards['p0'], [card]);
+      expect(next.handCards['p0'], isEmpty);
+      expect(next.currentTurnIndex, 1);
+    });
+
+    test('replayed card is rejected even after that player becomes active again', () {
+      const card = Card(Suit.hearts, Rank.two);
+      final state = buildState(handCards: {'p0': [card]});
+      final played = GameEngine.apply(state, PlayCardAction('p0', card)).newState;
+      final laterTurn = played.copyWith(currentTurnIndex: 0);
+      final replay = GameEngine.apply(laterTurn, PlayCardAction('p0', card));
+      expect(replay.newState, same(laterTurn));
+      expect(replay.newState.board, [card]);
+    });
+
     test('rejects a play from a player who is not on turn', () {
       final hand = [const Card(Suit.hearts, Rank.two)];
       final state = buildState(currentTurnIndex: 0, handCards: {'p1': hand});

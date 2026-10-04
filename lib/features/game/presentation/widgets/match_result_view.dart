@@ -10,6 +10,7 @@ class MatchResultView extends StatefulWidget {
   final String starsLabel, coinsLabel, homeLabel, replayLabel;
   final VoidCallback onHome;
   final VoidCallback? onReplay;
+  final bool replayLeavesView;
   const MatchResultView({
     super.key,
     required this.title,
@@ -26,6 +27,7 @@ class MatchResultView extends StatefulWidget {
     required this.replayLabel,
     required this.onHome,
     this.onReplay,
+    this.replayLeavesView = true,
   });
 
   @override
@@ -34,6 +36,7 @@ class MatchResultView extends StatefulWidget {
 
 class _MatchResultViewState extends State<MatchResultView> {
   bool _leaving = false;
+  bool _replayRequested = false;
   void _home() {
     if (_leaving) return;
     setState(() => _leaving = true);
@@ -41,8 +44,11 @@ class _MatchResultViewState extends State<MatchResultView> {
   }
 
   void _replay() {
-    if (_leaving || widget.onReplay == null) return;
-    setState(() => _leaving = true);
+    if (_leaving || _replayRequested || widget.onReplay == null) return;
+    setState(() {
+      _replayRequested = true;
+      _leaving = widget.replayLeavesView;
+    });
     widget.onReplay!();
   }
 
@@ -126,7 +132,7 @@ class _MatchResultViewState extends State<MatchResultView> {
                           foregroundColor: TableStyle.ink,
                           minimumSize: const Size(48, 52),
                         ),
-                        onPressed: _leaving ? null : _replay,
+                        onPressed: _leaving || _replayRequested ? null : _replay,
                         child: Text(widget.replayLabel),
                       ),
                       const SizedBox(height: 10),

@@ -8,6 +8,12 @@ export type MatchState = Record<string, unknown> & {
 const suits = ["hearts", "diamonds", "clubs", "spades"];
 const ranks = ["two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "jack", "queen", "king", "ace"];
 
+/** Fill opposite teammate seats first; seating stays independent of turn order. */
+export function waitingSeatIndex(playerIds: unknown[]) {
+  return [0, 2, 1, 3].find((index) =>
+    typeof playerIds[index] === "string" && String(playerIds[index]).startsWith("waiting_")) ?? -1;
+}
+
 function cardKey(card: Card) {
   return `${card.suit}_${card.rank}`;
 }

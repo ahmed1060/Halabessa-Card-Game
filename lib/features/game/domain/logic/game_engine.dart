@@ -41,9 +41,15 @@ class GameEngine {
     // Validate turn
     if (state.playerIds[state.currentTurnIndex] != playerId) return GameEngineResult(state);
 
+    // A duplicate/late action must not manufacture a card on the board.
+    if (!(state.handCards[playerId]?.any((c) => c.firebaseKey == card.firebaseKey) ?? false)) {
+      return GameEngineResult(state);
+    }
+
     // 1. Prepare local state
     final board = List<game_card.Card>.from(state.board);
-    final hands = Map<String, List<game_card.Card>>.from(state.handCards);
+    final hands = {for (final entry in state.handCards.entries)
+      entry.key: List<game_card.Card>.from(entry.value)};
     final harvest = Map<String, List<Capture>>.from(state.harvestStacks);
     final skipped = Map<String, List<String>>.from(state.skippedMatches);
     final ownership = Map<String, String>.from(state.cardOwnership);
@@ -189,7 +195,8 @@ class GameEngine {
       return GameEngineResult(state);
     }
     
-    final hands = Map<String, List<game_card.Card>>.from(state.handCards);
+    final hands = {for (final entry in state.handCards.entries)
+      entry.key: List<game_card.Card>.from(entry.value)};
     final board = List<game_card.Card>.from(state.board);
     
     if (action.isInitial) {

@@ -2,13 +2,27 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:halabessa/features/game/presentation/widgets/match_result_view.dart';
 
-Widget result({VoidCallback? replay, VoidCallback? home}) => MaterialApp(home: MatchResultView(
+Widget result({VoidCallback? replay, VoidCallback? home, bool replayLeavesView = true}) => MaterialApp(home: MatchResultView(
   title: 'Victory', subtitle: 'Great play', firstTeam: 'My Team', secondTeam: 'Opponent Team',
   firstScore: 42, secondScore: 30, stars: 3, coins: 100,
   starsLabel: 'Stars', coinsLabel: 'Coins', homeLabel: 'Return home',
-  replayLabel: 'Play again', onHome: home ?? () {}, onReplay: replay));
+  replayLabel: 'Play again', onHome: home ?? () {}, onReplay: replay,
+  replayLeavesView: replayLeavesView));
 
 void main() {
+  testWidgets('rematch vote is single-shot but return home stays available', (tester) async {
+    var votes = 0;
+    var exits = 0;
+    await tester.pumpWidget(result(replay: () => votes++, home: () => exits++,
+      replayLeavesView: false));
+    await tester.tap(find.text('Play again'));
+    await tester.pump();
+    expect(votes, 1);
+    expect(tester.widget<FilledButton>(find.byType(FilledButton)).onPressed, isNull);
+    expect(tester.widget<OutlinedButton>(find.byType(OutlinedButton)).onPressed, isNotNull);
+    await tester.tap(find.text('Return home'));
+    expect(exits, 1);
+  });
   for (final size in [const Size(320, 568), const Size(390, 844), const Size(844, 390)]) {
     for (final scale in [1.0, 2.0]) {
       testWidgets('results fit $size at ${scale}x text', (tester) async {

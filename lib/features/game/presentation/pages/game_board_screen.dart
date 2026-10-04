@@ -247,7 +247,8 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
 
     final myUid = currentUser.uid;
     final bool isSpectator = matchState.playerIds.indexOf(myUid) == -1;
-    if (matchState.phase == GamePhase.matchOver) {
+    if (matchState.phase == GamePhase.matchOver ||
+        matchState.phase == GamePhase.rematchVoting) {
       return _buildMatchResult(matchState, currentUser, isSpectator);
     }
     final settings = ref.watch(settingsProvider);
@@ -842,6 +843,7 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
     final won = myTeam == winner;
     final offline = state.id.startsWith('OFFLINE_');
     return MatchResultView(
+      key: ValueKey('${state.id}-${state.roundCount}-${state.phase.name}'),
       title: spectator ? 'match_over'.tr() : (won ? 'victory' : 'defeat').tr(),
       subtitle: spectator ? 'you_are_spectating'.tr() : (won ? 'great_play' : 'better_luck').tr(),
       firstTeam: (spectator ? 'team_a' : 'my_team').tr(),
@@ -852,9 +854,14 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
       coins: state.earnedCoins[user.uid] ?? 0,
       starsLabel: 'stars_label'.tr(), coinsLabel: 'coins_label'.tr(),
       homeLabel: 'return_home'.tr(), replayLabel: 'play_again'.tr(),
+      replayLeavesView: offline,
       onReplay: offline && !spectator ? () => ref.read(matchStateProvider.notifier)
         .startOfflinePracticeMatch(user.uid, user.displayName,
-          mode: state.mode, maxPoints: state.maxPoints) : null,
+          mode: state.mode, maxPoints: state.maxPoints) :
+        !spectator && state.phase == GamePhase.rematchVoting &&
+            !state.rematchVotes.containsKey(user.uid)
+          ? () => ref.read(matchStateProvider.notifier).voteRematch(user.uid, true)
+          : null,
       onHome: () {
         ref.read(matchStateProvider.notifier).leaveMatch();
         _returnToHome();

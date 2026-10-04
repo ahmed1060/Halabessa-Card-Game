@@ -13,6 +13,7 @@ import '../../domain/models/card.dart' as game_card;
 import '../../domain/models/game_action.dart';
 import '../../domain/logic/deck.dart';
 import '../../domain/logic/game_engine.dart';
+import '../../domain/logic/match_lifecycle.dart';
 import '../../domain/logic/bot_brain.dart';
 import '../../domain/logic/score_config.dart';
 import '../../data/repositories/multiplayer_sync_service.dart';
@@ -85,6 +86,8 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
   // only notification that the next bot is now active.
   bool _isHandlingBotLogic = false;
   bool _botEvaluationQueued = false;
+  bool _playInFlight = false;
+  bool _roundEnding = false;
   // Timers for heartbeat and AFK monitoring
   Timer? _heartbeatTimer;
   Timer? _afkWatchdogTimer;
@@ -498,7 +501,6 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
           // Bot/AFK/Stuck Turn Takeover
           final activeId = currentState.playerIds[currentState.currentTurnIndex];
           bool isBot = activeId.startsWith('bot_');
-          bool isAFK = currentState.playerOnlineStatus[activeId] == false;
 
           // Watchdog: If player's turn exceeded timerDurationSeconds + 2s grace period,
           // it means their local client crashed, disconnected, or froze without autoplaying.
@@ -510,20 +512,19 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
             }
           }
 
-          if (isBot || isAFK || isTurnStuck) {
+          // A disconnected human retains control until the turn expires.
+          // Only actual bot seats think/play early.
+          if (isBot || isTurnStuck) {
              if (kDebugMode) {
                if (isTurnStuck) {
                  debugPrint('TURN WATCHDOG: Host resolving stuck turn for $activeId');
-               } else if (isAFK) {
-                 debugPrint('AFK TAKEOVER: Host playing for $activeId');
                }
              }
              
              final delayMs = (isBot && !isTurnStuck) ? (800 + Random().nextInt(1500)) : 200;
              await Future.delayed(Duration(milliseconds: delayMs));
              final finalState = state;
-             if (finalState != null && finalState.phase == GamePhase.playing && 
-                 finalState.playerIds[finalState.currentTurnIndex] == activeId) {
+             if (finalState != null && sameMatchTurn(finalState, currentState)) {
                 
                  try {
                    final decision = BotBrain.decidePlayAdvanced(finalState, activeId);
@@ -532,11 +533,9 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
                      sendEmoji(activeId, decision.emojiReaction!);
                    }
                  } catch (e) {
-                   // Stuck failsafe: advance turn if BotBrain fails (e.g. no cards)
-                   _publishState(finalState.copyWith(
-                     currentTurnIndex: (finalState.currentTurnIndex + 1) % 4,
-                     turnStartTime: DateTime.now(),
-                   ));
+                   // A failed decision is not a move. Skipping the turn here
+                   // silently loses cards and corrupts round completion.
+                   debugPrint('BOT DECISION FAILED: $e');
                  }
              }
           }
@@ -657,7 +656,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
           (t) => {}, // Each tick could update local UI state if needed
           onDone: () {
             final currentState = state;
-            if (currentState != null && currentState.id == matchState.id) {
+            if (currentState != null && sameMatchTurn(currentState, matchState)) {
               _triggerAutoplay(currentState, currentUser.uid);
             }
           },
@@ -994,6 +993,8 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
   }
 
   Future<void> playCard(String playerId, game_card.Card card, {Offset? origin}) async {
+    if (_playInFlight) return;
+    _playInFlight = true;
     try {
       MatchState? currentState = state;
       if (currentState == null || currentState.phase != GamePhase.playing) return;
@@ -1004,10 +1005,12 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
 
       final result = GameEngine.apply(currentState, PlayCardAction(playerId, card));
       final newState = result.newState;
+      if (identical(newState, currentState)) return;
 
       if (result.capturedCards.isNotEmpty) {
         final intermediateBoard = List<game_card.Card>.from(currentState.board)..add(card);
-        final intermediateHands = Map<String, List<game_card.Card>>.from(currentState.handCards);
+        final intermediateHands = {for (final entry in currentState.handCards.entries)
+          entry.key: List<game_card.Card>.from(entry.value)};
         intermediateHands[playerId]?.removeWhere((c) => c.firebaseKey == card.firebaseKey);
         final intermediateHandCounts = {
           for (final id in currentState.playerIds)
@@ -1027,9 +1030,15 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
         _multimedia.playSfx('sfx/capture.mp3');
         await Future.delayed(const Duration(milliseconds: 600));
 
+        if (!mounted || state?.id != currentState.id ||
+            state?.roundCount != currentState.roundCount ||
+            state?.phase != GamePhase.capturing) return;
         await _publishState(state!.copyWith(capturingStage: 1));
         await Future.delayed(const Duration(milliseconds: 600));
 
+        if (!mounted || state?.id != currentState.id ||
+            state?.roundCount != currentState.roundCount ||
+            state?.phase != GamePhase.capturing) return;
         await _publishState(newState);
       } else {
         await _publishState(newState);
@@ -1046,15 +1055,21 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
       }
     } catch (e) {
       debugPrint('ERROR in playCard: $e');
+    } finally {
+      _playInFlight = false;
     }
   }
 
   Future<void> _handleRoundEnd() async {
+    if (_roundEnding) return;
+    _roundEnding = true;
     try {
       final currentState = state;
-      if (currentState == null) return;
+      if (currentState == null || currentState.phase != GamePhase.playing ||
+          !currentState.areAllHandsEmpty || currentState.deckCount != 0) return;
        
-      final harvest = Map<String, List<Capture>>.from(currentState.harvestStacks);
+      final harvest = {for (final entry in currentState.harvestStacks.entries)
+        entry.key: List<Capture>.from(entry.value)};
       final board = List<game_card.Card>.from(currentState.board);
       
       // 1. Last Capture Rule
@@ -1094,7 +1109,9 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
       await Future.delayed(const Duration(seconds: 5));
       
       // Check if we are still in roundScoring (hasn't been interrupted)
-      if (state?.phase != GamePhase.roundScoring) return;
+      if (!mounted || state?.id != currentState.id ||
+          state?.roundCount != currentState.roundCount ||
+          state?.phase != GamePhase.roundScoring) return;
 
       // 4. Check Match Win or Next Round
       if (pointsA >= scoringState.maxPoints || pointsB >= scoringState.maxPoints) {
@@ -1122,6 +1139,8 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
       }
     } catch (e) {
       debugPrint('ERROR in _handleRoundEnd: $e');
+    } finally {
+      _roundEnding = false;
     }
   }
 
@@ -1200,11 +1219,11 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
       }
     }
 
-    // Update state one last time with rewards for everyone to see
-    _publishState(currentState.copyWith(
-      earnedStars: matchStars,
-      earnedCoins: matchCoins,
-    ));
+    // Patch the latest phase. The original scoring snapshot may be obsolete
+    // after awaiting Firestore (or the player may already be in another room).
+    if (!mounted) return;
+    final rewarded = applyMatchRewards(state, currentState, matchStars, matchCoins);
+    if (rewarded != null) await _publishState(rewarded);
   }
 
   Future<void> _applyForfeitPenalty(String playerId) async {

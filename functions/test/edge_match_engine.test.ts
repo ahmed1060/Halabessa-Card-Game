@@ -6,11 +6,29 @@ import {
   deal,
   playCard,
   startRound,
+  waitingSeatIndex,
   type Card,
   type MatchState,
 } from "../../supabase/functions/halabessa-api/match_engine.ts";
 
 const players = ["player-one", "player-two", "player-three", "player-four"];
+
+test("first two joining humans are opposite teammates; remaining seats form the rival team", () => {
+  const seats = ["waiting_0", "waiting_1", "waiting_2", "waiting_3"];
+  const claimed = [];
+  for (const player of players) {
+    const index = waitingSeatIndex(seats);
+    claimed.push(index);
+    seats[index] = player;
+  }
+  assert.deepEqual(claimed, [0, 2, 1, 3]);
+  assert.equal(waitingSeatIndex(seats), -1);
+  assert.deepEqual(seats, [players[0], players[2], players[1], players[3]]);
+});
+
+test("team-first seating ignores bot and occupied seats", () => {
+  assert.equal(waitingSeatIndex(["human", "waiting_1", "bot_2", "waiting_3"]), 1);
+});
 
 function waitingState(): MatchState {
   return {
