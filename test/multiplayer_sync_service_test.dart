@@ -3,6 +3,29 @@ import 'package:halabessa/features/game/data/repositories/multiplayer_sync_servi
 import 'package:halabessa/features/game/domain/models/match_state.dart';
 
 void main() {
+  test('command snapshot keeps public opponent counts and only caller cards', () {
+    final state = MultiplayerSyncService.commandSnapshot({
+      'state': {'id': 'ABC12345', 'mode': 'classic', 'serverVersion': 8,
+        'playerIds': ['human', 'bot_1', 'bot_2', 'bot_3'],
+        'handCounts': {'human': 1, 'bot_1': 4, 'bot_2': 3, 'bot_3': 2},
+        'handCards': {'bot_1': [{'suit': 'clubs', 'rank': 'king'}]}},
+      'hand': [{'suit': 'hearts', 'rank': 'ace'}],
+    }, 'human');
+    expect(state.serverVersion, 8);
+    expect(state.handCards.keys, ['human']);
+    expect(state.cardsRemainingFor('bot_1'), 4);
+    expect(state.cardsRemainingFor('bot_2'), 3);
+    expect(state.handCards['human'], hasLength(1));
+  });
+  test('empty command hand clears stale cards without clearing opponent counts', () {
+    final state = MultiplayerSyncService.commandSnapshot({
+      'state': {'id': 'ABC12345', 'mode': 'classic',
+        'playerIds': ['human', 'bot_1', 'bot_2', 'bot_3'],
+        'handCounts': {'human': 0, 'bot_1': 4, 'bot_2': 3, 'bot_3': 2}},
+    }, 'human');
+    expect(state.handCards['human'], isEmpty);
+    expect(state.cardsRemainingFor('bot_1'), 4);
+  });
   test('sparse private hand snapshot clears counts for omitted empty hands', () {
     final publicState = <String, dynamic>{
       'id': 'ABC12345',

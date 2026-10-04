@@ -44,6 +44,29 @@ Reward values remain a preview with `settlementPending`; no reward settlement
 or production rules migration is claimed. Keep this foundation inactive until
 the command/mirror/privacy/reward migration is verified end to end.
 
+Command delivery integration (219 Flutter / 48 backend tests): commit the SQL
+state/ledger before delivery; repair reads the latest committed room while
+holding its transaction row lock, so late requests cannot publish old revisions.
+Mirror failure returns an accepted result marked `mirrorPending`; an identical
+retry repairs delivery without applying another move. Field-level atomic Firebase
+updates preserve chat, presence and heartbeats. Responses and version conflicts
+return the same-revision public state plus only the caller's private hand.
+Client command transport uses one immutable UUID/payload across one bounded
+network retry, and does not retry version/validation rejection as another move.
+`getMatchSnapshot` is for the SQL command protocol, **not legacy RTDB recovery**.
+Production read-only verification found zero accepted commands/versioned rooms
+before this change: the existing gameplay controller still needs migration.
+No new timeout/takeover activation or private-hand rules rollout is claimed here.
+
+Approved live private-room verification passed on 4 October: four temporary
+guest accounts filled seats 0, 2, 1, 3; two simultaneous card commands accepted
+exactly one move and rejected the other with a version conflict. Retrying the
+accepted command after another turn returned current revision 6 with original
+applied revision 5, without replaying it. Chat and presence survived delivery.
+The temporary Firebase accounts/match data and SQL room/profile records were
+removed afterward; an expired private lobby-index entry may await cleanup.
+This verifies the command transport, not migration of the existing controller.
+
 - Connect online play to the versioned, idempotent server command ledger.
 - Complete server round/deal/scoring/rematch and reward settlement before removing legacy writes.
 - Single accepted move per turn across manual, timeout and bot requests.

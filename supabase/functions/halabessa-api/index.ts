@@ -3,6 +3,7 @@ import { Client } from "jsr:@db/postgres@0.19.5";
 import { createRemoteJWKSet, importPKCS8, jwtVerify, SignJWT } from "npm:jose@6";
 import { cut, deal, playCard, startRound, waitingSeatIndex, type Card, type MatchState } from "./match_engine.ts";
 import { createDatabaseRunner, databaseConnectionString } from "./database.ts";
+import { commitAndDeliver, deliverLatestRoom, matchMirrorUpdates, participantSnapshot, publicMatchState } from "./match_delivery.ts";
 
 const firebaseProject = "halabessa-card-game1";
 const firebaseKeys = createRemoteJWKSet(new URL(
@@ -82,6 +83,7 @@ async function firebaseAccessToken() {
     .sign(key);
   const response = await fetch(account.token_uri, {
     method: "POST",
+    signal: AbortSignal.timeout(12_000),
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
       grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
@@ -99,6 +101,7 @@ async function firebaseRequest(path: string, method = "GET", body?: unknown, eta
   const token = await firebaseAccessToken();
   const response = await fetch(`${firebaseDatabaseUrl}/${path}.json`, {
     method,
+    signal: AbortSignal.timeout(12_000),
     headers: {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
@@ -149,13 +152,28 @@ function objectPayload(value: unknown) {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }
 
-function publicMatchState(state: MatchState, version: number) {
-  const publicState = { ...state } as Record<string, unknown>;
-  const hands = objectPayload(publicState.handCards) as Record<string, unknown[]>;
-  publicState.handCounts = Object.fromEntries(Object.entries(hands).map(([uid, cards]) => [uid, Array.isArray(cards) ? cards.length : 0]));
-  publicState.serverVersion = version;
-  delete publicState.handCards;
-  return publicState;
+async function mirrorDurableRoom(connection: Client, id: string) {
+  return deliverLatestRoom(async publish => {
+    await connection.queryObject`begin`;
+    try {
+      const result = await connection.queryObject<{ state: MatchState; version: string; hands: Record<string, Card[]> }>`
+        select r.state, r.version::text as version, s.hands
+        from halabessa.rooms r join halabessa.room_secrets s on s.room_id = r.room_id
+        where r.room_id = ${id} for update of r, s
+      `;
+      const row = result.rows[0];
+      if (!row) throw new Error("room_not_found");
+      const snapshot = await publish({ state: row.state, version: Number(row.version), hands: row.hands ?? {} });
+      await connection.queryObject`commit`;
+      return snapshot;
+    } catch (error) {
+      await connection.queryObject`rollback`;
+      throw error;
+    }
+  }, async room => {
+    const mirrored = await firebaseRequest("", "PATCH", matchMirrorUpdates(id, room, roomSummary));
+    if (mirrored.status < 200 || mirrored.status >= 300) throw new Error("match_mirror_failed");
+  });
 }
 
 function applyMatchCommand(
@@ -423,11 +441,6 @@ Deno.serve(async (request) => {
           }
           const currentVersion = Number(room.version);
           const playerIds = Array.isArray(room.state.playerIds) ? room.state.playerIds : [];
-          if (!playerIds.includes(user.uid)) {
-            await connection.queryObject`rollback`;
-            transactionOpen = false;
-            return reply({ error: "not_room_participant" }, 403, origin);
-          }
           const ownerProxy = room.owner_uid === user.uid && (
             requestedActor.startsWith("bot_") ||
             commandType === "dealInitial" ||
@@ -453,20 +466,35 @@ Deno.serve(async (request) => {
             where room_id = ${id} and command_id = ${commandId}::uuid
           `;
           if (duplicate.rows[0]) {
-            await connection.queryObject`commit`;
-            transactionOpen = false;
             if (duplicate.rows[0].actor_uid !== user.uid ||
                 duplicate.rows[0].action !== commandType ||
                 Number(duplicate.rows[0].expected_version) !== expectedVersion ||
                 !duplicate.rows[0].payload_matches) {
+              await connection.queryObject`rollback`;
+              transactionOpen = false;
               return reply({ error: "command_id_conflict" }, 409, origin);
             }
-            return reply(duplicate.rows[0].result, 200, origin);
+            const delivery = await commitAndDeliver(async () => {
+              await connection.queryObject`commit`;
+              transactionOpen = false;
+            }, () => mirrorDurableRoom(connection, id));
+            return reply({ ...duplicate.rows[0].result,
+              appliedVersion: duplicate.rows[0].result.version,
+              ...participantSnapshot(delivery.snapshot ?? {
+                state: room.state, version: currentVersion, hands: room.hands ?? {},
+              }, user.uid), duplicate: true, mirrorPending: delivery.mirrorPending }, 200, origin);
+          }
+          if (!playerIds.includes(user.uid)) {
+            await connection.queryObject`rollback`;
+            transactionOpen = false;
+            return reply({ error: "not_room_participant" }, 403, origin);
           }
           if (currentVersion !== expectedVersion) {
             await connection.queryObject`rollback`;
             transactionOpen = false;
-            return reply({ error: "version_conflict", currentVersion }, 409, origin);
+            return reply({ error: "version_conflict", currentVersion,
+              ...participantSnapshot({ state: room.state, version: currentVersion, hands: room.hands ?? {} }, user.uid),
+            }, 409, origin);
           }
 
           const fullState = { ...room.state, handCards: room.hands ?? {} } as MatchState;
@@ -488,6 +516,7 @@ Deno.serve(async (request) => {
             commandId,
             commandType,
             version: appliedVersion,
+            appliedVersion,
             actorUid: requestedActor,
           };
           const response = { ...ledgerResult, state: publicState, hand: hands[user.uid] ?? [] };
@@ -512,20 +541,32 @@ Deno.serve(async (request) => {
               (${id}, ${commandId}::uuid, ${user.uid}, ${commandType}, ${expectedVersion}, ${appliedVersion},
                ${JSON.stringify(ledgerPayload)}::jsonb, ${JSON.stringify(response)}::jsonb)
           `;
-          const mirrored = await firebaseRequest("", "PATCH", {
-            [`matches/${id}`]: publicState,
-            [`matchHands/${id}`]: hands,
-            [`matchSecrets/${id}`]: null,
-            [`rooms/${id}`]: roomSummary(publicState),
-          });
-          if (mirrored.status < 200 || mirrored.status >= 300) throw new Error("match_mirror_failed");
-          await connection.queryObject`commit`;
-          transactionOpen = false;
-          return reply(response, 200, origin);
+          const delivery = await commitAndDeliver(async () => {
+            await connection.queryObject`commit`;
+            transactionOpen = false;
+          }, () => mirrorDurableRoom(connection, id));
+          if (delivery.mirrorPending) console.warn("halabessa-match: committed command awaits mirror repair");
+          return reply({ ...response,
+            ...participantSnapshot(delivery.snapshot ?? {
+              state: publicState, version: appliedVersion, hands,
+            }, user.uid), mirrorPending: delivery.mirrorPending }, 200, origin);
         } catch (error) {
           if (transactionOpen) await connection.queryObject`rollback`;
           throw error;
         }
+      }
+      if (body.action === "getMatchSnapshot") {
+        const id = validRoomId(body.roomId);
+        if (!id) return reply({ error: "invalid_room_id" }, 400, origin);
+        const result = await connection.queryObject<{ state: MatchState; version: string; hands: Record<string, Card[]> }>`
+          select r.state, r.version::text as version, s.hands
+          from halabessa.rooms r join halabessa.room_secrets s on s.room_id = r.room_id
+          where r.room_id = ${id}
+        `;
+        const room = result.rows[0];
+        if (!room) return reply({ error: "room_not_found" }, 404, origin);
+        if (!(room.state.playerIds ?? []).includes(user.uid)) return reply({ error: "not_room_participant" }, 403, origin);
+        return reply(participantSnapshot({ state: room.state, version: Number(room.version), hands: room.hands ?? {} }, user.uid), 200, origin);
       }
       if (body.action === "createRoom") {
         if (!roomModes.has(body.mode as string) || !roomPoints.has(body.maxPoints as number) ||

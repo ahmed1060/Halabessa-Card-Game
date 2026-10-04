@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:halabessa/core/services/supabase_backend_service.dart';
+import 'package:halabessa/core/services/idempotent_match_request.dart';
 import '../../domain/models/match_state.dart';
 import '../../domain/models/room_summary.dart';
 import '../../domain/models/chat_message.dart';
@@ -94,28 +95,37 @@ class MultiplayerSyncService {
     required String callerUid,
     Map<String, dynamic> payload = const {},
     String? actorUid,
+    String? commandId,
   }) async {
-    final data = await SupabaseBackendService.call(
-      'submitMatchCommand',
-      data: {
+    final data = await sendIdempotentMatchRequest({
         'roomId': matchState.id,
-        'commandId': _newCommandId(),
+        'commandId': commandId ?? _newCommandId(),
         'commandType': commandType,
         'expectedVersion': matchState.serverVersion,
         'commandPayload': payload,
         if (actorUid != null) 'actorUid': actorUid,
-      },
-    );
+      }, (intent) => SupabaseBackendService.call('submitMatchCommand', data: intent,
+        timeout: const Duration(seconds: 20)));
+    return commandSnapshot(data, callerUid);
+  }
+
+  /// Private/public state in a command response belongs to one SQL revision.
+  @visibleForTesting
+  static MatchState commandSnapshot(Map<String, dynamic> data, String callerUid) {
     final publicValue = data['state'];
     if (publicValue is! Map) {
       throw const SupabaseBackendException('invalid_match_response');
     }
     final merged = Map<String, dynamic>.from(publicValue);
     final ownHand = data['hand'];
-    if (ownHand is List || ownHand is Map) {
-      merged['handCards'] = {callerUid: ownHand};
-    }
+    merged['handCards'] = {callerUid: ownHand is List || ownHand is Map ? ownHand : []};
     return MatchState.fromJson(merged);
+  }
+
+  Future<MatchState> getCommandSnapshot(String matchId, String callerUid) async {
+    final data = await SupabaseBackendService.call('getMatchSnapshot',
+      data: {'roomId': matchId}, timeout: const Duration(seconds: 20));
+    return commandSnapshot(data, callerUid);
   }
 
   String _newCommandId() {
