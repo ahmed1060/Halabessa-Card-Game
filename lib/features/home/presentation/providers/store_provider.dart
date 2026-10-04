@@ -19,6 +19,12 @@ ShopItem resolveTableSkin(List<ShopItem> items, String selectedId) =>
     orElse: () => items.firstWhere((item) => item.id == 'default_table' &&
       item.type == ShopItemType.tableSkin, orElse: defaultTableSkin));
 
+ShopItem resolveCardBack(List<ShopItem> items, String selectedId) =>
+  items.firstWhere((item) => item.id == selectedId && item.type == ShopItemType.cardBack,
+    orElse: () => items.firstWhere((item) => item.id == 'default_card' &&
+      item.type == ShopItemType.cardBack,
+      orElse: () => StoreNotifier.builtinItems.firstWhere((item) => item.id == 'default_card')));
+
 class ShopItem {
   final String id;
   final String name;
@@ -148,7 +154,7 @@ class StoreNotifier extends StateNotifier<StoreState> {
     });
   }
 
-  List<ShopItem> get allItems => [..._defaultItems, ...state.extraItems];
+  List<ShopItem> get allItems => [...builtinItems, ...state.extraItems];
 
   Future<void> purchaseItem(ShopItem item) async {
     final user = _ref.read(currentUserProvider);
@@ -237,14 +243,15 @@ class StoreNotifier extends StateNotifier<StoreState> {
   }
 
   ShopItem get activeCardBack {
-    return allItems.firstWhere((i) => i.id == state.activeCardBackId, orElse: () => allItems[0]);
+    return resolveCardBack(allItems, state.activeCardBackId);
   }
 
   ShopItem get activeTableSkin {
     return resolveTableSkin(allItems, state.activeTableSkinId);
   }
 
-  static final _defaultItems = [
+  // Resolve translated names when read, not once at the first locale used.
+  static List<ShopItem> get builtinItems => [
     ShopItem(
       id: 'default_card', 
       name: 'skin_premium'.tr(), 
@@ -347,5 +354,5 @@ final activeTableSkinProvider = Provider<ShopItem>((ref) {
 
 final activeCardBackProvider = Provider<ShopItem>((ref) {
   final store = ref.watch(storeProvider);
-  return ref.watch(storeProvider.notifier).allItems.firstWhere((i) => i.id == store.activeCardBackId, orElse: () => ref.watch(storeProvider.notifier).allItems[0]);
+  return resolveCardBack(ref.watch(storeProvider.notifier).allItems, store.activeCardBackId);
 });

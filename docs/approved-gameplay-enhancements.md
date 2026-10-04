@@ -31,6 +31,17 @@ Reward patching is NOT server-side exactly-once reward settlement.
 
 ## Batch 2 — authoritative online lifecycle
 
+Server-policy foundation implemented and regression-tested, **not connected to
+the production client/server command path yet**: deadline-gated manual/timeout
+play, three accepted timeout removals, explicit leave, inherited replacement
+hands/team, waiting-room vacancy reopening, non-host phase advancement,
+round conservation, capture phases, scoring and bounded rematch votes.
+The full backend regression gate currently passes 39 tests. A complete-round
+simulation caught and fixed an inconsistent subsequent-hand turn timestamp.
+Reward values remain a preview with `settlementPending`; no reward settlement
+or production rules migration is claimed. Keep this foundation inactive until
+the command/mirror/privacy/reward migration is verified end to end.
+
 - Connect online play to the versioned, idempotent server command ledger.
 - Complete server round/deal/scoring/rematch and reward settlement before removing legacy writes.
 - Single accepted move per turn across manual, timeout and bot requests.
@@ -66,6 +77,20 @@ in the store; the emerald theme remains available separately. Table fallback
 selects by type/ID, never a fragile list index. Existing equipped/ownership IDs
 are preserved. Native Facebook App ID/configuration is still missing; requested
 from the user. Provider sign-in is not verified as fixed.
+
+Authentication code corrections pass the complete 211-test Flutter suite:
+Google explicitly requests the configured web client token; iOS's callback
+scheme matches its committed Google client; Google/Facebook guest upgrades
+retain the anonymous UID; cancellation and configuration errors are surfaced.
+Android CI supports an optional stable, owner-provided private upload keystore
+and reports its public certificate fingerprints. No signing secrets were
+created or published. See `social-sign-in-setup.md` for the remaining owner
+configuration. This does not establish successful provider sign-in on a device.
+
+Catalog audit: every built-in store asset and card illustration exists, and
+built-in item IDs are unique. Card-back fallback is now type-safe too; owned
+selections are preserved. Built-in translated names resolve when the catalog
+is read rather than being frozen in the first language used.
 
 - Capture actual Google/Facebook errors on mobile web and Android before changing flows.
 - Verify provider enablement, authorized domains, callbacks and actual APK signing fingerprints.

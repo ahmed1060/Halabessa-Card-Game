@@ -1,4 +1,9 @@
 {
+  "auth_popup_blocked": "Allow pop-ups for this site, then try signing in again.",
+  "auth_unauthorized_domain": "Sign-in is not configured for this website address.",
+  "auth_guest_credential_used": "That account already has a profile. Your guest progress is unchanged; sign out only if you want to use the existing profile.",
+  "auth_google_configuration": "Google sign-in is not configured for this app build.",
+  "auth_facebook_configuration": "Facebook could not sign in. This app's Facebook configuration needs to be checked.",
   "skin_lantern_nights": "Lantern Nights",
   "game_landscape": "Landscape gameplay",
   "game_orientation_help": "Turn off for portrait. On the mobile website, rotate your phone; your browser controls orientation.",

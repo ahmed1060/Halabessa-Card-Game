@@ -69,27 +69,51 @@ jobs:
       - name: Test
         run: flutter test
 
+      - name: Prepare optional persistent Android signing identity
+        if: github.event_name != 'pull_request'
+        env:
+          KEYSTORE_BASE64: ${{ secrets.HALABESSA_UPLOAD_KEYSTORE_BASE64 }}
+        shell: bash
+        run: |
+          if [[ -n "$KEYSTORE_BASE64" ]]; then
+            umask 077
+            printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/halabessa-upload.jks"
+            echo "HALABESSA_UPLOAD_KEYSTORE=$RUNNER_TEMP/halabessa-upload.jks" >> "$GITHUB_ENV"
+          fi
+
       - name: Build APK (Release code, CI signing)
         # A previous run failed while Gradle updated a shared runner cache's
         # last-build.bin. Keep Gradle's mutable state isolated per job and
         # disable the daemon/file watcher, neither of which helps a one-shot
         # CI release build.
         env:
+          HALABESSA_UPLOAD_STORE_PASSWORD: ${{ github.event_name != 'pull_request' && secrets.HALABESSA_UPLOAD_STORE_PASSWORD || '' }}
+          HALABESSA_UPLOAD_KEY_ALIAS: ${{ github.event_name != 'pull_request' && secrets.HALABESSA_UPLOAD_KEY_ALIAS || '' }}
+          HALABESSA_UPLOAD_KEY_PASSWORD: ${{ github.event_name != 'pull_request' && secrets.HALABESSA_UPLOAD_KEY_PASSWORD || '' }}
           GRADLE_USER_HOME: ${{ runner.temp }}/halabessa-gradle
           GRADLE_OPTS: -Dorg.gradle.daemon=false -Dorg.gradle.vfs.watch=false
         run: flutter build apk --release --android-skip-build-dependency-validation
-        # This validates release-mode code. The current Gradle configuration
-        # signs with the debug key, so this APK is not a Play submission build.
+        # Without all four private upload-key settings this is a debug-signed
+        # release-code check, not a Play submission build.
 
       - name: Verify Play target and 16 KB native library packaging
         run: |
           "$ANDROID_HOME/build-tools/35.0.0/zipalign" -v -c -P 16 4 build/app/outputs/flutter-apk/app-release.apk
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging build/app/outputs/flutter-apk/app-release.apk | grep -Fq "targetSdkVersion:'36'"
 
+      - name: Report actual APK signing certificate for Google sign-in setup
+        # Certificate fingerprints are public identifiers, not keystore secrets.
+        # Register the APK's SHA-1 in Firebase; a runner-generated debug key is
+        # not a stable identity for Google sign-in across future CI builds.
+        run: '"$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs build/app/outputs/flutter-apk/app-release.apk'
+
       - name: Build App Bundle (CI signing)
-        # Exercise the package format Google Play accepts. No upload key is
-        # configured in this workflow, so this output is only a build check.
+        # Exercise the Play package format. Submission still needs the owner's
+        # upload key and Play App Signing configuration.
         env:
+          HALABESSA_UPLOAD_STORE_PASSWORD: ${{ github.event_name != 'pull_request' && secrets.HALABESSA_UPLOAD_STORE_PASSWORD || '' }}
+          HALABESSA_UPLOAD_KEY_ALIAS: ${{ github.event_name != 'pull_request' && secrets.HALABESSA_UPLOAD_KEY_ALIAS || '' }}
+          HALABESSA_UPLOAD_KEY_PASSWORD: ${{ github.event_name != 'pull_request' && secrets.HALABESSA_UPLOAD_KEY_PASSWORD || '' }}
           GRADLE_USER_HOME: ${{ runner.temp }}/halabessa-gradle
           GRADLE_OPTS: -Dorg.gradle.daemon=false -Dorg.gradle.vfs.watch=false
         run: flutter build appbundle --release --android-skip-build-dependency-validation

@@ -5,6 +5,16 @@ class ErrorHandler {
   static String getAuthErrorMessage(dynamic error) {
     if (error is FirebaseAuthException) {
       switch (error.code) {
+        case 'popup-blocked':
+          return 'auth_popup_blocked'.tr();
+        case 'unauthorized-domain':
+          return 'auth_unauthorized_domain'.tr();
+        case 'credential-already-in-use':
+          return 'auth_guest_credential_used'.tr();
+        case 'google-token-missing':
+          return 'auth_google_configuration'.tr();
+        case 'facebook-login-failed':
+          return 'auth_facebook_configuration'.tr();
         case 'invalid-email':
           return 'auth_invalid_email'.tr();
         case 'user-disabled':

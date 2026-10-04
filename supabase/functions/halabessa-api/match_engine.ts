@@ -30,7 +30,7 @@ function numberValue(value: unknown, fallback = 0) {
 }
 
 function objectValue<T>(value: unknown): Record<string, T> {
-  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, T> : {};
+  return value && typeof value === "object" && !Array.isArray(value) ? { ...value as Record<string, T> } : {};
 }
 
 export function standardDeck(): Card[] {

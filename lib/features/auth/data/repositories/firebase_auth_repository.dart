@@ -11,9 +11,32 @@ import '../../domain/models/app_user.dart';
 import '../../domain/repositories/auth_repository.dart';
 
 class FirebaseAuthRepository implements AuthRepository {
+  static const googleWebClientId = '54223815037-gg8pie8gu740lhci35i8df8f37mga6i2.apps.googleusercontent.com';
+  static const googleIosClientId = '54223815037-647c34d72d4dih6mgv9j18btb8867crt.apps.googleusercontent.com';
   final firebase_auth.FirebaseAuth _firebaseAuth;
 
   FirebaseAuthRepository(this._firebaseAuth);
+
+  @visibleForTesting
+  Future<firebase_auth.UserCredential> signInOrLinkCredential(
+      firebase_auth.AuthCredential credential) {
+    final current = _firebaseAuth.currentUser;
+    // Upgrading a guest must retain their UID, profile, purchases and room.
+    // An already-used credential is surfaced, not silently switched to a
+    // different account whose profile would hide the guest's progress.
+    return current?.isAnonymous == true
+        ? current!.linkWithCredential(credential)
+        : _firebaseAuth.signInWithCredential(credential);
+  }
+
+  @visibleForTesting
+  Future<firebase_auth.UserCredential> signInOrLinkPopup(
+      firebase_auth.AuthProvider provider) {
+    final current = _firebaseAuth.currentUser;
+    return current?.isAnonymous == true
+        ? current!.linkWithPopup(provider)
+        : _firebaseAuth.signInWithPopup(provider);
+  }
 
   // Cache the server-owned admin status per user so authStateChanges does not
   // repeatedly invoke the Edge Function on Firebase token refreshes.
@@ -234,26 +257,33 @@ class FirebaseAuthRepository implements AuthRepository {
     try {
       if (kIsWeb) {
         final googleProvider = firebase_auth.GoogleAuthProvider();
-        final userCredential = await _firebaseAuth.signInWithPopup(googleProvider);
+        final userCredential = await signInOrLinkPopup(googleProvider);
         final user = _userFromFirebase(userCredential.user);
         if (user != null) await _syncUserToDatabase(user);
         return user;
       }
 
-      final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
+      final GoogleSignInAccount? googleUser = await GoogleSignIn(
+        clientId: defaultTargetPlatform == TargetPlatform.iOS ? googleIosClientId : null,
+        serverClientId: googleWebClientId,
+      ).signIn();
       if (googleUser == null) return null;
 
       final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      if (googleAuth.idToken == null) {
+        throw firebase_auth.FirebaseAuthException(code: 'google-token-missing');
+      }
       final credential = firebase_auth.GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
 
-      final userCredential = await _firebaseAuth.signInWithCredential(credential);
+      final userCredential = await signInOrLinkCredential(credential);
       final user = _userFromFirebase(userCredential.user);
       if (user != null) await _syncUserToDatabase(user);
       return user;
     } catch (e) {
+      if (e is firebase_auth.FirebaseAuthException && e.code == 'popup-closed-by-user') return null;
       debugPrint("Google Sign In failed: $e");
       rethrow;
     }
@@ -264,7 +294,7 @@ class FirebaseAuthRepository implements AuthRepository {
     try {
       if (kIsWeb) {
         final facebookProvider = firebase_auth.FacebookAuthProvider();
-        final userCredential = await _firebaseAuth.signInWithPopup(facebookProvider);
+        final userCredential = await signInOrLinkPopup(facebookProvider);
         final user = _userFromFirebase(userCredential.user);
         if (user != null) await _syncUserToDatabase(user);
         return user;
@@ -273,13 +303,17 @@ class FirebaseAuthRepository implements AuthRepository {
       final LoginResult result = await FacebookAuth.instance.login();
       if (result.status == LoginStatus.success) {
         final credential = firebase_auth.FacebookAuthProvider.credential(result.accessToken!.tokenString);
-        final userCredential = await _firebaseAuth.signInWithCredential(credential);
+        final userCredential = await signInOrLinkCredential(credential);
         final user = _userFromFirebase(userCredential.user);
         if (user != null) await _syncUserToDatabase(user);
         return user;
       }
+      if (result.status != LoginStatus.cancelled) {
+        throw firebase_auth.FirebaseAuthException(code: 'facebook-login-failed');
+      }
       return null;
     } catch (e) {
+      if (e is firebase_auth.FirebaseAuthException && e.code == 'popup-closed-by-user') return null;
       debugPrint("Facebook Sign In failed: $e");
       rethrow;
     }

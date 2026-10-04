@@ -19,4 +19,22 @@ void main() {
     expect(resolveTableSkin(items, 'removed_table').id, 'default_table');
     expect(resolveTableSkin(items, 'card').type, ShopItemType.tableSkin);
   });
+  test('every built-in theme and card illustration exists and IDs are unique', () {
+    final items = StoreNotifier.builtinItems;
+    expect(items.map((item) => item.id).toSet().length, items.length);
+    for (final item in items) {
+      for (final asset in [item.assetPath, item.frontSkinPath, item.aceSkinPath,
+        item.sevenDiamondSkinPath, ...?item.faceIllustrations?.values,
+        ...?item.suitIcons?.values].whereType<String>()) {
+        expect(File(asset).existsSync(), isTrue, reason: '${item.id}: $asset');
+      }
+    }
+  });
+  test('card-back selection is typed and preserves an owned skin', () {
+    final cards = StoreNotifier.builtinItems.where((item) => item.type == ShopItemType.cardBack).toList();
+    final items = [defaultTableSkin(), ...cards];
+    expect(resolveCardBack(items, 'neon_card').id, 'neon_card');
+    expect(resolveCardBack(items, 'default_table').id, 'default_card');
+    expect(resolveCardBack([], 'removed_card').id, 'default_card');
+  });
 }
