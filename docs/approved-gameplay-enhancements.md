@@ -114,6 +114,18 @@ creation still defaults to legacy mode. Private-hand rules and client wallet
 writes remain unchanged. Do not claim normal gameplay or full-plan migration
 complete from the separate protocol-1 QA test.
 
+Client synchronization follow-up (229 Flutter tests pass): the room protocol is
+checked before opening any private-hand subscription. Protocol-1 notifications
+fetch the caller's hand and public board together through `getMatchSnapshot`;
+heartbeat-only updates do not refetch a delivered revision. Concurrent revision
+notifications are coalesced, stale responses are suppressed, and cancellation
+or deletion invalidates in-flight responses. Failed reads are stream errors,
+not room-deletion signals; a later notification retries without a busy loop.
+Active-room join responses now retain the caller's returned hand. Seven new
+tests cover these read races and cancellation paths. Normal creation remains
+legacy until controller command routing and private-hand rules are complete;
+this client change alone does not enforce hand privacy on the server.
+
 - Connect online play to the versioned, idempotent server command ledger.
 - Complete server round/deal/scoring/rematch and reward settlement before removing legacy writes.
 - Single accepted move per turn across manual, timeout and bot requests.

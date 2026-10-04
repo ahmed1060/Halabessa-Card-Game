@@ -278,7 +278,9 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
 
     _startHeartbeat();
 
-    _matchListener = ref.read(multiplayerSyncServiceProvider).watchMatch(matchId).listen(
+    _matchListener = ref.read(multiplayerSyncServiceProvider).watchMatch(
+      matchId, callerUid: ref.read(currentUserProvider)?.uid,
+    ).listen(
       (serverState) {
         if (serverState != null) {
           try {
@@ -813,6 +815,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
       displayName: displayName,
       cardBackId: ref.read(storeProvider).activeCardBackId,
       avatarUrl: currentUser.avatarUrl ?? '',
+      callerUid: currentUser.uid,
     );
     state = joined;
     bindToMatch(joined.id);

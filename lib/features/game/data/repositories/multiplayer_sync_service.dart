@@ -5,6 +5,7 @@ import 'package:firebase_database/firebase_database.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:halabessa/core/services/supabase_backend_service.dart';
 import 'package:halabessa/core/services/idempotent_match_request.dart';
+import 'command_snapshot_stream.dart';
 import '../../domain/models/match_state.dart';
 import '../../domain/models/room_summary.dart';
 import '../../domain/models/chat_message.dart';
@@ -193,6 +194,7 @@ class MultiplayerSyncService {
     required String displayName,
     required String cardBackId,
     required String avatarUrl,
+    required String callerUid,
   }) async {
     final data = await SupabaseBackendService.call('joinRoom', data: {
       'roomId': roomId,
@@ -200,7 +202,11 @@ class MultiplayerSyncService {
       'cardBackId': cardBackId,
       'avatarUrl': avatarUrl,
     });
-    return MatchState.fromJson(Map<String, dynamic>.from(data['match'] as Map));
+    final joined = MatchState.fromJson(Map<String, dynamic>.from(data['match'] as Map));
+    // The join response's hand must not be dropped for active replacements.
+    return joined.usesServerCommands
+        ? commandSnapshot({...data, 'state': data['match']}, callerUid)
+        : joined;
   }
 
   /// Watches the public match node and the (participant-only) hands tree
@@ -208,7 +214,34 @@ class MultiplayerSyncService {
   /// two-subscription merge rather than combining via a Stream library --
   /// this file has no reactive-streams dependency to reach for, and the
   /// merge itself is small enough not to need one.
-  Stream<MatchState?> watchMatch(String matchId) {
+  Stream<MatchState?> watchMatch(String matchId, {String? callerUid}) async* {
+    // Inspect the protocol before subscribing to the private tree. Server
+    // rooms never read matchHands/$id (which would reveal opponents' cards).
+    final initial = await matchRef.child(matchId).get();
+    final value = initial.value;
+    final publicState = value is Map ? Map<String, dynamic>.from(value) : null;
+    if (publicState == null) {
+      yield null;
+      return;
+    }
+    if (((publicState['protocolVersion'] as num?)?.toInt() ?? 0) > 0) {
+      if (callerUid == null || callerUid.isEmpty) {
+        throw const SupabaseBackendException('unauthenticated');
+      }
+      yield* watchCommandSnapshots(
+        roomId: matchId,
+        notifications: matchRef.child(matchId).onValue.map((event) {
+          final value = event.snapshot.value;
+          return value is Map ? Map<String, dynamic>.from(value) : null;
+        }),
+        fetchSnapshot: () => getCommandSnapshot(matchId, callerUid),
+      );
+      return;
+    }
+    yield* _watchLegacyMatch(matchId);
+  }
+
+  Stream<MatchState?> _watchLegacyMatch(String matchId) {
     final controller = StreamController<MatchState?>.broadcast();
     Map<String, dynamic>? latestPublic;
     Object? latestHands;
@@ -227,7 +260,7 @@ class MultiplayerSyncService {
         controller.add(MatchState.fromJson(merged));
       } catch (e) {
         if (kDebugMode) debugPrint('CRITICAL: Error parsing match state for $matchId: $e');
-        controller.add(null);
+        controller.addError(e);
       }
     }
 
@@ -238,7 +271,7 @@ class MultiplayerSyncService {
       emit();
     }, onError: (error) {
       if (kDebugMode) debugPrint('STREAM ERROR for match $matchId: $error');
-      controller.add(null);
+      controller.addError(error);
     });
 
     final handsSub = _handsRef(matchId).onValue.listen((event) {
