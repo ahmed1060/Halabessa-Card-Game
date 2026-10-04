@@ -55,7 +55,7 @@ class PublicRoomsList extends ConsumerWidget {
                 ),
                 subtitle: Text(
                   'room_players_info'.tr(args: [
-                    '${match.playerIds.where((id) => !id.startsWith('waiting_')).length}/4', 
+                    '${match.playerIds.length - match.openSeatCount}/4',
                     match.id
                   ]),
                   style: const TextStyle(color: Colors.white70),
@@ -74,7 +74,7 @@ class PublicRoomsList extends ConsumerWidget {
                     const SizedBox(width: 8),
                     Builder(
                       builder: (context) {
-                        final bool isFull = !match.playerIds.any((id) => id.startsWith('waiting_'));
+                        final bool isFull = !match.isJoinable(DateTime.now());
                         return Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
@@ -109,7 +109,7 @@ class PublicRoomsList extends ConsumerWidget {
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: isFull ? Colors.grey.withOpacity(0.3) : Colors.teal,
                               ),
-                              child: Text(isFull ? 'full'.tr() : 'join'.tr()),
+                              child: Text(isFull ? (match.isActiveReplacementRoom ? 'table_playing'.tr() : 'full'.tr()) : 'join'.tr()),
                             ),
                           ],
                         );

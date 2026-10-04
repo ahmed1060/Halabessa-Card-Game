@@ -14,11 +14,11 @@ export function joinCommandRoom(state: MatchState, uid: string, profile: Profile
   if (!Array.isArray(ids) || ids.length !== 4) throw new Error("invalid_room_state");
   const existing = ids.indexOf(uid);
   if (existing >= 0) return { state, seatIndex: existing, alreadyJoined: true };
+  if (typeof state.expireAt === "string" && Date.parse(state.expireAt) <= now) throw new Error("room_not_joinable");
   if (state.phase !== "waitingForPlayers") {
     const next = claimReplacement(state, uid, profile);
     return { state: next, seatIndex: next.playerIds!.indexOf(uid), alreadyJoined: false };
   }
-  if (typeof state.expireAt === "string" && Date.parse(state.expireAt) <= now) throw new Error("room_not_joinable");
   const seat = waitingSeatIndex(ids);
   if (seat < 0) throw new Error("room_full");
   const seats = [...ids];

@@ -13,6 +13,19 @@ class RoomSummary {
   final bool isPublic;
   final GamePhase phase;
   final DateTime? expireAt;
+  final int protocolVersion;
+  final int replacementSeatCount;
+  final int safeReplacementSeatCount;
+
+  int get openSeatCount => phase == GamePhase.waitingForPlayers
+      ? playerIds.where((id) => id.startsWith('waiting_')).length : replacementSeatCount;
+  bool get isActiveReplacementRoom => protocolVersion == 1 &&
+      phase == GamePhase.playing && replacementSeatCount > 0;
+  bool isVisiblePublic(DateTime now) => isPublic &&
+      (expireAt == null || expireAt!.isAfter(now)) &&
+      (phase == GamePhase.waitingForPlayers || isActiveReplacementRoom);
+  bool isJoinable(DateTime now) => isVisiblePublic(now) &&
+      (phase == GamePhase.waitingForPlayers ? openSeatCount > 0 : safeReplacementSeatCount > 0);
 
   RoomSummary({
     required this.id,
@@ -21,6 +34,9 @@ class RoomSummary {
     required this.isPublic,
     required this.phase,
     this.expireAt,
+    this.protocolVersion = 0,
+    this.replacementSeatCount = 0,
+    this.safeReplacementSeatCount = 0,
   });
 
   Map<String, dynamic> toJson() => {
@@ -28,6 +44,9 @@ class RoomSummary {
         'playerIds': playerIds,
         'isPublic': isPublic,
         'phase': phase.name,
+        'protocolVersion': protocolVersion,
+        'replacementSeatCount': replacementSeatCount,
+        'safeReplacementSeatCount': safeReplacementSeatCount,
         if (expireAt != null) 'expireAt': expireAt!.toIso8601String(),
       };
 
@@ -45,6 +64,11 @@ class RoomSummary {
         orElse: () => GamePhase.waitingForPlayers,
       ),
       expireAt: json['expireAt'] != null ? DateTime.tryParse(json['expireAt'].toString()) : null,
+      protocolVersion: json['protocolVersion'] is num ? (json['protocolVersion'] as num).toInt() : 0,
+      replacementSeatCount: json['replacementSeatCount'] is num
+          ? (json['replacementSeatCount'] as num).toInt().clamp(0, 4) : 0,
+      safeReplacementSeatCount: json['safeReplacementSeatCount'] is num
+          ? (json['safeReplacementSeatCount'] as num).toInt().clamp(0, 4) : 0,
     );
   }
 }

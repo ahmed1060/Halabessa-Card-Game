@@ -125,8 +125,12 @@ export function claimReplacement(state: MatchState, uid: string, profile: {
 
 /** Initial bots are not replacement vacancies; claim only explicitly released seats. */
 export function replacementSeatIndex(state: MatchState) {
-  if (!state.isPublic || state.phase !== "playing") return -1;
+  return replacementSeatIndices(state)[0] ?? -1;
+}
+
+export function replacementSeatIndices(state: MatchState) {
+  if (!state.isPublic || state.phase !== "playing") return [];
   const released = record<unknown>(state.releasedSeats);
-  return (state.playerIds ?? []).findIndex((uid, index) =>
-    uid.startsWith("bot_") && uid in released && index !== Number(state.currentTurnIndex));
+  return (state.playerIds ?? []).flatMap((uid, index) =>
+    uid.startsWith("bot_") && uid in released && index !== Number(state.currentTurnIndex) ? [index] : []);
 }

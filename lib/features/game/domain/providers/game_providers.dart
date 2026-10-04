@@ -94,6 +94,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
   bool _playInFlight = false;
   bool _roundEnding = false;
   int _bindingGeneration = 0;
+  bool _isSpectating = false;
   Timer? _serverProgressTimer;
   bool _serverCommandBusy = false;
   Completer<void>? _serverIdle;
@@ -114,6 +115,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
   }
 
   Future<void> _sendServerIntent(String type, {Map<String, dynamic> payload = const {}}) async {
+    if (_isSpectating) return;
     final generation = _bindingGeneration;
     // Human votes/cuts must not disappear while a timed transition or reward
     // request is pending. Wait, then use the freshly accepted revision.
@@ -157,6 +159,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
   }
 
   Future<void> _tickServerProgress() async {
+    if (_isSpectating) return;
     final s = state;
     final uid = ref.read(currentUserProvider)?.uid;
     final now = DateTime.now();
@@ -200,6 +203,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
   static const String _matchIdKey = 'last_match_id';
 
   Future<void> _publishState(MatchState newState) async {
+    if (_isSpectating) return;
     // Never optimistically replace a server-owned room with a locally computed
     // snapshot. Its next state must come from an accepted command/snapshot.
     MultiplayerSyncService.validateLegacyWrite(newState);
@@ -308,7 +312,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
   }
 
   void leaveMatch({bool notifyServer = true}) {
-    if (lastBoundMatchId != null && !lastBoundMatchId!.startsWith('OFFLINE_')) {
+    if (!_isSpectating && lastBoundMatchId != null && !lastBoundMatchId!.startsWith('OFFLINE_')) {
       final currentUser = ref.read(currentUserProvider);
       if (currentUser != null) {
         // Apply forfeit penalty if leaving during active play
@@ -352,6 +356,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
   }
 
   bool _amIHost(MatchState s, {Map<String, bool>? presenceMap}) {
+    if (_isSpectating) return false;
     if (s.id.startsWith('OFFLINE_')) return true;
     final currentUser = ref.read(currentUserProvider);
     if (currentUser == null) return false;
@@ -372,7 +377,8 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     return false;
   }
 
-  void bindToMatch(String matchId) {
+  void bindToMatch(String matchId, {bool spectating = false}) {
+    _isSpectating = spectating;
     final generation = ++_bindingGeneration;
     _serverCommandBusy = false;
     _serverRetryAfter = null;
@@ -387,7 +393,11 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     }
     _tafweetSubscriptions.clear();
     lastBoundMatchId = matchId;
-    _saveMatchId(matchId);
+    if (spectating) {
+      _clearMatchId();
+    } else {
+      _saveMatchId(matchId);
+    }
     _matchListener?.cancel(); 
     
     if (matchId.startsWith('OFFLINE_')) {
@@ -400,18 +410,26 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
       return;
     }
 
-    _startHeartbeat();
-    _serverProgressTimer = Timer.periodic(const Duration(milliseconds: 250), (_) {
-      unawaited(_tickServerProgress());
-    });
+    _heartbeatTimer?.cancel();
+    _heartbeatTimer = null;
+    if (!spectating) _startHeartbeat();
+    if (!spectating) {
+      _serverProgressTimer = Timer.periodic(const Duration(milliseconds: 250), (_) {
+        unawaited(_tickServerProgress());
+      });
+    }
 
     _matchListener = ref.read(multiplayerSyncServiceProvider).watchMatch(
-      matchId, callerUid: ref.read(currentUserProvider)?.uid,
+      matchId, callerUid: ref.read(currentUserProvider)?.uid, spectator: spectating,
     ).listen(
       (serverState) {
         if (!mounted || generation != _bindingGeneration) return;
         if (serverState != null) {
           try {
+            if (spectating) {
+              state = serverState;
+              return;
+            }
             if (serverState.usesServerCommands) {
               if (state == null) state = serverState;
               _adoptServerSnapshot(serverState);
@@ -442,7 +460,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
 
     // Initial Sync
     final currentUser = ref.read(currentUserProvider);
-    if (currentUser != null) {
+    if (currentUser != null && !spectating) {
       ref.read(multiplayerSyncServiceProvider).syncPresence(matchId, currentUser.uid);
     }
     
@@ -461,7 +479,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     _presenceListener = ref.read(multiplayerSyncServiceProvider).watchPresence(matchId).listen((presence) {
        final serverState = state;
        if (serverState == null) return;
-       if (serverState.usesServerCommands) return;
+       if (_isSpectating || serverState.usesServerCommands) return;
        
        // Host Transition: We use the ACTUAL presence map from RTDB during this transition to avoid circular locks.
        // If I am the first human online according to the presence map, I take over the state-update duties.
@@ -530,7 +548,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
   }
 
   void _syncProfileWithMatch(MatchState s) {
-    if (s.usesServerCommands) return;
+    if (_isSpectating || s.usesServerCommands) return;
     final user = ref.read(currentUserProvider);
     if (user == null) return;
     
@@ -908,12 +926,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
           final roomData = entry.value as Map;
           final summary = RoomSummary.fromJson(roomId, roomData);
 
-          final bool isExpired = summary.expireAt != null && summary.expireAt!.isBefore(now);
-          final bool hasOpenSeat = summary.playerIds.any((id) => id.startsWith('waiting_'));
-          final bool isJoinable = summary.isPublic && 
-                                  summary.phase == GamePhase.waitingForPlayers && 
-                                  hasOpenSeat && 
-                                  !isExpired;
+          final bool isJoinable = summary.isJoinable(now);
 
           if (isJoinable && (summary.mode == mode || mode == GameMode.classic)) {
             await joinMatch(summary.id, playerId, displayName);
@@ -938,7 +951,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
   }
 
   void spectateMatch(String matchId) {
-    bindToMatch(matchId);
+    bindToMatch(matchId, spectating: true);
   }
 
   Future<void> joinMatch(String matchId, String playerId, String displayName) async {

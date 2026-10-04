@@ -3,6 +3,15 @@ import 'package:halabessa/features/game/data/repositories/multiplayer_sync_servi
 import 'package:halabessa/features/game/domain/models/match_state.dart';
 
 void main() {
+  test('spectator snapshot strips all private cards but preserves public counts', () {
+    final state = MultiplayerSyncService.publicSnapshot({
+      'id': 'ABC12345', 'mode': 'classic', 'protocolVersion': 1,
+      'playerIds': ['one', 'two'], 'handCounts': {'one': 4, 'two': 3},
+      'handCards': {'two': [{'suit': 'hearts', 'rank': 'ace'}]},
+    });
+    expect(state.handCards, isEmpty);
+    expect(state.cardsRemainingFor('two'), 3);
+  });
   test('whole-state writes reject server protocols and retain legacy behavior', () {
     final legacy = MatchState.fromJson({
       'id': 'ABC12345', 'mode': 'classic', 'playerIds': ['one'],

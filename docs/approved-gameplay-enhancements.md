@@ -159,8 +159,22 @@ The Hosting workflow now runs both suites before deploying any Firebase rules.
 No production users/data were used by these tests. On this Windows host the
 portable Java runtime needed a process-local Unix-domain temp-path override to
 use its TCP pipe fallback; no system settings or production configuration were
-changed. The public replacement index, cosmetics/error feedback and full UI
-verification still precede normal protocol-1 activation.
+changed. Hosting and Android CI passed for the rules-migration commit.
+
+Replacement-index follow-up: backend revision 21 publishes released-seat counts
+only for public, playing protocol-1 rooms. Initial bots are not vacancies. Rooms
+remain listed during a replacement bot's turn, but Join is disabled until a safe
+seat exists; the server rechecks availability atomically and refuses expired
+rooms. Rejoining an already-held seat remains a no-op. Quick Match uses the same
+availability model. Spectators read only public state, with all hand cards
+stripped, and do not send presence, heartbeat, progression or snapshot writes.
+This is not a spectator-count tracking feature.
+
+All 78 backend tests and 255 Flutter tests passed; changed Flutter sources have
+no analyzer warnings or errors. The deployed endpoint and SQL connection respond
+successfully. These are regression checks, not a live replacement-room UI test.
+Cosmetics/error feedback and end-to-end UI verification still precede normal
+protocol-1 activation; normal room creation remains on the legacy protocol.
 
 - Connect online play to the versioned, idempotent server command ledger.
 - Complete server round/deal/scoring/rematch and reward settlement before removing legacy writes.

@@ -232,7 +232,14 @@ class MultiplayerSyncService {
   /// two-subscription merge rather than combining via a Stream library --
   /// this file has no reactive-streams dependency to reach for, and the
   /// merge itself is small enough not to need one.
-  Stream<MatchState?> watchMatch(String matchId, {String? callerUid}) async* {
+  Stream<MatchState?> watchMatch(String matchId, {String? callerUid, bool spectator = false}) async* {
+    if (spectator) {
+      yield* matchRef.child(matchId).onValue.map((event) {
+        final value = event.snapshot.value;
+        return value is Map ? publicSnapshot(Map<String, dynamic>.from(value)) : null;
+      });
+      return;
+    }
     // Inspect the protocol before subscribing to the private tree. Server
     // rooms never read matchHands/$id (which would reveal opponents' cards).
     final initial = await matchRef.child(matchId).get();
@@ -313,6 +320,10 @@ class MultiplayerSyncService {
     return controller.stream;
   }
 
+  /// Spectators never subscribe to any private tree or participant endpoint.
+  static MatchState publicSnapshot(Map<String, dynamic> publicState) =>
+      MatchState.fromJson({...publicState, 'handCards': <String, dynamic>{}});
+
   /// Sync presence for a player: sets online status and removes it on disconnect
   Future<void> syncPresence(String matchId, String playerId) async {
     final presenceRef = matchRef.child(matchId).child('presence').child(playerId);
@@ -367,7 +378,7 @@ class MultiplayerSyncService {
               return;
             }
 
-            if (room.isPublic && room.phase == GamePhase.waitingForPlayers) {
+            if (room.isVisiblePublic(now)) {
               rooms.add(room);
             }
           } catch (e) {

@@ -4,6 +4,7 @@ import { createRemoteJWKSet, importPKCS8, jwtVerify, SignJWT } from "npm:jose@6"
 import { waitingSeatIndex, type Card, type MatchState } from "./match_engine.ts";
 import { executeMatchIntent, matchCommandTypes } from "./match_commands.ts";
 import { joinCommandRoom } from "./room_seating.ts";
+import { roomSummary } from "./room_summary.ts";
 import { rewardPlan } from "./match_rewards.ts";
 import { createFirestoreRewardStore } from "./firestore_rewards.ts";
 import { createDatabaseRunner, databaseConnectionString } from "./database.ts";
@@ -122,16 +123,6 @@ function roomId() {
   const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
   const random = crypto.getRandomValues(new Uint32Array(8));
   return `${alphabet[random[0] % 26]}${alphabet[random[1] % 26]}${alphabet[random[2] % 26]}${String(random[3] % 100000).padStart(5, "0")}`;
-}
-
-function roomSummary(state: Record<string, unknown>) {
-  return {
-    mode: state.mode,
-    playerIds: state.playerIds,
-    isPublic: state.isPublic,
-    phase: state.phase,
-    ...(typeof state.expireAt === "string" ? { expireAt: state.expireAt } : {}),
-  };
 }
 
 function optionalText(value: unknown, maximum: number) {
