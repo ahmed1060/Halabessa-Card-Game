@@ -26,7 +26,7 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
-      - name: Test profile permissions in isolated Firestore emulator
+      - name: Test profile and private-match permissions in isolated emulators
         working-directory: rules-tests
         run: |
           npm ci --no-audit --no-fund

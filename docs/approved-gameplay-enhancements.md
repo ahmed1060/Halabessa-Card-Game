@@ -144,6 +144,24 @@ profile/emoji intents, error/leave feedback and end-to-end server-room UI tests.
 Profile/emoji full-snapshot writes are disabled in protocol-1 rooms until their
 intent routes are ready. Do not enable normal protocol-1 creation yet.
 
+Private-match rules follow-up: protocol-1 client game-state/hand writes are
+denied, including root multi-path attacks and marker downgrades. A seated
+player can read only their own hand child; parent and opponent-hand reads are
+denied. Only own presence/heartbeat and bounded, append-only, authenticated
+sender chat are client-writable. Released players lose private reads and
+presence authority. Unknown protocols fail closed. Legacy/unmarked room writes
+and atomic public/private updates remain compatible; clients cannot promote
+them to a trusted protocol. This deliberately does not secure the legacy
+gameplay/economy while that migration is still gated.
+
+All 15 isolated emulator tests passed locally (10 RTDB, 5 existing Firestore).
+The Hosting workflow now runs both suites before deploying any Firebase rules.
+No production users/data were used by these tests. On this Windows host the
+portable Java runtime needed a process-local Unix-domain temp-path override to
+use its TCP pipe fallback; no system settings or production configuration were
+changed. The public replacement index, cosmetics/error feedback and full UI
+verification still precede normal protocol-1 activation.
+
 - Connect online play to the versioned, idempotent server command ledger.
 - Complete server round/deal/scoring/rematch and reward settlement before removing legacy writes.
 - Single accepted move per turn across manual, timeout and bot requests.

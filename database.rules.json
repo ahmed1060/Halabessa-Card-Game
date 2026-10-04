@@ -3,13 +3,38 @@
     "matches": {
       "$matchId": {
         ".read": "auth != null",
-        ".write": "auth != null && data.exists() && data.child('players').hasChild(auth.uid)"
+        ".write": "auth != null && data.exists() && data.child('players').hasChild(auth.uid) && (!data.child('protocolVersion').exists() || data.child('protocolVersion').val() == 0) && (!newData.child('protocolVersion').exists() || newData.child('protocolVersion').val() == 0)",
+        "presence": {
+          "$uid": {
+            ".write": "auth != null && auth.uid == $uid && root.child('matches').child($matchId).child('protocolVersion').val() == 1 && root.child('matches').child($matchId).child('players').hasChild(auth.uid) && (!newData.exists() || newData.val() == true)"
+          }
+        },
+        "playerLastActive": {
+          "$uid": {
+            ".write": "auth != null && auth.uid == $uid && root.child('matches').child($matchId).child('protocolVersion').val() == 1 && root.child('matches').child($matchId).child('players').hasChild(auth.uid) && (!newData.exists() || (newData.isString() && newData.val().length <= 40))"
+          }
+        },
+        "chat": {
+          "$messageId": {
+            ".write": "auth != null && root.child('matches').child($matchId).child('protocolVersion').val() == 1 && root.child('matches').child($matchId).child('players').hasChild(auth.uid) && !data.exists() && newData.hasChildren(['id', 'senderId', 'senderName', 'text', 'timestamp', 'isQuickChat']) && newData.child('senderId').val() == auth.uid && newData.child('id').isString() && newData.child('id').val().length <= 128 && newData.child('senderName').isString() && newData.child('senderName').val().length <= 80 && newData.child('text').isString() && newData.child('text').val().length > 0 && newData.child('text').val().length <= 300 && newData.child('timestamp').isNumber() && newData.child('isQuickChat').isBoolean()",
+            "id": { ".validate": true },
+            "senderId": { ".validate": true },
+            "senderName": { ".validate": true },
+            "text": { ".validate": true },
+            "timestamp": { ".validate": true },
+            "isQuickChat": { ".validate": true },
+            "$other": { ".validate": "root.child('matches').child($matchId).child('protocolVersion').val() != 1" }
+          }
+        }
       }
     },
     "matchHands": {
       "$matchId": {
-        ".read": "auth != null && root.child('matches').child($matchId).child('players').hasChild(auth.uid)",
-        ".write": "auth != null && root.child('matches').child($matchId).child('players').hasChild(auth.uid)"
+        ".read": "auth != null && root.child('matches').child($matchId).child('players').hasChild(auth.uid) && (!root.child('matches').child($matchId).child('protocolVersion').exists() || root.child('matches').child($matchId).child('protocolVersion').val() == 0)",
+        ".write": "auth != null && root.child('matches').child($matchId).child('players').hasChild(auth.uid) && (!root.child('matches').child($matchId).child('protocolVersion').exists() || root.child('matches').child($matchId).child('protocolVersion').val() == 0)",
+        "$uid": {
+          ".read": "auth != null && auth.uid == $uid && root.child('matches').child($matchId).child('protocolVersion').val() == 1 && root.child('matches').child($matchId).child('players').hasChild(auth.uid)"
+        }
       }
     },
     "matchSecrets": {

@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "firebase emulators:exec --config ../firebase.rules-test.json --only firestore --project demo-halabessa-ui \"node --test firestore.test.mjs\""
+    "test": "firebase emulators:exec --config ../firebase.rules-test.json --only firestore,database --project demo-halabessa-ui \"node --test firestore.test.mjs database.test.mjs\"",
+    "test:database": "firebase emulators:exec --config ../firebase.rules-test.json --only database --project demo-halabessa-ui \"node --test database.test.mjs\""
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "5.0.2",
