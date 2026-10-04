@@ -184,6 +184,12 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<MatchFeedback?>(matchFeedbackProvider, (_, next) {
+      if (next == null || !mounted) return;
+      final messenger = ScaffoldMessenger.of(context);
+      messenger.hideCurrentSnackBar();
+      messenger.showSnackBar(SnackBar(content: Text(next.translationKey.tr())));
+    });
     ref.listen(settingsProvider, (previous, next) {
       if (previous?.gameOrientation != next.gameOrientation) {
         _applyGameOrientation(next.gameOrientation);
@@ -235,7 +241,7 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
            ScaffoldMessenger.of(context).showSnackBar(
              SnackBar(content: Text('room_expired'.tr()))
            );
-           ref.read(matchStateProvider.notifier).leaveMatch();
+           ref.read(matchStateProvider.notifier).leaveMatch(notifyServer: false);
            _returnToHome();
          }
        });
@@ -703,10 +709,11 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
             ),
-            onPressed: () {
-              ref.read(matchStateProvider.notifier).leaveMatch();
+            onPressed: () async {
+              final left = await ref.read(matchStateProvider.notifier).leaveMatch();
+              if (!left || !context.mounted) return;
               Navigator.pop(context); // Close dialog
-              Navigator.pop(context); // Exit Game Screen
+              if (mounted) _returnToHome();
             },
             child: Text(
               'leave'.tr(),
@@ -883,9 +890,9 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
             !state.rematchVotes.containsKey(user.uid)
           ? () => ref.read(matchStateProvider.notifier).voteRematch(user.uid, true)
           : null,
-      onHome: () {
-        ref.read(matchStateProvider.notifier).leaveMatch();
-        _returnToHome();
+      onHome: () async {
+        final left = await ref.read(matchStateProvider.notifier).leaveMatch();
+        if (left && mounted) _returnToHome();
       },
     );
   }

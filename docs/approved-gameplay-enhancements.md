@@ -176,6 +176,23 @@ successfully. These are regression checks, not a live replacement-room UI test.
 Cosmetics/error feedback and end-to-end UI verification still precede normal
 protocol-1 activation; normal room creation remains on the legacy protocol.
 
+Human-command feedback follow-up: rejected and stale actions now emit localized
+feedback in English and both Arabic locales. Ambiguous transport/backend failures
+ask the player to check the table rather than claiming the play was rejected;
+cards are not removed optimistically. Automatic progression failures do not spam
+the player. Explicit server-mode Leave waits for acknowledgement; failure keeps
+the current table/recovery binding available for retry and duplicate taps send
+one leave request. A confirmed server removal takes precedence over a lost leave
+response. Late responses cannot clear a newly-bound room. Leave and results-home
+buttons navigate only after successful departure. Legacy exit behavior is retained.
+
+The complete Flutter suite passed 261 tests, then the final removal/new-binding
+race checks passed in the 13-test controller suite. Analyzer reports no errors or
+warnings in the changed controller, screen and tests (existing informational
+lints remain). Hosting succeeded for the preceding replacement/spectator batch.
+Full protocol-1 gameplay UI tests and cosmetics are still outstanding, as are
+owner provider configuration and physical-device verification.
+
 - Connect online play to the versioned, idempotent server command ledger.
 - Complete server round/deal/scoring/rematch and reward settlement before removing legacy writes.
 - Single accepted move per turn across manual, timeout and bot requests.

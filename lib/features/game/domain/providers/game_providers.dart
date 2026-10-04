@@ -34,6 +34,13 @@ final multiplayerSyncServiceProvider = Provider<MultiplayerSyncService>((ref) {
 
 final localPlayOriginsProvider = StateProvider<Map<String, Offset>>((ref) => {});
 
+// A new event is emitted for each failed human action, even when the key repeats.
+class MatchFeedback {
+  final String translationKey;
+  MatchFeedback(this.translationKey);
+}
+final matchFeedbackProvider = StateProvider<MatchFeedback?>((ref) => null);
+
 enum MatchRecoveryStart { listening, noSavedMatch, offlinePracticeNotSaved }
 
 class MatchStateNotifier extends StateNotifier<MatchState?> {
@@ -95,6 +102,8 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
   bool _roundEnding = false;
   int _bindingGeneration = 0;
   bool _isSpectating = false;
+  bool _leavePending = false;
+  String? _lastDepartedRoom;
   Timer? _serverProgressTimer;
   bool _serverCommandBusy = false;
   Completer<void>? _serverIdle;
@@ -115,7 +124,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
   }
 
   Future<void> _sendServerIntent(String type, {Map<String, dynamic> payload = const {}}) async {
-    if (_isSpectating) return;
+    if (_isSpectating || _leavePending) return;
     final generation = _bindingGeneration;
     // Human votes/cuts must not disappear while a timed transition or reward
     // request is pending. Wait, then use the freshly accepted revision.
@@ -146,11 +155,20 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
       } else if (kDebugMode) {
         debugPrint('Server intent $type rejected: ${error.code}');
       }
+      if (type != 'advance' && mounted) {
+        ref.read(matchFeedbackProvider.notifier).state = MatchFeedback(
+          error.code == 'version_conflict' ? 'match_action_changed' :
+          const {'backend_busy', 'backend_unavailable', 'internal_error', 'invalid_match_response'}
+              .contains(error.code) ? 'match_action_unavailable' : 'match_action_rejected');
+      }
       _serverRetryAfter = DateTime.now().add(const Duration(seconds: 2));
     } catch (error) {
       if (generation == _bindingGeneration) {
         _serverRetryAfter = DateTime.now().add(const Duration(seconds: 2));
         if (kDebugMode) debugPrint('Server intent $type unavailable: $error');
+        if (type != 'advance' && mounted) {
+          ref.read(matchFeedbackProvider.notifier).state = MatchFeedback('match_action_unavailable');
+        }
       }
     } finally {
       if (generation == _bindingGeneration) _serverCommandBusy = false;
@@ -164,7 +182,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     final uid = ref.read(currentUserProvider)?.uid;
     final now = DateTime.now();
     if (s == null || !s.usesServerCommands || uid == null ||
-        !s.playerIds.contains(uid) || _serverCommandBusy ||
+        !s.playerIds.contains(uid) || _serverCommandBusy || _leavePending ||
         (_serverRetryAfter != null && now.isBefore(_serverRetryAfter!))) {
       return;
     }
@@ -311,19 +329,33 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     return MatchRecoveryStart.listening;
   }
 
-  void leaveMatch({bool notifyServer = true}) {
+  Future<bool> leaveMatch({bool notifyServer = true}) async {
+    if (notifyServer && _leavePending) return false;
+    final generation = _bindingGeneration;
     if (!_isSpectating && lastBoundMatchId != null && !lastBoundMatchId!.startsWith('OFFLINE_')) {
       final currentUser = ref.read(currentUserProvider);
       if (currentUser != null) {
         // Apply forfeit penalty if leaving during active play
         final s = state;
         if (notifyServer && s != null && s.usesServerCommands) {
-          // Capture the immutable room intent before clearing local state.
-          ref.read(multiplayerSyncServiceProvider).leaveServerMatch(
-            s, currentUser.uid,
-          ).catchError((Object error) {
-            if (kDebugMode) debugPrint('Leave intent failed: $error');
-          });
+          _leavePending = true;
+          try {
+            await ref.read(multiplayerSyncServiceProvider).leaveServerMatch(s, currentUser.uid);
+          } catch (error) {
+            if (mounted && generation != _bindingGeneration &&
+                state == null && _lastDepartedRoom == s.id) return true;
+            if (mounted && generation == _bindingGeneration) {
+              ref.read(matchFeedbackProvider.notifier).state = MatchFeedback('match_leave_failed');
+            }
+            return false;
+          } finally {
+            _leavePending = false;
+          }
+          // A late leave response must not clear a newly-bound room.
+          if (!mounted) return false;
+          if (generation != _bindingGeneration) {
+            return state == null && _lastDepartedRoom == s.id;
+          }
         }
         if (notifyServer && s != null && !s.usesServerCommands &&
             s.phase != GamePhase.waitingForPlayers && 
@@ -351,8 +383,10 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
       sub.cancel();
     }
     _tafweetSubscriptions.clear();
+    _lastDepartedRoom = state?.id;
     state = null;
     _clearMatchId();
+    return true;
   }
 
   bool _amIHost(MatchState s, {Map<String, bool>? presenceMap}) {
@@ -378,6 +412,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
   }
 
   void bindToMatch(String matchId, {bool spectating = false}) {
+    _lastDepartedRoom = null;
     _isSpectating = spectating;
     final generation = ++_bindingGeneration;
     _serverCommandBusy = false;
