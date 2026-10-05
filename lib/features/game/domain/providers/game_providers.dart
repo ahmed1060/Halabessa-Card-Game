@@ -123,23 +123,23 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     state = incoming;
   }
 
-  Future<void> _sendServerIntent(String type, {Map<String, dynamic> payload = const {}}) async {
-    if (_isSpectating || _leavePending) return;
+  Future<bool> _sendServerIntent(String type, {Map<String, dynamic> payload = const {}}) async {
+    if (_isSpectating || _leavePending) return false;
     final generation = _bindingGeneration;
     // Human votes/cuts must not disappear while a timed transition or reward
     // request is pending. Wait, then use the freshly accepted revision.
     while (_serverCommandBusy && generation == _bindingGeneration) {
-      if (type == 'advance') return;
+      if (type == 'advance') return false;
       final idle = _serverIdle;
-      if (idle == null) return;
+      if (idle == null) return false;
       await idle.future;
     }
-    if (!mounted || generation != _bindingGeneration) return;
+    if (!mounted || generation != _bindingGeneration) return false;
     final current = state;
     final uid = ref.read(currentUserProvider)?.uid;
     if (current == null || !current.usesServerCommands || uid == null ||
         !current.playerIds.contains(uid)) {
-      return;
+      return false;
     }
     final idle = Completer<void>();
     _serverIdle = idle;
@@ -148,8 +148,9 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
       final result = await ref.read(multiplayerSyncServiceProvider).submitMatchCommand(
         matchState: current, commandType: type, callerUid: uid, payload: payload);
       if (generation == _bindingGeneration) _adoptServerSnapshot(result);
+      return generation == _bindingGeneration;
     } on SupabaseBackendException catch (error) {
-      if (generation != _bindingGeneration) return;
+      if (generation != _bindingGeneration) return false;
       if (error.code == 'version_conflict' && error.details['state'] is Map) {
         _adoptServerSnapshot(MultiplayerSyncService.commandSnapshot(error.details, uid));
       } else if (kDebugMode) {
@@ -174,6 +175,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
       if (generation == _bindingGeneration) _serverCommandBusy = false;
       idle.complete();
     }
+    return false;
   }
 
   Future<void> _tickServerProgress() async {
@@ -1394,18 +1396,18 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     }
   }
 
-  Future<void> voteRematch(String playerId, bool wantsRematch) async {
+  Future<bool> voteRematch(String playerId, bool wantsRematch) async {
     final currentState = state;
-    if (currentState == null) return;
+    if (currentState == null) return false;
     if (currentState.usesServerCommands) {
-      await _sendServerIntent('voteRematch', payload: {'vote': wantsRematch});
-      return;
+      return _sendServerIntent('voteRematch', payload: {'vote': wantsRematch});
     }
     final result = GameEngine.apply(currentState, VoteAction(playerId, wantsRematch, isRematch: true));
     await _publishState(result.newState);
     if (_amIHost(result.newState)) {
        _checkVoteCompletion(result.newState);
     }
+    return true;
   }
 
 

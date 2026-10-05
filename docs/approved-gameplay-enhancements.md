@@ -11,6 +11,9 @@
 - Landscape is the default gameplay preference; settings can select portrait.
 - Keep the approved Lantern Nights visual language and Facebook button visible.
 - Stay on the existing free services; no paid service added.
+- User-data reset is deferred until the UI plan is finished and verified.
+  Preserve the administrator account. Resolve the exact identity and data
+  scope, then obtain final confirmation before any irreversible deletion.
 
 ## Current verification checkpoint — 5 October 2026
 
@@ -45,6 +48,14 @@ Temporary private browser fixture `KTD16855` and guest
 temporary privileged cleanup endpoint was blocked by safety review and was
 not deployed. Explicit owner approval is pending; no such endpoint is present
 in the committed client or permanent function source.
+
+Results retry correction: Return home and replay now await their action's
+acknowledgement. A rejected request or thrown error restores the controls;
+pending requests remain single-shot. Server rematch intent returns explicit
+success/failure rather than leaving the results UI latched after rejection.
+Regression tests cover pending exit, failed exit, failed replay and vote retry.
+The retained private QA room completed a round and recovered after browser
+reload; full-match results/replay browser verification still remains.
 
 ## Batch 1 — local engine and lifecycle safety
 

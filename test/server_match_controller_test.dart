@@ -86,6 +86,16 @@ void main() {
     sync.pending.last.complete(match.copyWith(serverVersion: 5));
     await second;
   });
+  test('rematch reports rejection so the results button can retry', () async {
+    final rejected = notifier.voteRematch('human', true);
+    sync.pending.single.completeError(const SupabaseBackendException('phase_not_ready'));
+    expect(await rejected, isFalse);
+    final accepted = notifier.voteRematch('human', true);
+    sync.pending.last.complete(match.copyWith(serverVersion: 4,
+      rematchVotes: {'human': true}));
+    expect(await accepted, isTrue);
+    expect(sync.types, ['voteRematch', 'voteRematch']);
+  });
   test('version conflict adopts current server state without replaying card', () async {
     final play = notifier.playCard('human', match.handCards['human']!.single);
     sync.pending.single.completeError(SupabaseBackendException('version_conflict', details: {

@@ -887,9 +887,11 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
       starsLabel: 'stars_label'.tr(), coinsLabel: 'coins_label'.tr(),
       homeLabel: 'return_home'.tr(), replayLabel: 'play_again'.tr(),
       replayLeavesView: offline,
-      onReplay: offline && !spectator ? () => ref.read(matchStateProvider.notifier)
-        .startOfflinePracticeMatch(user.uid, user.displayName,
-          mode: state.mode, maxPoints: state.maxPoints) :
+      onReplay: offline && !spectator ? () async {
+        await ref.read(matchStateProvider.notifier).startOfflinePracticeMatch(
+          user.uid, user.displayName, mode: state.mode, maxPoints: state.maxPoints);
+        return true;
+      } :
         !spectator && state.phase == GamePhase.rematchVoting &&
             !state.rematchVotes.containsKey(user.uid)
           ? () => ref.read(matchStateProvider.notifier).voteRematch(user.uid, true)
@@ -897,6 +899,7 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
       onHome: () async {
         final left = await ref.read(matchStateProvider.notifier).leaveMatch();
         if (left && mounted) _returnToHome();
+        return left;
       },
     );
   }

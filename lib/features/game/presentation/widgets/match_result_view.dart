@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'table_style.dart';
 import 'match_table_layout.dart';
@@ -8,8 +9,8 @@ class MatchResultView extends StatefulWidget {
   final String title, subtitle, firstTeam, secondTeam;
   final int firstScore, secondScore, stars, coins;
   final String starsLabel, coinsLabel, homeLabel, replayLabel;
-  final VoidCallback onHome;
-  final VoidCallback? onReplay;
+  final FutureOr<bool> Function() onHome;
+  final FutureOr<bool> Function()? onReplay;
   final bool replayLeavesView;
   const MatchResultView({
     super.key,
@@ -37,19 +38,33 @@ class MatchResultView extends StatefulWidget {
 class _MatchResultViewState extends State<MatchResultView> {
   bool _leaving = false;
   bool _replayRequested = false;
-  void _home() {
+  Future<void> _home() async {
     if (_leaving) return;
     setState(() => _leaving = true);
-    widget.onHome();
+    try {
+      final accepted = await widget.onHome();
+      if (!accepted && mounted) setState(() => _leaving = false);
+    } catch (_) {
+      if (mounted) setState(() => _leaving = false);
+    }
   }
 
-  void _replay() {
+  Future<void> _replay() async {
     if (_leaving || _replayRequested || widget.onReplay == null) return;
     setState(() {
       _replayRequested = true;
       _leaving = widget.replayLeavesView;
     });
-    widget.onReplay!();
+    try {
+      final accepted = await widget.onReplay!();
+      if (!accepted && mounted) {
+        setState(() { _replayRequested = false; _leaving = false; });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() { _replayRequested = false; _leaving = false; });
+      }
+    }
   }
 
   @override
