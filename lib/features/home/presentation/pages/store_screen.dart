@@ -9,6 +9,9 @@ import '../../../../core/theme/theme_config.dart';
 import '../providers/store_provider.dart';
 import '../widgets/admin_add_item_dialog.dart';
 import '../widgets/shop_item_preview_dialog.dart';
+import '../widgets/shop_card_artwork.dart';
+import '../../../../core/widgets/lantern_panel.dart';
+import '../../../game/presentation/widgets/table_style.dart';
 
 class StoreScreen extends ConsumerStatefulWidget {
   const StoreScreen({super.key});
@@ -34,11 +37,20 @@ class _StoreScreenState extends ConsumerState<StoreScreen> {
             backgroundColor: Colors.transparent,
             elevation: 0,
             toolbarHeight: 110,
+            centerTitle: true,
             title: LanternPageTitle(
               title: (_ownedOnly ? 'inventory_title' : 'store_title').tr(),
             ),
             bottom: TabBar(
               isScrollable: true,
+              labelColor: TableStyle.ink,
+              unselectedLabelColor: TableStyle.ivory,
+              indicatorSize: TabBarIndicatorSize.tab,
+              dividerColor: Colors.transparent,
+              indicator: BoxDecoration(
+                color: TableStyle.brass,
+                borderRadius: BorderRadius.circular(24),
+              ),
               tabs: [
                 Tab(text: 'card_skins'.tr()),
                 Tab(text: 'table_skins'.tr()),
@@ -46,40 +58,52 @@ class _StoreScreenState extends ConsumerState<StoreScreen> {
                 Tab(text: 'store_consumables'.tr()),
               ],
             ),
-            actions: [
+          ),
+          body: Column(
+            children: [
               if (user != null)
                 Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 8,
-                  ),
-                  child: Row(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: 8,
+                    runSpacing: 4,
                     children: [
                       _buildCurrencyChip(
                         context,
                         user.coins,
                         '🪙',
-                        Colors.orange,
+                        TableStyle.brass,
                         isAdmin: user.isAdmin,
                       ),
-                      const SizedBox(width: 8),
                       _buildCurrencyChip(
                         context,
                         user.diamonds,
                         '💎',
-                        ThemeConfig.primaryTeal,
+                        TableStyle.mint,
                         isAdmin: user.isAdmin,
                       ),
                     ],
                   ),
                 ),
-            ],
-          ),
-          body: Column(
-            children: [
               Padding(
                 padding: const EdgeInsets.all(12),
                 child: SegmentedButton<bool>(
+                  style: ButtonStyle(
+                    backgroundColor: WidgetStateProperty.resolveWith(
+                      (states) => states.contains(WidgetState.selected)
+                          ? TableStyle.mint
+                          : TableStyle.ink,
+                    ),
+                    foregroundColor: WidgetStateProperty.resolveWith(
+                      (states) => states.contains(WidgetState.selected)
+                          ? TableStyle.ink
+                          : TableStyle.ivory,
+                    ),
+                    side: const WidgetStatePropertyAll(
+                      BorderSide(color: TableStyle.mint),
+                    ),
+                  ),
                   segments: [
                     ButtonSegment(
                       value: false,
@@ -203,7 +227,7 @@ class _StoreScreenState extends ConsumerState<StoreScreen> {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.03),
+              color: Colors.white.withValues(alpha: 0.03),
               borderRadius: BorderRadius.circular(14),
               border: Border.all(color: Colors.white10),
             ),
@@ -371,30 +395,8 @@ class _StoreScreenState extends ConsumerState<StoreScreen> {
       onTap: onTap,
       child: Stack(
         children: [
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 250),
-            decoration: BoxDecoration(
-              color: const Color(0xFF192638),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: isActive
-                    ? ThemeConfig.goldAccent
-                    : (isOwned
-                          ? Colors.tealAccent.withOpacity(0.4)
-                          : Colors.white10),
-                width: isActive ? 2 : 1,
-              ),
-              boxShadow: [
-                if (isActive)
-                  BoxShadow(
-                    color: ThemeConfig.goldAccent.withOpacity(0.25),
-                    blurRadius: 10,
-                    spreadRadius: 1,
-                  )
-                else if (isOwned)
-                  BoxShadow(color: Colors.teal.withOpacity(0.1), blurRadius: 6),
-              ],
-            ),
+          LanternPanel(
+            selected: isActive,
             child: Column(
               children: [
                 Expanded(
@@ -405,7 +407,21 @@ class _StoreScreenState extends ConsumerState<StoreScreen> {
                       child: Container(
                         color: Colors.black26,
                         alignment: Alignment.center,
-                        child: item.assetPath.startsWith('http')
+                        child: item.type == ShopItemType.cardBack
+                            ? LayoutBuilder(
+                                builder: (context, bounds) {
+                                  final height = bounds.maxHeight.clamp(
+                                    0.0,
+                                    180.0,
+                                  );
+                                  return ShopCardArtwork(
+                                    item: item,
+                                    width: height * .7,
+                                    height: height,
+                                  );
+                                },
+                              )
+                            : item.assetPath.startsWith('http')
                             ? Image.network(
                                 item.assetPath,
                                 fit:
@@ -448,7 +464,7 @@ class _StoreScreenState extends ConsumerState<StoreScreen> {
                           fontFamily: ThemeConfig.fontHeading,
                           fontSize: 13,
                           fontWeight: FontWeight.bold,
-                          color: Colors.white,
+                          color: TableStyle.ink,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -463,16 +479,14 @@ class _StoreScreenState extends ConsumerState<StoreScreen> {
                         ),
                         decoration: BoxDecoration(
                           color: isActive
-                              ? ThemeConfig.goldAccent
-                              : (isOwned
-                                    ? Colors.teal.withOpacity(0.2)
-                                    : Colors.white10),
+                              ? TableStyle.brass
+                              : (isOwned ? TableStyle.mint : TableStyle.ink),
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(
                             color: isActive
                                 ? ThemeConfig.goldAccent
                                 : (isOwned
-                                      ? Colors.teal.withOpacity(0.4)
+                                    ? Colors.teal.withValues(alpha: 0.4)
                                       : Colors.white12),
                             width: 0.8,
                           ),
@@ -485,10 +499,8 @@ class _StoreScreenState extends ConsumerState<StoreScreen> {
                             fontSize: 11,
                             fontWeight: FontWeight.bold,
                             color: isActive
-                                ? Colors.black
-                                : (isOwned
-                                      ? Colors.tealAccent
-                                      : Colors.white70),
+                                ? TableStyle.ink
+                                : (isOwned ? TableStyle.ink : TableStyle.ivory),
                           ),
                         ),
                       ),
@@ -557,9 +569,9 @@ class _StoreScreenState extends ConsumerState<StoreScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -590,7 +602,7 @@ class _StoreScreenState extends ConsumerState<StoreScreen> {
       child: Container(
         padding: const EdgeInsets.all(5),
         decoration: BoxDecoration(
-          color: (isDelete ? Colors.red : Colors.black).withOpacity(0.7),
+          color: (isDelete ? Colors.red : Colors.black).withValues(alpha: 0.7),
           shape: BoxShape.circle,
           border: Border.all(color: Colors.white24, width: 0.8),
         ),

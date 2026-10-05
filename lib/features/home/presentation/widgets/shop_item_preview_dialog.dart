@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:halabessa/core/theme/theme_config.dart';
-import 'package:halabessa/features/auth/domain/models/app_user.dart';
 import 'package:halabessa/features/game/domain/models/card.dart' as game_models;
-import 'package:halabessa/features/game/presentation/widgets/card_widget.dart';
+import 'shop_card_artwork.dart';
+import '../../../../core/widgets/lantern_panel.dart';
+import '../../../game/presentation/widgets/table_style.dart';
 import '../providers/store_provider.dart';
 
 class ShopItemPreviewDialog extends StatefulWidget {
@@ -23,7 +24,13 @@ class ShopItemPreviewDialog extends StatefulWidget {
 }
 
 class _ShopItemPreviewDialogState extends State<ShopItemPreviewDialog> {
-  final List<bool> _flipStates = [false, false, false, false, false]; // Ace, King, Back, Queen, Jack
+  final List<bool> _flipStates = [
+    false,
+    false,
+    false,
+    false,
+    false,
+  ]; // Ace, King, Back, Queen, Jack
 
   @override
   Widget build(BuildContext context) {
@@ -33,13 +40,7 @@ class _ShopItemPreviewDialogState extends State<ShopItemPreviewDialog> {
     return Dialog(
       backgroundColor: Colors.transparent,
       insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
-      child: Container(
-        width: double.infinity,
-        decoration: BoxDecoration(
-          color: ThemeConfig.darkBg.withOpacity(0.95),
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: Colors.white10),
-        ),
+      child: LanternPanel(
         child: Column(
           children: [
             // Header
@@ -48,15 +49,32 @@ class _ShopItemPreviewDialogState extends State<ShopItemPreviewDialog> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(item.name, style: const TextStyle(fontFamily: ThemeConfig.fontHeading, fontSize: 24, color: Colors.white)),
-                      Text(item.type.name.tr(), style: TextStyle(color: Colors.white54, fontSize: 14)),
-                    ],
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          item.name,
+                          style: TableStyle.label.copyWith(
+                            fontSize: 24,
+                            color: TableStyle.ink,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        Text(
+                          item.type.name.tr(),
+                          style: TableStyle.detail.copyWith(
+                            color: TableStyle.ink,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.close, color: Colors.white54),
+                    tooltip: MaterialLocalizations.of(
+                      context,
+                    ).closeButtonTooltip,
+                    icon: const Icon(Icons.close, color: TableStyle.ink),
                     onPressed: () => Navigator.pop(context),
                   ),
                 ],
@@ -76,11 +94,14 @@ class _ShopItemPreviewDialogState extends State<ShopItemPreviewDialog> {
                         _buildTablePreview()
                       else
                         _buildGenericPreview(),
-  
+
                       const SizedBox(height: 30),
-  
+
                       // Suit Showcase (if applicable)
-                      if (isSkin && item.suitIcons != null) _buildSuitShowcase(),
+                      if (isSkin &&
+                          item.id != 'default_card' &&
+                          item.suitIcons != null)
+                        _buildSuitShowcase(),
                     ],
                   ),
                 ),
@@ -95,18 +116,27 @@ class _ShopItemPreviewDialogState extends State<ShopItemPreviewDialog> {
                 height: 54,
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: ThemeConfig.primaryTeal,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    elevation: 8,
+                    backgroundColor: TableStyle.brass,
+                    foregroundColor: TableStyle.ink,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    elevation: 0,
                   ),
                   onPressed: () {
                     Navigator.pop(context);
                     widget.onAction();
                   },
                   child: Text(
-                    widget.isOwned ? 'status_active'.tr() : (item.diamondPrice > 0 ? 'buy_for'.tr() + ' ${item.diamondPrice} 💎' : 'buy_for'.tr() + ' ${item.price} ⭐'),
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    widget.isOwned
+                        ? 'status_active'.tr()
+                        : (item.diamondPrice > 0
+                              ? '${'buy_for'.tr()} ${item.diamondPrice} 💎'
+                              : '${'buy_for'.tr()} ${item.price} 🪙'),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
                   ),
                 ),
               ),
@@ -126,19 +156,36 @@ class _ShopItemPreviewDialogState extends State<ShopItemPreviewDialog> {
         children: [
           _buildFlippableCard(0, game_models.Suit.spades, game_models.Rank.ace),
           const SizedBox(width: 16),
-          _buildFlippableCard(1, game_models.Suit.hearts, game_models.Rank.king),
+          _buildFlippableCard(
+            1,
+            game_models.Suit.hearts,
+            game_models.Rank.king,
+          ),
           const SizedBox(width: 16),
           _buildFlippableCard(2, null, null, isMiddle: true),
           const SizedBox(width: 16),
-          _buildFlippableCard(3, game_models.Suit.clubs, game_models.Rank.queen),
+          _buildFlippableCard(
+            3,
+            game_models.Suit.clubs,
+            game_models.Rank.queen,
+          ),
           const SizedBox(width: 16),
-          _buildFlippableCard(4, game_models.Suit.diamonds, game_models.Rank.jack),
+          _buildFlippableCard(
+            4,
+            game_models.Suit.diamonds,
+            game_models.Rank.jack,
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildFlippableCard(int index, game_models.Suit? suit, game_models.Rank? rank, {bool isMiddle = false}) {
+  Widget _buildFlippableCard(
+    int index,
+    game_models.Suit? suit,
+    game_models.Rank? rank, {
+    bool isMiddle = false,
+  }) {
     return GestureDetector(
       onTap: () => setState(() => _flipStates[index] = !_flipStates[index]),
       child: TweenAnimationBuilder(
@@ -152,79 +199,52 @@ class _ShopItemPreviewDialogState extends State<ShopItemPreviewDialog> {
               ..setEntry(3, 2, 0.001)
               ..rotateY(value * 0.0174533),
             alignment: Alignment.center,
-            child: isBackVisible 
-              ? Transform.scale(
-                  scaleX: -1, 
-                  child: _buildFaceOrBack(index, suit, rank, isMiddle, true),
-                )
-              : _buildFaceOrBack(index, suit, rank, isMiddle, false),
+            child: isBackVisible
+                ? Transform.scale(
+                    scaleX: -1,
+                    child: _buildFaceOrBack(index, suit, rank, isMiddle, true),
+                  )
+                : _buildFaceOrBack(index, suit, rank, isMiddle, false),
           );
         },
       ),
     );
   }
 
-  Widget _buildFaceOrBack(int index, game_models.Suit? suit, game_models.Rank? rank, bool isMiddle, bool isBackVisible) {
+  Widget _buildFaceOrBack(
+    int index,
+    game_models.Suit? suit,
+    game_models.Rank? rank,
+    bool isMiddle,
+    bool isBackVisible,
+  ) {
     // Determine what to show on each side
     if (isMiddle) {
       // Middle Card: Back -> 7 Diamonds
-      return isBackVisible 
-        ? _buildPreviewCard(game_models.Suit.diamonds, game_models.Rank.seven) 
-        : _buildBackPreviewOnly();
+      return isBackVisible
+          ? _buildPreviewCard(game_models.Suit.diamonds, game_models.Rank.seven)
+          : _buildBackPreviewOnly();
     } else {
       // Side Cards: Front -> Back
-      return isBackVisible 
-        ? _buildBackPreviewOnly()
-        : _buildPreviewCard(suit!, rank!);
+      return isBackVisible
+          ? _buildBackPreviewOnly()
+          : _buildPreviewCard(suit!, rank!);
     }
   }
 
   Widget _buildPreviewCard(game_models.Suit suit, game_models.Rank rank) {
-    return CardWidget(
+    return ShopCardArtwork(
+      item: widget.item,
       card: game_models.Card(suit, rank),
       width: 100,
       height: 150,
-      isFaceUp: true,
-      customFrontPath: widget.item.frontSkinPath,
-      customAceSkinPath: widget.item.aceSkinPath,
-      customSevenDiamondSkinPath: widget.item.sevenDiamondSkinPath,
-      faceIllustrations: widget.item.faceIllustrations,
-      customSuitIcons: widget.item.suitIcons,
+      faceUp: true,
     );
   }
 
   Widget _buildBackPreviewOnly() {
-    return Container(
-      width: 100,
-      height: 150,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [BoxShadow(color: Colors.black38, blurRadius: 15, offset: const Offset(0, 6))],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: widget.item.assetPath.startsWith('http')
-            ? Image.network(
-                widget.item.assetPath,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Container(
-                  color: ThemeConfig.primaryTeal,
-                  child: const Center(child: Icon(Icons.style, color: ThemeConfig.goldAccent, size: 40)),
-                ),
-              )
-            : Image.asset(
-                widget.item.assetPath,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Container(
-                  color: ThemeConfig.primaryTeal,
-                  child: const Center(child: Icon(Icons.style, color: ThemeConfig.goldAccent, size: 40)),
-                ),
-              ),
-      ),
-    );
+    return ShopCardArtwork(item: widget.item);
   }
-
-
 
   Widget _buildSuitShowcase() {
     final suits = widget.item.suitIcons!;
@@ -233,44 +253,65 @@ class _ShopItemPreviewDialogState extends State<ShopItemPreviewDialog> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('custom_suit_set'.tr(), style: const TextStyle(color: ThemeConfig.goldAccent, fontWeight: FontWeight.bold)),
+          Text(
+            'custom_suit_set'.tr(),
+            style: const TextStyle(
+              color: ThemeConfig.goldAccent,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
           const SizedBox(height: 16),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: suits.entries.map((e) {
               String label = e.key.toUpperCase();
               String iconPath = e.value;
-              
+
               return Column(
                 children: [
                   ClipRRect(
                     borderRadius: BorderRadius.circular(8),
                     child: iconPath.startsWith('http')
-                      ? Image.network(
-                          iconPath,
-                          width: 40,
-                          height: 40,
-                          fit: BoxFit.contain,
-                          errorBuilder: (_, __, ___) => const SizedBox(
+                        ? Image.network(
+                            iconPath,
                             width: 40,
                             height: 40,
-                            child: Center(child: Icon(Icons.favorite, color: ThemeConfig.goldAccent, size: 24)),
-                          ),
-                        )
-                      : Image.asset(
-                          iconPath,
-                          width: 40,
-                          height: 40,
-                          fit: BoxFit.contain,
-                          errorBuilder: (_, __, ___) => const SizedBox(
+                            fit: BoxFit.contain,
+                            errorBuilder: (_, __, ___) => const SizedBox(
+                              width: 40,
+                              height: 40,
+                              child: Center(
+                                child: Icon(
+                                  Icons.favorite,
+                                  color: ThemeConfig.goldAccent,
+                                  size: 24,
+                                ),
+                              ),
+                            ),
+                          )
+                        : Image.asset(
+                            iconPath,
                             width: 40,
                             height: 40,
-                            child: Center(child: Icon(Icons.favorite, color: ThemeConfig.goldAccent, size: 24)),
+                            fit: BoxFit.contain,
+                            errorBuilder: (_, __, ___) => const SizedBox(
+                              width: 40,
+                              height: 40,
+                              child: Center(
+                                child: Icon(
+                                  Icons.favorite,
+                                  color: ThemeConfig.goldAccent,
+                                  size: 24,
+                                ),
+                              ),
+                            ),
                           ),
-                        ),
                   ),
                   const SizedBox(height: 4),
-                  Text(label, style: const TextStyle(color: Colors.white30, fontSize: 10)),
+                  Text(
+                    label,
+                    style: const TextStyle(color: Colors.white30, fontSize: 10),
+                  ),
                 ],
               );
             }).toList(),
@@ -287,7 +328,7 @@ class _ShopItemPreviewDialogState extends State<ShopItemPreviewDialog> {
         height: 150,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
-          boxShadow: [BoxShadow(color: Colors.black54, blurRadius: 20)],
+          boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 20)],
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(16),
@@ -297,7 +338,13 @@ class _ShopItemPreviewDialogState extends State<ShopItemPreviewDialog> {
                   fit: BoxFit.cover,
                   errorBuilder: (_, __, ___) => Container(
                     color: ThemeConfig.boardGreen,
-                    child: const Center(child: Icon(Icons.table_restaurant, color: ThemeConfig.goldAccent, size: 40)),
+                    child: const Center(
+                      child: Icon(
+                        Icons.table_restaurant,
+                        color: ThemeConfig.goldAccent,
+                        size: 40,
+                      ),
+                    ),
                   ),
                 )
               : Image.asset(
@@ -305,7 +352,13 @@ class _ShopItemPreviewDialogState extends State<ShopItemPreviewDialog> {
                   fit: BoxFit.cover,
                   errorBuilder: (_, __, ___) => Container(
                     color: ThemeConfig.boardGreen,
-                    child: const Center(child: Icon(Icons.table_restaurant, color: ThemeConfig.goldAccent, size: 40)),
+                    child: const Center(
+                      child: Icon(
+                        Icons.table_restaurant,
+                        color: ThemeConfig.goldAccent,
+                        size: 40,
+                      ),
+                    ),
                   ),
                 ),
         ),
@@ -327,7 +380,13 @@ class _ShopItemPreviewDialogState extends State<ShopItemPreviewDialog> {
                   width: 150,
                   height: 150,
                   color: ThemeConfig.cardDarkBg,
-                  child: const Center(child: Icon(Icons.shopping_bag, color: ThemeConfig.goldAccent, size: 48)),
+                  child: const Center(
+                    child: Icon(
+                      Icons.shopping_bag,
+                      color: ThemeConfig.goldAccent,
+                      size: 48,
+                    ),
+                  ),
                 ),
               )
             : Image.asset(
@@ -339,7 +398,13 @@ class _ShopItemPreviewDialogState extends State<ShopItemPreviewDialog> {
                   width: 150,
                   height: 150,
                   color: ThemeConfig.cardDarkBg,
-                  child: const Center(child: Icon(Icons.shopping_bag, color: ThemeConfig.goldAccent, size: 48)),
+                  child: const Center(
+                    child: Icon(
+                      Icons.shopping_bag,
+                      color: ThemeConfig.goldAccent,
+                      size: 48,
+                    ),
+                  ),
                 ),
               ),
       ),

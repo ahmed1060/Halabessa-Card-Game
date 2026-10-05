@@ -254,7 +254,7 @@ class StoreNotifier extends StateNotifier<StoreState> {
   static List<ShopItem> get builtinItems => [
     ShopItem(
       id: 'default_card', 
-      name: 'skin_premium'.tr(), 
+      name: 'skin_lantern_nights'.tr(),
       assetPath: 'assets/images/cards/premium/card_back_premium.png', 
       frontSkinPath: 'assets/images/cards/premium/card_front_premium_bg.png', 
       faceIllustrations: {
