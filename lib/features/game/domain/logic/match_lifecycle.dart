@@ -19,6 +19,7 @@ MatchState? applyMatchRewards(
   if (latest == null ||
       latest.id != completed.id ||
       latest.roundCount != completed.roundCount ||
+      latest.matchSequence != completed.matchSequence ||
       !const [
         GamePhase.roundScoring,
         GamePhase.rematchVoting,

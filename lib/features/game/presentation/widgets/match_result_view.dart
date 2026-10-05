@@ -12,6 +12,7 @@ class MatchResultView extends StatefulWidget {
   final FutureOr<bool> Function() onHome;
   final FutureOr<bool> Function()? onReplay;
   final bool replayLeavesView;
+  final Widget? decision;
   const MatchResultView({
     super.key,
     required this.title,
@@ -29,6 +30,7 @@ class MatchResultView extends StatefulWidget {
     required this.onHome,
     this.onReplay,
     this.replayLeavesView = true,
+    this.decision,
   });
 
   @override
@@ -91,7 +93,7 @@ class _MatchResultViewState extends State<MatchResultView> {
                   MediaQuery.textScalerOf(context).scale(14) <= 20;
               return Center(
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(20),
+                  padding: EdgeInsets.all(compact && widget.decision != null ? 12 : 20),
                   child: ConstrainedBox(
                     constraints: BoxConstraints(maxWidth: compact ? 880 : 440),
                     child: compact
@@ -100,7 +102,7 @@ class _MatchResultViewState extends State<MatchResultView> {
                             children: [
                               Expanded(child: _summary(compact: true)),
                               const SizedBox(width: 32),
-                              Expanded(child: _details(compact: true)),
+                              Expanded(flex: widget.decision != null ? 2 : 1, child: _details(compact: true)),
                             ],
                           )
                         : Column(
@@ -158,6 +160,11 @@ class _MatchResultViewState extends State<MatchResultView> {
     mainAxisSize: MainAxisSize.min,
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
+      if (compact && widget.decision != null) Row(children: [
+        Expanded(child: _score(widget.firstTeam, widget.firstScore, TableStyle.mint, compact: true)),
+        const SizedBox(width: 8),
+        Expanded(child: _score(widget.secondTeam, widget.secondScore, TableStyle.red, compact: true)),
+      ]) else ...[
       _score(
         widget.firstTeam,
         widget.firstScore,
@@ -171,7 +178,8 @@ class _MatchResultViewState extends State<MatchResultView> {
         TableStyle.red,
         compact: compact,
       ),
-      SizedBox(height: compact ? 12 : 16),
+      ],
+      SizedBox(height: compact && widget.decision != null ? 6 : compact ? 12 : 16),
       Wrap(
         alignment: WrapAlignment.center,
         spacing: 24,
@@ -185,7 +193,10 @@ class _MatchResultViewState extends State<MatchResultView> {
           ),
         ],
       ),
-      SizedBox(height: compact ? 12 : 20),
+      SizedBox(height: compact && widget.decision != null ? 6 : compact ? 12 : 20),
+      if (widget.decision != null) ...[
+        widget.decision!, const SizedBox(height: 10),
+      ],
       if (widget.onReplay != null) ...[
         FilledButton(
           style: FilledButton.styleFrom(

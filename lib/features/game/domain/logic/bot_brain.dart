@@ -1,6 +1,7 @@
 import '../models/match_state.dart';
 import '../models/card.dart' as game_card;
 import '../models/game_action.dart';
+import '../models/bot_difficulty.dart';
 import 'dart:math';
 
 /// Result object returned by the advanced bot evaluation.
@@ -42,8 +43,10 @@ class CardCountingMatrix {
   factory CardCountingMatrix.fromState(MatchState state, String botId) {
     final seen = <game_card.Rank, int>{};
     final inHand = <game_card.Rank, int>{};
+    final observed = <String>{};
 
     void recordCard(game_card.Card card) {
+      if (!observed.add(card.firebaseKey)) return;
       seen[card.rank] = (seen[card.rank] ?? 0) + 1;
     }
 
@@ -61,6 +64,7 @@ class CardCountingMatrix {
     for (final c in state.board) {
       recordCard(c);
     }
+    if (state.cutLastCard != null) recordCard(state.cutLastCard!);
 
     // 3. Cards in bot's own hand
     final myHand = state.handCards[botId] ?? [];
@@ -93,15 +97,38 @@ class BotBrain {
 
   /// Advanced strategic decision-making incorporating card counting, dead ranks,
   /// Tafweet risk/reward analysis, and emotional ahwa reactions.
-  static BotDecision decidePlayAdvanced(MatchState state, String botId) {
+  static BotDecision decidePlayAdvanced(MatchState state, String botId,
+      {BotDifficulty difficulty = BotDifficulty.expert, Random? rng}) {
     final hand = state.handCards[botId];
     if (hand == null || hand.isEmpty) {
       throw Exception('Bot $botId has no cards to play.');
     }
 
     final board = state.board;
-    final random = Random();
+    final random = rng ?? Random();
     final matrix = CardCountingMatrix.fromState(state, botId);
+    final matches = board.isEmpty ? <game_card.Card>[] : hand.where((c) => c.rank == board.last.rank).toList();
+    if (difficulty == BotDifficulty.easy) {
+      final candidates = matches.isNotEmpty && random.nextDouble() < 0.6 ? matches : hand;
+      return BotDecision(candidates[random.nextInt(candidates.length)], reason: 'Easy: basic capture or exploratory discard');
+    }
+    if (difficulty == BotDifficulty.medium) {
+      if (matches.isNotEmpty) return BotDecision(matches.first, reason: 'Medium: immediate capture');
+      final copies = <game_card.Rank, int>{};
+      for (final c in hand) { copies[c.rank] = (copies[c.rank] ?? 0) + 1; }
+      final ranked = List<game_card.Card>.from(hand)..sort((a, b) => copies[b.rank]!.compareTo(copies[a.rank]!));
+      return BotDecision(ranked.first, reason: 'Medium: preserve a duplicate for later capture');
+    }
+    if (difficulty == BotDifficulty.hard) {
+      if (matches.isNotEmpty) return BotDecision(matches.first, reason: 'Hard: secure capture');
+      final seat = state.playerIds.indexOf(botId);
+      final next = seat >= 0 && state.playerIds.length == 4 ? state.playerIds[(seat + 1) % 4] : '';
+      final known = state.skippedMatches[next] ?? const <String>[];
+      int risk(game_card.Card card) => matrix.unseen(card.rank) * 10 +
+        (known.any((s) => s.startsWith('${card.rank.name}:')) ? 100 : 0);
+      final ranked = List<game_card.Card>.from(hand)..sort((a, b) => risk(a).compareTo(risk(b)));
+      return BotDecision(ranked.first, reason: 'Hard: counted discard avoiding known opponent ranks');
+    }
 
     final int botIndex = state.playerIds.indexOf(botId);
     final String nextOpponentId = (botIndex >= 0 && state.playerIds.length == 4) 
@@ -150,7 +177,7 @@ class BotBrain {
         }
 
         // Standard Capture execution (98% to account for slight human-like variance)
-        if (random.nextDouble() < 0.98) {
+        if (matches.isNotEmpty) {
           final cardToPlay = matchingCards.first;
           final bool isBasraSweep = board.length == 1;
           final bool isHugeHarvest = board.length >= 4;

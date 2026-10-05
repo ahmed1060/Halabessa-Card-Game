@@ -6,6 +6,7 @@ import 'package:easy_localization/easy_localization.dart';
 
 import 'package:halabessa/features/auth/presentation/providers/auth_providers.dart';
 import 'package:halabessa/features/game/domain/providers/game_providers.dart';
+import 'package:halabessa/features/game/domain/models/bot_difficulty.dart';
 import 'package:halabessa/features/home/presentation/widgets/public_rooms_list.dart';
 import 'package:halabessa/features/auth/presentation/widgets/social_overlay.dart'
     as social_ui;
@@ -349,12 +350,25 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     }
   }
 
-  void _startOfflinePractice(BuildContext context, dynamic user) {
+  Future<void> _startOfflinePractice(BuildContext context, dynamic user) async {
+    final difficulty = await showDialog<BotDifficulty>(context: context, builder: (context) => AlertDialog(
+      backgroundColor: TableStyle.ink,
+      title: Text('training_difficulty'.tr(), style: TableStyle.label),
+      content: Column(mainAxisSize: MainAxisSize.min, children: [
+        for (final level in BotDifficulty.values) ListTile(
+          title: Text('bot_difficulty_${level.name}'.tr(), style: TableStyle.label),
+          subtitle: Text('bot_strategy_${level.name}'.tr(), style: TableStyle.label.copyWith(fontSize: 13)),
+          onTap: () => Navigator.pop(context, level),
+        ),
+      ]),
+    ));
+    if (difficulty == null || !context.mounted) return;
     ref
         .read(matchStateProvider.notifier)
         .startOfflinePracticeMatch(
           user?.uid ?? 'guest_${DateTime.now().millisecondsSinceEpoch}',
           user?.displayName ?? 'Player',
+          difficulty: difficulty,
         );
     Navigator.pushNamed(context, '/game');
   }

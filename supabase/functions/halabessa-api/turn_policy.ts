@@ -1,4 +1,5 @@
 import { playCard, type Card, type MatchState } from "./match_engine.ts";
+import { assignBotDifficulties } from './bot_strategy.ts';
 
 function record<T>(value: unknown): Record<string, T> {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -48,7 +49,7 @@ export function releasePlayer(state: MatchState, uid: string, reason: "left" | "
     skips[id] = skips[id].map(skip => skip.endsWith(`:${uid}`) ? `${skip.slice(0, -(uid.length + 1))}:${bot}` : skip);
   }
   next.skippedMatches = skips;
-  return next;
+  return assignBotDifficulties(next);
 }
 
 /** Server wall time decides timeout eligibility, never a client-supplied flag. */

@@ -77,6 +77,7 @@ class MatchState {
   final DateTime? expireAt;
   final int spectatorCount;
   final Map<String, String> playerSkins;
+  final Map<String, String> botDifficulties;
   final Map<String, int> earnedStars;
   final Map<String, int> earnedCoins;
   final Map<String, String> playerAvatars;
@@ -130,6 +131,7 @@ class MatchState {
       this.spectatorCount = 0,
       this.expireAt,
       this.playerSkins = const {},
+      this.botDifficulties = const {},
       this.playerAvatars = const {},
       this.earnedStars = const {},
       this.earnedCoins = const {},
@@ -199,6 +201,7 @@ class MatchState {
     Map<String, int>? earnedStars,
     Map<String, int>? earnedCoins,
     Map<String, String>? playerSkins,
+    Map<String, String>? botDifficulties,
   }) {
     return MatchState(
       id: id ?? this.id,
@@ -248,6 +251,7 @@ class MatchState {
       spectatorCount: spectatorCount ?? this.spectatorCount,
       expireAt: expireAt ?? this.expireAt,
       playerSkins: playerSkins ?? this.playerSkins,
+      botDifficulties: botDifficulties ?? this.botDifficulties,
       playerAvatars: playerAvatars ?? this.playerAvatars,
       earnedStars: earnedStars ?? this.earnedStars,
       earnedCoins: earnedCoins ?? this.earnedCoins,
@@ -312,6 +316,7 @@ class MatchState {
       'spectatorCount': spectatorCount,
       'expireAt': expireAt?.toIso8601String(),
       'playerSkins': playerSkins,
+      'botDifficulties': botDifficulties,
       'playerAvatars': playerAvatars,
       'earnedStars': earnedStars,
       'earnedCoins': earnedCoins,
@@ -537,6 +542,7 @@ class MatchState {
         spectatorCount: json['spectatorCount'] is int ? json['spectatorCount'] as int : 0,
         expireAt: json['expireAt'] != null ? DateTime.tryParse(json['expireAt'].toString()) : null,
         playerSkins: playerSkins,
+        botDifficulties: parseStringMap(json['botDifficulties']),
         playerAvatars: playerAvatars,
         earnedStars: parseIntMap(json['earnedStars']),
         earnedCoins: parseIntMap(json['earnedCoins']),

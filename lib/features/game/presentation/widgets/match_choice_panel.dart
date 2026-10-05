@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'table_style.dart';
 
 /// A two-way phase decision that stays in the hand tray. The first tap owns
@@ -6,10 +7,12 @@ import 'table_style.dart';
 class MatchChoicePanel extends StatefulWidget {
   final String title, detail, firstLabel, secondLabel, failureMessage;
   final bool canVote;
+  final DateTime? voteStartedAt;
+  final String Function(int)? countdownLabel;
   final Future<void> Function()? onFirst, onSecond;
   const MatchChoicePanel({super.key, required this.title, required this.detail,
     required this.firstLabel, required this.secondLabel, required this.failureMessage,
-    required this.canVote, this.onFirst, this.onSecond});
+    required this.canVote, this.onFirst, this.onSecond, this.voteStartedAt, this.countdownLabel});
 
   @override
   State<MatchChoicePanel> createState() => _MatchChoicePanelState();
@@ -18,6 +21,18 @@ class MatchChoicePanel extends StatefulWidget {
 class _MatchChoicePanelState extends State<MatchChoicePanel> {
   bool _pending = false;
   bool _failed = false;
+  Timer? _clock;
+  @override
+  void initState() {
+    super.initState();
+    _clock = Timer.periodic(const Duration(milliseconds: 250), (_) {
+      if (mounted && widget.voteStartedAt != null) setState(() {});
+    });
+  }
+  @override
+  void dispose() { _clock?.cancel(); super.dispose(); }
+  int get _remaining => widget.voteStartedAt == null ? 10 :
+      ((10000 - DateTime.now().difference(widget.voteStartedAt!).inMilliseconds) / 1000).ceil().clamp(0, 10);
   Future<void> _submit(Future<void> Function()? action) async {
     if (_pending || action == null) return;
     setState(() { _pending = true; _failed = false; });
@@ -36,7 +51,12 @@ class _MatchChoicePanelState extends State<MatchChoicePanel> {
     const SizedBox(height: 6),
     Text(_failed ? widget.failureMessage : widget.detail,
       textAlign: TextAlign.center, style: TableStyle.label),
-    if (widget.canVote) ...[
+    if (widget.countdownLabel != null) ...[
+      const SizedBox(height: 6),
+      Text(widget.countdownLabel!(_remaining), textAlign: TextAlign.center,
+        style: TableStyle.label.copyWith(color: TableStyle.brass)),
+    ],
+    if (widget.canVote && _remaining > 0) ...[
       const SizedBox(height: 10),
       Wrap(spacing: 8, runSpacing: 8, alignment: WrapAlignment.center, children: [
         FilledButton(

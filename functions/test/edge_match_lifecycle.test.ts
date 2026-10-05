@@ -12,6 +12,8 @@ test("complete server round conserves all 52 cards and reaches visible results",
   let { state, deck } = advanceMatch(room(), [], now);
   assert.equal(state.phase, "preRoundCut");
   ({ state, deck } = lifecycleCommand("cut", state, deck, "d", { position: 20 }, now));
+  assert.throws(() => advanceMatch(state, deck, now + 1999), /no_transition_due/);
+  now += 2000;
   ({ state, deck } = advanceMatch(state, deck, now));
   assert.equal(state.phase, "dealingCards");
   assert.throws(() => advanceMatch(state, deck, now + 4999), /no_transition_due/);
@@ -66,7 +68,11 @@ test("rematch expires rather than waiting forever; duplicate or invalid votes ar
   const vote = lifecycleCommand("voteRematch", initial, [], "a", { vote: true }, now);
   assert.throws(() => lifecycleCommand("voteRematch", vote.state, [], "a", { vote: true }, now), /already_voted/);
   assert.throws(() => lifecycleCommand("voteRematch", initial, [], "a", { vote: "yes" }, now), /invalid_vote/);
-  assert.equal(advanceMatch(vote.state, [], now + 20000).state.phase, "matchOver");
+  assert.throws(() => advanceMatch(vote.state, [], now + 9999), /no_transition_due/);
+  const expired = advanceMatch(vote.state, [], now + 10000).state;
+  assert.equal(expired.phase, "matchOver");
+  assert.deepEqual(expired.rematchVotes, { a: true, b: false, c: false, d: false });
+  assert.throws(() => lifecycleCommand('voteRematch', initial, [], 'b', {vote: true}, now + 10000), /vote_deadline_reached/);
 });
 test("nonparticipants and bot identities cannot issue lifecycle commands", () => {
   assert.throws(() => lifecycleCommand("advance", room(), [], "stranger", {}, now), /human_participant_required/);

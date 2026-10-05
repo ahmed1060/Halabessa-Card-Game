@@ -536,6 +536,7 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
       final shuffle = state.phase == GamePhase.shuffleVoting;
       final votes = shuffle ? state.shuffleVotes : state.rematchVotes;
       final canVote = !spectator && !votes.containsKey(uid);
+      final humans = state.playerIds.where((id) => !id.startsWith('bot_') && !id.startsWith('waiting_')).toList();
       final myTeam = _getTeamOfPlayer(uid, state.playerIds);
       final winner = state.teamAScore >= state.teamBScore ? 'teamA' : 'teamB';
       return MatchChoicePanel(
@@ -545,16 +546,18 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
             (myTeam == winner ? 'your_team_wins' : 'opponent_wins').tr()),
         detail: spectator ? 'you_are_spectating'.tr() :
           votes.containsKey(uid) ? 'waiting_for_other_players'.tr() :
-          (shuffle ? 'shuffle_votes' : 'rematch_votes').tr(args: [votes.length.toString()]),
+          'vote_progress'.tr(args: [humans.where(votes.containsKey).length.toString(), humans.length.toString()]),
+        voteStartedAt: state.phaseStartedAt,
+        countdownLabel: (seconds) => 'vote_countdown'.tr(args: [seconds.toString()]),
         firstLabel: (shuffle ? 'shuffle_yes' : 'best_of_3_yes').tr(),
         secondLabel: (shuffle ? 'keep_sequence_no' : 'leave_match_no').tr(),
         failureMessage: 'match_action_retry'.tr(), canVote: canVote,
         onFirst: !canVote ? null : () => shuffle
-          ? ref.read(matchStateProvider.notifier).voteShuffle(uid, true)
-          : ref.read(matchStateProvider.notifier).voteRematch(uid, true),
+          ? ref.read(matchStateProvider.notifier).voteShuffle(uid, true, expected: state)
+          : ref.read(matchStateProvider.notifier).voteRematch(uid, true, expected: state),
         onSecond: !canVote ? null : () => shuffle
-          ? ref.read(matchStateProvider.notifier).voteShuffle(uid, false)
-          : ref.read(matchStateProvider.notifier).voteRematch(uid, false),
+          ? ref.read(matchStateProvider.notifier).voteShuffle(uid, false, expected: state)
+          : ref.read(matchStateProvider.notifier).voteRematch(uid, false, expected: state),
       );
     }
     if (state.phase == GamePhase.preRoundCut) {
@@ -887,15 +890,25 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
       starsLabel: 'stars_label'.tr(), coinsLabel: 'coins_label'.tr(),
       homeLabel: 'return_home'.tr(), replayLabel: 'play_again'.tr(),
       replayLeavesView: offline,
-      onReplay: offline && !spectator ? () {
-        ref.read(matchStateProvider.notifier).startOfflinePracticeMatch(
-          user.uid, user.displayName, mode: state.mode, maxPoints: state.maxPoints);
-        return true;
-      } :
-        !spectator && state.phase == GamePhase.rematchVoting &&
-            !state.rematchVotes.containsKey(user.uid)
-          ? () => ref.read(matchStateProvider.notifier).voteRematch(user.uid, true)
-          : null,
+      decision: state.phase == GamePhase.rematchVoting ? MatchChoicePanel(
+        key: ValueKey('${state.id}-${state.roundCount}-rematch-${state.matchSequence}'),
+        title: 'rematch_question'.tr(),
+        detail: state.rematchVotes.containsKey(user.uid) ? 'vote_recorded'.tr() :
+          'vote_progress'.tr(args: [
+            state.playerIds.where((id) => !id.startsWith('bot_') && state.rematchVotes.containsKey(id)).length.toString(),
+            state.playerIds.where((id) => !id.startsWith('bot_') && !id.startsWith('waiting_')).length.toString()]),
+        firstLabel: 'vote_yes'.tr(), secondLabel: 'vote_no'.tr(),
+        failureMessage: 'match_action_retry'.tr(),
+        voteStartedAt: state.phaseStartedAt,
+        countdownLabel: (seconds) => 'vote_countdown'.tr(args: [seconds.toString()]),
+        canVote: !spectator && !state.rematchVotes.containsKey(user.uid),
+        onFirst: () async {
+          if (!await ref.read(matchStateProvider.notifier).voteRematch(user.uid, true, expected: state)) throw StateError('vote_rejected');
+        },
+        onSecond: () async {
+          if (!await ref.read(matchStateProvider.notifier).voteRematch(user.uid, false, expected: state)) throw StateError('vote_rejected');
+        },
+      ) : Text('rematch_closed'.tr(), textAlign: TextAlign.center, style: TableStyle.label),
       onHome: () async {
         final left = await ref.read(matchStateProvider.notifier).leaveMatch();
         if (left && mounted) _returnToHome();

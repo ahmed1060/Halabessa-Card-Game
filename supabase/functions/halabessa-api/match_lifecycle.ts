@@ -1,5 +1,6 @@
 import { cut, deal, playCard, startRound, type Card, type MatchState } from "./match_engine.ts";
 import { manualPlay, releasePlayer, timeoutPlay } from "./turn_policy.ts";
+import { assignBotDifficulties, chooseBotCard } from './bot_strategy.ts';
 
 type Capture = { leadingCard: Card; capturedCards: Card[]; isRoundAward?: boolean };
 type Transition = { state: MatchState; deck: Card[] };
@@ -28,7 +29,7 @@ function nextRound(state: MatchState, shuffle: boolean, now: number): Transition
     turnStartTime: new Date(now).toISOString(), capturingCards: [], capturingTeam: null,
     capturingStage: 0, playHistory: [], earnedStars: {}, earnedCoins: {}, expireAt: null,
     settlementPending: false, rewardRoster: [], rewardScores: null, rewardReceiptId: null };
-  return stamp(started, now);
+  return stamp({ ...started, state: assignBotDifficulties(started.state) }, now);
 }
 function finishRound(state: MatchState, deck: Card[], now: number): Transition {
   if (deck.length || !(state.playerIds ?? []).every(uid => !(state.handCards?.[uid] ?? []).length)) {
@@ -59,6 +60,7 @@ function animateCapture(before: MatchState, after: MatchState, deck: Card[], now
 
 /** All timed transitions use a supplied server clock, never a client clock. */
 export function advanceMatch(state: MatchState, deck: Card[], now = Date.now()): Transition {
+  state = assignBotDifficulties(state);
   const ids = state.playerIds ?? [];
   if (ids.length !== 4) throw new Error("four_players_required");
   switch (state.phase) {
@@ -72,7 +74,9 @@ export function advanceMatch(state: MatchState, deck: Card[], now = Date.now()):
       }
       return stamp(cut(state, deck, cutter, Math.floor(deck.length / 2)), now);
     }
-    case "dealingFasha": return stamp(deal(state, deck, ids[integer(state.dealerIndex)], true), now);
+    case "dealingFasha":
+      if (elapsed(state, now) < 2000) throw new Error("no_transition_due");
+      return stamp(deal(state, deck, ids[integer(state.dealerIndex)], true), now);
     case "dealingCards":
       if (elapsed(state, now) < 5000) throw new Error("no_transition_due");
       return stamp({ state: { ...state, phase: "playing", turnStartTime: new Date(now).toISOString() }, deck }, now);
@@ -96,7 +100,7 @@ export function advanceMatch(state: MatchState, deck: Card[], now = Date.now()):
         if (!Number.isFinite(started) || now - started < 1000) throw new Error("no_transition_due");
         const hand = state.handCards?.[uid] ?? [];
         if (!hand.length) throw new Error("empty_hand");
-        const card = hand.find(c => c.rank === state.board?.at(-1)?.rank) ?? hand[0];
+        const card = chooseBotCard(state, uid);
         return animateCapture(state, playCard(state, uid, card), deck, now);
       }
       return animateCapture(state, timeoutPlay(state, now), deck, now);
@@ -123,13 +127,14 @@ export function advanceMatch(state: MatchState, deck: Card[], now = Date.now()):
       const rematch = state.phase === "rematchVoting";
       const field = rematch ? "rematchVotes" : "shuffleVotes";
       const votes = map<boolean>(state[field]);
-      ids.filter(uid => uid.startsWith("bot_")).forEach(uid => { votes[uid] = true; });
-      const timedOut = elapsed(state, now) >= 20000;
-      const refused = Object.values(votes).includes(false);
-      const all = ids.every(uid => uid in votes);
-      if (refused || timedOut || all) {
+      const humans = ids.filter(uid => !uid.startsWith("bot_") && !uid.startsWith("waiting_"));
+      const timedOut = elapsed(state, now) >= 10000;
+      if (timedOut) humans.forEach(uid => { if (!(uid in votes)) votes[uid] = false; });
+      const all = humans.length > 0 && humans.every(uid => uid in votes);
+      const refused = humans.some(uid => votes[uid] === false);
+      if (timedOut || all) {
         if (rematch) {
-          if (refused || timedOut) return { state: { ...state, phase: "matchOver", rematchVotes: votes }, deck };
+          if (refused || !all) return { state: { ...state, phase: "matchOver", rematchVotes: votes }, deck };
           // Settlement must complete before any rematch discards its reward record.
           if (state.settlementPending === true) throw new Error("settlement_pending");
           return nextRound({ ...state, teamAScore: 0, teamBScore: 0, roundCount: 0,
@@ -165,6 +170,7 @@ export function lifecycleCommand(type: string, state: MatchState, deck: Card[], 
       throw new Error("invalid_vote");
     }
     const field = rematch ? "rematchVotes" : "shuffleVotes";
+    if (elapsed(state, now) >= 10000) throw new Error("vote_deadline_reached");
     const votes = map<boolean>(state[field]);
     if (uid in votes) throw new Error("already_voted");
     return { state: { ...state, [field]: { ...votes, [uid]: payload.vote } }, deck };
@@ -180,7 +186,7 @@ export function lifecycleCommand(type: string, state: MatchState, deck: Card[], 
       next.playerNames = { ...map<string>(state.playerNames),
         ...Object.fromEntries(next.playerIds.filter(id => id.startsWith("bot_")).map(id => [id, "bot_name_template"])) };
     }
-    return { state: next, deck };
+    return { state: assignBotDifficulties(next), deck };
   }
   throw new Error("unsupported_command");
 }

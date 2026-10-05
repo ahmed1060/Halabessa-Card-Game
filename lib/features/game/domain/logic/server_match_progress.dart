@@ -14,7 +14,7 @@ bool serverProgressDue(MatchState s, DateTime now) {
       return elapsed(cutter.startsWith('bot_') ? 1000 :
           (s.timerDurationSeconds > 0 ? s.timerDurationSeconds : 15) * 1000);
     case GamePhase.dealingFasha:
-      return true;
+      return elapsed(2000);
     case GamePhase.dealingCards:
     case GamePhase.roundScoring:
       return elapsed(5000);
@@ -30,9 +30,8 @@ bool serverProgressDue(MatchState s, DateTime now) {
     case GamePhase.shuffleVoting:
     case GamePhase.rematchVoting:
       final votes = s.phase == GamePhase.rematchVoting ? s.rematchVotes : s.shuffleVotes;
-      return votes.values.contains(false) || elapsed(20000) ||
-          s.playerIds.every((id) => votes.containsKey(id) || id.startsWith('bot_')) ||
-          s.playerIds.any((id) => id.startsWith('bot_') && !votes.containsKey(id));
+      final humans = s.playerIds.where((id) => !id.startsWith('bot_') && !id.startsWith('waiting_')).toList();
+      return elapsed(10000) || (humans.isNotEmpty && humans.every(votes.containsKey));
     case GamePhase.matchOver:
       return false;
   }

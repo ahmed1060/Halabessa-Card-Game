@@ -257,6 +257,14 @@ class GameEngine {
   }
 
   static GameEngineResult _vote(MatchState state, VoteAction action) {
+    final phase = action.isRematch ? GamePhase.rematchVoting : GamePhase.shuffleVoting;
+    final votes = action.isRematch ? state.rematchVotes : state.shuffleVotes;
+    if (state.phase != phase || !state.playerIds.contains(action.playerId) ||
+        action.playerId.startsWith('bot_') || action.playerId.startsWith('waiting_') ||
+        votes.containsKey(action.playerId) ||
+        (state.phaseStartedAt != null && DateTime.now().difference(state.phaseStartedAt!).inMilliseconds >= 10000)) {
+      return GameEngineResult(state);
+    }
     if (action.isRematch) {
       final votes = Map<String, bool>.from(state.rematchVotes);
       votes[action.playerId] = action.vote;

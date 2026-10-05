@@ -15,6 +15,7 @@ import '../../domain/logic/deck.dart';
 import '../../domain/logic/game_engine.dart';
 import '../../domain/logic/match_lifecycle.dart';
 import '../../domain/logic/bot_brain.dart';
+import '../../domain/models/bot_difficulty.dart';
 import '../../domain/logic/score_config.dart';
 import '../../domain/logic/server_match_progress.dart';
 import 'package:halabessa/core/services/supabase_backend_service.dart';
@@ -50,6 +51,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
 
   @override
   void dispose() {
+    _votingTimer?.cancel();
     _bindingGeneration++;
     _serverProgressTimer?.cancel();
     // Disposal is not a player leaving: release local resources without
@@ -100,6 +102,55 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
   bool _botEvaluationQueued = false;
   bool _playInFlight = false;
   bool _roundEnding = false;
+  Timer? _votingTimer;
+  bool _voteResolving = false;
+  bool _roundStartInFlight = false;
+  bool _initialDealInFlight = false;
+  String? _lastRoundStartSource;
+
+  bool _samePhase(MatchState expected) => mounted && state?.id == expected.id &&
+      state?.roundCount == expected.roundCount && state?.phase == expected.phase &&
+      state?.matchSequence == expected.matchSequence && state?.phaseStartedAt == expected.phaseStartedAt;
+
+  void _manageVotingTimer(MatchState s) {
+    _votingTimer?.cancel();
+    _votingTimer = null;
+    if (s.usesServerCommands || ![GamePhase.shuffleVoting, GamePhase.rematchVoting].contains(s.phase)) return;
+    if (s.phaseStartedAt == null && _amIHost(s)) {
+      unawaited(_publishState(s.copyWith(phaseStartedAt: DateTime.now())));
+      return;
+    }
+    _votingTimer = Timer.periodic(const Duration(milliseconds: 250), (_) {
+      final latest = state;
+      if (latest != null && _samePhase(s) && _amIHost(latest)) {
+        unawaited(_resolveHumanVotes(latest));
+      }
+    });
+  }
+
+  Future<void> _resolveHumanVotes(MatchState expected) async {
+    if (_voteResolving || !_samePhase(expected) || !_amIHost(expected)) return;
+    final rematch = expected.phase == GamePhase.rematchVoting;
+    if (!rematch && expected.phase != GamePhase.shuffleVoting) return;
+    final humans = expected.playerIds.where((id) => !id.startsWith('bot_') && !id.startsWith('waiting_')).toList();
+    final votes = Map<String, bool>.from(rematch ? expected.rematchVotes : expected.shuffleVotes);
+    final start = expected.phaseStartedAt;
+    final expired = start != null && DateTime.now().difference(start).inMilliseconds >= 10000;
+    if (!expired && humans.any((id) => !votes.containsKey(id))) return;
+    _voteResolving = true;
+    try {
+      for (final id in humans) { votes.putIfAbsent(id, () => false); }
+      final agreed = humans.isNotEmpty && humans.every((id) => votes[id] == true);
+      final resolved = rematch ? expected.copyWith(rematchVotes: votes) : expected.copyWith(shuffleVotes: votes);
+      await _publishState(resolved);
+      if (!_samePhase(expected)) return;
+      if (rematch && !agreed) {
+        await _publishState(state!.copyWith(phase: GamePhase.matchOver));
+      } else {
+        await startNewRound(isFirstRound: rematch, forceShuffle: rematch || agreed);
+      }
+    } finally { _voteResolving = false; }
+  }
   int _bindingGeneration = 0;
   bool _isSpectating = false;
   bool _leavePending = false;
@@ -228,7 +279,16 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     // snapshot. Its next state must come from an accepted command/snapshot.
     MultiplayerSyncService.validateLegacyWrite(newState);
     final previousState = state;
+    final difficulties = Map<String, String>.from(newState.botDifficulties);
+    for (final id in newState.playerIds.where((id) => id.startsWith('bot_'))) {
+      difficulties.putIfAbsent(id, () => BotDifficulty.values[Random().nextInt(4)].name);
+    }
+    newState = newState.copyWith(botDifficulties: difficulties);
+    if (previousState?.phase != newState.phase || previousState?.roundCount != newState.roundCount) {
+      newState = newState.copyWith(phaseStartedAt: DateTime.now());
+    }
     state = newState;
+    _manageVotingTimer(newState);
     if (!newState.id.startsWith('OFFLINE_')) {
       final refreshRoomIndex = previousState == null ||
           previousState.phase != newState.phase ||
@@ -370,6 +430,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
       }
     }
     _matchListener?.cancel();
+    _votingTimer?.cancel();
     _bindingGeneration++;
     _serverProgressTimer?.cancel();
     _serverProgressTimer = null;
@@ -473,6 +534,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
               return;
             }
             state = serverState;
+            _manageVotingTimer(serverState);
             if (_amIHost(serverState)) {
               _ensureSecretDeck(serverState);
             }
@@ -632,6 +694,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
   }
 
   Future<void> _evaluateBotActions(MatchState serverState) async {
+    if (!mounted) return;
     if (serverState.usesServerCommands) return;
     if (_isHandlingBotLogic) {
       _botEvaluationQueued = true;
@@ -643,11 +706,13 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
       _isHandlingBotLogic = false;
       return;
     }
+    final generation = _bindingGeneration;
     // Safety delay to allow state to settle
     await Future.delayed(const Duration(milliseconds: 100));
     
     try {
       final currentState = serverState;
+      if (generation != _bindingGeneration || !_samePhase(currentState)) return;
       if (currentState.playerIds.isEmpty) return;
 
       // 1. LOBBY AUTO-START
@@ -673,7 +738,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
 
           if (isBot || isAFK) {
             await Future.delayed(Duration(milliseconds: 1500 + Random().nextInt(1000)));
-            if (state?.phase == GamePhase.preRoundCut) {
+            if (generation == _bindingGeneration && _samePhase(currentState)) {
               performCut(BotBrain.decideCut(currentState.deckCount));
             }
           }
@@ -708,7 +773,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
           // Watchdog: If player's turn exceeded timerDurationSeconds + 2s grace period,
           // it means their local client crashed, disconnected, or froze without autoplaying.
           bool isTurnStuck = false;
-          if (currentState.turnStartTime != null) {
+          if (currentState.timerDurationSeconds > 0 && currentState.turnStartTime != null) {
             final elapsed = DateTime.now().difference(currentState.turnStartTime!).inSeconds;
             if (elapsed >= (currentState.timerDurationSeconds + 2)) {
               isTurnStuck = true;
@@ -730,7 +795,8 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
              if (finalState != null && sameMatchTurn(finalState, currentState)) {
                 
                  try {
-                   final decision = BotBrain.decidePlayAdvanced(finalState, activeId);
+                   final decision = BotBrain.decidePlayAdvanced(finalState, activeId,
+                     difficulty: parseBotDifficulty(finalState.botDifficulties[activeId]));
                    await playCard(activeId, decision.card);
                    if (decision.emojiReaction != null) {
                      sendEmoji(activeId, decision.emojiReaction!);
@@ -759,7 +825,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
       debugPrint('CRITICAL ASYNC ERROR in _evaluateBotActions: $e');
     } finally {
       _isHandlingBotLogic = false;
-      if (_botEvaluationQueued) {
+      if (_botEvaluationQueued && mounted) {
         _botEvaluationQueued = false;
         final latestState = state;
         if (latestState != null) {
@@ -774,61 +840,11 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
   }
 
   Future<void> _handleBotVotes(MatchState currentState, {required bool isRematch}) async {
-    for (var playerId in currentState.playerIds) {
-      if (!playerId.startsWith('bot_')) continue;
-      
-      final votes = isRematch ? currentState.rematchVotes : currentState.shuffleVotes;
-      if (!votes.containsKey(playerId)) {
-        await Future.delayed(Duration(milliseconds: 1500 + Random().nextInt(1500)));
-        if (isRematch) {
-          voteRematch(playerId, BotBrain.decideRematchVote());
-        } else {
-          voteShuffle(playerId, BotBrain.decideShuffleVote(currentState, playerId));
-        }
-      }
-    }
-
-    // Host Transition after voting
-    final latestState = state;
-    if (latestState == null) return;
-
-    if (isRematch) {
-      if (latestState.rematchVotes.length == 4) {
-        _checkVoteCompletion(latestState);
-      }
-    } else {
-      final sVotes = latestState.shuffleVotes;
-      bool anyoneVotedNo = sVotes.values.any((v) => v == false);
-      if (anyoneVotedNo || sVotes.length == 4) {
-        startNewRound(forceShuffle: !anyoneVotedNo && sVotes.values.any((v) => v == true));
-      }
-    }
+    await _resolveHumanVotes(currentState);
   }
 
   void _checkVoteCompletion(MatchState currentState) {
-    if (currentState.phase == GamePhase.shuffleVoting) {
-       final sVotes = currentState.shuffleVotes;
-       bool anyoneVotedNo = sVotes.values.any((v) => v == false);
-       if (anyoneVotedNo || sVotes.length == 4) {
-         startNewRound(forceShuffle: !anyoneVotedNo && sVotes.values.any((v) => v == true));
-       }
-    } else if (currentState.phase == GamePhase.rematchVoting) {
-       final rVotes = currentState.rematchVotes;
-       final bool anyoneVotedNo = rVotes.values.any((v) => v == false);
-       if (anyoneVotedNo) {
-         _publishState(currentState.copyWith(phase: GamePhase.matchOver));
-       } else if (rVotes.length == 4) {
-         bool unanimous = rVotes.values.every((v) => v == true);
-         if (unanimous) {
-           _publishState(currentState.copyWith(
-             teamAScore: 0, teamBScore: 0, roundCount: 1, roundsSinceLastShuffle: 0, rematchVotes: {},
-           ));
-           startNewRound(isFirstRound: true);
-         } else {
-           _publishState(currentState.copyWith(phase: GamePhase.matchOver));
-         }
-       }
-    }
+    unawaited(_resolveHumanVotes(currentState));
   }
 
   void _manageAutoplayTimer(MatchState matchState) {
@@ -903,7 +919,8 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     bindToMatch(created.id);
   }
 
-  void startOfflinePracticeMatch(String playerId, String displayName, {GameMode mode = GameMode.classic, int maxPoints = 41}) {
+  void startOfflinePracticeMatch(String playerId, String displayName, {GameMode mode = GameMode.classic, int maxPoints = 41,
+      BotDifficulty difficulty = BotDifficulty.medium}) {
     final offlineId = 'OFFLINE_${DateTime.now().millisecondsSinceEpoch}';
     final store = ref.read(storeProvider);
     final avatarUrl = ref.read(currentUserProvider)?.avatarUrl ?? "";
@@ -914,6 +931,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
       maxPoints: maxPoints,
       isPublic: false,
       playerIds: [playerId, "bot_1", "bot_2", "bot_3"],
+      botDifficulties: {for (final id in ['bot_1', 'bot_2', 'bot_3']) id: difficulty.name},
       playerNames: {
         playerId: displayName.isEmpty ? "Player" : displayName,
         "bot_1": "bot_name_template",
@@ -1068,6 +1086,10 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
       await _sendServerIntent('advance');
       return;
     }
+    if (_roundStartInFlight || ![GamePhase.waitingForPlayers, GamePhase.roundScoring,
+        GamePhase.shuffleVoting, GamePhase.rematchVoting].contains(currentState.phase)) return;
+    final source = '${currentState.id}:${currentState.matchSequence}:${currentState.roundCount}:${currentState.phase}:${currentState.phaseStartedAt}';
+    if (_lastRoundStartSource == source) return;
     
     // CRITICAL: Ensure we don't start with placeholders
     if (currentState.playerIds.any((id) => id.startsWith('waiting_'))) {
@@ -1085,7 +1107,12 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
       ref.read(multimediaServiceProvider).playSfx('sfx/shuffle.mp3');
     } else {
       // RESTORE LOGIC: Pick up cards from last round
-      _secretDeck = Deck.restoreFromHarvest(currentState.harvestStacks);
+      final restored = Deck.restoreFromHarvest(currentState.harvestStacks);
+      if (restored.cards.length != 52 || restored.cards.map((c) => c.firebaseKey).toSet().length != 52) {
+        ref.read(matchFeedbackProvider.notifier).state = MatchFeedback('match_action_retry');
+        return;
+      }
+      _secretDeck = restored;
     }
 
     final newState = currentState.copyWith(
@@ -1103,11 +1130,18 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
       handInRound: 0,
       lastCardRevealed: _secretDeck?.lastCardRevealed,
       recentFasha: [],
+      teamAScore: isFirstRound ? 0 : currentState.teamAScore,
+      teamBScore: isFirstRound ? 0 : currentState.teamBScore,
+      earnedStars: {}, earnedCoins: {},
+      matchSequence: currentState.phase == GamePhase.rematchVoting ? currentState.matchSequence + 1 : currentState.matchSequence,
       lastCaptureTeam: null,
       cardOwnership: {},
     );
 
-    await _publishState(newState);
+    _roundStartInFlight = true;
+    _lastRoundStartSource = source;
+    try { await _publishState(newState); }
+    finally { _roundStartInFlight = false; }
   }
 
   Future<void> performCut(int index) async {
@@ -1137,6 +1171,12 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
       await _sendServerIntent('advance');
       return;
     }
+    if (_initialDealInFlight || currentState.phase != GamePhase.dealingFasha) return;
+    _initialDealInFlight = true;
+    final generation = _bindingGeneration;
+    try {
+    await Future.delayed(const Duration(seconds: 2));
+    if (generation != _bindingGeneration || !_samePhase(currentState)) return;
 
     _ensureSecretDeck(currentState);
 
@@ -1156,12 +1196,15 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
         : const Duration(seconds: 5);
     await Future.delayed(memoryDuration);
     
-    if (state?.phase == GamePhase.dealingCards) {
+    if (mounted && generation == _bindingGeneration && state?.id == currentState.id &&
+        state?.roundCount == currentState.roundCount && state?.matchSequence == currentState.matchSequence &&
+        state?.phase == GamePhase.dealingCards) {
       await _publishState(state!.copyWith(
         phase: GamePhase.playing,
         turnStartTime: DateTime.now(),
       ));
     }
+    } finally { _initialDealInFlight = false; }
   }
 
   Future<void> dealSubsequentCards() async {
@@ -1171,6 +1214,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
       await _sendServerIntent('advance');
       return;
     }
+    if (currentState.phase != GamePhase.playing || !currentState.areAllHandsEmpty) return;
 
     _ensureSecretDeck(currentState);
 
@@ -1366,7 +1410,6 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
             await startNewRound(forceShuffle: true);
          } else if (scoringState.roundsSinceLastShuffle >= 2) {
             await _publishState(scoringState.copyWith(
-               dealerIndex: (scoringState.dealerIndex + 1) % 4,
                phase: GamePhase.shuffleVoting,
                skippedMatches: {},
                playHistory: [],
@@ -1382,27 +1425,29 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     }
   }
 
-  Future<void> voteShuffle(String playerId, bool wantsShuffle) async {
+  Future<bool> voteShuffle(String playerId, bool wantsShuffle, {MatchState? expected}) async {
     final currentState = state;
-    if (currentState == null) return;
+    if (currentState == null || (expected != null && !_samePhase(expected))) return false;
     if (currentState.usesServerCommands) {
-      await _sendServerIntent('voteShuffle', payload: {'vote': wantsShuffle});
-      return;
+      return _sendServerIntent('voteShuffle', payload: {'vote': wantsShuffle});
     }
     final result = GameEngine.apply(currentState, VoteAction(playerId, wantsShuffle, isRematch: false));
+    if (identical(result.newState, currentState)) return false;
     await _publishState(result.newState);
     if (_amIHost(result.newState)) {
        _checkVoteCompletion(result.newState);
     }
+    return true;
   }
 
-  Future<bool> voteRematch(String playerId, bool wantsRematch) async {
+  Future<bool> voteRematch(String playerId, bool wantsRematch, {MatchState? expected}) async {
     final currentState = state;
-    if (currentState == null) return false;
+    if (currentState == null || (expected != null && !_samePhase(expected))) return false;
     if (currentState.usesServerCommands) {
       return _sendServerIntent('voteRematch', payload: {'vote': wantsRematch});
     }
     final result = GameEngine.apply(currentState, VoteAction(playerId, wantsRematch, isRematch: true));
+    if (identical(result.newState, currentState)) return false;
     await _publishState(result.newState);
     if (_amIHost(result.newState)) {
        _checkVoteCompletion(result.newState);

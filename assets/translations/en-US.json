@@ -491,4 +491,20 @@
     "help_team": "Four players form two teams. Your teammate sits opposite you; the two side seats are your rivals.",
     "help_history": "Your team shares one face-down collection stack. Tap the face-up capture card beside it to see the cards your team played to collect, in this round only.",
     "help_dealer": "The face-down deal deck stays beside the current dealer. Its count shows the cards still to be distributed."
+    ,"vote_progress": "Human votes: {} of {}",
+    "vote_countdown": "{} seconds left · unanswered votes become No",
+    "vote_recorded": "Your vote is recorded. Waiting for the other players.",
+    "rematch_question": "Play again with this room?",
+    "vote_yes": "Yes, play again",
+    "vote_no": "No, finish here",
+    "rematch_closed": "The rematch vote has ended. You can return home.",
+    "training_difficulty": "Choose training difficulty",
+    "bot_difficulty_easy": "Easy",
+    "bot_difficulty_medium": "Medium",
+    "bot_difficulty_hard": "Hard",
+    "bot_difficulty_expert": "Expert",
+    "bot_strategy_easy": "Basic captures with occasional mistakes",
+    "bot_strategy_medium": "Captures and simple hand planning",
+    "bot_strategy_hard": "Remembers exposed cards and avoids risky ranks",
+    "bot_strategy_expert": "Card counting and teammate-aware decisions"
 }
