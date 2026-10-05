@@ -18,6 +18,7 @@ import '../../domain/logic/bot_brain.dart';
 import '../../domain/models/bot_difficulty.dart';
 import '../../domain/logic/score_config.dart';
 import '../../domain/logic/server_match_progress.dart';
+import '../../domain/logic/shuffle_bot_votes.dart';
 import 'package:halabessa/core/services/supabase_backend_service.dart';
 import '../../data/repositories/multiplayer_sync_service.dart';
 import 'package:halabessa/features/auth/presentation/providers/auth_providers.dart';
@@ -133,13 +134,14 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     final rematch = expected.phase == GamePhase.rematchVoting;
     if (!rematch && expected.phase != GamePhase.shuffleVoting) return;
     final humans = expected.playerIds.where((id) => !id.startsWith('bot_') && !id.startsWith('waiting_')).toList();
-    final votes = Map<String, bool>.from(rematch ? expected.rematchVotes : expected.shuffleVotes);
+    var votes = Map<String, bool>.from(rematch ? expected.rematchVotes : expected.shuffleVotes);
     final start = expected.phaseStartedAt;
     final expired = start != null && DateTime.now().difference(start).inMilliseconds >= 10000;
     if (!expired && humans.any((id) => !votes.containsKey(id))) return;
     _voteResolving = true;
     try {
       for (final id in humans) { votes.putIfAbsent(id, () => false); }
+      if (!rematch) votes = resolveShuffleBotVotes(expected.playerIds, votes);
       final agreed = humans.isNotEmpty && humans.every((id) => votes[id] == true);
       final resolved = rematch ? expected.copyWith(rematchVotes: votes) : expected.copyWith(shuffleVotes: votes);
       await _publishState(resolved);

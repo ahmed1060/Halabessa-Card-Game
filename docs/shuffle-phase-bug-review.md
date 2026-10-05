@@ -2,10 +2,11 @@
 
 ## Implementation follow-up (2026-10-05)
 
-The later user decision supersedes independent bot voting: only real players
-determine shuffle/rematch outcomes. The existing unanimity outcome is retained;
-bots neither vote nor block completion. The hardcoded deadline is 10 seconds,
-with unanswered humans recorded as No and late votes rejected.
+The clarified user decision excludes bots from rematch voting. For shuffle only,
+bots wait for all human ballots or the deadline, follow the human majority, and
+share one randomly selected Yes/No ballot on a tie. Timeout human ballots are No.
+The existing unanimity outcome is retained; bots never block completion or submit
+independent votes. The hardcoded deadline is 10 seconds; late votes are rejected.
 
 Local implementation now includes one guarded legacy vote resolver, stale phase/
 match-sequence checks, deck restoration validation, single dealer rotation, a

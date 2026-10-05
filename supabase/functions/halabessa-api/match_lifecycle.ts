@@ -8,6 +8,18 @@ function map<T>(value: unknown): Record<string, T> {
   return value && typeof value === "object" && !Array.isArray(value) ? { ...value as Record<string, T> } : {};
 }
 function integer(value: unknown, fallback = 0) { return Number.isSafeInteger(value) ? value as number : fallback; }
+// Resolve once, after human voting closes; bots never submit independent votes.
+export function resolveShuffleBotVotes(ids: string[], humanVotes: Record<string, boolean>, random = Math.random) {
+  const humans = ids.filter(id => !id.startsWith("bot_") && !id.startsWith("waiting_"));
+  const votes: Record<string, boolean> = Object.fromEntries(humans.map(id => [id, humanVotes[id] ?? false]));
+  const yes = Object.values(votes).filter(Boolean).length;
+  const no = humans.length - yes;
+  const bots = ids.filter(id => id.startsWith("bot_"));
+  if (!bots.length) return votes;
+  const choice = !humans.length ? false : yes === no ? random() < 0.5 : yes > no;
+  for (const id of bots) votes[id] = choice;
+  return votes;
+}
 function elapsed(state: MatchState, now: number) {
   const started = Date.parse(String(state.phaseStartedAt ?? state.turnStartTime ?? ""));
   return Number.isFinite(started) ? Math.max(0, now - started) : 0;
@@ -140,7 +152,9 @@ export function advanceMatch(state: MatchState, deck: Card[], now = Date.now()):
           return nextRound({ ...state, teamAScore: 0, teamBScore: 0, roundCount: 0,
             matchSequence: integer(state.matchSequence) + 1 }, true, now);
         }
-        return nextRound(state, !refused && all, now);
+        const resolved = resolveShuffleBotVotes(ids, votes);
+        const next = nextRound(state, !refused && all, now);
+        return { ...next, state: { ...next.state, shuffleVotes: resolved } };
       }
       if (JSON.stringify(votes) !== JSON.stringify(state[field] ?? {})) return { state: { ...state, [field]: votes }, deck };
       throw new Error("no_transition_due");
