@@ -81,6 +81,8 @@ class MultiplayerSyncService {
       'timerDurationSeconds': matchState.timerDurationSeconds,
       'isPublic': matchState.isPublic,
       'displayName': matchState.playerNames.isEmpty ? '' : matchState.playerNames.values.first,
+      // QA builds opt in; production activation follows end-to-end verification.
+      if (const bool.fromEnvironment('HALABESSA_SERVER_MATCHES')) 'protocolVersion': 1,
       'cardBackId': matchState.playerSkins.isEmpty ? '' : matchState.playerSkins.values.first,
       'avatarUrl': matchState.playerAvatars.isEmpty ? '' : matchState.playerAvatars.values.first,
     });

@@ -62,6 +62,7 @@ class MatchState {
   final DateTime? phaseStartedAt;
   final int timerDurationSeconds;
   final Map<String, String> playerEmojis;
+  final Map<String, String> playerEmojiExpiresAt;
   final Map<String, bool> shuffleVotes;
   final Map<String, bool> rematchVotes;
   final Map<String, bool> botInjectionVotes;
@@ -111,6 +112,7 @@ class MatchState {
       this.phaseStartedAt,
       this.timerDurationSeconds = 10,
       this.playerEmojis = const {},
+      this.playerEmojiExpiresAt = const {},
       this.shuffleVotes = const {},
       this.rematchVotes = const {},
       this.botInjectionVotes = const {},
@@ -174,6 +176,7 @@ class MatchState {
     DateTime? phaseStartedAt,
     int? timerDurationSeconds,
     Map<String, String>? playerEmojis,
+    Map<String, String>? playerEmojiExpiresAt,
     Map<String, bool>? shuffleVotes,
     Map<String, bool>? rematchVotes,
     Map<String, bool>? botInjectionVotes,
@@ -225,6 +228,7 @@ class MatchState {
       phaseStartedAt: phaseStartedAt ?? this.phaseStartedAt,
       timerDurationSeconds: timerDurationSeconds ?? this.timerDurationSeconds,
       playerEmojis: playerEmojis ?? this.playerEmojis,
+      playerEmojiExpiresAt: playerEmojiExpiresAt ?? this.playerEmojiExpiresAt,
       shuffleVotes: shuffleVotes ?? this.shuffleVotes,
       rematchVotes: rematchVotes ?? this.rematchVotes,
       botInjectionVotes: botInjectionVotes ?? this.botInjectionVotes,
@@ -293,6 +297,7 @@ class MatchState {
       'phaseStartedAt': phaseStartedAt?.toIso8601String(),
       'timerDurationSeconds': timerDurationSeconds,
       'playerEmojis': playerEmojis,
+      'playerEmojiExpiresAt': playerEmojiExpiresAt,
       'shuffleVotes': shuffleVotes,
       'rematchVotes': rematchVotes,
       'botInjectionVotes': botInjectionVotes,
@@ -512,6 +517,7 @@ class MatchState {
         phaseStartedAt: json['phaseStartedAt'] != null ? DateTime.tryParse(json['phaseStartedAt'].toString()) : null,
         timerDurationSeconds: json['timerDurationSeconds'] is int ? json['timerDurationSeconds'] as int : 10,
         playerEmojis: playerEmojis,
+        playerEmojiExpiresAt: parseStringMap(json['playerEmojiExpiresAt']),
         shuffleVotes: shuffleVotes,
         rematchVotes: rematchVotes,
         botInjectionVotes: botInjectionVotes,

@@ -12,6 +12,7 @@ class TableSeat extends StatefulWidget {
   final String? portraitAsset;
   final String? dealerLabel;
   final String? message;
+  final DateTime? messageExpiresAt;
   final bool isBot;
   final bool active;
   final Color accent;
@@ -30,6 +31,7 @@ class TableSeat extends StatefulWidget {
     this.portraitAsset,
     this.dealerLabel,
     this.message,
+    this.messageExpiresAt,
     this.isBot = false,
     this.active = false,
     this.accent = TableStyle.mint,
@@ -47,6 +49,8 @@ class TableSeat extends StatefulWidget {
 
 class _TableSeatState extends State<TableSeat> {
   Timer? _clock;
+  Timer? _messageExpiry;
+  bool _messageExpired = false;
   @override
   void initState() {
     super.initState();
@@ -58,12 +62,21 @@ class _TableSeatState extends State<TableSeat> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.active != widget.active ||
         oldWidget.turnStarted != widget.turnStarted ||
-        oldWidget.turnSeconds != widget.turnSeconds) {
+        oldWidget.turnSeconds != widget.turnSeconds ||
+        oldWidget.messageExpiresAt != widget.messageExpiresAt || oldWidget.message != widget.message) {
       _updateClock();
     }
   }
 
   void _updateClock() {
+    _messageExpiry?.cancel();
+    final expiry = widget.messageExpiresAt;
+    _messageExpired = expiry != null && !DateTime.now().isBefore(expiry);
+    if (expiry != null && !_messageExpired) {
+      _messageExpiry = Timer(expiry.difference(DateTime.now()), () {
+        if (mounted) setState(() => _messageExpired = true);
+      });
+    }
     _clock?.cancel();
     if (widget.active && widget.turnStarted != null && widget.turnSeconds > 0) {
       _clock = Timer.periodic(const Duration(seconds: 1), (_) {
@@ -74,12 +87,14 @@ class _TableSeatState extends State<TableSeat> {
 
   @override
   void dispose() {
+    _messageExpiry?.cancel();
     _clock?.cancel();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final message = _messageExpired ? null : widget.message;
     final url = widget.avatarUrl;
     final fallback =
         widget.portraitAsset ?? 'assets/images/avatars/lantern_partner_v1.png';
@@ -100,7 +115,7 @@ class _TableSeatState extends State<TableSeat> {
           widget.name,
           widget.detail,
           if (widget.dealerLabel != null) widget.dealerLabel!,
-          if (widget.message != null) widget.message!,
+          if (message != null) message,
         ].join('\n'),
         decoration: BoxDecoration(
           color: TableStyle.ink,
@@ -324,10 +339,10 @@ class _TableSeatState extends State<TableSeat> {
                     ),
                     SizedBox(
                       height: line,
-                      child: widget.message == null
+                      child: message == null
                           ? const SizedBox.shrink()
                           : Text(
-                              widget.message!,
+                              message,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TableStyle.detail,

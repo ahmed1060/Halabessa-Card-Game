@@ -178,4 +178,14 @@ void main() {
     await notifier.playCard('bot_1', cards.Card.fromJson({'suit': 'hearts', 'rank': 'ace'}));
     expect(sync.types, isEmpty);
   });
+  test('server emotes submit caller intent and never publish a match snapshot', () async {
+    await notifier.sendEmoji('bot_1', '👑');
+    expect(sync.types, isEmpty);
+    final emote = notifier.sendEmoji('human', '👑');
+    expect(sync.types, ['sendEmoji']);
+    sync.pending.single.complete(match.copyWith(serverVersion: 4,
+      playerEmojis: {'human': '👑'}, playerEmojiExpiresAt: {'human': '2026-10-04T11:00:03Z'}));
+    await emote;
+    expect(container.read(matchStateProvider)!.playerEmojis['human'], '👑');
+  });
 }

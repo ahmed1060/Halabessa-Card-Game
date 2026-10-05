@@ -4,6 +4,33 @@ import { executeMatchIntent } from "../../supabase/functions/halabessa-api/match
 import type { MatchState } from "../../supabase/functions/halabessa-api/match_engine.ts";
 
 const now = Date.parse("2026-10-04T10:00:00Z");
+test("cosmetics are caller-scoped and cannot alter timing, hands or other players", () => {
+  const state = playing();
+  const original = structuredClone(state);
+  const updated = executeMatchIntent("updateProfile", state, [], "a", "a", {
+    displayName: " QA ", cardBackId: "default_card", avatarUrl: "",
+    currentTurnIndex: 3, playerNames: { b: "forged" }, handCards: {},
+  }, now).state;
+  assert.deepEqual(state, original);
+  assert.equal((updated.playerNames as Record<string, string>).a, "QA");
+  assert.equal((updated.playerNames as Record<string, string>).b, undefined);
+  assert.deepEqual(updated.handCards, state.handCards);
+  assert.equal(updated.turnStartTime, state.turnStartTime);
+  for (const uid of ["outsider", "bot_1", "waiting_1"]) {
+    assert.throws(() => executeMatchIntent("sendEmoji", state, [], uid, uid, { emoji: "👑" }, now), /human_participant_required/);
+  }
+  assert.throws(() => executeMatchIntent("updateProfile", state, [], "a", "b", {}, now), /invalid_command_actor/);
+  assert.throws(() => executeMatchIntent("updateProfile", state, [], "a", "a",
+    { displayName: "QA", cardBackId: "../bad", avatarUrl: "javascript:bad" }, now), /invalid_profile/);
+});
+test("approved emotes expire by server time and are rate-limited per player", () => {
+  const state = executeMatchIntent("sendEmoji", playing(), [], "a", "a", { emoji: "👑" }, now).state;
+  assert.equal((state.playerEmojis as Record<string, string>).a, "👑");
+  assert.equal((state.playerEmojiExpiresAt as Record<string, string>).a, new Date(now + 3000).toISOString());
+  assert.throws(() => executeMatchIntent("sendEmoji", state, [], "a", "a", { emoji: "😂" }, now + 999), /emoji_rate_limited/);
+  assert.equal((executeMatchIntent("sendEmoji", state, [], "a", "a", { emoji: "😂" }, now + 1000).state.playerEmojis as Record<string, string>).a, "😂");
+  assert.throws(() => executeMatchIntent("sendEmoji", state, [], "a", "a", { emoji: "untrusted text" }, now + 3000), /invalid_emoji/);
+});
 function room(): MatchState {
   return { id: "ABC12345", phase: "waitingForPlayers", playerIds: ["a", "b", "c", "d"],
     mode: "classic", timerDurationSeconds: 15, maxPoints: 41, teamAScore: 0, teamBScore: 0 };

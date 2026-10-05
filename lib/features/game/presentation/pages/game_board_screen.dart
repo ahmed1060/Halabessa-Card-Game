@@ -67,7 +67,6 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
     super.initState();
     _confettiController = ConfettiController(duration: const Duration(seconds: 5));
     _applyGameOrientation(ref.read(settingsProvider).gameOrientation);
-    ref.read(localPlayOriginsProvider.notifier).state = {};
     
     final multimedia = ref.read(multimediaServiceProvider);
     final unityVisibility = ref.read(unityLayerVisibilityProvider.notifier);
@@ -79,6 +78,7 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
     // Start Room Music
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      ref.read(localPlayOriginsProvider.notifier).state = {};
       multimedia.playRoomMusic('music/room_music.mp3');
       // Unity is optional. Keep its startup/error screen from covering the
       // Flutter board when the player has disabled 3D mode.
@@ -411,7 +411,8 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
     Widget seat(int offset) {
       final user = _getAvatarUser(ref, state, myUid, offset);
       final active = playing && state.currentTurnIndex == _getAbsoluteIndex(state, myUid, offset);
-      final message = ref.watch(lastMessageForUserProvider(user.uid))?.text ??
+      final chat = ref.watch(lastMessageForUserProvider(user.uid))?.text;
+      final message = chat ??
           _getPlayerEmoji(state, myUid, offset);
       final avatar = TableSeat(
         name: user.uid.startsWith('bot_') ? user.displayName.replaceAll('🤖', '').trim() : user.displayName,
@@ -424,6 +425,7 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
         detail: active ? 'table_playing'.tr() : 'cards_count'.tr(args: [state.cardsRemainingFor(user.uid).toString()]),
         turnStarted: state.turnStartTime, turnSeconds: state.timerDurationSeconds,
         message: message,
+        messageExpiresAt: chat == null ? DateTime.tryParse(state.playerEmojiExpiresAt[user.uid] ?? '') : null,
         hiddenHandCount: offset == 0 ? null : state.cardsRemainingFor(user.uid),
         dealIdentity: '${state.id}-${state.roundCount}-${state.handInRound}-${user.uid}',
         dealerDeckKey: _dealerDeckKey, backBuilder: _cardBack,
@@ -617,7 +619,9 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
     showModalBottomSheet(
       context: context, backgroundColor: TableStyle.ivory, isScrollControlled: true,
       builder: (context) => SafeArea(child: SizedBox(
-        height: MediaQuery.sizeOf(context).height * 0.65,
+        // Phone landscape needs room for a full card plus history controls.
+        height: MediaQuery.sizeOf(context).height *
+            (MediaQuery.sizeOf(context).width > MediaQuery.sizeOf(context).height ? 0.95 : 0.65),
         // Read live state: an open sheet must clear when the next round starts.
         child: Consumer(builder: (context, ref, _) {
           final current = ref.watch(matchStateProvider);

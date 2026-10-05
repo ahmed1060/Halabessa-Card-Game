@@ -12,6 +12,40 @@
 - Keep the approved Lantern Nights visual language and Facebook button visible.
 - Stay on the existing free services; no paid service added.
 
+## Current verification checkpoint — 5 October 2026
+
+The batch notes below record incremental implementation history, not current
+release certification. The server-command controller, private-hand rules and
+exactly-once reward settlement are implemented and tested. Normal production
+room creation remains on the legacy protocol until the staged UI migration
+has completed; `HALABESSA_SERVER_MATCHES=true` enables server rooms for QA.
+
+- Current regression gates: 265 Flutter tests and 80 backend tests pass.
+- Previous published commit `db1cf200` passed Android, iOS and Hosting CI.
+  The iOS artifact is unsigned, not an App Store-ready signed release.
+- Private browser QA entered a server room, filled bots, dealt successive
+  hands, accepted card-center taps, showed current-round capture history,
+  and retained the orientation preference across settings visits.
+- Browser QA exposed a Riverpod write during widget construction. Moving
+  the animation-origin reset to the mounted post-frame callback fixes startup.
+- Landscape capture-history height now accommodates full card faces and
+  controls. RTL physical seats remain stable in the tested viewport.
+- Server reactions/profile presentation use caller-scoped commands, never
+  client whole-match writes. Reactions expire locally after three seconds.
+  Cosmetic validation is not proof of purchase entitlement.
+
+Remaining release gates: complete staged browser results/rematch/recovery
+verification before enabling normal server rooms; real iPhone/Safari rotation
+and touch checks; successful Google/Facebook sign-in on web and Android with
+owner provider configuration, native Facebook credentials and stable Android
+certificate fingerprints. These cannot be certified by layout tests alone.
+
+Temporary private browser fixture `KTD16855` and guest
+`iLMjc96TZ9NsZsCW3iQyb26iLI33` still need cleanup. A proposed narrowly scoped
+temporary privileged cleanup endpoint was blocked by safety review and was
+not deployed. Explicit owner approval is pending; no such endpoint is present
+in the committed client or permanent function source.
+
 ## Batch 1 — local engine and lifecycle safety
 
 Implemented; 197 Flutter tests and 15 backend tests pass. Pending release/device verification:

@@ -583,7 +583,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
   }
 
   void _syncProfileWithMatch(MatchState s) {
-    if (_isSpectating || s.usesServerCommands) return;
+    if (_isSpectating) return;
     final user = ref.read(currentUserProvider);
     if (user == null) return;
     
@@ -599,7 +599,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
       skins[myUid] = store.activeCardBackId;
       changed = true;
     }
-    if (avatars[myUid] != user.avatarUrl) {
+    if (avatars[myUid] != (user.avatarUrl ?? '')) {
       avatars[myUid] = user.avatarUrl ?? "";
       changed = true;
     }
@@ -609,6 +609,13 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     }
 
     if (changed) {
+      if (s.usesServerCommands) {
+        unawaited(_sendServerIntent('updateProfile', payload: {
+          'displayName': user.displayName, 'cardBackId': store.activeCardBackId,
+          'avatarUrl': user.avatarUrl ?? '',
+        }));
+        return;
+      }
       _publishState(s.copyWith(
         playerSkins: skins,
         playerAvatars: avatars,
@@ -1187,7 +1194,13 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
   Future<void> sendEmoji(String playerId, String emoji) async {
     final currentState = state;
     if (currentState == null) return;
-    if (currentState.usesServerCommands) return; // Cosmetic intent migration pending.
+    if (_isSpectating) return;
+    if (currentState.usesServerCommands) {
+      if (playerId == ref.read(currentUserProvider)?.uid) {
+        await _sendServerIntent('sendEmoji', payload: {'emoji': emoji});
+      }
+      return;
+    }
     final emojis = Map<String, String>.from(currentState.playerEmojis);
     emojis[playerId] = emoji;
     _multimedia.vibrate();

@@ -1,8 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:halabessa/features/game/presentation/widgets/lantern_controls.dart';
+import 'package:halabessa/features/game/presentation/widgets/table_seat.dart';
 
 void main() {
+  testWidgets('server emote expires without a sender cleanup command', (tester) async {
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: TableSeat(
+      name: 'QA', detail: '4 cards', message: '👑',
+      messageExpiresAt: DateTime.now().add(const Duration(seconds: 3)),
+    ))));
+    expect(find.text('👑'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 4));
+    expect(find.text('👑'), findsNothing);
+    await tester.pumpWidget(const SizedBox());
+    expect(tester.takeException(), isNull);
+  });
   testWidgets('local turn shows remaining deadline and clamps expired turns', (
     tester,
   ) async {
