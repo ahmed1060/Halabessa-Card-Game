@@ -887,8 +887,8 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
       starsLabel: 'stars_label'.tr(), coinsLabel: 'coins_label'.tr(),
       homeLabel: 'return_home'.tr(), replayLabel: 'play_again'.tr(),
       replayLeavesView: offline,
-      onReplay: offline && !spectator ? () async {
-        await ref.read(matchStateProvider.notifier).startOfflinePracticeMatch(
+      onReplay: offline && !spectator ? () {
+        ref.read(matchStateProvider.notifier).startOfflinePracticeMatch(
           user.uid, user.displayName, mode: state.mode, maxPoints: state.maxPoints);
         return true;
       } :
