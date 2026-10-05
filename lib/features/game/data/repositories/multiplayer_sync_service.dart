@@ -7,6 +7,7 @@ import 'package:halabessa/core/services/supabase_backend_service.dart';
 import 'package:halabessa/core/services/idempotent_match_request.dart';
 import 'command_snapshot_stream.dart';
 import '../../domain/models/match_state.dart';
+import '../../domain/logic/online_room_protocol.dart';
 import '../../domain/models/room_summary.dart';
 import '../../domain/models/chat_message.dart';
 import '../../../auth/domain/models/app_user.dart';
@@ -81,8 +82,8 @@ class MultiplayerSyncService {
       'timerDurationSeconds': matchState.timerDurationSeconds,
       'isPublic': matchState.isPublic,
       'displayName': matchState.playerNames.isEmpty ? '' : matchState.playerNames.values.first,
-      // QA builds opt in; production activation follows end-to-end verification.
-      if (const bool.fromEnvironment('HALABESSA_SERVER_MATCHES')) 'protocolVersion': 1,
+      // Creation policy never rewrites an existing room's saved protocol.
+      'protocolVersion': newOnlineRoomProtocol,
       'cardBackId': matchState.playerSkins.isEmpty ? '' : matchState.playerSkins.values.first,
       'avatarUrl': matchState.playerAvatars.isEmpty ? '' : matchState.playerAvatars.values.first,
     });

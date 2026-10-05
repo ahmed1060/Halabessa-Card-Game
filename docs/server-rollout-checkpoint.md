@@ -1,6 +1,6 @@
 # Server-controlled room rollout — 5 October 2026
 
-Activation is prepared locally but is NOT published yet. New online rooms will
+Live activation gates passed; the creation-policy change is ready to publish. New online rooms will
 request protocol 1 by default. Existing rooms retain their saved protocol, and
 offline training remains local. An emergency rebuild can set
 `HALABESSA_SERVER_MATCHES=false`; this affects new rooms only, not active rooms.
@@ -35,16 +35,24 @@ Verified for this checkpoint:
   Lobby joining exposed a second race: disappearance of the availability tile
   disposed its context before navigation. Route-level navigation handles now
   survive that removal; a widget regression test verifies this sequence.
+- A subsequent live leave and lobby-button join opened /game successfully,
+  restoring the same seat, remaining hand, round 2 and score 1–5.
 - Best-effort presence operations now handle permission failures after server
   membership revocation without producing unhandled asynchronous exceptions.
 - Previous Hosting, Android and iOS runs for 39612c9d all completed successfully.
+- Recovery fixes were pushed as 7b70897e; Hosting run 37308599832 succeeded.
+  Android 37308599816 and iOS 37308599775 were still running at the last check.
+- Supabase revision 25 was read back and all 13 deployed files matched the
+  local deployment payload. Security advisors returned no findings afterward.
+- User approved lowering only QFP39484's target from 21 to 7 to finish the
+  live test. Scores stayed intact. Normal gameplay reached results at 12–6;
+  the human's Yes replay vote was accepted within the ten-second window.
+  The same room reset both scores to zero, advanced matchSequence to 1 and
+  dealt a new round. The QA target was then restored to 21.
 
 Remaining activation gates:
 
-1. Verify accepted live replay/new match sequence through normal gameplay.
-2. Verify the corrected lobby navigation path in the live UI; the seat claim
-   itself and public listing availability have already been verified.
-3. Publish the creation-policy change and verify deployment plus normal room
+1. Publish the creation-policy change and verify deployment plus normal room
    creation (without the QA build flag).
 
 No user accounts, balances, or non-QA match data were reset or deleted.
