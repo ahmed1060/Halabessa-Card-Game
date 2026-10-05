@@ -1,6 +1,6 @@
 # Server-controlled room rollout — 5 October 2026
 
-Live activation gates passed; the creation-policy change is ready to publish. New online rooms will
+Live activation gates passed; the creation-policy change was pushed as 223262d5. New online rooms will
 request protocol 1 by default. Existing rooms retain their saved protocol, and
 offline training remains local. An emergency rebuild can set
 `HALABESSA_SERVER_MATCHES=false`; this affects new rooms only, not active rooms.
@@ -49,6 +49,10 @@ Verified for this checkpoint:
   the human's Yes replay vote was accepted within the ten-second window.
   The same room reset both scores to zero, advanced matchSequence to 1 and
   dealt a new round. The QA target was then restored to 21.
+- Final review extended unattended recovery to pre-round cut, deal and capture
+  phases, preserving their existing phase. Scoring, voting and results remain
+  excluded to protect the settlement roster. Eight targeted Flutter tests and
+  all 89 backend tests passed; this backend is deployed as revision 26.
 
 Remaining activation gates:
 

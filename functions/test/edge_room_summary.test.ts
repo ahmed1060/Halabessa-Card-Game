@@ -35,6 +35,22 @@ test("unattended public room advertises its released active seat for recovery", 
   assert.equal(joined.seatIndex, 2);
   assert.equal(roomSummary(joined.state).safeReplacementSeatCount, 0);
 });
+
+test("unattended animation and preparation vacancies recover without opening voting or results", () => {
+  const base = { ...room(), playerIds: ["bot_1", "bot_2", "bot_3_replacement_7", "bot_4"], currentTurnIndex: 2 };
+  for (const phase of ["preRoundCut", "dealingFasha", "dealingCards", "capturing"]) {
+    const s = { ...base, phase };
+    assert.equal(roomSummary(s).safeReplacementSeatCount, 1);
+    const joined = joinCommandRoom(s, "new", profile, now);
+    assert.equal(joined.state.phase, phase);
+    assert.equal(joined.state.handCards!.new.length, 1);
+    assert.equal(roomSummary(joined.state).replacementSeatCount, 0);
+  }
+  for (const phase of ["roundScoring", "shuffleVoting", "rematchVoting", "matchOver"]) {
+    assert.equal(roomSummary({ ...base, phase }).replacementSeatCount, 0);
+    assert.throws(() => joinCommandRoom({ ...base, phase }, "new", profile, now), /no_safe_replacement_seat/);
+  }
+});
 test("private, legacy and non-playing rooms do not advertise replacements", () => {
   for (const changed of [{ isPublic: false }, { protocolVersion: 0 },
     { protocolVersion: 2 }, { phase: "capturing" }, { phase: "matchOver" }]) {

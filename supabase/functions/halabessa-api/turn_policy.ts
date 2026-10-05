@@ -130,7 +130,7 @@ export function replacementSeatIndex(state: MatchState) {
 }
 
 export function replacementSeatIndices(state: MatchState) {
-  if (!state.isPublic || state.phase !== "playing") return [];
+  if (!state.isPublic || !replacementPhaseAvailable(state)) return [];
   const released = record<unknown>(state.releasedSeats);
   // An all-bot room has no human who can request advances. Permit recovery of
   // its explicitly released active seat under the same room transaction lock.
@@ -138,4 +138,13 @@ export function replacementSeatIndices(state: MatchState) {
   const unattended = ids.length === 4 && ids.every(uid => uid.startsWith("bot_"));
   return ids.flatMap((uid, index) =>
     uid.startsWith("bot_") && uid in released && (unattended || index !== Number(state.currentTurnIndex)) ? [index] : []);
+}
+
+/** Only live preparation/animation phases may recover an unattended room.
+ * Voting, scoring and results are excluded to avoid joining a settled roster. */
+export function replacementPhaseAvailable(state: MatchState) {
+  if (state.phase === "playing") return true;
+  const ids = state.playerIds ?? [];
+  return ids.length === 4 && ids.every(uid => uid.startsWith("bot_")) &&
+    ["preRoundCut", "dealingFasha", "dealingCards", "capturing"].includes(String(state.phase));
 }

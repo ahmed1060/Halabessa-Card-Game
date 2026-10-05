@@ -25,6 +25,16 @@ void main() {
     expect(s.isVisiblePublic(now), false);
     expect(s.isJoinable(now), false);
   });
+  test('unattended live animations advertise recovery but results do not', () {
+    final bots = ['bot_1', 'bot_2', 'bot_replacement_2', 'bot_4'];
+    for (final phase in ['preRoundCut', 'dealingFasha', 'dealingCards', 'capturing']) {
+      expect(summary({'playerIds': bots, 'phase': phase}).isJoinable(now), true);
+      expect(summary({'phase': phase}).isJoinable(now), false);
+    }
+    for (final phase in ['roundScoring', 'shuffleVoting', 'rematchVoting', 'matchOver']) {
+      expect(summary({'playerIds': bots, 'phase': phase}).isJoinable(now), false);
+    }
+  });
   test('private, expired, legacy and results rooms cannot advertise a replacement', () {
     for (final changes in [
       {'isPublic': false}, {'expireAt': now.toIso8601String()},

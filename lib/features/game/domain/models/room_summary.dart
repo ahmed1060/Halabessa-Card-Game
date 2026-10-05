@@ -20,7 +20,10 @@ class RoomSummary {
   int get openSeatCount => phase == GamePhase.waitingForPlayers
       ? playerIds.where((id) => id.startsWith('waiting_')).length : replacementSeatCount;
   bool get isActiveReplacementRoom => protocolVersion == 1 &&
-      phase == GamePhase.playing && replacementSeatCount > 0;
+      (phase == GamePhase.playing ||
+        (playerIds.length == 4 && playerIds.every((id) => id.startsWith('bot_')) &&
+          [GamePhase.preRoundCut, GamePhase.dealingFasha, GamePhase.dealingCards,
+            GamePhase.capturing].contains(phase))) && replacementSeatCount > 0;
   bool isVisiblePublic(DateTime now) => isPublic &&
       (expireAt == null || expireAt!.isAfter(now)) &&
       (phase == GamePhase.waitingForPlayers || isActiveReplacementRoom);
