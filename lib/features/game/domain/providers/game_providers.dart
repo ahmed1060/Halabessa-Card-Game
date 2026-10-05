@@ -428,7 +428,13 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
           _applyForfeitPenalty(currentUser.uid);
         }
         
-        ref.read(multiplayerSyncServiceProvider).removePresence(lastBoundMatchId!, currentUser.uid);
+        // Server leave revokes membership before this best-effort mirror
+        // cleanup. A denied cleanup must not become an unhandled async error.
+        unawaited(ref.read(multiplayerSyncServiceProvider)
+            .removePresence(lastBoundMatchId!, currentUser.uid)
+            .catchError((Object error) {
+          if (kDebugMode) debugPrint('Presence cleanup unavailable: $error');
+        }));
       }
     }
     _matchListener?.cancel();
@@ -562,7 +568,10 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     // Initial Sync
     final currentUser = ref.read(currentUserProvider);
     if (currentUser != null && !spectating) {
-      ref.read(multiplayerSyncServiceProvider).syncPresence(matchId, currentUser.uid);
+      unawaited(ref.read(multiplayerSyncServiceProvider)
+          .syncPresence(matchId, currentUser.uid).catchError((Object error) {
+        if (kDebugMode) debugPrint('Presence sync unavailable: $error');
+      }));
     }
     
     // Listen for Store/Auth changes to sync profile real-time

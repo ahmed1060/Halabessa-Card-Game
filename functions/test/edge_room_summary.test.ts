@@ -27,6 +27,14 @@ test("active replacement turn retains listing but exposes no safe claim", () => 
   assert.equal(roomSummary(s).safeReplacementSeatCount, 0);
   assert.throws(() => joinCommandRoom(s, "new", profile, now), /no_safe_replacement_seat/);
 });
+
+test("unattended public room advertises its released active seat for recovery", () => {
+  const s = { ...room(), playerIds: ["bot_1", "bot_2", "bot_3_replacement_7", "bot_4"], currentTurnIndex: 2 };
+  assert.equal(roomSummary(s).safeReplacementSeatCount, 1);
+  const joined = joinCommandRoom(s, "new", profile, now);
+  assert.equal(joined.seatIndex, 2);
+  assert.equal(roomSummary(joined.state).safeReplacementSeatCount, 0);
+});
 test("private, legacy and non-playing rooms do not advertise replacements", () => {
   for (const changed of [{ isPublic: false }, { protocolVersion: 0 },
     { protocolVersion: 2 }, { phase: "capturing" }, { phase: "matchOver" }]) {

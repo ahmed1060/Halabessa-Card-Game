@@ -88,18 +88,24 @@ class PublicRoomsList extends ConsumerWidget {
                             ElevatedButton(
                               onPressed: isFull ? null : () async {
                                 if (currentUser != null) {
+                                  // A successful join removes this room from the
+                                  // availability stream before the request returns.
+                                  // Keep route-level handles, not the removed tile's
+                                  // BuildContext, across that asynchronous boundary.
+                                  final navigator = Navigator.of(context);
+                                  final messenger = ScaffoldMessenger.of(context);
                                   try {
                                     await ref.read(matchStateProvider.notifier).joinMatch(
                                       match.id, 
                                       currentUser.uid, 
                                       currentUser.displayName
                                     );
-                                    if (context.mounted) {
-                                      Navigator.pushNamed(context, '/game');
+                                    if (navigator.mounted) {
+                                      navigator.pushNamed('/game');
                                     }
                                   } catch (e) {
-                                    if (context.mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
+                                    if (messenger.mounted) {
+                                      messenger.showSnackBar(
                                         SnackBar(content: Text(ErrorHandler.getAuthErrorMessage(e))),
                                       );
                                     }

@@ -17,6 +17,11 @@ export function joinCommandRoom(state: MatchState, uid: string, profile: Profile
   if (typeof state.expireAt === "string" && Date.parse(state.expireAt) <= now) throw new Error("room_not_joinable");
   if (state.phase !== "waitingForPlayers") {
     const next = claimReplacement(state, uid, profile);
+    // Recovery must give the incoming active human a full turn, not inherit
+    // an expired bot timestamp and immediately incur a timeout.
+    if (next.playerIds!.indexOf(uid) === Number(next.currentTurnIndex)) {
+      next.turnStartTime = new Date(now).toISOString();
+    }
     return { state: next, seatIndex: next.playerIds!.indexOf(uid), alreadyJoined: false };
   }
   const seat = waitingSeatIndex(ids);

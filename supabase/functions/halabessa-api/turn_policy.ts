@@ -132,6 +132,10 @@ export function replacementSeatIndex(state: MatchState) {
 export function replacementSeatIndices(state: MatchState) {
   if (!state.isPublic || state.phase !== "playing") return [];
   const released = record<unknown>(state.releasedSeats);
-  return (state.playerIds ?? []).flatMap((uid, index) =>
-    uid.startsWith("bot_") && uid in released && index !== Number(state.currentTurnIndex) ? [index] : []);
+  // An all-bot room has no human who can request advances. Permit recovery of
+  // its explicitly released active seat under the same room transaction lock.
+  const ids = state.playerIds ?? [];
+  const unattended = ids.length === 4 && ids.every(uid => uid.startsWith("bot_"));
+  return ids.flatMap((uid, index) =>
+    uid.startsWith("bot_") && uid in released && (unattended || index !== Number(state.currentTurnIndex)) ? [index] : []);
 }
