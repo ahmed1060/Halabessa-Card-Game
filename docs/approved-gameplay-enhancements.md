@@ -57,6 +57,13 @@ Regression tests cover pending exit, failed exit, failed replay and vote retry.
 The retained private QA room completed a round and recovered after browser
 reload; full-match results/replay browser verification still remains.
 
+Landscape results now use a compact two-column summary/score/action layout.
+Normal-text replay and home controls fit without scrolling at 667x375,
+844x390 and 932x430 with simulated safe areas, in both RTL and LTR.
+Portrait and enlarged-text views retain the scrollable stacked layout rather
+than shrinking text or touch targets. These are automated layout/tap checks,
+not a claim of physical iPhone/Safari or final mockup pixel-equivalence.
+
 ## Batch 1 — local engine and lifecycle safety
 
 Implemented; 197 Flutter tests and 15 backend tests pass. Pending release/device verification:

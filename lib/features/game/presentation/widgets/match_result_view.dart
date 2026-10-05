@@ -58,11 +58,17 @@ class _MatchResultViewState extends State<MatchResultView> {
     try {
       final accepted = await widget.onReplay!();
       if (!accepted && mounted) {
-        setState(() { _replayRequested = false; _leaving = false; });
+        setState(() {
+          _replayRequested = false;
+          _leaving = false;
+        });
       }
     } catch (_) {
       if (mounted) {
-        setState(() { _replayRequested = false; _leaving = false; });
+        setState(() {
+          _replayRequested = false;
+          _leaving = false;
+        });
       }
     }
   }
@@ -70,136 +76,170 @@ class _MatchResultViewState extends State<MatchResultView> {
   @override
   Widget build(BuildContext context) => PopScope(
     canPop: false,
-    onPopInvoked: (didPop) {
+    onPopInvokedWithResult: (didPop, result) {
       if (!didPop) _home();
     },
     child: LanternPageFrame(
       child: Scaffold(
         backgroundColor: Colors.transparent,
         body: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 440),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const LanternWordmark(),
-                    const SizedBox(height: 24),
-                    const Icon(
-                      Icons.emoji_events_rounded,
-                      size: 52,
-                      color: TableStyle.brass,
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      widget.title,
-                      textAlign: TextAlign.center,
-                      style: TableStyle.label.copyWith(
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                        color: TableStyle.brass,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      widget.subtitle,
-                      textAlign: TextAlign.center,
-                      style: TableStyle.label,
-                    ),
-                    const SizedBox(height: 24),
-                    _score(
-                      widget.firstTeam,
-                      widget.firstScore,
-                      const Color(0xFF78D2AF),
-                    ),
-                    const SizedBox(height: 8),
-                    _score(
-                      widget.secondTeam,
-                      widget.secondScore,
-                      const Color(0xFFED767A),
-                    ),
-                    const SizedBox(height: 24),
-                    Wrap(
-                      alignment: WrapAlignment.center,
-                      spacing: 24,
-                      runSpacing: 12,
-                      children: [
-                        _reward(
-                          Icons.star_rounded,
-                          widget.starsLabel,
-                          widget.stars,
-                        ),
-                        _reward(
-                          Icons.monetization_on_rounded,
-                          widget.coinsLabel,
-                          widget.coins,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 28),
-                    if (widget.onReplay != null) ...[
-                      FilledButton(
-                        style: FilledButton.styleFrom(
-                          backgroundColor: TableStyle.brass,
-                          foregroundColor: TableStyle.ink,
-                          minimumSize: const Size(48, 52),
-                        ),
-                        onPressed: _leaving || _replayRequested ? null : _replay,
-                        child: Text(widget.replayLabel),
-                      ),
-                      const SizedBox(height: 10),
-                    ],
-                    OutlinedButton(
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: TableStyle.ivory,
-                        minimumSize: const Size(48, 52),
-                      ),
-                      onPressed: _leaving ? null : _home,
-                      child: Text(widget.homeLabel),
-                    ),
-                  ],
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final compact =
+                  constraints.maxWidth >= 560 &&
+                  constraints.maxHeight < 600 &&
+                  MediaQuery.textScalerOf(context).scale(14) <= 20;
+              return Center(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(20),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: compact ? 880 : 440),
+                    child: compact
+                        ? Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              Expanded(child: _summary(compact: true)),
+                              const SizedBox(width: 32),
+                              Expanded(child: _details(compact: true)),
+                            ],
+                          )
+                        : Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              _summary(),
+                              const SizedBox(height: 24),
+                              _details(),
+                            ],
+                          ),
+                  ),
                 ),
-              ),
-            ),
+              );
+            },
           ),
         ),
       ),
     ),
   );
 
-  Widget _score(String label, int score, Color color) => Semantics(
-    label: '$label: $score',
-    excludeSemantics: true,
-    child: Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(20),
+  Widget _summary({bool compact = false}) => Column(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      SizedBox(
+        height: compact ? 56 : 80,
+        child: const FittedBox(child: LanternWordmark()),
       ),
-      child: Text.rich(
-        TextSpan(
-          children: [
-            TextSpan(
-              text: '$label  ',
-              style: TableStyle.label.copyWith(color: TableStyle.ink),
-            ),
-            TextSpan(
-              text: '$score',
-              style: TableStyle.label.copyWith(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: TableStyle.ink,
-              ),
-            ),
-          ],
-        ),
+      SizedBox(height: compact ? 12 : 24),
+      Icon(
+        Icons.emoji_events_rounded,
+        size: compact ? 42 : 52,
+        color: TableStyle.brass,
+      ),
+      const SizedBox(height: 12),
+      Text(
+        widget.title,
         textAlign: TextAlign.center,
+        style: TableStyle.label.copyWith(
+          fontSize: 28,
+          fontWeight: FontWeight.bold,
+          color: TableStyle.brass,
+        ),
       ),
-    ),
+      const SizedBox(height: 8),
+      Text(
+        widget.subtitle,
+        textAlign: TextAlign.center,
+        style: TableStyle.label,
+      ),
+    ],
   );
+
+  Widget _details({bool compact = false}) => Column(
+    mainAxisSize: MainAxisSize.min,
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      _score(
+        widget.firstTeam,
+        widget.firstScore,
+        TableStyle.mint,
+        compact: compact,
+      ),
+      const SizedBox(height: 8),
+      _score(
+        widget.secondTeam,
+        widget.secondScore,
+        TableStyle.red,
+        compact: compact,
+      ),
+      SizedBox(height: compact ? 12 : 16),
+      Wrap(
+        alignment: WrapAlignment.center,
+        spacing: 24,
+        runSpacing: 12,
+        children: [
+          _reward(Icons.star_rounded, widget.starsLabel, widget.stars),
+          _reward(
+            Icons.monetization_on_rounded,
+            widget.coinsLabel,
+            widget.coins,
+          ),
+        ],
+      ),
+      SizedBox(height: compact ? 12 : 20),
+      if (widget.onReplay != null) ...[
+        FilledButton(
+          style: FilledButton.styleFrom(
+            backgroundColor: TableStyle.brass,
+            foregroundColor: TableStyle.ink,
+            minimumSize: const Size(48, 52),
+          ),
+          onPressed: _leaving || _replayRequested ? null : _replay,
+          child: Text(widget.replayLabel),
+        ),
+        const SizedBox(height: 10),
+      ],
+      OutlinedButton(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: TableStyle.ivory,
+          minimumSize: const Size(48, 52),
+        ),
+        onPressed: _leaving ? null : _home,
+        child: Text(widget.homeLabel),
+      ),
+    ],
+  );
+
+  Widget _score(String label, int score, Color color, {bool compact = false}) =>
+      Semantics(
+        label: '$label: $score',
+        excludeSemantics: true,
+        child: Container(
+          padding: EdgeInsets.all(compact ? 12 : 16),
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Text.rich(
+            TextSpan(
+              children: [
+                TextSpan(
+                  text: '$label  ',
+                  style: TableStyle.label.copyWith(color: TableStyle.ink),
+                ),
+                TextSpan(
+                  text: '$score',
+                  style: TableStyle.label.copyWith(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: TableStyle.ink,
+                  ),
+                ),
+              ],
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ),
+      );
   Widget _reward(IconData icon, String label, int value) => Semantics(
     label: '$label: $value',
     excludeSemantics: true,
