@@ -2,8 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'table_style.dart';
 import 'match_table_layout.dart';
-import 'lantern_card_art.dart';
-import '../../domain/models/card.dart' as game;
+import '../../../../core/widgets/lantern_card_fan.dart';
 import '../../../../core/widgets/lantern_page_frame.dart';
 
 /// Starts one recovery attempt per mounted identity, never from a build loop.
@@ -16,6 +15,7 @@ class MatchRecoveryView extends StatefulWidget {
       retryLabel,
       exitLabel;
   final Duration timeout;
+  final bool terminal;
   const MatchRecoveryView({
     super.key,
     required this.onRetry,
@@ -26,6 +26,7 @@ class MatchRecoveryView extends StatefulWidget {
     required this.retryLabel,
     required this.exitLabel,
     this.timeout = const Duration(seconds: 8),
+    this.terminal = false,
   });
   @override
   State<MatchRecoveryView> createState() => _MatchRecoveryViewState();
@@ -38,6 +39,10 @@ class _MatchRecoveryViewState extends State<MatchRecoveryView> {
   @override
   void initState() {
     super.initState();
+    if (widget.terminal) {
+      _pending = false;
+      return;
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _recover();
     });
@@ -58,6 +63,10 @@ class _MatchRecoveryViewState extends State<MatchRecoveryView> {
     });
     try {
       await widget.onRetry?.call();
+      if (widget.terminal && mounted && attempt == _attempt) {
+        _timeout?.cancel();
+        setState(() => _pending = false);
+      }
       // Binding a stream is not confirmation that a match loaded. The parent
       // removes this view only when it has both the profile and match state.
     } catch (_) {
@@ -83,12 +92,7 @@ class _MatchRecoveryViewState extends State<MatchRecoveryView> {
                 children: [
                   const LanternWordmark(),
                   const SizedBox(height: 32),
-                  const LanternCardArt(
-                    card: game.Card(game.Suit.spades, game.Rank.ace),
-                    faceUp: false,
-                    width: 76,
-                    height: 110,
-                  ),
+                  const LanternCardFan(),
                   const SizedBox(height: 24),
                   if (_pending)
                     const Padding(
@@ -116,12 +120,23 @@ class _MatchRecoveryViewState extends State<MatchRecoveryView> {
                     alignment: WrapAlignment.center,
                     children: [
                       FilledButton(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: TableStyle.mint,
+                          foregroundColor: TableStyle.ink,
+                          minimumSize: const Size(140, 52),
+                        ),
                         onPressed: _pending || widget.onRetry == null
                             ? null
                             : _recover,
                         child: Text(widget.retryLabel),
                       ),
                       OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          backgroundColor: TableStyle.ink,
+                          foregroundColor: TableStyle.ivory,
+                          side: const BorderSide(color: TableStyle.mint),
+                          minimumSize: const Size(140, 52),
+                        ),
                         onPressed: widget.onExit,
                         child: Text(widget.exitLabel),
                       ),

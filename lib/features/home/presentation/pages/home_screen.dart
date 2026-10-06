@@ -1,5 +1,7 @@
 import 'package:halabessa/features/game/presentation/widgets/match_table_layout.dart';
 import 'package:halabessa/core/widgets/lantern_page_frame.dart';
+import 'package:halabessa/core/widgets/lantern_navigation_dock.dart';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easy_localization/easy_localization.dart';
@@ -8,6 +10,7 @@ import 'package:halabessa/features/auth/presentation/providers/auth_providers.da
 import 'package:halabessa/features/game/domain/providers/game_providers.dart';
 import 'package:halabessa/features/game/domain/models/bot_difficulty.dart';
 import 'package:halabessa/features/home/presentation/widgets/public_rooms_list.dart';
+import '../widgets/practice_difficulty_dialog.dart';
 import 'package:halabessa/features/auth/presentation/widgets/social_overlay.dart'
     as social_ui;
 import 'package:halabessa/core/widgets/settings_overlay.dart';
@@ -23,7 +26,8 @@ import 'package:halabessa/core/services/daily_streak_service.dart';
 import 'package:halabessa/features/home/presentation/widgets/daily_streak_dialog.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
-  const HomeScreen({super.key});
+  final bool playFocus;
+  const HomeScreen({super.key, this.playFocus = false});
 
   @override
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
@@ -67,6 +71,42 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     ),
                   ],
                 ),
+          bottom: user == null
+              ? null
+              : PreferredSize(
+                  preferredSize: const Size.fromHeight(32),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                    child: Row(
+                      children: [
+                        Text(
+                          'level_label'.tr(args: [user.level.toString()]),
+                          style: TableStyle.detail.copyWith(
+                            color: TableStyle.brass,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: LinearProgressIndicator(
+                              value: (user.points % 1000) / 1000,
+                              minHeight: 8,
+                              color: TableStyle.brass,
+                              backgroundColor: TableStyle.felt,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          '${user.points % 1000}/1000',
+                          textDirection: ui.TextDirection.ltr,
+                          style: TableStyle.detail,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
           actions: [
             IconButton(
               tooltip: 'settings'.tr(),
@@ -84,6 +124,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               onPressed: () => Navigator.pushNamed(context, '/profile'),
             ),
           ],
+        ),
+        bottomNavigationBar: LanternNavigationDock(
+          selected: widget.playFocus
+              ? LanternDestination.play
+              : LanternDestination.home,
         ),
         body: SafeArea(
           child: SingleChildScrollView(
@@ -126,18 +171,25 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    Material(
-                      color: TableStyle.ink,
-                      borderRadius: BorderRadius.circular(18),
-                      child: ExpansionTile(
-                        title: Text('join_room'.tr(), style: TableStyle.label),
-                        leading: const Icon(
-                          Icons.login_rounded,
-                          color: TableStyle.ivory,
-                        ),
-                        childrenPadding: const EdgeInsets.all(12),
-                        children: [_buildJoinCodeBar(context, user)],
+                    OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        backgroundColor: TableStyle.ink,
+                        foregroundColor: TableStyle.ivory,
+                        minimumSize: const Size.fromHeight(58),
+                        side: const BorderSide(color: TableStyle.mint),
                       ),
+                      icon: const Icon(Icons.login_rounded),
+                      label: Text('join_room'.tr(), style: TableStyle.label),
+                      onPressed: user == null
+                          ? null
+                          : () => showModalBottomSheet(
+                              context: context,
+                              isScrollControlled: true,
+                              backgroundColor: Colors.transparent,
+                              builder: (_) => RoomEntrySheet(
+                                child: _buildJoinCodeBar(context, user),
+                              ),
+                            ),
                     ),
                     const SizedBox(height: 20),
                     Wrap(
@@ -317,7 +369,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           onJoin: (code) => ref
               .read(matchStateProvider.notifier)
               .joinMatch(code, user?.uid ?? '', user?.displayName ?? ''),
-          onJoined: () => Navigator.pushNamed(context, '/game'),
+          onJoined: () {
+            final navigator = Navigator.of(context);
+            navigator.pop();
+            navigator.pushNamed('/game');
+          },
         ),
       ),
     );
@@ -351,17 +407,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Future<void> _startOfflinePractice(BuildContext context, dynamic user) async {
-    final difficulty = await showDialog<BotDifficulty>(context: context, builder: (context) => AlertDialog(
-      backgroundColor: TableStyle.ink,
-      title: Text('training_difficulty'.tr(), style: TableStyle.label),
-      content: Column(mainAxisSize: MainAxisSize.min, children: [
-        for (final level in BotDifficulty.values) ListTile(
-          title: Text('bot_difficulty_${level.name}'.tr(), style: TableStyle.label),
-          subtitle: Text('bot_strategy_${level.name}'.tr(), style: TableStyle.label.copyWith(fontSize: 13)),
-          onTap: () => Navigator.pop(context, level),
-        ),
-      ]),
-    ));
+    final difficulty = await showDialog<BotDifficulty>(
+      context: context,
+      builder: (_) => const PracticeDifficultyDialog(),
+    );
     if (difficulty == null || !context.mounted) return;
     ref
         .read(matchStateProvider.notifier)

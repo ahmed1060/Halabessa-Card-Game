@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:halabessa/features/game/domain/models/match_state.dart';
 import 'package:halabessa/features/game/presentation/widgets/table_style.dart';
 import 'room_entry_errors.dart';
+import '../../../../core/widgets/lantern_card_fan.dart';
 
 class RoomCreationConfig {
   final GameMode mode;
@@ -129,7 +130,19 @@ class _RoomCreationFormState extends State<RoomCreationForm> {
         color: selected ? TableStyle.ink : TableStyle.ivory,
       ),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      label: Text(label),
+      label: value is GameMode
+          ? Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(
+                  width: 112,
+                  height: 76,
+                  child: FittedBox(child: LanternCardFan()),
+                ),
+                Text(label),
+              ],
+            )
+          : Text(label),
       onSelected: _pending ? null : (_) => setState(() => onSelected(value)),
     );
   }

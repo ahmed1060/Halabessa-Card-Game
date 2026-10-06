@@ -5,21 +5,27 @@ import '../../features/game/presentation/widgets/table_style.dart';
 class LanternPanel extends StatelessWidget {
   final Widget child;
   final bool selected;
+  final bool dark;
   final EdgeInsetsGeometry padding;
   const LanternPanel({
     super.key,
     required this.child,
     this.selected = false,
+    this.dark = false,
     this.padding = EdgeInsets.zero,
   });
 
   @override
   Widget build(BuildContext context) => DecoratedBox(
     decoration: BoxDecoration(
-      color: TableStyle.ivory,
+      color: dark ? TableStyle.ink : TableStyle.ivory,
       borderRadius: BorderRadius.circular(20),
       border: Border.all(
-        color: selected ? TableStyle.brass : TableStyle.ink,
+        color: selected
+            ? TableStyle.brass
+            : dark
+            ? TableStyle.muted
+            : TableStyle.ink,
         width: selected ? 2 : 1,
       ),
       boxShadow: const [

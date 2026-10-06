@@ -63,7 +63,8 @@ class _TableSeatState extends State<TableSeat> {
     if (oldWidget.active != widget.active ||
         oldWidget.turnStarted != widget.turnStarted ||
         oldWidget.turnSeconds != widget.turnSeconds ||
-        oldWidget.messageExpiresAt != widget.messageExpiresAt || oldWidget.message != widget.message) {
+        oldWidget.messageExpiresAt != widget.messageExpiresAt ||
+        oldWidget.message != widget.message) {
       _updateClock();
     }
   }
@@ -99,6 +100,9 @@ class _TableSeatState extends State<TableSeat> {
     final fallback =
         widget.portraitAsset ?? 'assets/images/avatars/lantern_partner_v1.png';
     final line = 16.0 * MediaQuery.textScalerOf(context).scale(12) / 12;
+    final viewport = MediaQuery.sizeOf(context);
+    final compact =
+        viewport.width > viewport.height && viewport.height < 500 && line <= 18;
     final remaining = widget.turnStarted == null || widget.turnSeconds <= 0
         ? 0.0
         : (1 -
@@ -109,7 +113,7 @@ class _TableSeatState extends State<TableSeat> {
               .clamp(0.0, 1.0);
     return SizedBox(
       width: 110,
-      height: 110 + 4 * line,
+      height: compact ? 146 : 110 + 4 * line,
       child: Tooltip(
         message: [
           widget.name,
@@ -198,7 +202,11 @@ class _TableSeatState extends State<TableSeat> {
                       padding: const EdgeInsets.symmetric(horizontal: 5),
                       decoration: BoxDecoration(
                         color: TableStyle.ink,
-                        border: Border.all(color: widget.accent),
+                        border: Border.all(
+                          color: compact && widget.dealerLabel != null
+                              ? TableStyle.brass
+                              : widget.accent,
+                        ),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
@@ -212,8 +220,8 @@ class _TableSeatState extends State<TableSeat> {
                       ),
                     ),
                     SizedBox(
-                      height: line,
-                      child: widget.dealerLabel == null
+                      height: compact ? 0 : line,
+                      child: compact || widget.dealerLabel == null
                           ? const SizedBox.shrink()
                           : Container(
                               padding: const EdgeInsets.symmetric(
@@ -235,7 +243,7 @@ class _TableSeatState extends State<TableSeat> {
                             ),
                     ),
                     SizedBox(
-                      height: 26 + line,
+                      height: compact ? 28 : 26 + line,
                       child: widget.hiddenHandCount == null
                           ? Text(
                               widget.detail,

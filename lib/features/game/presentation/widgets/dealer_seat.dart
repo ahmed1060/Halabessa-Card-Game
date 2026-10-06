@@ -7,6 +7,7 @@ class DealerSeat extends StatelessWidget {
   final Widget seat;
   final bool isDealer;
   final bool compact;
+  final bool deckOnLeft;
   final int remaining;
   final String label;
   final GlobalKey? deckKey;
@@ -20,12 +21,13 @@ class DealerSeat extends StatelessWidget {
     required this.backBuilder,
     this.deckKey,
     this.compact = false,
+    this.deckOnLeft = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final deck = SizedBox(
-      width: 64,
+      width: compact ? 44 : 64,
       child: isDealer
           ? Semantics(
               label: '$label: $remaining',
@@ -36,8 +38,8 @@ class DealerSeat extends StatelessWidget {
                     key: deckKey,
                     count: remaining,
                     backBuilder: backBuilder,
-                    width: compact ? 30 : 38,
-                    height: compact ? 42 : 54,
+                    width: compact ? 30 : 46,
+                    height: compact ? 42 : 66,
                   ),
                   Text(
                     '$remaining',
@@ -53,9 +55,23 @@ class DealerSeat extends StatelessWidget {
             )
           : const SizedBox(height: 84),
     );
-    // Side seats use a vertical layout to keep the central table clear on a phone.
+    // A side dealer's deck sits beside the avatar, toward the table. Its
+    // reserved physical side does not mirror when the reading direction changes.
     return compact
-        ? Column(mainAxisSize: MainAxisSize.min, children: [seat, deck])
+        ? Stack(
+            alignment: Alignment.topCenter,
+            clipBehavior: Clip.none,
+            children: [
+              seat,
+              if (isDealer)
+                Positioned(
+                  top: 8,
+                  left: deckOnLeft ? -34 : null,
+                  right: deckOnLeft ? null : -34,
+                  child: deck,
+                ),
+            ],
+          )
         : Row(
             mainAxisSize: MainAxisSize.min,
             children: [const SizedBox(width: 64), seat, deck],

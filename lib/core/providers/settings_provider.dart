@@ -129,6 +129,20 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
     state = state.copyWith(themeMode: mode);
     await _prefs.setInt('themeMode', mode.index);
   }
+
+  /// Reset only presentation preferences; never clear auth, inventory or rooms.
+  Future<void> resetPresentationDefaults() async {
+    await toggleSound(true);
+    await toggleMusic(true);
+    await toggleHaptics(true);
+    await toggle3DMode(true);
+    await setReducedMotion(false);
+    await setMusicVolume(1);
+    await setSoundVolume(1);
+    await setLanguage('en');
+    await setThemeMode(ThemeMode.system);
+    await setGameOrientation(GameOrientation.landscape);
+  }
 }
 
 final sharedPreferencesProvider = Provider<SharedPreferences>((ref) {

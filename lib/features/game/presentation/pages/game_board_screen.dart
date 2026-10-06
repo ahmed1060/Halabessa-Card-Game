@@ -31,8 +31,12 @@ import '../widgets/team_capture_stack.dart';
 import '../widgets/match_phase_panel.dart';
 import '../widgets/match_choice_panel.dart';
 import '../widgets/match_result_view.dart';
+import '../widgets/round_summary_panel.dart';
+import 'package:halabessa/core/widgets/user_avatar.dart';
 import '../widgets/match_waiting_room_panel.dart';
 import '../widgets/match_recovery_view.dart';
+import '../../../home/presentation/widgets/practice_difficulty_dialog.dart';
+import '../../domain/models/bot_difficulty.dart';
 import '../widgets/basra_celebration_overlay.dart';
 import '../widgets/emote_wheel_overlay.dart';
 import 'package:flutter/services.dart';
@@ -57,17 +61,22 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
   final GlobalKey _rivalPileKey = GlobalKey();
   final List<GlobalKey> _seatKeys = List.generate(4, (_) => GlobalKey());
   bool _isEmoteWheelOpen = false;
+  bool _offlinePracticeEnded = false;
 
   void _returnToHome() {
-    Navigator.of(context).pushNamedAndRemoveUntil(AppRoutes.initial, (_) => false);
+    Navigator.of(
+      context,
+    ).pushNamedAndRemoveUntil(AppRoutes.initial, (_) => false);
   }
 
   @override
   void initState() {
     super.initState();
-    _confettiController = ConfettiController(duration: const Duration(seconds: 5));
+    _confettiController = ConfettiController(
+      duration: const Duration(seconds: 5),
+    );
     _applyGameOrientation(ref.read(settingsProvider).gameOrientation);
-    
+
     final multimedia = ref.read(multimediaServiceProvider);
     final unityVisibility = ref.read(unityLayerVisibilityProvider.notifier);
     _restoreLobbyPresentation = () {
@@ -82,8 +91,9 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
       multimedia.playRoomMusic('music/room_music.mp3');
       // Unity is optional. Keep its startup/error screen from covering the
       // Flutter board when the player has disabled 3D mode.
-      ref.read(unityLayerVisibilityProvider.notifier).state =
-          ref.read(settingsProvider).is3DModeEnabled;
+      ref.read(unityLayerVisibilityProvider.notifier).state = ref
+          .read(settingsProvider)
+          .is3DModeEnabled;
     });
   }
 
@@ -96,8 +106,11 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
     // Cache dependencies while mounted: WidgetRef is invalid after disposal.
     Future.microtask(_restoreLobbyPresentation);
     if (!kIsWeb) {
-      SystemChrome.setPreferredOrientations(const [DeviceOrientation.portraitUp,
-        DeviceOrientation.landscapeLeft, DeviceOrientation.landscapeRight]);
+      SystemChrome.setPreferredOrientations(const [
+        DeviceOrientation.portraitUp,
+        DeviceOrientation.landscapeLeft,
+        DeviceOrientation.landscapeRight,
+      ]);
     }
     super.dispose();
   }
@@ -106,53 +119,79 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
     // Browsers own device rotation. Never rotate the Flutter canvas with a
     // transform: that separates painted controls from pointer coordinates.
     if (kIsWeb) return;
-    SystemChrome.setPreferredOrientations(orientation == GameOrientation.landscape
-      ? const [DeviceOrientation.landscapeLeft, DeviceOrientation.landscapeRight]
-      : const [DeviceOrientation.portraitUp]);
+    SystemChrome.setPreferredOrientations(
+      orientation == GameOrientation.landscape
+          ? const [
+              DeviceOrientation.landscapeLeft,
+              DeviceOrientation.landscapeRight,
+            ]
+          : const [DeviceOrientation.portraitUp],
+    );
   }
 
-  AppUser _getAvatarUser(WidgetRef ref, MatchState matchState, String currentUserUid, int relativeOffset) {
-     if (matchState.playerIds.isEmpty) return AppUser(uid: 'empty', email: '', displayName: 'waiting_label'.tr());
-     
-     int myIdx = matchState.playerIds.indexOf(currentUserUid);
-     
-     // spectator logic: if I'm not in the playerIds, I see from Host's perspective (bottom = T1P1)
-     int baseIdx = myIdx == -1 ? 0 : myIdx;
-     
-     // 0 = Bottom (Local Player), 1 = Left, 2 = Top (Opponent), 3 = Right
-     if (myIdx != -1 && relativeOffset == 0) {
-        final realUser = ref.watch(currentUserProvider);
-        if (realUser != null) {
-          return realUser.copyWith(displayName: 'you_label'.tr(args: [realUser.displayName]));
-        }
-     }
-     
-     int targetIdx = (baseIdx + relativeOffset) % 4;
-     if (targetIdx < 0 || targetIdx >= matchState.playerIds.length) {
-       return AppUser(uid: 'empty', email: '', displayName: 'waiting_label'.tr());
-     }
-     
-     String targetUid = matchState.playerIds[targetIdx];
-     String rawName = matchState.playerNames[targetUid] ?? 
-         (targetUid.startsWith('bot_') ? 'bot_name_template' : 'player_default_name');
-     
-     String targetName;
-      if (rawName == 'bot_name_template') {
-        final bits = targetUid.split('_');
-        final num = bits.length > 1 ? bits[1] : '';
-        targetName = '${'bot_name'.tr()} $num';
-     } else {
-       targetName = rawName.tr();
-     }
-     
-     String avatarUrl = matchState.playerAvatars[targetUid] ?? "";
-     
-     return AppUser(uid: targetUid, email: '', displayName: targetName, avatarUrl: avatarUrl.isEmpty ? null : avatarUrl);
+  AppUser _getAvatarUser(
+    WidgetRef ref,
+    MatchState matchState,
+    String currentUserUid,
+    int relativeOffset,
+  ) {
+    if (matchState.playerIds.isEmpty)
+      return AppUser(
+        uid: 'empty',
+        email: '',
+        displayName: 'waiting_label'.tr(),
+      );
+
+    int myIdx = matchState.playerIds.indexOf(currentUserUid);
+
+    // spectator logic: if I'm not in the playerIds, I see from Host's perspective (bottom = T1P1)
+    int baseIdx = myIdx == -1 ? 0 : myIdx;
+
+    // Physical clockwise seats: 0 bottom, 1 right, 2 partner/top, 3 left.
+    // Text direction must not reverse this mapping or the animation origins.
+    if (myIdx != -1 && relativeOffset == 0) {
+      final realUser = ref.watch(currentUserProvider);
+      if (realUser != null) {
+        return realUser.copyWith(
+          displayName: 'you_label'.tr(args: [realUser.displayName]),
+        );
+      }
+    }
+
+    int targetIdx = (baseIdx + relativeOffset) % 4;
+    if (targetIdx < 0 || targetIdx >= matchState.playerIds.length) {
+      return AppUser(
+        uid: 'empty',
+        email: '',
+        displayName: 'waiting_label'.tr(),
+      );
+    }
+
+    String targetUid = matchState.playerIds[targetIdx];
+    String rawName =
+        matchState.playerNames[targetUid] ??
+        (targetUid.startsWith('bot_')
+            ? 'bot_name_template'
+            : 'player_default_name');
+
+    String targetName;
+    if (rawName == 'bot_name_template') {
+      final bits = targetUid.split('_');
+      final num = bits.length > 1 ? bits[1] : '';
+      targetName = '${'bot_name'.tr()} $num';
+    } else {
+      targetName = rawName.tr();
+    }
+
+    String avatarUrl = matchState.playerAvatars[targetUid] ?? "";
+
+    return AppUser(
+      uid: targetUid,
+      email: '',
+      displayName: targetName,
+      avatarUrl: avatarUrl.isEmpty ? null : avatarUrl,
+    );
   }
-
-
-
-
 
   String _getTeamOfPlayer(String playerId, List<String> playerIds) {
     final index = playerIds.indexOf(playerId);
@@ -166,7 +205,6 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
     return (myIdx + offset) % 4;
   }
 
-
   void _checkWinner(MatchState? state, String myUid) {
     if (state == null) return;
     if (state.phase == GamePhase.matchOver) {
@@ -174,7 +212,7 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
       if (myTeamId.isEmpty) return;
       final aWins = state.teamAScore >= state.teamBScore;
       final iWin = aWins == (myTeamId == 'teamA');
-      
+
       if (iWin) {
         _confettiController.play();
         HapticFeedback.vibrate();
@@ -215,55 +253,110 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
       }
 
       // Sync turn timer to Unity when turn or phase changes
-      if (next.currentTurnIndex != previous?.currentTurnIndex || next.phase != previous?.phase) {
+      if (next.currentTurnIndex != previous?.currentTurnIndex ||
+          next.phase != previous?.phase) {
         if (next.phase == GamePhase.playing) {
-          ref.read(unityCommunicationServiceProvider).startTimer(next.timerDurationSeconds);
+          ref
+              .read(unityCommunicationServiceProvider)
+              .startTimer(next.timerDurationSeconds);
         }
       }
 
-      if (next.phase == GamePhase.matchOver && previous?.phase != GamePhase.matchOver) {
+      if (next.phase == GamePhase.matchOver &&
+          previous?.phase != GamePhase.matchOver) {
         if (currentUser != null && !MediaQuery.disableAnimationsOf(context)) {
           _checkWinner(next, currentUser.uid);
         }
         if (currentUser != null) {
           final myTeam = _getTeamOfPlayer(currentUser.uid, next.playerIds);
           final winner = next.teamAScore >= next.teamBScore ? 'teamA' : 'teamB';
-          ref.read(multimediaServiceProvider).playSfx(
-            myTeam == winner ? 'sfx/win.mp3' : 'sfx/lose.mp3');
+          ref
+              .read(multimediaServiceProvider)
+              .playSfx(myTeam == winner ? 'sfx/win.mp3' : 'sfx/lose.mp3');
         }
       }
     });
 
     // Room Expiry Check (Hibernation Timeout)
-    if (matchState != null && matchState.expireAt != null && DateTime.now().isAfter(matchState.expireAt!)) {
-       WidgetsBinding.instance.addPostFrameCallback((_) {
-         if (mounted) {
-           ScaffoldMessenger.of(context).showSnackBar(
-             SnackBar(content: Text('room_expired'.tr()))
-           );
-           ref.read(matchStateProvider.notifier).leaveMatch(notifyServer: false);
-           _returnToHome();
-         }
-       });
-       return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    if (matchState != null &&
+        matchState.expireAt != null &&
+        DateTime.now().isAfter(matchState.expireAt!)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('room_expired'.tr())));
+          ref.read(matchStateProvider.notifier).leaveMatch(notifyServer: false);
+          _returnToHome();
+        }
+      });
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     if (matchState == null || currentUser == null) {
       return MatchRecoveryView(
-        key: ValueKey(currentUser?.uid ?? 'awaiting-profile'),
+        key: ValueKey(
+          '${currentUser?.uid ?? 'awaiting-profile'}-$_offlinePracticeEnded',
+        ),
+        terminal: _offlinePracticeEnded,
         loadingTitle: 'recovery_loading'.tr(),
-        unavailableTitle: 'recovery_unavailable'.tr(),
-        explanation: 'recovery_explanation'.tr(),
-        retryLabel: 'retry_action'.tr(), exitLabel: 'return_home'.tr(),
-        onRetry: currentUser == null ? null : () async {
-          final result = await ref.read(matchStateProvider.notifier).tryRecoverLastMatch();
-          if (!mounted || result == MatchRecoveryStart.listening) return;
-          ref.read(matchStateProvider.notifier).leaveMatch();
-          final messenger = ScaffoldMessenger.of(context);
-          _returnToHome();
-          messenger.showSnackBar(SnackBar(content: Text((result == MatchRecoveryStart.offlinePracticeNotSaved
-              ? 'recovery_practice_restart' : 'recovery_no_saved_match').tr())));
-        },
+        unavailableTitle:
+            (_offlinePracticeEnded
+                    ? 'ui_practice_ended'
+                    : 'recovery_unavailable')
+                .tr(),
+        explanation:
+            (_offlinePracticeEnded
+                    ? 'recovery_practice_restart'
+                    : 'recovery_explanation')
+                .tr(),
+        retryLabel: (_offlinePracticeEnded ? 'practice_bots' : 'retry_action')
+            .tr(),
+        exitLabel: 'return_home'.tr(),
+        onRetry: currentUser == null
+            ? null
+            : () async {
+                if (_offlinePracticeEnded) {
+                  final difficulty = await showDialog<BotDifficulty>(
+                    context: context,
+                    builder: (_) => const PracticeDifficultyDialog(),
+                  );
+                  if (!mounted || difficulty == null) return;
+                  ref
+                      .read(matchStateProvider.notifier)
+                      .startOfflinePracticeMatch(
+                        currentUser.uid,
+                        currentUser.displayName,
+                        difficulty: difficulty,
+                      );
+                  setState(() => _offlinePracticeEnded = false);
+                  return;
+                }
+                final result = await ref
+                    .read(matchStateProvider.notifier)
+                    .tryRecoverLastMatch();
+                if (!mounted || result == MatchRecoveryStart.listening) return;
+                if (result == MatchRecoveryStart.offlinePracticeNotSaved) {
+                  await ref
+                      .read(matchStateProvider.notifier)
+                      .leaveMatch(notifyServer: false);
+                  if (mounted) setState(() => _offlinePracticeEnded = true);
+                  return;
+                }
+                ref.read(matchStateProvider.notifier).leaveMatch();
+                final messenger = ScaffoldMessenger.of(context);
+                _returnToHome();
+                messenger.showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      (result == MatchRecoveryStart.offlinePracticeNotSaved
+                              ? 'recovery_practice_restart'
+                              : 'recovery_no_saved_match')
+                          .tr(),
+                    ),
+                  ),
+                );
+              },
         onExit: () {
           ref.read(matchStateProvider.notifier).leaveMatch();
           _returnToHome();
@@ -278,8 +371,8 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
       return _buildMatchResult(matchState, currentUser, isSpectator);
     }
     final settings = ref.watch(settingsProvider);
-    final show3DHand = settings.is3DModeEnabled && ref.watch(unityLayerActiveProvider);
-
+    final show3DHand =
+        settings.is3DModeEnabled && ref.watch(unityLayerActiveProvider);
 
     return PopScope(
       canPop: false,
@@ -292,7 +385,7 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
         body: OrientationBuilder(
           builder: (context, orientation) {
             final isLandscape = orientation == Orientation.landscape;
-            
+
             return Stack(
               children: [
                 // Background Table (Skin)
@@ -301,30 +394,38 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
                     builder: (context, ref, child) {
                       final settings = ref.watch(settingsProvider);
                       final activeTable = ref.watch(activeTableSkinProvider);
-                      final is3DActive = settings.is3DModeEnabled && ref.watch(unityLayerActiveProvider);
-                      
+                      final is3DActive =
+                          settings.is3DModeEnabled &&
+                          ref.watch(unityLayerActiveProvider);
+
                       return AnimatedOpacity(
-                        duration: is3DActive ? const Duration(milliseconds: 500) : Duration.zero,
+                        duration: is3DActive
+                            ? const Duration(milliseconds: 500)
+                            : Duration.zero,
                         opacity: is3DActive ? 0.0 : 1.0,
                         child: activeTable.id == 'default_table'
-                          ? Image.asset(
-                              MediaQuery.sizeOf(context).width < MediaQuery.sizeOf(context).height
-                                  ? 'assets/images/tables/lantern_nights_portrait_v2.png'
-                                  : 'assets/images/tables/lantern_nights_v1.png',
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => const ColoredBox(color: TableStyle.felt),
-                            )
-                          : activeTable.assetPath.startsWith('http')
-                          ? Image.network(
-                              activeTable.assetPath,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Container(color: ThemeConfig.boardGreen),
-                            )
-                          : Image.asset(
-                              activeTable.assetPath,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Container(color: ThemeConfig.boardGreen),
-                            ),
+                            ? Image.asset(
+                                MediaQuery.sizeOf(context).width <
+                                        MediaQuery.sizeOf(context).height
+                                    ? 'assets/images/tables/lantern_nights_portrait_v2.png'
+                                    : 'assets/images/tables/lantern_nights_v1.png',
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) =>
+                                    const ColoredBox(color: TableStyle.felt),
+                              )
+                            : activeTable.assetPath.startsWith('http')
+                            ? Image.network(
+                                activeTable.assetPath,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) =>
+                                    Container(color: ThemeConfig.boardGreen),
+                              )
+                            : Image.asset(
+                                activeTable.assetPath,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) =>
+                                    Container(color: ThemeConfig.boardGreen),
+                              ),
                       );
                     },
                   ),
@@ -341,241 +442,457 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
                     ),
                   ),
                 ),
-                
+
                 SafeArea(
                   child: Stack(
                     children: [
-                      Positioned.fill(child: _buildTable(
-                        context, ref, matchState, myUid, isLandscape,
-                        isSpectator: isSpectator, show3DHand: show3DHand,
-                      )),
+                      Positioned.fill(
+                        child: _buildTable(
+                          context,
+                          ref,
+                          matchState,
+                          myUid,
+                          isLandscape,
+                          isSpectator: isSpectator,
+                          show3DHand: show3DHand,
+                        ),
+                      ),
 
-                    // Overlays
-                    if (matchState.phase == GamePhase.waitingForPlayers &&
-                        !matchState.id.startsWith('OFFLINE_'))
-                      _buildLobbyOverlay(context, ref, matchState, myUid),
-                    if (isSpectator && matchState.phase != GamePhase.waitingForPlayers) _buildSpectatorIndicator(),
-                    if (matchState.phase == GamePhase.capturing && matchState.board.isEmpty) _buildBasraOverlay(matchState, myUid),
-                      
-                  ],
-                ),
-              ),
-              
-              // Chat Panel
-              const ChatOverlay(),
-
-              // Emote Wheel Overlay
-              if (_isEmoteWheelOpen)
-                Positioned.fill(
-                  child: EmoteWheelOverlay(
-                    myUid: myUid,
-                    onDismiss: () => setState(() => _isEmoteWheelOpen = false),
+                      // Overlays
+                      if (matchState.phase == GamePhase.waitingForPlayers &&
+                          !matchState.id.startsWith('OFFLINE_'))
+                        _buildLobbyOverlay(context, ref, matchState, myUid),
+                      if (isSpectator &&
+                          matchState.phase != GamePhase.waitingForPlayers)
+                        _buildSpectatorIndicator(),
+                      if (matchState.phase == GamePhase.capturing &&
+                          matchState.board.isEmpty)
+                        _buildBasraOverlay(matchState, myUid),
+                    ],
                   ),
                 ),
 
-              // Confetti Celebration
-              Align(
-                alignment: Alignment.topCenter,
-                child: ConfettiWidget(
-                  confettiController: _confettiController,
-                  blastDirectionality: BlastDirectionality.explosive,
-                  shouldLoop: false,
-                  colors: const [
-                    ThemeConfig.goldAccent,
-                    ThemeConfig.primaryTeal,
-                    Colors.white,
-                    ThemeConfig.accentPink,
-                  ],
-                  createParticlePath: _drawStar,
+                // Chat Panel
+                const ChatOverlay(),
+
+                // Emote Wheel Overlay
+                if (_isEmoteWheelOpen)
+                  Positioned.fill(
+                    child: EmoteWheelOverlay(
+                      myUid: myUid,
+                      onDismiss: () =>
+                          setState(() => _isEmoteWheelOpen = false),
+                    ),
+                  ),
+
+                // Confetti Celebration
+                Align(
+                  alignment: Alignment.topCenter,
+                  child: ConfettiWidget(
+                    confettiController: _confettiController,
+                    blastDirectionality: BlastDirectionality.explosive,
+                    shouldLoop: false,
+                    colors: const [
+                      ThemeConfig.goldAccent,
+                      ThemeConfig.primaryTeal,
+                      Colors.white,
+                      ThemeConfig.accentPink,
+                    ],
+                    createParticlePath: _drawStar,
+                  ),
                 ),
-              ),
-            ],
-          );
-        },
+              ],
+            );
+          },
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 
-
-  Widget _buildTable(BuildContext context, WidgetRef ref, MatchState state,
-      String myUid, bool isLandscape, {required bool isSpectator, required bool show3DHand}) {
+  Widget _buildTable(
+    BuildContext context,
+    WidgetRef ref,
+    MatchState state,
+    String myUid,
+    bool isLandscape, {
+    required bool isSpectator,
+    required bool show3DHand,
+  }) {
     final myTeam = _getTeamOfPlayer(myUid, state.playerIds);
     final firstIsA = myTeam != 'teamB';
     final playing = state.phase == GamePhase.playing;
-    final myTurn = playing && !isSpectator &&
+    final myTurn =
+        playing &&
+        !isSpectator &&
         state.currentTurnIndex == _getAbsoluteIndex(state, myUid, 0);
     final firstLabel = (isSpectator ? 'team_a' : 'my_team').tr();
     final secondLabel = (isSpectator ? 'team_b' : 'table_rivals').tr();
 
     Widget seat(int offset) {
       final user = _getAvatarUser(ref, state, myUid, offset);
-      final active = playing && state.currentTurnIndex == _getAbsoluteIndex(state, myUid, offset);
+      final active =
+          playing &&
+          state.currentTurnIndex == _getAbsoluteIndex(state, myUid, offset);
       final chat = ref.watch(lastMessageForUserProvider(user.uid))?.text;
-      final message = chat ??
-          _getPlayerEmoji(state, myUid, offset);
+      final message = chat ?? _getPlayerEmoji(state, myUid, offset);
       final avatar = TableSeat(
-        name: user.uid.startsWith('bot_') ? user.displayName.replaceAll('🤖', '').trim() : user.displayName,
+        name: user.uid.startsWith('bot_')
+            ? user.displayName.replaceAll('🤖', '').trim()
+            : user.displayName,
         avatarUrl: user.avatarUrl,
-        portraitAsset: offset == 2 ? 'assets/images/avatars/lantern_partner_v1.png' :
-          offset == 3 ? 'assets/images/avatars/lantern_rival_man_v1.png' : 'assets/images/avatars/lantern_rival_woman_v1.png',
+        portraitAsset: offset == 2
+            ? 'assets/images/avatars/lantern_partner_v1.png'
+            : offset == 3
+            ? 'assets/images/avatars/lantern_rival_man_v1.png'
+            : 'assets/images/avatars/lantern_rival_woman_v1.png',
         accent: offset == 2 ? TableStyle.mint : TableStyle.red,
-        dealerLabel: _getAbsoluteIndex(state, myUid, offset) == state.dealerIndex ? 'table_dealer'.tr() : null,
-        isBot: user.uid.startsWith('bot_'), active: active,
-        detail: active ? 'table_playing'.tr() : 'cards_count'.tr(args: [state.cardsRemainingFor(user.uid).toString()]),
-        turnStarted: state.turnStartTime, turnSeconds: state.timerDurationSeconds,
+        dealerLabel:
+            _getAbsoluteIndex(state, myUid, offset) == state.dealerIndex
+            ? 'table_dealer'.tr()
+            : null,
+        isBot: user.uid.startsWith('bot_'),
+        active: active,
+        detail: active
+            ? 'table_playing'.tr()
+            : 'cards_count'.tr(
+                args: [state.cardsRemainingFor(user.uid).toString()],
+              ),
+        turnStarted: state.turnStartTime,
+        turnSeconds: state.timerDurationSeconds,
         message: message,
-        messageExpiresAt: chat == null ? DateTime.tryParse(state.playerEmojiExpiresAt[user.uid] ?? '') : null,
+        messageExpiresAt: chat == null
+            ? DateTime.tryParse(state.playerEmojiExpiresAt[user.uid] ?? '')
+            : null,
         hiddenHandCount: offset == 0 ? null : state.cardsRemainingFor(user.uid),
-        dealIdentity: '${state.id}-${state.roundCount}-${state.handInRound}-${user.uid}',
-        dealerDeckKey: _dealerDeckKey, backBuilder: _cardBack,
+        dealIdentity:
+            '${state.id}-${state.roundCount}-${state.handInRound}-${user.uid}',
+        dealerDeckKey: _dealerDeckKey,
+        backBuilder: _cardBack,
         onPressed: () => _showPlayerProfile(context, ref, state, myUid, offset),
       );
-      return KeyedSubtree(key: _seatKeys[offset], child: DealerSeat(seat: avatar,
-        isDealer: _getAbsoluteIndex(state, myUid, offset) == state.dealerIndex,
-        compact: offset == 1 || offset == 3,
-        remaining: state.deckCount, label: 'table_deal_deck'.tr(),
-        deckKey: _getAbsoluteIndex(state, myUid, offset) == state.dealerIndex ? _dealerDeckKey : null,
-        backBuilder: _cardBack,
-      ));
+      return KeyedSubtree(
+        key: _seatKeys[offset],
+        child: DealerSeat(
+          seat: avatar,
+          isDealer:
+              _getAbsoluteIndex(state, myUid, offset) == state.dealerIndex,
+          compact: offset == 1 || offset == 3,
+          deckOnLeft: offset == 1,
+          remaining: state.deckCount,
+          label: 'table_deal_deck'.tr(),
+          deckKey: _getAbsoluteIndex(state, myUid, offset) == state.dealerIndex
+              ? _dealerDeckKey
+              : null,
+          backBuilder: _cardBack,
+        ),
+      );
     }
 
     return MatchTableLayout(
       header: MatchScoreBar(
-        firstLabel: firstLabel, secondLabel: secondLabel,
+        firstLabel: firstLabel,
+        secondLabel: secondLabel,
         firstScore: firstIsA ? state.teamAScore : state.teamBScore,
         secondScore: firstIsA ? state.teamBScore : state.teamAScore,
-        details: 'table_round_target'.tr(args: [state.roundCount.toString(), state.maxPoints.toString()]),
-        roomLabel: state.id.startsWith('OFFLINE_') ? 'practice_bots'.tr() : state.id,
-        onCopyRoom: state.id.startsWith('OFFLINE_') ? null : () {
-          Clipboard.setData(ClipboardData(text: state.id));
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('room_id_copied'.tr())));
-        },
+        details: 'table_round_target'.tr(
+          args: [state.roundCount.toString(), state.maxPoints.toString()],
+        ),
+        roomLabel: state.id.startsWith('OFFLINE_')
+            ? 'practice_bots'.tr()
+            : state.id,
+        onCopyRoom: state.id.startsWith('OFFLINE_')
+            ? null
+            : () {
+                Clipboard.setData(ClipboardData(text: state.id));
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(SnackBar(content: Text('room_id_copied'.tr())));
+              },
       ),
-      partner: seat(2), leftOpponent: seat(3), rightOpponent: seat(1),
+      partner: seat(2),
+      leftOpponent: seat(3),
+      rightOpponent: seat(1),
       localSeat: state.dealerIndex == _getAbsoluteIndex(state, myUid, 0)
-        ? Semantics(key: _seatKeys[0], label: 'table_deal_deck'.tr(), child: Column(
-            mainAxisSize: MainAxisSize.min, children: [
-              FaceDownStack(key: _dealerDeckKey, count: state.deckCount, backBuilder: _cardBack,
-                width: 38, height: 54),
-              Text('${state.deckCount}', style: TableStyle.detail.copyWith(color: TableStyle.brass)),
-              Text('table_dealer'.tr(), textAlign: TextAlign.center,
-                style: TableStyle.detail.copyWith(color: TableStyle.brass, fontWeight: FontWeight.w700)),
-            ]))
-        : const SizedBox(height: 84),
-      collections: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Expanded(flex: 2, child: TeamCaptureStack(
-          captures: state.harvestStacks[firstIsA ? 'teamA' : 'teamB'] ?? const [],
-          label: firstLabel,
-          countLabel: 'cards_count'.tr(args: [_captureCount(state, firstIsA ? 'teamA' : 'teamB').toString()]),
-          latestLabel: 'table_last_capture'.tr(), historyLabel: 'table_view_history'.tr(),
-          showLatest: !isSpectator, pileKey: _ourPileKey,
-          faceBuilder: _cardFace, backBuilder: _cardBack,
-          onHistory: isSpectator ? null : () => _showCaptures(context),
-        )),
-        const SizedBox(width: 8),
-        Expanded(child: TeamCaptureStack(
-          captures: state.harvestStacks[firstIsA ? 'teamB' : 'teamA'] ?? const [],
-          label: secondLabel,
-          countLabel: 'cards_count'.tr(args: [_captureCount(state, firstIsA ? 'teamB' : 'teamA').toString()]),
-          latestLabel: '', historyLabel: '', showLatest: false,
-          pileKey: _rivalPileKey, accent: TableStyle.red,
-          faceBuilder: _cardFace, backBuilder: _cardBack,
-        )),
-      ]),
-      board: SizedBox(key: _boardKey,
-        child: _buildBoardCenter(context, ref, state, myUid, isLandscape, is3DActive: show3DHand)),
-      status: _buildTableStatus(state, myUid, isSpectator, myTurn),
-      hand: isSpectator || show3DHand || (state.handCards[myUid]?.isEmpty ?? true)
-        ? const SizedBox(height: 24)
-        : FannedHandWidget(
-            key: ValueKey('hand-${state.id}-${state.roundCount}-${state.handInRound}'),
-            dealerDeckKey: _dealerDeckKey,
-            cards: state.handCards[myUid] ?? [], isMyTurn: myTurn,
-            interactionEnabled: playing,
-            playHint: 'table_play_card'.tr(), queueHint: 'table_queue_card'.tr(),
-            cardLabelBuilder: (card) => 'table_card_name'.tr(args: [
-              'table_rank_${card.rank.name}'.tr(), 'table_suit_${card.suit.name}'.tr()]),
-            onCardTap: (card, globalOrigin) {
-              final box = _boardKey.currentContext?.findRenderObject() as RenderBox?;
-              final origin = box == null || globalOrigin == Offset.zero ? Offset.zero :
-                  box.globalToLocal(globalOrigin) - box.size.center(Offset.zero);
-              ref.read(matchStateProvider.notifier).playCard(myUid, card, origin: origin);
-            },
+          ? Semantics(
+              key: _seatKeys[0],
+              label: 'table_deal_deck'.tr(),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  FaceDownStack(
+                    key: _dealerDeckKey,
+                    count: state.deckCount,
+                    backBuilder: _cardBack,
+                    width: 38,
+                    height: 54,
+                  ),
+                  Text(
+                    '${state.deckCount}',
+                    style: TableStyle.detail.copyWith(color: TableStyle.brass),
+                  ),
+                  Text(
+                    'table_dealer'.tr(),
+                    textAlign: TextAlign.center,
+                    style: TableStyle.detail.copyWith(
+                      color: TableStyle.brass,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            )
+          : const SizedBox(height: 84),
+      collections: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            flex: 2,
+            child: TeamCaptureStack(
+              captures:
+                  state.harvestStacks[firstIsA ? 'teamA' : 'teamB'] ?? const [],
+              label: firstLabel,
+              countLabel: 'cards_count'.tr(
+                args: [
+                  _captureCount(state, firstIsA ? 'teamA' : 'teamB').toString(),
+                ],
+              ),
+              latestLabel: 'table_last_capture'.tr(),
+              historyLabel: 'table_view_history'.tr(),
+              showLatest: !isSpectator,
+              pileKey: _ourPileKey,
+              faceBuilder: _cardFace,
+              backBuilder: _cardBack,
+              onHistory: isSpectator ? null : () => _showCaptures(context),
+            ),
           ),
-      controls: Padding(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-        child: Wrap(alignment: WrapAlignment.center, spacing: 8, children: [
-        LanternControlButton(label: 'chat'.tr(), icon: Icons.chat_bubble_rounded,
-          onPressed: () => ref.read(chatStateProvider.notifier).toggleOverlay()),
-        LanternControlButton(label: (ref.watch(settingsProvider).isSoundEnabled ? 'table_sound_on' : 'table_sound_off').tr(),
-          icon: ref.watch(settingsProvider).isSoundEnabled ? Icons.volume_up_rounded : Icons.volume_off_rounded,
-          onPressed: () => ref.read(settingsProvider.notifier).toggleSound(!ref.read(settingsProvider).isSoundEnabled)),
-        LanternControlButton(label: 'settings'.tr(), icon: Icons.settings_rounded,
-          onPressed: () => _showSettings(context)),
-        PopupMenuButton<String>(tooltip: 'table_more'.tr(), color: TableStyle.ink,
-          icon: const Icon(Icons.more_horiz, color: TableStyle.ivory),
-          constraints: const BoxConstraints(minWidth: 160),
-          onSelected: (action) {
-            switch (action) {
-              case 'reactions': setState(() => _isEmoteWheelOpen = !_isEmoteWheelOpen);
-              case 'captures': _showCaptures(context);
-              case 'leave': _confirmLeave(context, ref);
-            }
-          },
-          itemBuilder: (_) => [
-            if (!isSpectator) PopupMenuItem(value: 'reactions', child: Text('table_reactions'.tr(), style: TableStyle.label)),
-            if (!isSpectator) PopupMenuItem(value: 'captures', child: Text('table_captures'.tr(), style: TableStyle.label)),
-            PopupMenuItem(value: 'leave', child: Text('leave_game_title'.tr(), style: TableStyle.label)),
-          ]),
-      ])),
+          const SizedBox(width: 8),
+          Expanded(
+            child: TeamCaptureStack(
+              captures:
+                  state.harvestStacks[firstIsA ? 'teamB' : 'teamA'] ?? const [],
+              label: secondLabel,
+              countLabel: 'cards_count'.tr(
+                args: [
+                  _captureCount(state, firstIsA ? 'teamB' : 'teamA').toString(),
+                ],
+              ),
+              latestLabel: '',
+              historyLabel: '',
+              showLatest: false,
+              pileKey: _rivalPileKey,
+              accent: TableStyle.red,
+              faceBuilder: _cardFace,
+              backBuilder: _cardBack,
+            ),
+          ),
+        ],
+      ),
+      board: SizedBox(
+        key: _boardKey,
+        child: _buildBoardCenter(
+          context,
+          ref,
+          state,
+          myUid,
+          isLandscape,
+          is3DActive: show3DHand,
+        ),
+      ),
+      status: _buildTableStatus(state, myUid, isSpectator, myTurn),
+      hand:
+          isSpectator || show3DHand || (state.handCards[myUid]?.isEmpty ?? true)
+          ? const SizedBox(height: 24)
+          : FannedHandWidget(
+              key: ValueKey(
+                'hand-${state.id}-${state.roundCount}-${state.handInRound}',
+              ),
+              dealerDeckKey: _dealerDeckKey,
+              cards: state.handCards[myUid] ?? [],
+              isMyTurn: myTurn,
+              interactionEnabled: playing,
+              playHint: 'table_play_card'.tr(),
+              queueHint: 'table_queue_card'.tr(),
+              cardLabelBuilder: (card) => 'table_card_name'.tr(
+                args: [
+                  'table_rank_${card.rank.name}'.tr(),
+                  'table_suit_${card.suit.name}'.tr(),
+                ],
+              ),
+              onCardTap: (card, globalOrigin) {
+                final box =
+                    _boardKey.currentContext?.findRenderObject() as RenderBox?;
+                final origin = box == null || globalOrigin == Offset.zero
+                    ? Offset.zero
+                    : box.globalToLocal(globalOrigin) -
+                          box.size.center(Offset.zero);
+                ref
+                    .read(matchStateProvider.notifier)
+                    .playCard(myUid, card, origin: origin);
+              },
+            ),
+      controls: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        child: Wrap(
+          alignment: WrapAlignment.center,
+          spacing: 8,
+          children: [
+            LanternControlButton(
+              label: 'chat'.tr(),
+              icon: Icons.chat_bubble_rounded,
+              onPressed: () =>
+                  ref.read(chatStateProvider.notifier).toggleOverlay(),
+            ),
+            LanternControlButton(
+              label:
+                  (ref.watch(settingsProvider).isSoundEnabled
+                          ? 'table_sound_on'
+                          : 'table_sound_off')
+                      .tr(),
+              icon: ref.watch(settingsProvider).isSoundEnabled
+                  ? Icons.volume_up_rounded
+                  : Icons.volume_off_rounded,
+              onPressed: () => ref
+                  .read(settingsProvider.notifier)
+                  .toggleSound(!ref.read(settingsProvider).isSoundEnabled),
+            ),
+            LanternControlButton(
+              label: 'settings'.tr(),
+              icon: Icons.settings_rounded,
+              onPressed: () => _showSettings(context),
+            ),
+            PopupMenuButton<String>(
+              tooltip: 'table_more'.tr(),
+              color: TableStyle.ink,
+              icon: const Icon(Icons.more_horiz, color: TableStyle.ivory),
+              constraints: const BoxConstraints(minWidth: 160),
+              onSelected: (action) {
+                switch (action) {
+                  case 'reactions':
+                    setState(() => _isEmoteWheelOpen = !_isEmoteWheelOpen);
+                  case 'captures':
+                    _showCaptures(context);
+                  case 'leave':
+                    _confirmLeave(context, ref);
+                }
+              },
+              itemBuilder: (_) => [
+                if (!isSpectator)
+                  PopupMenuItem(
+                    value: 'reactions',
+                    child: Text(
+                      'table_reactions'.tr(),
+                      style: TableStyle.label,
+                    ),
+                  ),
+                if (!isSpectator)
+                  PopupMenuItem(
+                    value: 'captures',
+                    child: Text('table_captures'.tr(), style: TableStyle.label),
+                  ),
+                PopupMenuItem(
+                  value: 'leave',
+                  child: Text('leave_game_title'.tr(), style: TableStyle.label),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 
-  Widget _buildTableStatus(MatchState state, String uid, bool spectator, bool myTurn) {
-    if (state.phase == GamePhase.shuffleVoting || state.phase == GamePhase.rematchVoting) {
+  Widget _buildTableStatus(
+    MatchState state,
+    String uid,
+    bool spectator,
+    bool myTurn,
+  ) {
+    if (state.phase == GamePhase.shuffleVoting ||
+        state.phase == GamePhase.rematchVoting) {
       final shuffle = state.phase == GamePhase.shuffleVoting;
       final votes = shuffle ? state.shuffleVotes : state.rematchVotes;
       final canVote = !spectator && !votes.containsKey(uid);
-      final humans = state.playerIds.where((id) => !id.startsWith('bot_') && !id.startsWith('waiting_')).toList();
+      final humans = state.playerIds
+          .where((id) => !id.startsWith('bot_') && !id.startsWith('waiting_'))
+          .toList();
       final myTeam = _getTeamOfPlayer(uid, state.playerIds);
       final winner = state.teamAScore >= state.teamBScore ? 'teamA' : 'teamB';
       return MatchChoicePanel(
-        key: ValueKey('${state.id}-${state.roundCount}-${state.phase.name}-$uid'),
-        title: shuffle ? 'deck_finished'.tr() :
-          (spectator ? 'match_over'.tr() :
-            (myTeam == winner ? 'your_team_wins' : 'opponent_wins').tr()),
-        detail: spectator ? 'you_are_spectating'.tr() :
-          votes.containsKey(uid) ? 'waiting_for_other_players'.tr() :
-          'vote_progress'.tr(args: [humans.where(votes.containsKey).length.toString(), humans.length.toString()]),
+        key: ValueKey(
+          '${state.id}-${state.roundCount}-${state.phase.name}-$uid',
+        ),
+        title: shuffle
+            ? 'deck_finished'.tr()
+            : (spectator
+                  ? 'match_over'.tr()
+                  : (myTeam == winner ? 'your_team_wins' : 'opponent_wins')
+                        .tr()),
+        detail: spectator
+            ? 'you_are_spectating'.tr()
+            : votes.containsKey(uid)
+            ? 'waiting_for_other_players'.tr()
+            : 'vote_progress'.tr(
+                args: [
+                  humans.where(votes.containsKey).length.toString(),
+                  humans.length.toString(),
+                ],
+              ),
         voteStartedAt: state.phaseStartedAt,
-        countdownLabel: (seconds) => 'vote_countdown'.tr(args: [seconds.toString()]),
+        countdownLabel: (seconds) =>
+            'vote_countdown'.tr(args: [seconds.toString()]),
         firstLabel: (shuffle ? 'shuffle_yes' : 'best_of_3_yes').tr(),
         secondLabel: (shuffle ? 'keep_sequence_no' : 'leave_match_no').tr(),
-        failureMessage: 'match_action_retry'.tr(), canVote: canVote,
-        onFirst: !canVote ? null : () => shuffle
-          ? ref.read(matchStateProvider.notifier).voteShuffle(uid, true, expected: state)
-          : ref.read(matchStateProvider.notifier).voteRematch(uid, true, expected: state),
-        onSecond: !canVote ? null : () => shuffle
-          ? ref.read(matchStateProvider.notifier).voteShuffle(uid, false, expected: state)
-          : ref.read(matchStateProvider.notifier).voteRematch(uid, false, expected: state),
+        failureMessage: 'match_action_retry'.tr(),
+        canVote: canVote,
+        onFirst: !canVote
+            ? null
+            : () => shuffle
+                  ? ref
+                        .read(matchStateProvider.notifier)
+                        .voteShuffle(uid, true, expected: state)
+                  : ref
+                        .read(matchStateProvider.notifier)
+                        .voteRematch(uid, true, expected: state),
+        onSecond: !canVote
+            ? null
+            : () => shuffle
+                  ? ref
+                        .read(matchStateProvider.notifier)
+                        .voteShuffle(uid, false, expected: state)
+                  : ref
+                        .read(matchStateProvider.notifier)
+                        .voteRematch(uid, false, expected: state),
       );
     }
     if (state.phase == GamePhase.preRoundCut) {
       final myIndex = state.playerIds.indexOf(uid);
-      final canCut = myIndex >= 0 && state.playerIds.isNotEmpty &&
-          myIndex == (state.dealerIndex + state.playerIds.length - 1) % state.playerIds.length;
+      final canCut =
+          myIndex >= 0 &&
+          state.playerIds.isNotEmpty &&
+          myIndex ==
+              (state.dealerIndex + state.playerIds.length - 1) %
+                  state.playerIds.length;
       return MatchPhasePanel(
         key: ValueKey('${state.id}-${state.roundCount}-cut'),
         title: 'pre_round_cut'.tr(),
         message: (canCut ? 'your_turn_cut_deck' : 'waiting_deck_cut').tr(),
         actionLabel: canCut ? 'cut_the_deck'.tr() : null,
-        onAction: canCut ? () => ref.read(matchStateProvider.notifier).performCut(20) : null,
+        onAction: canCut
+            ? () => ref.read(matchStateProvider.notifier).performCut(20)
+            : null,
         failureMessage: 'match_action_retry'.tr(),
       );
     }
     if (state.phase == GamePhase.dealingCards ||
         state.phase == GamePhase.dealingFasha ||
         state.phase == GamePhase.roundScoring) {
+      if (state.phase == GamePhase.roundScoring) {
+        return RoundSummaryPanel(
+          state: state,
+          firstIsA: _getTeamOfPlayer(uid, state.playerIds) != 'teamB',
+          spectator: spectator,
+        );
+      }
       final title = switch (state.phase) {
         GamePhase.dealingCards => 'memorize_table_cards',
         GamePhase.roundScoring => 'round_finished',
@@ -583,17 +900,33 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
       };
       return MatchPhasePanel(
         key: ValueKey('${state.id}-${state.phase.name}'),
-        title: title.tr(), message: (state.phase == GamePhase.roundScoring
-            ? 'round_advances_automatically' : 'next_phase_automatically').tr(),
+        title: title.tr(),
+        message:
+            (state.phase == GamePhase.roundScoring
+                    ? 'round_advances_automatically'
+                    : 'next_phase_automatically')
+                .tr(),
         failureMessage: 'match_action_retry'.tr(),
       );
     }
-    return LanternTurnBadge(active: myTurn,
-      turnStarted: state.turnStartTime, turnSeconds: state.timerDurationSeconds,
-      title: spectator ? 'you_are_spectating'.tr() : myTurn ? 'table_your_turn'.tr() :
-        state.phase == GamePhase.playing ? 'table_waiting'.tr() : _tablePhaseLabel(state.phase),
-      hint: spectator || state.phase != GamePhase.playing ? '' :
-        (myTurn ? 'table_play_hint' : 'table_wait_or_queue').tr());
+    return LanternTurnBadge(
+      active: myTurn,
+      turnStarted: state.turnStartTime,
+      turnSeconds: state.timerDurationSeconds,
+      countdownLabel: (seconds) => 'ui_seconds_short'.tr(args: ['$seconds']),
+      countdownSemantics: (seconds) =>
+          'ui_seconds_remaining'.tr(args: ['$seconds']),
+      title: spectator
+          ? 'you_are_spectating'.tr()
+          : myTurn
+          ? 'table_your_turn'.tr()
+          : state.phase == GamePhase.playing
+          ? 'table_waiting'.tr()
+          : _tablePhaseLabel(state.phase),
+      hint: spectator || state.phase != GamePhase.playing
+          ? ''
+          : (myTurn ? 'table_play_hint' : 'table_wait_or_queue').tr(),
+    );
   }
 
   String _tablePhaseLabel(GamePhase phase) => switch (phase) {
@@ -603,48 +936,74 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
     GamePhase.capturing => 'table_capturing'.tr(),
     GamePhase.roundScoring => 'table_scoring'.tr(),
     GamePhase.matchOver => 'match_over'.tr(),
-    GamePhase.shuffleVoting || GamePhase.rematchVoting => 'waiting_for_other_players'.tr(),
+    GamePhase.shuffleVoting ||
+    GamePhase.rematchVoting => 'waiting_for_other_players'.tr(),
     GamePhase.playing => 'table_wait_or_queue'.tr(),
   };
 
   Widget _cardFace(game_card.Card card, double width, double height) =>
-    CardWidget(card: card, width: width, height: height);
+      CardWidget(card: card, width: width, height: height);
 
   Widget _cardBack(double width, double height) => CardWidget(
     card: const game_card.Card(game_card.Suit.spades, game_card.Rank.ace),
-    isFaceUp: false, width: width, height: height);
+    isFaceUp: false,
+    width: width,
+    height: height,
+  );
 
   int _captureCount(MatchState state, String team) =>
-    (state.harvestStacks[team] ?? const <Capture>[])
-      .fold<int>(0, (count, capture) => count + capture.cardCount);
+      (state.harvestStacks[team] ?? const <Capture>[]).fold<int>(
+        0,
+        (count, capture) => count + capture.cardCount,
+      );
 
   void _showCaptures(BuildContext context) {
     showModalBottomSheet(
-      context: context, backgroundColor: TableStyle.ivory, isScrollControlled: true,
-      builder: (context) => SafeArea(child: SizedBox(
-        // Phone landscape needs room for a full card plus history controls.
-        height: MediaQuery.sizeOf(context).height *
-            (MediaQuery.sizeOf(context).width > MediaQuery.sizeOf(context).height ? 0.95 : 0.65),
-        // Read live state: an open sheet must clear when the next round starts.
-        child: Consumer(builder: (context, ref, _) {
-          final current = ref.watch(matchStateProvider);
-          final uid = ref.watch(currentUserProvider)?.uid;
-          final team = current == null || uid == null ? '' :
-            _getTeamOfPlayer(uid, current.playerIds);
-          return CaptureCardHistory(
-            captures: current?.harvestStacks[team] ?? const [],
-            title: 'table_capture_cards'.tr(),
-            explanation: 'table_capture_history_help'.tr(),
-            emptyLabel: 'table_no_captures'.tr(), faceBuilder: _cardFace,
-            statusLabel: current?.phase == GamePhase.playing &&
-                    current!.playerIds.indexOf(uid ?? '') == current.currentTurnIndex
-                ? 'table_your_turn'.tr() : 'table_waiting'.tr(),
-            latestLabel: 'table_latest'.tr(), backLabel: 'table_back_to_table'.tr(),
-            cardLabel: (card) => 'table_card_name'.tr(args: [
-              'table_rank_${card.rank.name}'.tr(), 'table_suit_${card.suit.name}'.tr()]),
-          );
-        }),
-      )),
+      context: context,
+      backgroundColor: TableStyle.ivory,
+      isScrollControlled: true,
+      builder: (context) => SafeArea(
+        child: SizedBox(
+          // Phone landscape needs room for a full card plus history controls.
+          height:
+              MediaQuery.sizeOf(context).height *
+              (MediaQuery.sizeOf(context).width >
+                      MediaQuery.sizeOf(context).height
+                  ? 0.95
+                  : 0.65),
+          // Read live state: an open sheet must clear when the next round starts.
+          child: Consumer(
+            builder: (context, ref, _) {
+              final current = ref.watch(matchStateProvider);
+              final uid = ref.watch(currentUserProvider)?.uid;
+              final team = current == null || uid == null
+                  ? ''
+                  : _getTeamOfPlayer(uid, current.playerIds);
+              return CaptureCardHistory(
+                captures: current?.harvestStacks[team] ?? const [],
+                title: 'table_capture_cards'.tr(),
+                explanation: 'table_capture_history_help'.tr(),
+                emptyLabel: 'table_no_captures'.tr(),
+                faceBuilder: _cardFace,
+                statusLabel:
+                    current?.phase == GamePhase.playing &&
+                        current!.playerIds.indexOf(uid ?? '') ==
+                            current.currentTurnIndex
+                    ? 'table_your_turn'.tr()
+                    : 'table_waiting'.tr(),
+                latestLabel: 'table_latest'.tr(),
+                backLabel: 'table_back_to_table'.tr(),
+                cardLabel: (card) => 'table_card_name'.tr(
+                  args: [
+                    'table_rank_${card.rank.name}'.tr(),
+                    'table_suit_${card.suit.name}'.tr(),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+      ),
     );
   }
 
@@ -661,10 +1020,14 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
     path.moveTo(size.width, halfWidth);
 
     for (double step = 0; step < fullAngle; step += degreesPerStep) {
-      path.lineTo(halfWidth + externalRadius * cos(step),
-          halfWidth + externalRadius * sin(step));
-      path.lineTo(halfWidth + internalRadius * cos(step + halfDegreesPerStep),
-          halfWidth + internalRadius * sin(step + halfDegreesPerStep));
+      path.lineTo(
+        halfWidth + externalRadius * cos(step),
+        halfWidth + externalRadius * sin(step),
+      );
+      path.lineTo(
+        halfWidth + internalRadius * cos(step + halfDegreesPerStep),
+        halfWidth + internalRadius * sin(step + halfDegreesPerStep),
+      );
     }
     path.close();
     return path;
@@ -694,7 +1057,10 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
             const SizedBox(width: 12),
             Text(
               'leave_game_title'.tr(),
-              style: const TextStyle(color: Colors.white, fontFamily: ThemeConfig.fontHeading),
+              style: const TextStyle(
+                color: Colors.white,
+                fontFamily: ThemeConfig.fontHeading,
+              ),
             ),
           ],
         ),
@@ -702,22 +1068,32 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
           'leave_game_warning'.tr(),
           style: const TextStyle(color: Colors.white70, fontSize: 14),
         ),
-        actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        actionsPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 12,
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('cancel'.tr(), style: const TextStyle(color: Colors.white38)),
+            child: Text(
+              'cancel'.tr(),
+              style: const TextStyle(color: Colors.white38),
+            ),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.redAccent,
               foregroundColor: Colors.white,
               elevation: 0,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
             ),
             onPressed: () async {
-              final left = await ref.read(matchStateProvider.notifier).leaveMatch();
+              final left = await ref
+                  .read(matchStateProvider.notifier)
+                  .leaveMatch();
               if (!left || !context.mounted) return;
               Navigator.pop(context); // Close dialog
               if (mounted) _returnToHome();
@@ -741,29 +1117,39 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
   }
 
   Widget _buildBoardCenter(
-    BuildContext context, 
-    WidgetRef ref, 
-    MatchState matchState, 
-    String myUid, 
-    bool isLandscape, 
-    {bool is3DActive = false}
-  ) {
+    BuildContext context,
+    WidgetRef ref,
+    MatchState matchState,
+    String myUid,
+    bool isLandscape, {
+    bool is3DActive = false,
+  }) {
     if (is3DActive) {
       return const SizedBox.shrink();
     }
 
-    if (matchState.phase == GamePhase.dealingFasha && matchState.cutLastCard != null) {
-      return Center(child: CardWidget(card: matchState.cutLastCard!, width: 96, height: 138));
+    if (matchState.phase == GamePhase.dealingFasha &&
+        matchState.cutLastCard != null) {
+      return Center(
+        child: CardWidget(
+          card: matchState.cutLastCard!,
+          width: 96,
+          height: 138,
+        ),
+      );
     }
     final isCapturing = matchState.phase == GamePhase.capturing;
     final collector = matchState.capturingTeam;
     final viewerTeam = _getTeamOfPlayer(myUid, matchState.playerIds);
-    final collectorLabel = collector == null ? null :
-        (viewerTeam.isEmpty
-          ? (collector == 'teamA' ? 'team_a' : 'team_b')
-          : (collector == viewerTeam ? 'my_team' : 'opponent_team')).tr();
+    final collectorLabel = collector == null
+        ? null
+        : (viewerTeam.isEmpty
+                  ? (collector == 'teamA' ? 'team_a' : 'team_b')
+                  : (collector == viewerTeam ? 'my_team' : 'opponent_team'))
+              .tr();
     final capturedCount = matchState.capturingCards.isNotEmpty
-        ? matchState.capturingCards.length : matchState.board.length;
+        ? matchState.capturingCards.length
+        : matchState.board.length;
     final localOrigins = ref.watch(localPlayOriginsProvider);
     final myIndex = matchState.playerIds.indexOf(myUid);
     final baseIndex = myIndex < 0 ? 0 : myIndex;
@@ -771,9 +1157,13 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
       final recorded = localOrigins[card.firebaseKey];
       if (recorded != null && recorded != Offset.zero) return recorded;
       final owner = matchState.cardOwnership[card.firebaseKey];
-      final ownerIndex = owner == null ? -1 : matchState.playerIds.indexOf(owner);
+      final ownerIndex = owner == null
+          ? -1
+          : matchState.playerIds.indexOf(owner);
       final relative = ownerIndex < 0
-          ? (isCapturing ? (matchState.currentTurnIndex - baseIndex + 4) % 4 : 2)
+          ? (isCapturing
+                ? (matchState.currentTurnIndex - baseIndex + 4) % 4
+                : 2)
           : (ownerIndex - baseIndex + 4) % 4;
       final measured = _seatOffset(relative);
       if (measured != null) {
@@ -797,9 +1187,11 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
       arrivalOffsets: {
         for (final card in matchState.board) card.firebaseKey: seatOrigin(card),
       },
-      captureToBottom: matchState.capturingTeam ==
+      captureToBottom:
+          matchState.capturingTeam ==
           (_getTeamOfPlayer(myUid, matchState.playerIds).isEmpty
-              ? 'teamA' : _getTeamOfPlayer(myUid, matchState.playerIds)),
+              ? 'teamA'
+              : _getTeamOfPlayer(myUid, matchState.playerIds)),
       backBuilder: _cardBack,
       captureOffset: _captureDestination(matchState, myUid),
       captureLabel: isCapturing && collectorLabel != null
@@ -816,8 +1208,11 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
 
   Offset? _captureDestination(MatchState state, String uid) {
     final viewer = _getTeamOfPlayer(uid, state.playerIds);
-    return _offsetFromBoard(state.capturingTeam == (viewer.isEmpty ? 'teamA' : viewer)
-        ? _ourPileKey : _rivalPileKey);
+    return _offsetFromBoard(
+      state.capturingTeam == (viewer.isEmpty ? 'teamA' : viewer)
+          ? _ourPileKey
+          : _rivalPileKey,
+    );
   }
 
   Widget _buildBasraOverlay(MatchState matchState, String myUid) {
@@ -832,40 +1227,55 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
     );
   }
 
-
-
-
-
-
-
-
-
-  Widget _buildLobbyOverlay(BuildContext context, WidgetRef ref, MatchState state, String currentUid) {
-    final humans = state.playerIds.where((id) =>
-      !id.startsWith('waiting_') && !id.startsWith('bot_')).toList();
-    final ready = humans.where((id) => state.botInjectionVotes[id] == true).length;
-    return Align(alignment: Alignment.bottomCenter,
-      child: Padding(padding: const EdgeInsets.all(12),
-        child: ConstrainedBox(constraints: BoxConstraints(maxWidth: 520,
-          maxHeight: MediaQuery.sizeOf(context).height * 0.82),
-          child: SingleChildScrollView(child: MatchWaitingRoomPanel(
-            roomId: state.id, currentUid: currentUid,
-            title: 'waiting_for_players'.tr(),
-            roomLabel: 'room_id_label'.tr(args: ['']).trim(),
-            waitingLabel: 'waiting_label'.tr(), youLabel: 'you'.tr(),
-            botLabel: 'bot_name'.tr(), playerLabel: 'player_default_name'.tr(),
-            readyLabel: 'ready_fill_bots'.tr(),
-            consentLabel: 'waiting_human_consent'.tr(args: [
-              ready.toString(), humans.length.toString()]),
-            fullLabel: 'room_full_starting'.tr(),
-            spectatorLabel: 'you_are_spectating'.tr(),
-            inviteLabel: 'invite_friends'.tr(),
-            failureLabel: 'match_action_retry'.tr(),
-            playerIds: state.playerIds, playerNames: state.playerNames,
-            botVotes: state.botInjectionVotes,
-            onInvite: () => _showInviteFriendDialog(context, ref, state, currentUid),
-            onReady: () => ref.read(matchStateProvider.notifier).voteForBots(currentUid),
-          )),
+  Widget _buildLobbyOverlay(
+    BuildContext context,
+    WidgetRef ref,
+    MatchState state,
+    String currentUid,
+  ) {
+    final humans = state.playerIds
+        .where((id) => !id.startsWith('waiting_') && !id.startsWith('bot_'))
+        .toList();
+    final ready = humans
+        .where((id) => state.botInjectionVotes[id] == true)
+        .length;
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: 520,
+            maxHeight: MediaQuery.sizeOf(context).height * 0.82,
+          ),
+          child: SingleChildScrollView(
+            child: MatchWaitingRoomPanel(
+              roomId: state.id,
+              currentUid: currentUid,
+              title: 'waiting_for_players'.tr(),
+              roomLabel: 'room_id_label'.tr(args: ['']).trim(),
+              waitingLabel: 'waiting_label'.tr(),
+              youLabel: 'you'.tr(),
+              botLabel: 'bot_name'.tr(),
+              playerLabel: 'player_default_name'.tr(),
+              readyLabel: 'ready_fill_bots'.tr(),
+              consentLabel: 'waiting_human_consent'.tr(
+                args: [ready.toString(), humans.length.toString()],
+              ),
+              fullLabel: 'room_full_starting'.tr(),
+              spectatorLabel: 'you_are_spectating'.tr(),
+              inviteLabel: 'invite_friends'.tr(),
+              failureLabel: 'match_action_retry'.tr(),
+              playerIds: state.playerIds,
+              playerNames: state.playerNames,
+              playerAvatars: state.playerAvatars,
+              botVotes: state.botInjectionVotes,
+              onInvite: () =>
+                  _showInviteFriendDialog(context, ref, state, currentUid),
+              onReady: () =>
+                  ref.read(matchStateProvider.notifier).voteForBots(currentUid),
+            ),
+          ),
         ),
       ),
     );
@@ -880,35 +1290,76 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
     return MatchResultView(
       key: ValueKey('${state.id}-${state.roundCount}-${state.phase.name}'),
       title: spectator ? 'match_over'.tr() : (won ? 'victory' : 'defeat').tr(),
-      subtitle: spectator ? 'you_are_spectating'.tr() : (won ? 'great_play' : 'better_luck').tr(),
+      subtitle: spectator
+          ? 'you_are_spectating'.tr()
+          : (won ? 'great_play' : 'better_luck').tr(),
       firstTeam: (spectator ? 'team_a' : 'my_team').tr(),
       secondTeam: (spectator ? 'team_b' : 'opponent_team').tr(),
       firstScore: firstIsA ? state.teamAScore : state.teamBScore,
       secondScore: firstIsA ? state.teamBScore : state.teamAScore,
+      firstPlayers: _resultPortraits(state, firstIsA ? 0 : 1),
+      secondPlayers: _resultPortraits(state, firstIsA ? 1 : 0),
+      firstWon: firstIsA == (winner == 'teamA'),
       stars: state.earnedStars[user.uid] ?? 0,
       coins: state.earnedCoins[user.uid] ?? 0,
-      starsLabel: 'stars_label'.tr(), coinsLabel: 'coins_label'.tr(),
-      homeLabel: 'return_home'.tr(), replayLabel: 'play_again'.tr(),
+      starsLabel: 'stars_label'.tr(),
+      coinsLabel: 'coins_label'.tr(),
+      homeLabel: 'return_home'.tr(),
+      replayLabel: 'play_again'.tr(),
       replayLeavesView: offline,
-      decision: state.phase == GamePhase.rematchVoting ? MatchChoicePanel(
-        key: ValueKey('${state.id}-${state.roundCount}-rematch-${state.matchSequence}'),
-        title: 'rematch_question'.tr(),
-        detail: state.rematchVotes.containsKey(user.uid) ? 'vote_recorded'.tr() :
-          'vote_progress'.tr(args: [
-            state.playerIds.where((id) => !id.startsWith('bot_') && state.rematchVotes.containsKey(id)).length.toString(),
-            state.playerIds.where((id) => !id.startsWith('bot_') && !id.startsWith('waiting_')).length.toString()]),
-        firstLabel: 'vote_yes'.tr(), secondLabel: 'vote_no'.tr(),
-        failureMessage: 'match_action_retry'.tr(),
-        voteStartedAt: state.phaseStartedAt,
-        countdownLabel: (seconds) => 'vote_countdown'.tr(args: [seconds.toString()]),
-        canVote: !spectator && !state.rematchVotes.containsKey(user.uid),
-        onFirst: () async {
-          if (!await ref.read(matchStateProvider.notifier).voteRematch(user.uid, true, expected: state)) throw StateError('vote_rejected');
-        },
-        onSecond: () async {
-          if (!await ref.read(matchStateProvider.notifier).voteRematch(user.uid, false, expected: state)) throw StateError('vote_rejected');
-        },
-      ) : Text('rematch_closed'.tr(), textAlign: TextAlign.center, style: TableStyle.label),
+      decision: state.phase == GamePhase.rematchVoting
+          ? MatchChoicePanel(
+              key: ValueKey(
+                '${state.id}-${state.roundCount}-rematch-${state.matchSequence}',
+              ),
+              title: 'rematch_question'.tr(),
+              detail: state.rematchVotes.containsKey(user.uid)
+                  ? 'vote_recorded'.tr()
+                  : 'vote_progress'.tr(
+                      args: [
+                        state.playerIds
+                            .where(
+                              (id) =>
+                                  !id.startsWith('bot_') &&
+                                  state.rematchVotes.containsKey(id),
+                            )
+                            .length
+                            .toString(),
+                        state.playerIds
+                            .where(
+                              (id) =>
+                                  !id.startsWith('bot_') &&
+                                  !id.startsWith('waiting_'),
+                            )
+                            .length
+                            .toString(),
+                      ],
+                    ),
+              firstLabel: 'vote_yes'.tr(),
+              secondLabel: 'vote_no'.tr(),
+              failureMessage: 'match_action_retry'.tr(),
+              voteStartedAt: state.phaseStartedAt,
+              countdownLabel: (seconds) =>
+                  'vote_countdown'.tr(args: [seconds.toString()]),
+              canVote: !spectator && !state.rematchVotes.containsKey(user.uid),
+              onFirst: () async {
+                if (!await ref
+                    .read(matchStateProvider.notifier)
+                    .voteRematch(user.uid, true, expected: state))
+                  throw StateError('vote_rejected');
+              },
+              onSecond: () async {
+                if (!await ref
+                    .read(matchStateProvider.notifier)
+                    .voteRematch(user.uid, false, expected: state))
+                  throw StateError('vote_rejected');
+              },
+            )
+          : Text(
+              'rematch_closed'.tr(),
+              textAlign: TextAlign.center,
+              style: TableStyle.label,
+            ),
       onHome: () async {
         final left = await ref.read(matchStateProvider.notifier).leaveMatch();
         if (left && mounted) _returnToHome();
@@ -916,7 +1367,48 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
       },
     );
   }
-  void _showInviteFriendDialog(BuildContext context, WidgetRef ref, MatchState state, String currentUid) {
+
+  Widget _resultPortraits(MatchState state, int parity) => Row(
+    mainAxisAlignment: MainAxisAlignment.center,
+    children: [
+      for (var index = parity; index < state.playerIds.length; index += 2)
+        Flexible(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                UserAvatar(
+                  radius: 32,
+                  user: AppUser(
+                    uid: state.playerIds[index],
+                    email: '',
+                    displayName:
+                        state.playerNames[state.playerIds[index]] ??
+                        'player_default_name'.tr(),
+                    avatarUrl: state.playerAvatars[state.playerIds[index]],
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  state.playerNames[state.playerIds[index]] ??
+                      'player_default_name'.tr(),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TableStyle.detail.copyWith(color: TableStyle.ink),
+                ),
+              ],
+            ),
+          ),
+        ),
+    ],
+  );
+  void _showInviteFriendDialog(
+    BuildContext context,
+    WidgetRef ref,
+    MatchState state,
+    String currentUid,
+  ) {
     final currentUser = ref.read(currentUserProvider);
     if (currentUser == null) return;
 
@@ -925,45 +1417,78 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
       builder: (context) {
         return AlertDialog(
           backgroundColor: Colors.grey[900],
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Text('invite_friends'.tr(), style: const TextStyle(color: Colors.white)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: Text(
+            'invite_friends'.tr(),
+            style: const TextStyle(color: Colors.white),
+          ),
           content: SizedBox(
             width: double.maxFinite,
-            child: currentUser.friends.isEmpty 
-              ? Text('no_friends_yet'.tr(), style: const TextStyle(color: Colors.white70))
-              : ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: currentUser.friends.length,
-                  itemBuilder: (context, index) {
-                    final friendId = currentUser.friends[index];
-                    return FutureBuilder<List<AppUser>>(
-                      future: ref.read(multiplayerSyncServiceProvider).searchUsers(friendId),
-                      builder: (context, snap) {
-                        final friend = snap.data?.firstWhere((u) => u.uid == friendId, orElse: () => AppUser(uid: friendId, email: '', displayName: 'player_default_name'.tr()));
-                        return ListTile(
-                          title: Text(friend?.displayName ?? 'player_default_name'.tr(), style: const TextStyle(color: Colors.white)),
-                          trailing: ElevatedButton(
-                            style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white),
-                            child: Text('send'.tr()),
-                            onPressed: () async {
-                              try {
-                                await ref.read(multiplayerSyncServiceProvider).sendInvite(friendId, state.id);
-                                if (!context.mounted) return;
-                                Navigator.pop(context);
-                                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('invitation_sent'.tr())));
-                              } catch (e) {
-                                if (!context.mounted) return;
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text(ErrorHandler.getAuthErrorMessage(e))),
-                                );
-                              }
-                            },
-                          ),
-                        );
-                      },
-                    );
-                  },
-                ),
+            child: currentUser.friends.isEmpty
+                ? Text(
+                    'no_friends_yet'.tr(),
+                    style: const TextStyle(color: Colors.white70),
+                  )
+                : ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: currentUser.friends.length,
+                    itemBuilder: (context, index) {
+                      final friendId = currentUser.friends[index];
+                      return FutureBuilder<List<AppUser>>(
+                        future: ref
+                            .read(multiplayerSyncServiceProvider)
+                            .searchUsers(friendId),
+                        builder: (context, snap) {
+                          final friend = snap.data?.firstWhere(
+                            (u) => u.uid == friendId,
+                            orElse: () => AppUser(
+                              uid: friendId,
+                              email: '',
+                              displayName: 'player_default_name'.tr(),
+                            ),
+                          );
+                          return ListTile(
+                            title: Text(
+                              friend?.displayName ?? 'player_default_name'.tr(),
+                              style: const TextStyle(color: Colors.white),
+                            ),
+                            trailing: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.teal,
+                                foregroundColor: Colors.white,
+                              ),
+                              child: Text('send'.tr()),
+                              onPressed: () async {
+                                try {
+                                  await ref
+                                      .read(multiplayerSyncServiceProvider)
+                                      .sendInvite(friendId, state.id);
+                                  if (!context.mounted) return;
+                                  Navigator.pop(context);
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('invitation_sent'.tr()),
+                                    ),
+                                  );
+                                } catch (e) {
+                                  if (!context.mounted) return;
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        ErrorHandler.getAuthErrorMessage(e),
+                                      ),
+                                    ),
+                                  );
+                                }
+                              },
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  ),
           ),
         );
       },
@@ -984,11 +1509,20 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.visibility_outlined, color: ThemeConfig.goldAccent, size: 16),
+            const Icon(
+              Icons.visibility_outlined,
+              color: ThemeConfig.goldAccent,
+              size: 16,
+            ),
             const SizedBox(width: 8),
             Text(
               'spectating_label'.tr().toUpperCase(),
-              style: const TextStyle(color: ThemeConfig.goldAccent, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1),
+              style: const TextStyle(
+                color: ThemeConfig.goldAccent,
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1,
+              ),
             ),
           ],
         ),
@@ -996,21 +1530,27 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
     );
   }
 
-  void _showPlayerProfile(BuildContext context, WidgetRef ref, MatchState matchState, String myUid, int offset) {
+  void _showPlayerProfile(
+    BuildContext context,
+    WidgetRef ref,
+    MatchState matchState,
+    String myUid,
+    int offset,
+  ) {
     if (matchState.playerIds.isEmpty) return;
-    
+
     final absoluteIndex = _getAbsoluteIndex(matchState, myUid, offset);
-    final targetPlayerId = matchState.playerIds[absoluteIndex % matchState.playerIds.length];
-    
+    final targetPlayerId =
+        matchState.playerIds[absoluteIndex % matchState.playerIds.length];
+
     // Don't show for bots
     if (targetPlayerId.startsWith('bot_')) return;
-    
+
     final user = _getAvatarUser(ref, matchState, myUid, offset);
-    
+
     showDialog(
       context: context,
       builder: (context) => PlayerProfilePreview(user: user),
     );
   }
 }
-

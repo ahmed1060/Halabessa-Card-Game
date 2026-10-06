@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'table_style.dart';
 import 'match_table_layout.dart';
 import '../../../../core/widgets/lantern_page_frame.dart';
+import '../../../../core/widgets/lantern_panel.dart';
 
 /// The only final-results surface. It owns no match rules or reward writes.
 class MatchResultView extends StatefulWidget {
@@ -13,6 +14,8 @@ class MatchResultView extends StatefulWidget {
   final FutureOr<bool> Function()? onReplay;
   final bool replayLeavesView;
   final Widget? decision;
+  final Widget? firstPlayers, secondPlayers;
+  final bool firstWon;
   const MatchResultView({
     super.key,
     required this.title,
@@ -31,6 +34,9 @@ class MatchResultView extends StatefulWidget {
     this.onReplay,
     this.replayLeavesView = true,
     this.decision,
+    this.firstPlayers,
+    this.secondPlayers,
+    this.firstWon = true,
   });
 
   @override
@@ -93,7 +99,9 @@ class _MatchResultViewState extends State<MatchResultView> {
                   MediaQuery.textScalerOf(context).scale(14) <= 20;
               return Center(
                 child: SingleChildScrollView(
-                  padding: EdgeInsets.all(compact && widget.decision != null ? 12 : 20),
+                  padding: EdgeInsets.all(
+                    compact && widget.decision != null ? 12 : 20,
+                  ),
                   child: ConstrainedBox(
                     constraints: BoxConstraints(maxWidth: compact ? 880 : 440),
                     child: compact
@@ -102,7 +110,10 @@ class _MatchResultViewState extends State<MatchResultView> {
                             children: [
                               Expanded(child: _summary(compact: true)),
                               const SizedBox(width: 32),
-                              Expanded(flex: widget.decision != null ? 2 : 1, child: _details(compact: true)),
+                              Expanded(
+                                flex: widget.decision != null ? 2 : 1,
+                                child: _details(compact: true),
+                              ),
                             ],
                           )
                         : Column(
@@ -124,62 +135,110 @@ class _MatchResultViewState extends State<MatchResultView> {
     ),
   );
 
-  Widget _summary({bool compact = false}) => Column(
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      SizedBox(
-        height: compact ? 56 : 80,
-        child: const FittedBox(child: LanternWordmark()),
-      ),
-      SizedBox(height: compact ? 12 : 24),
-      Icon(
-        Icons.emoji_events_rounded,
-        size: compact ? 42 : 52,
-        color: TableStyle.brass,
-      ),
-      const SizedBox(height: 12),
-      Text(
-        widget.title,
-        textAlign: TextAlign.center,
-        style: TableStyle.label.copyWith(
-          fontSize: 28,
-          fontWeight: FontWeight.bold,
+  Widget _summary({bool compact = false}) => LanternPanel(
+    padding: EdgeInsets.all(compact ? 16 : 24),
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          height: compact ? 56 : 80,
+          child: const FittedBox(child: LanternWordmark()),
+        ),
+        SizedBox(height: compact ? 12 : 24),
+        Icon(
+          Icons.emoji_events_rounded,
+          size: compact ? 42 : 52,
           color: TableStyle.brass,
         ),
-      ),
-      const SizedBox(height: 8),
-      Text(
-        widget.subtitle,
-        textAlign: TextAlign.center,
-        style: TableStyle.label,
-      ),
-    ],
+        const SizedBox(height: 12),
+        Text(
+          widget.title,
+          textAlign: TextAlign.center,
+          style: TableStyle.label.copyWith(
+            fontSize: 28,
+            fontWeight: FontWeight.bold,
+            color: TableStyle.ink,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          widget.subtitle,
+          textAlign: TextAlign.center,
+          style: TableStyle.label.copyWith(color: TableStyle.ink),
+        ),
+        if ((widget.firstWon ? widget.firstPlayers : widget.secondPlayers) !=
+            null) ...[
+          const SizedBox(height: 16),
+          (widget.firstWon ? widget.firstPlayers : widget.secondPlayers)!,
+          const SizedBox(height: 8),
+          Text(
+            widget.firstWon ? widget.firstTeam : widget.secondTeam,
+            style: TableStyle.label.copyWith(color: TableStyle.ink),
+          ),
+        ],
+        if ((widget.firstWon ? widget.secondPlayers : widget.firstPlayers) !=
+                null &&
+            !compact) ...[
+          const SizedBox(height: 16),
+          (widget.firstWon ? widget.secondPlayers : widget.firstPlayers)!,
+          const SizedBox(height: 8),
+          Text(
+            widget.firstWon ? widget.secondTeam : widget.firstTeam,
+            style: TableStyle.detail.copyWith(color: TableStyle.ink),
+          ),
+        ],
+      ],
+    ),
   );
 
   Widget _details({bool compact = false}) => Column(
     mainAxisSize: MainAxisSize.min,
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
-      if (compact && widget.decision != null) Row(children: [
-        Expanded(child: _score(widget.firstTeam, widget.firstScore, TableStyle.mint, compact: true)),
-        const SizedBox(width: 8),
-        Expanded(child: _score(widget.secondTeam, widget.secondScore, TableStyle.red, compact: true)),
-      ]) else ...[
-      _score(
-        widget.firstTeam,
-        widget.firstScore,
-        TableStyle.mint,
-        compact: compact,
-      ),
-      const SizedBox(height: 8),
-      _score(
-        widget.secondTeam,
-        widget.secondScore,
-        TableStyle.red,
-        compact: compact,
-      ),
+      if (compact && widget.decision != null)
+        Row(
+          children: [
+            Expanded(
+              child: _score(
+                widget.firstTeam,
+                widget.firstScore,
+                TableStyle.mint,
+                compact: true,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _score(
+                widget.secondTeam,
+                widget.secondScore,
+                TableStyle.red,
+                compact: true,
+              ),
+            ),
+          ],
+        )
+      else ...[
+        _score(
+          widget.firstTeam,
+          widget.firstScore,
+          TableStyle.mint,
+          compact: compact,
+        ),
+        const SizedBox(height: 8),
+        _score(
+          widget.secondTeam,
+          widget.secondScore,
+          TableStyle.red,
+          compact: compact,
+        ),
       ],
-      SizedBox(height: compact && widget.decision != null ? 6 : compact ? 12 : 16),
+      SizedBox(
+        height: compact && widget.decision != null
+            ? 6
+            : compact
+            ? 12
+            : 16,
+      ),
       Wrap(
         alignment: WrapAlignment.center,
         spacing: 24,
@@ -193,9 +252,16 @@ class _MatchResultViewState extends State<MatchResultView> {
           ),
         ],
       ),
-      SizedBox(height: compact && widget.decision != null ? 6 : compact ? 12 : 20),
+      SizedBox(
+        height: compact && widget.decision != null
+            ? 6
+            : compact
+            ? 12
+            : 20,
+      ),
       if (widget.decision != null) ...[
-        widget.decision!, const SizedBox(height: 10),
+        widget.decision!,
+        const SizedBox(height: 10),
       ],
       if (widget.onReplay != null) ...[
         FilledButton(

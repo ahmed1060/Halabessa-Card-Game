@@ -106,3 +106,24 @@ Server-controlled new online rooms are enabled by default. Production creation/s
 - Local proof images: `build/ui-store-stage1.jpg` and `build/ui-store-preview-stage1.jpg` (not committed assets).
 
 Next: shared navigation/header/category composition, featured store presentation and the table/motion pass. No gameplay, account deletion, paid-service or backend-channel changes were made in this batch.
+
+## Combined UI completion checkpoint — 6 October 2026
+
+The approved visual/component pass is implemented as one publishing batch with the first local store commit. The frontend-design review kept the approved lantern-café palette and composition; it did not introduce a replacement theme. This is not a pixel-identical or app-store-ready certification.
+
+- G1: explicit physical-seat portrait/landscape composition; hand below the arena; shared collection panels above the hand in portrait and alongside it in landscape. Compact landscape portraits and dealer-deck offsets were checked in the local browser. RTL does not reverse physical seat or animation anchors. Existing motion queue, gameplay deadlines and reduced-motion behavior remain in place.
+- G2: five-destination navigation dock, actual XP treatment, four lobby actions, modal join flow, illustrated mode choices and shared four-difficulty practice selector.
+- G3: public player portraits in the waiting room, ivory decision/phase panels, real public capture/card totals with explicitly cumulative match scores, winning-team portraits and ivory results presentation. Replay and shuffle policies are unchanged.
+- G4: featured-deck carousel with actual ownership/equip/purchase actions, paired face/back owned collection tiles, shared profile/navigation presentation and compact leaderboard podium with readable selected categories.
+- G5: navy/mint presentation for settings, rewards, social and chat. Confirmed reset changes only presentation preferences and preserves account, inventory and room values.
+- G6: tabbed rules-correct interactive help, illustrated recovery fan, a distinct ended-practice restart state, guest Google/Facebook linking with pending/error guards, and truthful account-data/support information routes.
+- Added regressions for navigation sizing/taps, guest linking pending/failure states, help interaction, terminal recovery, settings reset isolation, localized deadline labels and long profile names in both text directions at enlarged text sizes. Complete Flutter suite: 309 passed; authoritative backend suite: 89 passed. Analyzer reports no errors, with existing warning/info debt still present. UI translation keys are present in all three locales.
+- Browser comparison/proof: `build/ui-table-landscape-final.jpg`, `build/ui-table-portrait-final.jpg`, `build/ui-help-final.jpg`, and `build/ui-store-portrait-stage2.jpg`. These are local QA artifacts, not shipped image assets. Desktop browser checks do not establish physical-device acceptance.
+
+### Intentional differences and remaining release work
+
+- Detailed per-round bonus rows require a public authoritative score breakdown. The UI displays only real available capture/card totals and cumulative scores, not fabricated mockup numbers.
+- Weekly leaderboards, presence-based filters and private team/global chat channels remain excluded pending separate functional approval and backend semantics.
+- No account-deletion confirmation is offered without an actual deletion API. Signing out is explicitly not deletion. A configured support destination and published privacy/legal policy remain release requirements; information screens are not substitutes for them. Google/Facebook guest linking uses existing flows; native provider success and Apple guest linking are not claimed by this visual work.
+- Browser orientation follows the device/browser; native preference remains landscape by default. Small screens and enlarged text intentionally adapt composition instead of preserving unreadable reference proportions.
+- Physical iPhone/Android testing, native authentication configuration, mobile CI/build acceptance and store-policy compliance are separate release gates. No player data or QA fixtures were deleted, no balances/prices changed, and no paid service was enabled.

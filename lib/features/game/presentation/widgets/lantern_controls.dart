@@ -45,6 +45,8 @@ class LanternTurnBadge extends StatelessWidget {
   final bool active;
   final DateTime? turnStarted;
   final int turnSeconds;
+  final String Function(int)? countdownLabel;
+  final String Function(int)? countdownSemantics;
   const LanternTurnBadge({
     super.key,
     required this.title,
@@ -52,6 +54,8 @@ class LanternTurnBadge extends StatelessWidget {
     required this.active,
     this.turnStarted,
     this.turnSeconds = 0,
+    this.countdownLabel,
+    this.countdownSemantics,
   });
   @override
   Widget build(BuildContext context) => Semantics(
@@ -102,6 +106,8 @@ class LanternTurnBadge extends StatelessWidget {
                       TurnCountdown(
                         started: turnStarted!,
                         seconds: turnSeconds,
+                        label: countdownLabel,
+                        semanticsLabel: countdownSemantics,
                       ),
                   ],
                 ),
@@ -136,10 +142,14 @@ class LanternTurnBadge extends StatelessWidget {
 class TurnCountdown extends StatefulWidget {
   final DateTime started;
   final int seconds;
+  final String Function(int)? label;
+  final String Function(int)? semanticsLabel;
   const TurnCountdown({
     super.key,
     required this.started,
     required this.seconds,
+    this.label,
+    this.semanticsLabel,
   });
   @override
   State<TurnCountdown> createState() => _TurnCountdownState();
@@ -169,13 +179,15 @@ class _TurnCountdownState extends State<TurnCountdown> {
         .inMilliseconds;
     final remaining = (remainingMs / 1000).ceil().clamp(0, widget.seconds);
     return Semantics(
-      label: '$remaining seconds remaining',
+      label:
+          widget.semanticsLabel?.call(remaining) ??
+          '$remaining seconds remaining',
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           const Icon(Icons.timer_outlined, size: 18, color: TableStyle.ink),
           Text(
-            '${remaining}s',
+            widget.label?.call(remaining) ?? '${remaining}s',
             key: const ValueKey('local-turn-countdown'),
             textDirection: TextDirection.ltr,
             style: TableStyle.label.copyWith(

@@ -4,6 +4,31 @@ import 'package:halabessa/core/providers/settings_provider.dart';
 
 void main() {
   test(
+    'presentation reset preserves account, inventory and room preferences',
+    () async {
+      SharedPreferences.setMockInitialValues({
+        'isMusicEnabled': false,
+        'reducedMotion': true,
+        'gameOrientation': 'portrait',
+        'languageCode': 'ar',
+        'authToken': 'unchanged',
+        'ownedItems': ['default_card', 'deck'],
+        'activeRoomId': 'unchanged-room',
+      });
+      final prefs = await SharedPreferences.getInstance();
+      final settings = SettingsNotifier(prefs);
+      await settings.resetPresentationDefaults();
+      expect(settings.state.isMusicEnabled, isTrue);
+      expect(settings.state.reducedMotion, isFalse);
+      expect(settings.state.gameOrientation, GameOrientation.landscape);
+      expect(settings.state.languageCode, 'en');
+      expect(prefs.getString('authToken'), 'unchanged');
+      expect(prefs.getStringList('ownedItems'), ['default_card', 'deck']);
+      expect(prefs.getString('activeRoomId'), 'unchanged-room');
+      settings.dispose();
+    },
+  );
+  test(
     'game orientation defaults to landscape and persists portrait',
     () async {
       SharedPreferences.setMockInitialValues({});

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'table_style.dart';
+import '../../../../core/widgets/user_avatar.dart';
+import '../../../auth/domain/models/app_user.dart';
 
 /// The pre-match room controls. The table stays visible behind this compact
 /// panel, while a pending bot-consent request cannot be submitted twice.
@@ -9,6 +11,7 @@ class MatchWaitingRoomPanel extends StatefulWidget {
   final String spectatorLabel, inviteLabel, failureLabel;
   final List<String> playerIds;
   final Map<String, String> playerNames;
+  final Map<String, String> playerAvatars;
   final Map<String, bool> botVotes;
   final VoidCallback? onInvite;
   final Future<void> Function()? onReady;
@@ -31,6 +34,7 @@ class MatchWaitingRoomPanel extends StatefulWidget {
     required this.failureLabel,
     required this.playerIds,
     required this.playerNames,
+    this.playerAvatars = const {},
     required this.botVotes,
     this.onInvite,
     this.onReady,
@@ -158,29 +162,43 @@ class _MatchWaitingRoomPanelState extends State<MatchWaitingRoomPanel> {
                           : (constraints.maxWidth - 10) / 2,
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF3B274C),
+                        color: TableStyle.ink,
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
                           color: widget.botVotes[widget.playerIds[i]] == true
                               ? const Color(0xFF78D2AF)
-                              : TableStyle.muted,
+                              : i.isEven
+                              ? TableStyle.mint
+                              : TableStyle.red,
                         ),
                       ),
                       child: Row(
                         children: [
-                          CircleAvatar(
-                            radius: 16,
-                            backgroundColor: TableStyle.felt,
-                            child: Icon(
-                              widget.playerIds[i].startsWith('waiting_')
-                                  ? Icons.hourglass_empty
-                                  : widget.playerIds[i].startsWith('bot_')
-                                  ? Icons.smart_toy_outlined
-                                  : Icons.person_outline,
-                              color: TableStyle.ivory,
-                              size: 18,
+                          if (!widget.playerIds[i].startsWith('waiting_'))
+                            UserAvatar(
+                              user: AppUser(
+                                uid: widget.playerIds[i],
+                                email: '',
+                                displayName: _name(widget.playerIds[i]),
+                                avatarUrl:
+                                    widget.playerAvatars[widget.playerIds[i]],
+                              ),
+                              radius: 28,
+                            )
+                          else
+                            CircleAvatar(
+                              radius: 28,
+                              backgroundColor: TableStyle.felt,
+                              child: Icon(
+                                widget.playerIds[i].startsWith('waiting_')
+                                    ? Icons.hourglass_empty
+                                    : widget.playerIds[i].startsWith('bot_')
+                                    ? Icons.smart_toy_outlined
+                                    : Icons.person_outline,
+                                color: TableStyle.ivory,
+                                size: 18,
+                              ),
                             ),
-                          ),
                           const SizedBox(width: 10),
                           Expanded(
                             child: Text(

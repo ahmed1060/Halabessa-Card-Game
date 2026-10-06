@@ -1,5 +1,6 @@
 import 'package:halabessa/features/game/presentation/widgets/match_table_layout.dart';
 import 'package:flutter/material.dart';
+import 'package:halabessa/features/game/presentation/widgets/table_style.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easy_localization/easy_localization.dart';
@@ -88,12 +89,12 @@ class _DailyStreakDialogState extends ConsumerState<DailyStreakDialog> {
             ),
             borderRadius: BorderRadius.circular(28),
             border: Border.all(
-              color: ThemeConfig.goldAccent.withOpacity(0.4),
+              color: TableStyle.brass.withOpacity(0.4),
               width: 1.5,
             ),
             boxShadow: [
               BoxShadow(
-                color: ThemeConfig.goldAccent.withOpacity(0.2),
+                color: TableStyle.brass.withOpacity(0.2),
                 blurRadius: 24,
                 offset: const Offset(0, 8),
               ),
@@ -118,12 +119,12 @@ class _DailyStreakDialogState extends ConsumerState<DailyStreakDialog> {
                         Container(
                           padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
-                            color: ThemeConfig.goldAccent.withOpacity(0.15),
+                            color: TableStyle.brass.withOpacity(0.15),
                             shape: BoxShape.circle,
                           ),
                           child: const Icon(
                             Icons.stars_rounded,
-                            color: ThemeConfig.goldAccent,
+                            color: TableStyle.brass,
                             size: 28,
                           ),
                         ),
@@ -146,9 +147,7 @@ class _DailyStreakDialogState extends ConsumerState<DailyStreakDialog> {
                                   args: [status.currentStreak.toString()],
                                 ),
                                 style: TextStyle(
-                                  color: ThemeConfig.goldAccent.withOpacity(
-                                    0.9,
-                                  ),
+                                  color: TableStyle.brass.withOpacity(0.9),
                                   fontSize: 12,
                                 ),
                               ),
@@ -179,17 +178,23 @@ class _DailyStreakDialogState extends ConsumerState<DailyStreakDialog> {
 
                   return Container(
                     width: isBigReward ? 140 : 66,
-                    constraints: BoxConstraints(minHeight: 94 * MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 2.0)),
+                    constraints: BoxConstraints(
+                      minHeight:
+                          94 *
+                          MediaQuery.textScalerOf(
+                            context,
+                          ).scale(1).clamp(1.0, 2.0),
+                    ),
                     decoration: BoxDecoration(
                       color: isCurrent
-                          ? ThemeConfig.goldAccent.withOpacity(0.2)
+                          ? TableStyle.brass.withOpacity(0.2)
                           : (isPast
                                 ? Colors.white.withOpacity(0.04)
                                 : Colors.black.withOpacity(0.25)),
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
                         color: isCurrent
-                            ? ThemeConfig.goldAccent
+                            ? TableStyle.brass
                             : (isPast
                                   ? Colors.green.withOpacity(0.5)
                                   : Colors.white10),
@@ -207,7 +212,7 @@ class _DailyStreakDialogState extends ConsumerState<DailyStreakDialog> {
                           'day_label'.tr(args: [reward.day.toString()]),
                           style: TextStyle(
                             color: isCurrent
-                                ? ThemeConfig.goldAccent
+                                ? TableStyle.brass
                                 : Colors.white70,
                             fontSize: 11,
                             fontWeight: FontWeight.bold,
@@ -225,8 +230,8 @@ class _DailyStreakDialogState extends ConsumerState<DailyStreakDialog> {
                                 ? Icons.diamond
                                 : Icons.monetization_on_rounded,
                             color: reward.diamonds > 0
-                                ? ThemeConfig.primaryTeal
-                                : ThemeConfig.goldAccent,
+                                ? TableStyle.mint
+                                : TableStyle.brass,
                             size: 26,
                           ),
                           Text(
@@ -242,7 +247,7 @@ class _DailyStreakDialogState extends ConsumerState<DailyStreakDialog> {
                           Text(
                             '+${reward.diamonds} 💎',
                             style: const TextStyle(
-                              color: ThemeConfig.primaryTeal,
+                              color: TableStyle.mint,
                               fontSize: 10,
                             ),
                           ),

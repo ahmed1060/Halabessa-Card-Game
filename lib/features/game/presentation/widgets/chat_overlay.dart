@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:halabessa/features/game/presentation/widgets/table_style.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easy_localization/easy_localization.dart';
 import '../providers/chat_providers.dart';
@@ -75,7 +76,7 @@ class _ChatOverlayState extends ConsumerState<ChatOverlay> {
       child: Container(
         width: panelWidth,
         decoration: const BoxDecoration(
-          color: Color(0xFF3B274C),
+          color: TableStyle.ink,
           boxShadow: [
             BoxShadow(color: Colors.black54, blurRadius: 20, spreadRadius: 5),
           ],
@@ -90,7 +91,7 @@ class _ChatOverlayState extends ConsumerState<ChatOverlay> {
                   children: [
                     const Icon(
                       Icons.chat_bubble_outline,
-                      color: ThemeConfig.primaryTeal,
+                      color: TableStyle.mint,
                     ),
                     const SizedBox(width: 12),
                     Text(
@@ -195,7 +196,7 @@ class _ChatOverlayState extends ConsumerState<ChatOverlay> {
                                   ),
                                   decoration: BoxDecoration(
                                     color: isMe
-                                        ? ThemeConfig.primaryTeal
+                                        ? TableStyle.mint
                                         : Colors.white,
                                     borderRadius: BorderRadius.circular(12),
                                     border: Border.all(
@@ -256,10 +257,7 @@ class _ChatOverlayState extends ConsumerState<ChatOverlay> {
                     ),
                     const SizedBox(width: 8),
                     IconButton(
-                      icon: const Icon(
-                        Icons.send,
-                        color: ThemeConfig.primaryTeal,
-                      ),
+                      icon: const Icon(Icons.send, color: TableStyle.mint),
                       onPressed: () => _sendMessage(_controller.text),
                     ),
                   ],

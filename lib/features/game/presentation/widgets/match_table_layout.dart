@@ -196,216 +196,174 @@ class MatchTableLayout extends StatelessWidget {
     },
   );
 
-  /// G1's table composition, rather than a recoloured legacy hand tray.
-  /// A scrolling arena is the accessibility fallback; the hand remains fixed.
+  /// One physical table coordinate system for seats, hands and card flights.
+  /// At normal text sizes G1's hand stays below the arena in both orientations.
+  /// Large text uses a scrolling layout rather than shrinking readable content.
   Widget _lanternComposition(BuildContext context, BoxConstraints bounds) {
-    final wide = bounds.maxWidth >= 700 && bounds.maxWidth > bounds.maxHeight;
-    final scale = MediaQuery.textScalerOf(context).scale(14) / 14;
-    final sideWidth = wide ? 110.0 : 82.0;
-    final boardHeight = wide ? 220.0 : 190.0;
-    final arena = Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (scale <= 1.2)
-          SizedBox(
-            height: 285,
-            child: Stack(
-              children: [
-                Align(alignment: Alignment.topCenter, child: partner),
-                Positioned(
-                  left: 0,
-                  bottom: 0,
-                  width: sideWidth,
-                  child: leftOpponent,
-                ),
-                Positioned(
-                  right: 0,
-                  bottom: 0,
-                  width: sideWidth,
-                  child: rightOpponent,
-                ),
-                Positioned(
-                  left: sideWidth,
-                  right: sideWidth,
-                  bottom: 0,
-                  height: 160,
-                  child: Center(
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: SizedBox(
-                        width: wide ? 300 : 230,
-                        height: 160,
-                        child: board,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+    final wide = bounds.maxWidth > bounds.maxHeight && bounds.maxWidth >= 700;
+    final largeText = MediaQuery.textScalerOf(context).scale(14) > 18;
+    final shortLandscape = wide && bounds.maxHeight < 500 && !largeText;
+    Widget remoteSeat(Widget seat) => shortLandscape
+        ? SizedBox(
+            height: 146,
+            child: FittedBox(fit: BoxFit.scaleDown, child: seat),
           )
-        else ...[
-          Padding(padding: const EdgeInsets.only(top: 4), child: partner),
-          SizedBox(
-            height: math.max(boardHeight, 250 * scale),
-            child: Row(
-              textDirection: TextDirection.ltr,
-              children: [
-                SizedBox(width: sideWidth, child: leftOpponent),
-                Expanded(
-                  child: Center(
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: SizedBox(
-                        width: wide ? 300 : 230,
-                        height: boardHeight,
-                        child: board,
-                      ),
-                    ),
-                  ),
-                ),
-                SizedBox(width: sideWidth, child: rightOpponent),
-              ],
-            ),
-          ),
-        ],
-        if (!wide)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-            child: collections!,
-          ),
-      ],
-    );
-    final handArea = ConstrainedBox(
-      key: const ValueKey('table-hand-tray'),
-      constraints: const BoxConstraints(minHeight: 168),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(8, 6, 8, 4),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            status,
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                // Balance the dealer slot, so the fan stays on the board axis.
-                if (localSeat != null) const SizedBox(width: 44),
-                Expanded(child: hand),
-                if (localSeat != null) SizedBox(width: 44, child: localSeat!),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-    if (wide && bounds.maxHeight < 600 && scale <= 1.2) {
-      // Fit one complete table into the live viewport. Do not scroll seats out
-      // from under the scoreboard or clip the player's playable card faces.
-      // FittedBox applies the same transform to painting and hit testing.
-      return Column(
-        children: [
-          header,
-          Expanded(
-            child: LayoutBuilder(
-              builder: (context, available) => Row(
+        : seat;
+    final arena = largeText
+        ? Column(
+            children: [
+              partner,
+              Row(
                 textDirection: TextDirection.ltr,
-                children: [
-                  Expanded(
-                    child: FittedBox(
-                      fit: BoxFit.contain,
-                      child: SizedBox(width: 520, height: 285, child: arena),
-                    ),
-                  ),
-                  SizedBox(
-                    width: math.min(360, bounds.maxWidth * .36),
-                    child: FittedBox(
-                      fit: BoxFit.contain,
-                      child: SizedBox(
-                        width: 340,
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.all(6),
-                              child: collections!,
-                            ),
-                            handArea,
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          controls,
-        ],
-      );
-    }
-    if (wide && bounds.maxHeight < 600) {
-      return Column(
-        children: [
-          header,
-          Expanded(
-            child: SingleChildScrollView(
-              child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(child: arena),
-                  SizedBox(
-                    width: math.min(360, bounds.maxWidth * .43),
-                    child: Column(
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.all(8),
-                          child: collections!,
-                        ),
-                        handArea,
-                      ],
-                    ),
-                  ),
+                  Expanded(child: leftOpponent),
+                  Expanded(child: rightOpponent),
                 ],
               ),
+              const SizedBox(height: 12),
+              SizedBox(height: 160, child: board),
+            ],
+          )
+        : SizedBox(
+            height: shortLandscape
+                ? 260
+                : wide
+                ? 320
+                : 310,
+            child: Stack(
+              children: [
+                Align(
+                  alignment: Alignment.topCenter,
+                  child: remoteSeat(partner),
+                ),
+                Positioned(
+                  left: wide ? 20 : 0,
+                  top: shortLandscape
+                      ? 50
+                      : wide
+                      ? 74
+                      : 132,
+                  width: wide ? 130 : 84,
+                  child: remoteSeat(leftOpponent),
+                ),
+                Positioned(
+                  right: wide ? 20 : 0,
+                  top: shortLandscape
+                      ? 50
+                      : wide
+                      ? 74
+                      : 132,
+                  width: wide ? 130 : 84,
+                  child: remoteSeat(rightOpponent),
+                ),
+                Positioned(
+                  left: wide ? 190 : 90,
+                  right: wide ? 190 : 90,
+                  bottom: 0,
+                  height: shortLandscape
+                      ? 100
+                      : wide
+                      ? 160
+                      : 140,
+                  child: Center(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: SizedBox(
+                        width: wide ? 340 : 250,
+                        height: wide ? 160 : 140,
+                        child: board,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
+          );
+    final handArea = ConstrainedBox(
+      key: const ValueKey('table-hand-tray'),
+      constraints: const BoxConstraints(minHeight: 164),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          status,
+          const SizedBox(height: 4),
+          Row(
+            textDirection: TextDirection.ltr,
+            children: [
+              if (localSeat != null) const SizedBox(width: 56),
+              Expanded(child: hand),
+              if (localSeat != null) SizedBox(width: 56, child: localSeat!),
+            ],
           ),
-          controls,
         ],
-      );
-    }
+      ),
+    );
+    Widget surface() => Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        arena,
+        if (!wide)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            child: collections!,
+          ),
+        if (wide)
+          Row(
+            textDirection: TextDirection.ltr,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(flex: 3, child: handArea),
+              Expanded(
+                flex: 2,
+                child: Padding(
+                  padding: const EdgeInsets.all(8),
+                  child: collections!,
+                ),
+              ),
+            ],
+          )
+        else
+          handArea,
+      ],
+    );
     return Column(
       children: [
         header,
         Expanded(
-          child: SingleChildScrollView(
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 900),
-                child: arena,
-              ),
-            ),
-          ),
-        ),
-        if (wide)
-          Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 900),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Expanded(child: handArea),
-                  SizedBox(
-                    width: 330,
-                    child: Padding(
-                      padding: const EdgeInsets.all(8),
-                      child: collections!,
+          child: largeText
+              ? SingleChildScrollView(
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 1000),
+                      child: surface(),
                     ),
                   ),
-                ],
-              ),
-            ),
-          )
-        else
-          handArea,
+                )
+              : LayoutBuilder(
+                  builder: (context, available) {
+                    final logicalWidth = wide ? 920.0 : 430.0;
+                    final minimumHeight = wide ? 484.0 : 620.0;
+                    final scale = math.min(
+                      available.maxWidth / logicalWidth,
+                      available.maxHeight / minimumHeight,
+                    );
+                    // Preserve usable card targets on unusually short windows.
+                    // Scrolling the arena is preferable to shrinking every action.
+                    if (!wide && scale < .7) {
+                      return SingleChildScrollView(child: surface());
+                    }
+                    // A single fit transform applies equally to painted cards, hit
+                    // targets and the measured GlobalKeys used by card-flight motion.
+                    return Center(
+                      child: FittedBox(
+                        fit: BoxFit.contain,
+                        child: SizedBox(width: logicalWidth, child: surface()),
+                      ),
+                    );
+                  },
+                ),
+        ),
         controls,
       ],
     );

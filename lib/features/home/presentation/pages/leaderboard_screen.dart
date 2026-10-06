@@ -1,4 +1,6 @@
 import 'package:halabessa/core/widgets/lantern_page_frame.dart';
+import 'package:halabessa/core/widgets/lantern_navigation_dock.dart';
+import 'package:halabessa/features/game/presentation/widgets/table_style.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -26,6 +28,9 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
     return LanternPageFrame(
       child: Scaffold(
         backgroundColor: Colors.transparent,
+        bottomNavigationBar: const LanternNavigationDock(
+          selected: LanternDestination.leaderboard,
+        ),
         appBar: AppBar(
           toolbarHeight: 116,
           backgroundColor: Colors.transparent,
@@ -77,15 +82,6 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
 
                     final top3 = users.take(3).toList();
                     final rest = users.skip(3).toList();
-
-                    // Find user rank
-                    int myRank = -1;
-                    if (currentUser != null) {
-                      final idx = users.indexWhere(
-                        (u) => u.uid == currentUser.uid,
-                      );
-                      if (idx != -1) myRank = idx + 1;
-                    }
 
                     return RefreshIndicator(
                       color: ThemeConfig.goldAccent,
@@ -171,7 +167,8 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
   ) {
     final isSelected = _selectedCategory == category;
     return Expanded(
-      child: GestureDetector(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
         onTap: () {
           if (!isSelected) {
             HapticFeedback.selectionClick();
@@ -180,11 +177,10 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
         },
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
+          constraints: const BoxConstraints(minHeight: 48),
           padding: const EdgeInsets.symmetric(vertical: 8),
           decoration: BoxDecoration(
-            color: isSelected
-                ? activeColor.withOpacity(0.18)
-                : Colors.transparent,
+            color: isSelected ? TableStyle.brass : Colors.transparent,
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
               color: isSelected
@@ -199,13 +195,13 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
               Icon(
                 icon,
                 size: 16,
-                color: isSelected ? activeColor : Colors.white54,
+                color: isSelected ? TableStyle.ink : TableStyle.ivory,
               ),
               const SizedBox(width: 6),
               Text(
                 title,
                 style: TextStyle(
-                  color: isSelected ? Colors.white : Colors.white54,
+                  color: isSelected ? TableStyle.ink : TableStyle.ivory,
                   fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
                   fontSize: 12,
                 ),
@@ -234,7 +230,7 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
               child: _buildPodiumStep(
                 player: second,
                 rank: 2,
-                height: 120,
+                height: 44,
                 color: const Color(0xFFC0C0C0),
                 crown: '🥈',
               ),
@@ -250,7 +246,7 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
               child: _buildPodiumStep(
                 player: first,
                 rank: 1,
-                height: 155,
+                height: 64,
                 color: ThemeConfig.goldAccent,
                 crown: '👑',
                 isChampion: true,
@@ -267,7 +263,7 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
               child: _buildPodiumStep(
                 player: third,
                 rank: 3,
-                height: 100,
+                height: 36,
                 color: const Color(0xFFCD7F32),
                 crown: '🥉',
               ),
@@ -492,7 +488,7 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
 
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0x00192638),
+        color: const Color(0xFF192638),
         border: Border(
           top: BorderSide(
             color: ThemeConfig.goldAccent.withOpacity(0.4),

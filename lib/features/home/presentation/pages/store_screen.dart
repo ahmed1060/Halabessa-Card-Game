@@ -1,4 +1,5 @@
 import 'package:halabessa/core/widgets/lantern_page_frame.dart';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easy_localization/easy_localization.dart';
@@ -12,15 +13,25 @@ import '../widgets/shop_item_preview_dialog.dart';
 import '../widgets/shop_card_artwork.dart';
 import '../../../../core/widgets/lantern_panel.dart';
 import '../../../game/presentation/widgets/table_style.dart';
+import '../../../../core/widgets/lantern_navigation_dock.dart';
 
 class StoreScreen extends ConsumerStatefulWidget {
-  const StoreScreen({super.key});
+  final bool initialOwnedOnly;
+  const StoreScreen({super.key, this.initialOwnedOnly = false});
   @override
   ConsumerState<StoreScreen> createState() => _StoreScreenState();
 }
 
 class _StoreScreenState extends ConsumerState<StoreScreen> {
   bool _ownedOnly = false;
+  int _featuredIndex = 0;
+  final Set<String> _pendingItems = {};
+  @override
+  void initState() {
+    super.initState();
+    _ownedOnly = widget.initialOwnedOnly;
+  }
+
   @override
   Widget build(BuildContext context) {
     final store = ref.watch(storeProvider);
@@ -33,6 +44,9 @@ class _StoreScreenState extends ConsumerState<StoreScreen> {
       child: LanternPageFrame(
         child: Scaffold(
           backgroundColor: Colors.transparent,
+          bottomNavigationBar: const LanternNavigationDock(
+            selected: LanternDestination.collection,
+          ),
           appBar: AppBar(
             backgroundColor: Colors.transparent,
             elevation: 0,
@@ -132,6 +146,8 @@ class _StoreScreenState extends ConsumerState<StoreScreen> {
                     ])
                       CustomScrollView(
                         slivers: [
+                          if (!_ownedOnly && entry.$1 == ShopItemType.cardBack)
+                            _buildFeaturedDecks(context, notifier, store, user),
                           _buildSectionHeader(
                             context,
                             entry.$2.tr(),
@@ -286,77 +302,227 @@ class _StoreScreenState extends ConsumerState<StoreScreen> {
             isOwned,
             isActive,
             user,
-            () async {
-              try {
-                if (item.type == ShopItemType.consumable) {
-                  await notifier.purchaseItem(item);
-                  if (context.mounted) {
-                    ref
-                        .read(multimediaServiceProvider)
-                        .playSfx('sfx/purchase.mp3');
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('item_unlocked'.tr(args: [item.name])),
-                      ),
-                    );
-                  }
-                } else if (isOwned) {
-                  notifier.setActiveSkin(item.id, item.type);
-                } else {
-                  await notifier.purchaseItem(item);
-                  if (context.mounted) {
-                    ref
-                        .read(multimediaServiceProvider)
-                        .playSfx('sfx/purchase.mp3');
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('item_unlocked'.tr(args: [item.name])),
-                      ),
-                    );
-                  }
-                }
-              } catch (e) {
-                if (context.mounted) {
-                  final errorStr = e.toString();
-                  final message = errorStr.contains('diamonds')
-                      ? 'not_enough_diamonds'.tr()
-                      : (errorStr.contains('coins')
-                            ? 'not_enough_coins'.tr()
-                            : errorStr.replaceAll('Exception: ', ''));
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      backgroundColor: Colors.red.shade900,
-                      behavior: SnackBarBehavior.floating,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      content: Row(
-                        children: [
-                          const Icon(
-                            Icons.warning_amber_rounded,
-                            color: Colors.amberAccent,
-                            size: 20,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              message,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                }
-              }
-            },
+            () => _activateItem(context, item, isOwned, notifier),
             onDelete: () => notifier.deleteItem(item.id),
           );
         }, childCount: items.length),
+      ),
+    );
+  }
+
+  Future<void> _activateItem(
+    BuildContext context,
+    ShopItem item,
+    bool isOwned,
+    StoreNotifier notifier,
+  ) async {
+    if (_pendingItems.contains(item.id)) return;
+    setState(() => _pendingItems.add(item.id));
+    try {
+      try {
+        if (item.type == ShopItemType.consumable) {
+          await notifier.purchaseItem(item);
+          if (context.mounted) {
+            ref.read(multimediaServiceProvider).playSfx('sfx/purchase.mp3');
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('item_unlocked'.tr(args: [item.name]))),
+            );
+          }
+        } else if (isOwned) {
+          notifier.setActiveSkin(item.id, item.type);
+        } else {
+          await notifier.purchaseItem(item);
+          if (context.mounted) {
+            ref.read(multimediaServiceProvider).playSfx('sfx/purchase.mp3');
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('item_unlocked'.tr(args: [item.name]))),
+            );
+          }
+        }
+      } catch (e) {
+        if (context.mounted) {
+          final errorStr = e.toString();
+          final message = errorStr.contains('diamonds')
+              ? 'not_enough_diamonds'.tr()
+              : (errorStr.contains('coins')
+                    ? 'not_enough_coins'.tr()
+                    : errorStr.replaceAll('Exception: ', ''));
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              backgroundColor: Colors.red.shade900,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              content: Row(
+                children: [
+                  const Icon(
+                    Icons.warning_amber_rounded,
+                    color: Colors.amberAccent,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      message,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+      }
+    } finally {
+      if (mounted) setState(() => _pendingItems.remove(item.id));
+    }
+  }
+
+  Widget _buildFeaturedDecks(
+    BuildContext context,
+    StoreNotifier notifier,
+    StoreState store,
+    AppUser? user,
+  ) {
+    final items = notifier.allItems
+        .where((item) => item.type == ShopItemType.cardBack)
+        .toList();
+    if (items.isEmpty)
+      return const SliverToBoxAdapter(child: SizedBox.shrink());
+    return SliverToBoxAdapter(
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 660),
+          child: Column(
+            children: [
+              SizedBox(
+                height: 330,
+                child: PageView.builder(
+                  itemCount: items.length,
+                  onPageChanged: (index) =>
+                      setState(() => _featuredIndex = index),
+                  itemBuilder: (context, index) {
+                    final item = items[index];
+                    final owned = store.ownedIds.contains(item.id);
+                    final active = store.activeCardBackId == item.id;
+                    return Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: TableStyle.felt,
+                          borderRadius: BorderRadius.circular(22),
+                          border: Border.all(
+                            color: TableStyle.brass.withValues(alpha: .5),
+                          ),
+                        ),
+                        child: SingleChildScrollView(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            children: [
+                              Text(
+                                'ui_featured'.tr(),
+                                style: TableStyle.detail,
+                              ),
+                              const SizedBox(height: 8),
+                              SizedBox(
+                                height: 155,
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  textDirection: ui.TextDirection.ltr,
+                                  children: [
+                                    Transform.rotate(
+                                      angle: -.1,
+                                      child: ShopCardArtwork(
+                                        item: item,
+                                        width: 92,
+                                        height: 136,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Transform.rotate(
+                                      angle: .06,
+                                      child: ShopCardArtwork(
+                                        item: item,
+                                        faceUp: true,
+                                        width: 92,
+                                        height: 136,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Text(
+                                item.name,
+                                textAlign: TextAlign.center,
+                                style: TableStyle.label.copyWith(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              FilledButton.icon(
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: active
+                                      ? TableStyle.mint
+                                      : TableStyle.brass,
+                                  foregroundColor: TableStyle.ink,
+                                  minimumSize: const Size.fromHeight(48),
+                                ),
+                                onPressed:
+                                    active || _pendingItems.contains(item.id)
+                                    ? null
+                                    : () => _activateItem(
+                                        context,
+                                        item,
+                                        owned,
+                                        notifier,
+                                      ),
+                                icon: Icon(
+                                  active
+                                      ? Icons.check_circle_rounded
+                                      : owned
+                                      ? Icons.style_rounded
+                                      : Icons.shopping_bag_outlined,
+                                ),
+                                label: Text(
+                                  active
+                                      ? 'status_active'.tr()
+                                      : owned
+                                      ? 'ui_equip'.tr()
+                                      : '${item.diamondPrice > 0 ? item.diamondPrice : item.price} ${item.diamondPrice > 0 ? '💎' : '🪙'}',
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  for (var i = 0; i < items.length; i++)
+                    Padding(
+                      padding: const EdgeInsets.all(4),
+                      child: Icon(
+                        Icons.circle,
+                        size: 8,
+                        color: i == _featuredIndex
+                            ? TableStyle.brass
+                            : TableStyle.muted,
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -397,6 +563,7 @@ class _StoreScreenState extends ConsumerState<StoreScreen> {
         children: [
           LanternPanel(
             selected: isActive,
+            dark: _ownedOnly,
             child: Column(
               children: [
                 Expanded(
@@ -414,10 +581,25 @@ class _StoreScreenState extends ConsumerState<StoreScreen> {
                                     0.0,
                                     180.0,
                                   );
-                                  return ShopCardArtwork(
-                                    item: item,
-                                    width: height * .7,
-                                    height: height,
+                                  return FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    child: Row(
+                                      textDirection: ui.TextDirection.ltr,
+                                      children: [
+                                        ShopCardArtwork(
+                                          item: item,
+                                          width: height * .6,
+                                          height: height,
+                                        ),
+                                        const SizedBox(width: 6),
+                                        ShopCardArtwork(
+                                          item: item,
+                                          faceUp: true,
+                                          width: height * .6,
+                                          height: height,
+                                        ),
+                                      ],
+                                    ),
                                   );
                                 },
                               )
@@ -460,11 +642,11 @@ class _StoreScreenState extends ConsumerState<StoreScreen> {
                     children: [
                       Text(
                         item.name,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontFamily: ThemeConfig.fontHeading,
                           fontSize: 13,
                           fontWeight: FontWeight.bold,
-                          color: TableStyle.ink,
+                          color: _ownedOnly ? TableStyle.ivory : TableStyle.ink,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -486,7 +668,7 @@ class _StoreScreenState extends ConsumerState<StoreScreen> {
                             color: isActive
                                 ? ThemeConfig.goldAccent
                                 : (isOwned
-                                    ? Colors.teal.withValues(alpha: 0.4)
+                                      ? Colors.teal.withValues(alpha: 0.4)
                                       : Colors.white12),
                             width: 0.8,
                           ),

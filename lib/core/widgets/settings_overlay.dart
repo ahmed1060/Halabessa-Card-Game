@@ -10,6 +10,7 @@ import 'package:halabessa/features/auth/presentation/providers/auth_providers.da
 import 'package:halabessa/core/theme/theme_config.dart';
 import 'package:halabessa/core/services/multimedia_service.dart';
 import 'package:halabessa/core/routes/app_routes.dart';
+import 'package:halabessa/features/game/presentation/widgets/table_style.dart';
 
 class SettingsOverlay extends ConsumerWidget {
   const SettingsOverlay({super.key});
@@ -27,7 +28,7 @@ class SettingsOverlay extends ConsumerWidget {
       child: Container(
         constraints: const BoxConstraints(maxWidth: 600),
         decoration: BoxDecoration(
-          color: const Color(0xFF3B274C).withOpacity(0.95),
+          color: TableStyle.ink.withValues(alpha: .98),
           borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
           border: Border.all(color: Colors.white.withOpacity(0.1), width: 1.5),
           boxShadow: [
@@ -55,141 +56,232 @@ class SettingsOverlay extends ConsumerWidget {
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
-                  // Header
-                  const Padding(padding: EdgeInsets.only(top: 12),
-                    child: SizedBox(height: 52, child: FittedBox(child: LanternWordmark()))),
-                  _buildHeader(context),
-                  
-                  // Scrollable Content
-                  Flexible(
-                    child: SingleChildScrollView(
-                      physics: const BouncingScrollPhysics(),
-                      padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildSectionTitle('audio'.tr()),
-                          _buildToggleTile(
-                            'music'.tr(),
-                            settings.isMusicEnabled,
-                            Icons.music_note_rounded,
-                            (val) {
-                              notifier.toggleMusic(val);
-                              multimedia.vibrate();
-                            },
-                          ),
-                          if (settings.isMusicEnabled)
-                            Padding(
-                              padding: const EdgeInsets.only(left: 48, right: 16, bottom: 16),
-                              child: SliderTheme(
-                                data: SliderTheme.of(context).copyWith(
-                                  trackHeight: 2,
-                                  thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-                                  overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
+                // Header
+                const Padding(
+                  padding: EdgeInsets.only(top: 12),
+                  child: SizedBox(
+                    height: 52,
+                    child: FittedBox(child: LanternWordmark()),
+                  ),
+                ),
+                _buildHeader(context),
+
+                // Scrollable Content
+                Flexible(
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildSectionTitle('audio'.tr()),
+                        _buildToggleTile(
+                          'music'.tr(),
+                          settings.isMusicEnabled,
+                          Icons.music_note_rounded,
+                          (val) {
+                            notifier.toggleMusic(val);
+                            multimedia.vibrate();
+                          },
+                        ),
+                        if (settings.isMusicEnabled)
+                          Padding(
+                            padding: const EdgeInsets.only(
+                              left: 48,
+                              right: 16,
+                              bottom: 16,
+                            ),
+                            child: SliderTheme(
+                              data: SliderTheme.of(context).copyWith(
+                                trackHeight: 2,
+                                thumbShape: const RoundSliderThumbShape(
+                                  enabledThumbRadius: 6,
                                 ),
-                                child: Slider(
-                                  value: settings.musicVolume,
-                                  onChanged: (val) => notifier.setMusicVolume(val),
-                                  activeColor: ThemeConfig.goldAccent,
-                                  inactiveColor: Colors.white10,
+                                overlayShape: const RoundSliderOverlayShape(
+                                  overlayRadius: 14,
                                 ),
                               ),
-                            ),
-                          _buildToggleTile(
-                            'sound_effects'.tr(),
-                            settings.isSoundEnabled,
-                            Icons.volume_up_rounded,
-                            (val) {
-                              notifier.toggleSound(val);
-                              multimedia.vibrate();
-                            },
-                          ),
-                          if (settings.isSoundEnabled)
-                            Padding(
-                              padding: const EdgeInsets.only(left: 48, right: 16, bottom: 16),
-                              child: SliderTheme(
-                                data: SliderTheme.of(context).copyWith(
-                                  trackHeight: 2,
-                                  thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-                                  overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
-                                ),
-                                child: Slider(
-                                  value: settings.soundVolume,
-                                  onChanged: (val) => notifier.setSoundVolume(val),
-                                  activeColor: ThemeConfig.goldAccent,
-                                  inactiveColor: Colors.white10,
-                                ),
+                              child: Slider(
+                                value: settings.musicVolume,
+                                onChanged: (val) =>
+                                    notifier.setMusicVolume(val),
+                                activeColor: ThemeConfig.goldAccent,
+                                inactiveColor: Colors.white10,
                               ),
                             ),
-                          _buildToggleTile(
-                            'haptic_feedback'.tr(),
-                            settings.isHapticsEnabled,
-                            Icons.vibration_rounded,
-                            (val) {
-                              notifier.toggleHaptics(val);
-                              HapticFeedback.mediumImpact();
-                            },
                           ),
-                          _buildToggleTile(
-                            'reduced_motion'.tr(),
-                            settings.reducedMotion,
-                            Icons.animation_rounded,
-                            notifier.setReducedMotion,
+                        _buildToggleTile(
+                          'sound_effects'.tr(),
+                          settings.isSoundEnabled,
+                          Icons.volume_up_rounded,
+                          (val) {
+                            notifier.toggleSound(val);
+                            multimedia.vibrate();
+                          },
+                        ),
+                        if (settings.isSoundEnabled)
+                          Padding(
+                            padding: const EdgeInsets.only(
+                              left: 48,
+                              right: 16,
+                              bottom: 16,
+                            ),
+                            child: SliderTheme(
+                              data: SliderTheme.of(context).copyWith(
+                                trackHeight: 2,
+                                thumbShape: const RoundSliderThumbShape(
+                                  enabledThumbRadius: 6,
+                                ),
+                                overlayShape: const RoundSliderOverlayShape(
+                                  overlayRadius: 14,
+                                ),
+                              ),
+                              child: Slider(
+                                value: settings.soundVolume,
+                                onChanged: (val) =>
+                                    notifier.setSoundVolume(val),
+                                activeColor: ThemeConfig.goldAccent,
+                                inactiveColor: Colors.white10,
+                              ),
+                            ),
                           ),
-                          
-                          const SizedBox(height: 24),
-                          _buildSectionTitle('language'.tr()),
-                          _buildLanguageGrid(context, currentLocale),
-                          
-                          const SizedBox(height: 24),
-                          _buildSectionTitle('theme'.tr()),
-                          _buildThemeSelector(settings.themeMode, notifier, multimedia),
+                        _buildToggleTile(
+                          'haptic_feedback'.tr(),
+                          settings.isHapticsEnabled,
+                          Icons.vibration_rounded,
+                          (val) {
+                            notifier.toggleHaptics(val);
+                            HapticFeedback.mediumImpact();
+                          },
+                        ),
+                        _buildToggleTile(
+                          'reduced_motion'.tr(),
+                          settings.reducedMotion,
+                          Icons.animation_rounded,
+                          notifier.setReducedMotion,
+                        ),
 
-                          const SizedBox(height: 24),
-                          _buildSectionTitle('graphics'.tr()),
-                          _buildToggleTile(
-                            'game_landscape'.tr(),
-                            settings.gameOrientation == GameOrientation.landscape,
-                            Icons.screen_rotation_rounded,
-                            (value) => notifier.setGameOrientation(value
-                                ? GameOrientation.landscape : GameOrientation.portrait),
-                          ),
-                          Text('game_orientation_help'.tr(),
-                            style: const TextStyle(color: Colors.white70)),
-                          ListTile(leading: const Icon(Icons.help_outline, color: ThemeConfig.goldAccent),
-                            title: Text('help_title'.tr(), style: const TextStyle(color: Colors.white)),
-                            onTap: () {
-                              Navigator.pop(context);
-                              Navigator.pushNamed(context, AppRoutes.help);
-                            }),
-                          _buildToggleTile(
-                            'mode_3d'.tr(),
-                            settings.is3DModeEnabled,
-                            Icons.view_in_ar_rounded,
-                            (val) {
-                              notifier.toggle3DMode(val);
-                              multimedia.vibrate();
-                            },
-                          ),
+                        const SizedBox(height: 24),
+                        _buildSectionTitle('language'.tr()),
+                        _buildLanguageGrid(context, currentLocale),
 
-                          if (user?.isAdmin == true) ...[
-                            const SizedBox(height: 32),
-                            _buildSectionTitle('admin_actions'.tr()),
-                            _buildAdminTile('manage_users'.tr(), Icons.people_alt_rounded, () => Navigator.pushNamed(context, AppRoutes.adminUsers)),
-                            _buildAdminTile('manage_music'.tr(), Icons.library_music_rounded, () => Navigator.pushNamed(context, AppRoutes.adminMusic)),
-                            _buildAdminTile('manage_sfx'.tr(), Icons.graphic_eq_rounded, () => Navigator.pushNamed(context, AppRoutes.adminSfx)),
-                          ],
+                        const SizedBox(height: 24),
+                        _buildSectionTitle('theme'.tr()),
+                        _buildThemeSelector(
+                          settings.themeMode,
+                          notifier,
+                          multimedia,
+                        ),
+
+                        const SizedBox(height: 24),
+                        _buildSectionTitle('graphics'.tr()),
+                        _buildToggleTile(
+                          'game_landscape'.tr(),
+                          settings.gameOrientation == GameOrientation.landscape,
+                          Icons.screen_rotation_rounded,
+                          (value) => notifier.setGameOrientation(
+                            value
+                                ? GameOrientation.landscape
+                                : GameOrientation.portrait,
+                          ),
+                        ),
+                        Text(
+                          'game_orientation_help'.tr(),
+                          style: const TextStyle(color: Colors.white70),
+                        ),
+                        ListTile(
+                          leading: const Icon(
+                            Icons.help_outline,
+                            color: ThemeConfig.goldAccent,
+                          ),
+                          title: Text(
+                            'help_title'.tr(),
+                            style: const TextStyle(color: Colors.white),
+                          ),
+                          onTap: () {
+                            Navigator.pop(context);
+                            Navigator.pushNamed(context, AppRoutes.help);
+                          },
+                        ),
+                        _buildToggleTile(
+                          'mode_3d'.tr(),
+                          settings.is3DModeEnabled,
+                          Icons.view_in_ar_rounded,
+                          (val) {
+                            notifier.toggle3DMode(val);
+                            multimedia.vibrate();
+                          },
+                        ),
+
+                        const SizedBox(height: 16),
+                        OutlinedButton.icon(
+                          icon: const Icon(Icons.restore_rounded),
+                          label: Text('ui_reset_settings'.tr()),
+                          onPressed: () async {
+                            final confirmed = await showDialog<bool>(
+                              context: context,
+                              builder: (dialogContext) => AlertDialog(
+                                title: Text('ui_reset_confirm'.tr()),
+                                content: Text('ui_reset_detail'.tr()),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () =>
+                                        Navigator.pop(dialogContext, false),
+                                    child: Text('cancel'.tr()),
+                                  ),
+                                  FilledButton(
+                                    onPressed: () =>
+                                        Navigator.pop(dialogContext, true),
+                                    child: Text('ui_reset_settings'.tr()),
+                                  ),
+                                ],
+                              ),
+                            );
+                            if (confirmed != true || !context.mounted) return;
+                            await notifier.resetPresentationDefaults();
+                            if (context.mounted)
+                              await context.setLocale(const Locale('en', 'US'));
+                          },
+                        ),
+                        if (user?.isAdmin == true) ...[
+                          const SizedBox(height: 32),
+                          _buildSectionTitle('admin_actions'.tr()),
+                          _buildAdminTile(
+                            'manage_users'.tr(),
+                            Icons.people_alt_rounded,
+                            () => Navigator.pushNamed(
+                              context,
+                              AppRoutes.adminUsers,
+                            ),
+                          ),
+                          _buildAdminTile(
+                            'manage_music'.tr(),
+                            Icons.library_music_rounded,
+                            () => Navigator.pushNamed(
+                              context,
+                              AppRoutes.adminMusic,
+                            ),
+                          ),
+                          _buildAdminTile(
+                            'manage_sfx'.tr(),
+                            Icons.graphic_eq_rounded,
+                            () => Navigator.pushNamed(
+                              context,
+                              AppRoutes.adminSfx,
+                            ),
+                          ),
                         ],
-                      ),
+                      ],
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),
-        );
-    }
+      ),
+    );
+  }
 
   Widget _buildHeader(BuildContext context) {
     return Container(
@@ -205,7 +297,11 @@ class SettingsOverlay extends ConsumerWidget {
                   color: ThemeConfig.goldAccent.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(Icons.settings_suggest_rounded, color: ThemeConfig.goldAccent, size: 24),
+                child: Icon(
+                  Icons.settings_suggest_rounded,
+                  color: ThemeConfig.goldAccent,
+                  size: 24,
+                ),
               ),
               const SizedBox(width: 16),
               Text(
@@ -236,7 +332,7 @@ class SettingsOverlay extends ConsumerWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12, left: 4),
       child: Text(
-        title.toUpperCase(),
+        title,
         style: TextStyle(
           color: ThemeConfig.goldAccent.withOpacity(0.8),
           fontSize: 12,
@@ -247,7 +343,12 @@ class SettingsOverlay extends ConsumerWidget {
     );
   }
 
-  Widget _buildToggleTile(String title, bool value, IconData icon, Function(bool) onChanged) {
+  Widget _buildToggleTile(
+    String title,
+    bool value,
+    IconData icon,
+    Function(bool) onChanged,
+  ) {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
@@ -257,10 +358,13 @@ class SettingsOverlay extends ConsumerWidget {
       child: SwitchListTile(
         value: value,
         onChanged: onChanged,
-        title: Text(title, style: const TextStyle(color: Colors.white, fontSize: 15)),
+        title: Text(
+          title,
+          style: const TextStyle(color: Colors.white, fontSize: 15),
+        ),
         secondary: Icon(icon, color: Colors.white70, size: 20),
-        activeColor: ThemeConfig.goldAccent,
-        activeTrackColor: ThemeConfig.goldAccent.withOpacity(0.3),
+        activeColor: TableStyle.ink,
+        activeTrackColor: TableStyle.mint,
         inactiveThumbColor: Colors.white38,
         inactiveTrackColor: Colors.white10,
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
@@ -274,32 +378,60 @@ class SettingsOverlay extends ConsumerWidget {
       spacing: 12,
       runSpacing: 12,
       children: [
-        _buildLanguageCard(context, 'english'.tr(), const Locale('en', 'US'), currentLocale),
-        _buildLanguageCard(context, 'arabic_eg'.tr(), const Locale('ar', 'EG'), currentLocale),
-        _buildLanguageCard(context, 'arabic_sa'.tr(), const Locale('ar', 'SA'), currentLocale),
+        _buildLanguageCard(
+          context,
+          'english'.tr(),
+          const Locale('en', 'US'),
+          currentLocale,
+        ),
+        _buildLanguageCard(
+          context,
+          'arabic_eg'.tr(),
+          const Locale('ar', 'EG'),
+          currentLocale,
+        ),
+        _buildLanguageCard(
+          context,
+          'arabic_sa'.tr(),
+          const Locale('ar', 'SA'),
+          currentLocale,
+        ),
       ],
     );
   }
 
-  Widget _buildLanguageCard(BuildContext context, String label, Locale locale, Locale currentLocale) {
+  Widget _buildLanguageCard(
+    BuildContext context,
+    String label,
+    Locale locale,
+    Locale currentLocale,
+  ) {
     final isSelected = currentLocale == locale;
     return GestureDetector(
       onTap: () => context.setLocale(locale),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
-          color: isSelected ? ThemeConfig.goldAccent.withOpacity(0.1) : Colors.white.withOpacity(0.03),
+          color: isSelected
+              ? ThemeConfig.goldAccent.withOpacity(0.1)
+              : Colors.white.withOpacity(0.03),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isSelected ? ThemeConfig.goldAccent.withOpacity(0.5) : Colors.white10,
+            color: isSelected
+                ? ThemeConfig.goldAccent.withOpacity(0.5)
+                : Colors.white10,
             width: isSelected ? 1.5 : 1,
           ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (isSelected) 
-              const Icon(Icons.check_circle_rounded, color: ThemeConfig.goldAccent, size: 14),
+            if (isSelected)
+              const Icon(
+                Icons.check_circle_rounded,
+                color: ThemeConfig.goldAccent,
+                size: 14,
+              ),
             if (isSelected) const SizedBox(width: 8),
             Text(
               label,
@@ -315,32 +447,64 @@ class SettingsOverlay extends ConsumerWidget {
     );
   }
 
-  Widget _buildThemeSelector(ThemeMode currentMode, SettingsNotifier notifier, MultimediaService multimedia) {
+  Widget _buildThemeSelector(
+    ThemeMode currentMode,
+    SettingsNotifier notifier,
+    MultimediaService multimedia,
+  ) {
     return Row(
       children: [
-        _buildThemeOption(Icons.light_mode_rounded, ThemeMode.light, currentMode, () => notifier.setThemeMode(ThemeMode.light)),
+        _buildThemeOption(
+          Icons.light_mode_rounded,
+          ThemeMode.light,
+          currentMode,
+          () => notifier.setThemeMode(ThemeMode.light),
+        ),
         const SizedBox(width: 12),
-        _buildThemeOption(Icons.dark_mode_rounded, ThemeMode.dark, currentMode, () => notifier.setThemeMode(ThemeMode.dark)),
+        _buildThemeOption(
+          Icons.dark_mode_rounded,
+          ThemeMode.dark,
+          currentMode,
+          () => notifier.setThemeMode(ThemeMode.dark),
+        ),
         const SizedBox(width: 12),
-        _buildThemeOption(Icons.settings_brightness_rounded, ThemeMode.system, currentMode, () => notifier.setThemeMode(ThemeMode.system)),
+        _buildThemeOption(
+          Icons.settings_brightness_rounded,
+          ThemeMode.system,
+          currentMode,
+          () => notifier.setThemeMode(ThemeMode.system),
+        ),
       ],
     );
   }
 
-  Widget _buildThemeOption(IconData icon, ThemeMode mode, ThemeMode currentMode, VoidCallback onTap) {
+  Widget _buildThemeOption(
+    IconData icon,
+    ThemeMode mode,
+    ThemeMode currentMode,
+    VoidCallback onTap,
+  ) {
     final isSelected = currentMode == mode;
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: isSelected ? ThemeConfig.goldAccent.withOpacity(0.1) : Colors.white.withOpacity(0.03),
+          color: isSelected
+              ? ThemeConfig.goldAccent.withOpacity(0.1)
+              : Colors.white.withOpacity(0.03),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isSelected ? ThemeConfig.goldAccent.withOpacity(0.5) : Colors.white10,
+            color: isSelected
+                ? ThemeConfig.goldAccent.withOpacity(0.5)
+                : Colors.white10,
           ),
         ),
-        child: Icon(icon, color: isSelected ? Colors.white : Colors.white38, size: 20),
+        child: Icon(
+          icon,
+          color: isSelected ? Colors.white : Colors.white38,
+          size: 20,
+        ),
       ),
     );
   }
@@ -358,9 +522,17 @@ class SettingsOverlay extends ConsumerWidget {
         leading: Icon(icon, color: ThemeConfig.goldAccent, size: 20),
         title: Text(
           label,
-          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 14,
+          ),
         ),
-        trailing: const Icon(Icons.chevron_right, color: ThemeConfig.goldAccent, size: 18),
+        trailing: const Icon(
+          Icons.chevron_right,
+          color: ThemeConfig.goldAccent,
+          size: 18,
+        ),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       ),
     );
