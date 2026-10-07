@@ -178,3 +178,30 @@ part of this work. Keep the requested single final push until the batch is ready
   warnings/informational lint notices remain.
 - Release JavaScript web build succeeded. Optional Wasm dry-run warnings from
   existing web plugins do not imply a successful Wasm target or physical QA.
+
+## Permission repair and durable deletion groundwork
+
+- The publisher confirmed granting the deployment principal the index role.
+  Retried Hosting run 37602418217: it successfully deployed indexes, dependent
+  rules and Hosting for 35752df4. Android 37602418220 and iOS 37602418243 also
+  succeeded. The logout fix is now deployed; an interactive logout check is
+  still required rather than inferred from the build outcome.
+- Added private account_deletion_jobs storage, deployed its migration and
+  explicit deny-all client policy. Database constraints enforce ordered stage
+  prefixes and completion only after all six stages. Recovery receipts are
+  SHA-256 digests, not plaintext secrets. Queue rows survive account removal.
+- A real Postgres row-lock adapter serializes bounded work across workers and
+  supports transaction pooling. Six adapter tests use a simulated query layer;
+  they do not establish live multi-connection deletion behavior.
+- Added Firebase server-only deletion-block rules and Edge checks before both
+  discovery and ordinary SQL work. Ordinary API calls cannot recreate a profile
+  while its durable deletion job exists. Twenty-three isolated emulator tests
+  passed, including retained-token refusal and unrelated-player access.
+- Edge revision 28 deployed successfully with these guards. There are zero
+  deletion jobs; no player identity was disabled/deleted and no live QA guest was
+  created. The new Firebase guards are pending this batch's Hosting deployment.
+- All 122 server/page tests passed. Account deletion remains unavailable: room,
+  reward, social, profile and avatar cleanup adapters; authenticated acceptance
+  and receipt/worker endpoints; scheduled recovery; native confirmation,
+  reauthentication/Apple revocation; and the approved isolated live QA are still
+  required. The private queue is not an operational deletion feature by itself.

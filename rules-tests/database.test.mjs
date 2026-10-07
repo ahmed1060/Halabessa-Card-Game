@@ -28,6 +28,18 @@ beforeEach(async () => {
 });
 after(async () => { await env?.cleanup(); });
 const db = uid => env.authenticatedContext(uid).database();
+test('deletion block denies retained-token access without affecting unrelated players', async () => {
+  await env.withSecurityRulesDisabled(async context => {
+    await set(ref(context.database(),'accountDeletionBlocked/alice'),true);
+  });
+  await assertFails(get(ref(db('alice'),'matches/SERVER')));
+  await assertFails(get(ref(db('alice'),'matchHands/SERVER/alice')));
+  await assertFails(set(ref(db('alice'),'users/alice'),{displayName:'Recreated'}));
+  await assertFails(set(ref(db('alice'),'userPresence/alice/connection'),{lastSeen:serverTimestamp()}));
+  await assertFails(remove(ref(db('alice'),'accountDeletionBlocked/alice')));
+  await assertFails(get(ref(db('alice'),'accountDeletionBlocked/alice')));
+  await assertSucceeds(get(ref(db('bob'),'matches/SERVER')));
+});
 test('legacy profile mirror is private and its root cannot be enumerated', async () => {
   await env.withSecurityRulesDisabled(async context => {
     await set(ref(context.database(), 'users/alice'), {email: 'private@example.test'});

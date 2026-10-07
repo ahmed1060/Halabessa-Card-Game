@@ -1,11 +1,15 @@
 {
   "rules": {
+  "accountDeletionBlocked": {
+    ".read": false,
+    ".write": false
+  },
   "matchChat": {
     "$matchId": {
       "public": {
-        ".read": "auth != null && root.child('matches').child($matchId).child('protocolVersion').val() == 1 && root.child('matches').child($matchId).child('players').hasChild(auth.uid)",
+        ".read": "auth != null && !root.child('accountDeletionBlocked').child(auth.uid).exists() && root.child('matches').child($matchId).child('protocolVersion').val() == 1 && root.child('matches').child($matchId).child('players').hasChild(auth.uid)",
         "$messageId": {
-          ".write": "auth != null && root.child('matches').child($matchId).child('protocolVersion').val() == 1 && root.child('matches').child($matchId).child('players').hasChild(auth.uid) && !data.exists() && newData.hasChildren(['id','senderId','senderName','text','timestamp','isQuickChat']) && newData.child('id').val() == $messageId && newData.child('senderId').val() == auth.uid && newData.parent().parent().child('rate').child(auth.uid).val() == now && (!data.parent().parent().child('rate').child(auth.uid).exists() || data.parent().parent().child('rate').child(auth.uid).val() <= now - 1000)",
+          ".write": "auth != null && !root.child('accountDeletionBlocked').child(auth.uid).exists() && root.child('matches').child($matchId).child('protocolVersion').val() == 1 && root.child('matches').child($matchId).child('players').hasChild(auth.uid) && !data.exists() && newData.hasChildren(['id','senderId','senderName','text','timestamp','isQuickChat']) && newData.child('id').val() == $messageId && newData.child('senderId').val() == auth.uid && newData.parent().parent().child('rate').child(auth.uid).val() == now && (!data.parent().parent().child('rate').child(auth.uid).exists() || data.parent().parent().child('rate').child(auth.uid).val() <= now - 1000)",
           "id": {
             ".validate": "newData.isString() && newData.val().length <= 128"
           },
@@ -30,9 +34,9 @@
         }
       },
       "teamA": {
-        ".read": "auth != null && root.child('matches').child($matchId).child('protocolVersion').val() == 1 && root.child('matches').child($matchId).child('players').hasChild(auth.uid) && (root.child('matches').child($matchId).child('playerIds').child('0').val() == auth.uid || root.child('matches').child($matchId).child('playerIds').child('2').val() == auth.uid)",
+        ".read": "auth != null && !root.child('accountDeletionBlocked').child(auth.uid).exists() && root.child('matches').child($matchId).child('protocolVersion').val() == 1 && root.child('matches').child($matchId).child('players').hasChild(auth.uid) && (root.child('matches').child($matchId).child('playerIds').child('0').val() == auth.uid || root.child('matches').child($matchId).child('playerIds').child('2').val() == auth.uid)",
         "$messageId": {
-          ".write": "auth != null && root.child('matches').child($matchId).child('protocolVersion').val() == 1 && root.child('matches').child($matchId).child('players').hasChild(auth.uid) && (root.child('matches').child($matchId).child('playerIds').child('0').val() == auth.uid || root.child('matches').child($matchId).child('playerIds').child('2').val() == auth.uid) && !data.exists() && newData.hasChildren(['id','senderId','senderName','text','timestamp','isQuickChat']) && newData.child('id').val() == $messageId && newData.child('senderId').val() == auth.uid && newData.parent().parent().child('rate').child(auth.uid).val() == now && (!data.parent().parent().child('rate').child(auth.uid).exists() || data.parent().parent().child('rate').child(auth.uid).val() <= now - 1000)",
+          ".write": "auth != null && !root.child('accountDeletionBlocked').child(auth.uid).exists() && root.child('matches').child($matchId).child('protocolVersion').val() == 1 && root.child('matches').child($matchId).child('players').hasChild(auth.uid) && (root.child('matches').child($matchId).child('playerIds').child('0').val() == auth.uid || root.child('matches').child($matchId).child('playerIds').child('2').val() == auth.uid) && !data.exists() && newData.hasChildren(['id','senderId','senderName','text','timestamp','isQuickChat']) && newData.child('id').val() == $messageId && newData.child('senderId').val() == auth.uid && newData.parent().parent().child('rate').child(auth.uid).val() == now && (!data.parent().parent().child('rate').child(auth.uid).exists() || data.parent().parent().child('rate').child(auth.uid).val() <= now - 1000)",
           "id": {
             ".validate": "newData.isString() && newData.val().length <= 128"
           },
@@ -57,9 +61,9 @@
         }
       },
       "teamB": {
-        ".read": "auth != null && root.child('matches').child($matchId).child('protocolVersion').val() == 1 && root.child('matches').child($matchId).child('players').hasChild(auth.uid) && (root.child('matches').child($matchId).child('playerIds').child('1').val() == auth.uid || root.child('matches').child($matchId).child('playerIds').child('3').val() == auth.uid)",
+        ".read": "auth != null && !root.child('accountDeletionBlocked').child(auth.uid).exists() && root.child('matches').child($matchId).child('protocolVersion').val() == 1 && root.child('matches').child($matchId).child('players').hasChild(auth.uid) && (root.child('matches').child($matchId).child('playerIds').child('1').val() == auth.uid || root.child('matches').child($matchId).child('playerIds').child('3').val() == auth.uid)",
         "$messageId": {
-          ".write": "auth != null && root.child('matches').child($matchId).child('protocolVersion').val() == 1 && root.child('matches').child($matchId).child('players').hasChild(auth.uid) && (root.child('matches').child($matchId).child('playerIds').child('1').val() == auth.uid || root.child('matches').child($matchId).child('playerIds').child('3').val() == auth.uid) && !data.exists() && newData.hasChildren(['id','senderId','senderName','text','timestamp','isQuickChat']) && newData.child('id').val() == $messageId && newData.child('senderId').val() == auth.uid && newData.parent().parent().child('rate').child(auth.uid).val() == now && (!data.parent().parent().child('rate').child(auth.uid).exists() || data.parent().parent().child('rate').child(auth.uid).val() <= now - 1000)",
+          ".write": "auth != null && !root.child('accountDeletionBlocked').child(auth.uid).exists() && root.child('matches').child($matchId).child('protocolVersion').val() == 1 && root.child('matches').child($matchId).child('players').hasChild(auth.uid) && (root.child('matches').child($matchId).child('playerIds').child('1').val() == auth.uid || root.child('matches').child($matchId).child('playerIds').child('3').val() == auth.uid) && !data.exists() && newData.hasChildren(['id','senderId','senderName','text','timestamp','isQuickChat']) && newData.child('id').val() == $messageId && newData.child('senderId').val() == auth.uid && newData.parent().parent().child('rate').child(auth.uid).val() == now && (!data.parent().parent().child('rate').child(auth.uid).exists() || data.parent().parent().child('rate').child(auth.uid).val() <= now - 1000)",
           "id": {
             ".validate": "newData.isString() && newData.val().length <= 128"
           },
@@ -85,16 +89,16 @@
       },
       "rate": {
         "$uid": {
-          ".write": "auth != null && root.child('matches').child($matchId).child('protocolVersion').val() == 1 && root.child('matches').child($matchId).child('players').hasChild(auth.uid) && auth.uid == $uid && newData.isNumber() && newData.val() == now"
+          ".write": "auth != null && !root.child('accountDeletionBlocked').child(auth.uid).exists() && root.child('matches').child($matchId).child('protocolVersion').val() == 1 && root.child('matches').child($matchId).child('players').hasChild(auth.uid) && auth.uid == $uid && newData.isNumber() && newData.val() == now"
         }
       }
     }
   },
     "userPresence": {
       "$uid": {
-        ".read": "auth != null",
+        ".read": "auth != null && !root.child('accountDeletionBlocked').child(auth.uid).exists()",
         "$connection": {
-          ".write": "auth != null && auth.uid == $uid",
+          ".write": "auth != null && !root.child('accountDeletionBlocked').child(auth.uid).exists() && auth.uid == $uid",
           ".validate": "newData.hasChildren(['lastSeen'])",
           "lastSeen": { ".validate": "newData.isNumber() && newData.val() == now" },
           "$other": { ".validate": false }
@@ -103,21 +107,21 @@
     },
     "matches": {
       "$matchId": {
-        ".read": "auth != null",
-        ".write": "auth != null && data.exists() && data.child('players').hasChild(auth.uid) && (!data.child('protocolVersion').exists() || data.child('protocolVersion').val() == 0) && (!newData.child('protocolVersion').exists() || newData.child('protocolVersion').val() == 0)",
+        ".read": "auth != null && !root.child('accountDeletionBlocked').child(auth.uid).exists()",
+        ".write": "auth != null && !root.child('accountDeletionBlocked').child(auth.uid).exists() && data.exists() && data.child('players').hasChild(auth.uid) && (!data.child('protocolVersion').exists() || data.child('protocolVersion').val() == 0) && (!newData.child('protocolVersion').exists() || newData.child('protocolVersion').val() == 0)",
         "presence": {
           "$uid": {
-            ".write": "auth != null && auth.uid == $uid && root.child('matches').child($matchId).child('protocolVersion').val() == 1 && root.child('matches').child($matchId).child('players').hasChild(auth.uid) && (!newData.exists() || newData.val() == true)"
+            ".write": "auth != null && !root.child('accountDeletionBlocked').child(auth.uid).exists() && auth.uid == $uid && root.child('matches').child($matchId).child('protocolVersion').val() == 1 && root.child('matches').child($matchId).child('players').hasChild(auth.uid) && (!newData.exists() || newData.val() == true)"
           }
         },
         "playerLastActive": {
           "$uid": {
-            ".write": "auth != null && auth.uid == $uid && root.child('matches').child($matchId).child('protocolVersion').val() == 1 && root.child('matches').child($matchId).child('players').hasChild(auth.uid) && (!newData.exists() || (newData.isString() && newData.val().length <= 40))"
+            ".write": "auth != null && !root.child('accountDeletionBlocked').child(auth.uid).exists() && auth.uid == $uid && root.child('matches').child($matchId).child('protocolVersion').val() == 1 && root.child('matches').child($matchId).child('players').hasChild(auth.uid) && (!newData.exists() || (newData.isString() && newData.val().length <= 40))"
           }
         },
         "chat": {
           "$messageId": {
-            ".write": "auth != null && root.child('matches').child($matchId).child('protocolVersion').val() == 1 && root.child('matches').child($matchId).child('players').hasChild(auth.uid) && !data.exists() && newData.hasChildren(['id', 'senderId', 'senderName', 'text', 'timestamp', 'isQuickChat']) && newData.child('senderId').val() == auth.uid && newData.child('id').isString() && newData.child('id').val().length <= 128 && newData.child('senderName').isString() && newData.child('senderName').val().length <= 80 && newData.child('text').isString() && newData.child('text').val().length > 0 && newData.child('text').val().length <= 300 && newData.child('timestamp').isNumber() && newData.child('isQuickChat').isBoolean()",
+            ".write": "auth != null && !root.child('accountDeletionBlocked').child(auth.uid).exists() && root.child('matches').child($matchId).child('protocolVersion').val() == 1 && root.child('matches').child($matchId).child('players').hasChild(auth.uid) && !data.exists() && newData.hasChildren(['id', 'senderId', 'senderName', 'text', 'timestamp', 'isQuickChat']) && newData.child('senderId').val() == auth.uid && newData.child('id').isString() && newData.child('id').val().length <= 128 && newData.child('senderName').isString() && newData.child('senderName').val().length <= 80 && newData.child('text').isString() && newData.child('text').val().length > 0 && newData.child('text').val().length <= 300 && newData.child('timestamp').isNumber() && newData.child('isQuickChat').isBoolean()",
             "id": { ".validate": true },
             "senderId": { ".validate": true },
             "senderName": { ".validate": true },
@@ -131,10 +135,10 @@
     },
     "matchHands": {
       "$matchId": {
-        ".read": "auth != null && root.child('matches').child($matchId).child('players').hasChild(auth.uid) && (!root.child('matches').child($matchId).child('protocolVersion').exists() || root.child('matches').child($matchId).child('protocolVersion').val() == 0)",
-        ".write": "auth != null && root.child('matches').child($matchId).child('players').hasChild(auth.uid) && (!root.child('matches').child($matchId).child('protocolVersion').exists() || root.child('matches').child($matchId).child('protocolVersion').val() == 0)",
+        ".read": "auth != null && !root.child('accountDeletionBlocked').child(auth.uid).exists() && root.child('matches').child($matchId).child('players').hasChild(auth.uid) && (!root.child('matches').child($matchId).child('protocolVersion').exists() || root.child('matches').child($matchId).child('protocolVersion').val() == 0)",
+        ".write": "auth != null && !root.child('accountDeletionBlocked').child(auth.uid).exists() && root.child('matches').child($matchId).child('players').hasChild(auth.uid) && (!root.child('matches').child($matchId).child('protocolVersion').exists() || root.child('matches').child($matchId).child('protocolVersion').val() == 0)",
         "$uid": {
-          ".read": "auth != null && auth.uid == $uid && root.child('matches').child($matchId).child('protocolVersion').val() == 1 && root.child('matches').child($matchId).child('players').hasChild(auth.uid)"
+          ".read": "auth != null && !root.child('accountDeletionBlocked').child(auth.uid).exists() && auth.uid == $uid && root.child('matches').child($matchId).child('protocolVersion').val() == 1 && root.child('matches').child($matchId).child('players').hasChild(auth.uid)"
         }
       }
     },
@@ -145,21 +149,21 @@
       }
     },
     "matchmaking_queue": {
-      ".read": "auth != null",
+      ".read": "auth != null && !root.child('accountDeletionBlocked').child(auth.uid).exists()",
       "$uid": {
-        ".write": "auth != null && auth.uid == $uid"
+        ".write": "auth != null && !root.child('accountDeletionBlocked').child(auth.uid).exists() && auth.uid == $uid"
       }
     },
     "rooms": {
-      ".read": "auth != null",
+      ".read": "auth != null && !root.child('accountDeletionBlocked').child(auth.uid).exists()",
       "$roomId": {
         ".write": false
       }
     },
     "users": {
       "$uid": {
-        ".read": "auth != null && (auth.uid == $uid || auth.token.admin == true)",
-        ".write": "auth != null && auth.uid == $uid && newData.child('friendInvites').val() == data.child('friendInvites').val()",
+        ".read": "auth != null && !root.child('accountDeletionBlocked').child(auth.uid).exists() && (auth.uid == $uid || auth.token.admin == true)",
+        ".write": "auth != null && !root.child('accountDeletionBlocked').child(auth.uid).exists() && auth.uid == $uid && newData.child('friendInvites').val() == data.child('friendInvites').val()",
         "friendInvites": {
           ".write": false
         }

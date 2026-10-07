@@ -18,6 +18,22 @@ test('weekly ranking cannot be created, forged or erased by its profile owner', 
   await assertSucceeds(updateDoc(doc(db, 'users/guest'), {displayName: 'New name'}));
 });
 let env;
+test('deletion block rejects old-token reads, profile recreation and reservation writes', async () => {
+  await env.withSecurityRulesDisabled(async context => {
+    await setDoc(doc(context.firestore(), 'users/blocked'), {displayName:'Private'});
+    await setDoc(doc(context.firestore(), 'accountDeletionBlocked/blocked'), {blocked:true});
+    await setDoc(doc(context.firestore(), 'accountDeletionBlocked/blocked-admin'), {blocked:true});
+  });
+  const db = env.authenticatedContext('blocked').firestore();
+  await assertFails(getDoc(doc(db,'users/blocked')));
+  await assertFails(setDoc(doc(db,'users/blocked'),{displayName:'Recreated'}));
+  await assertFails(setDoc(doc(db,'usernames/recreated'),{uid:'blocked'}));
+  await assertFails(setDoc(doc(db,'accountDeletionBlocked/blocked'),{blocked:false}));
+  await assertFails(getDoc(doc(db,'accountDeletionBlocked/blocked')));
+  const admin = env.authenticatedContext('blocked-admin',{admin:true}).firestore();
+  await assertFails(getDoc(doc(admin,'users/blocked')));
+  await assertSucceeds(setDoc(doc(env.authenticatedContext('unrelated').firestore(),'users/unrelated'),{displayName:'Still active'}));
+});
 before(async () => { env = await initializeTestEnvironment({
   projectId: 'demo-halabessa-ui', firestore: { rules },
 }); });

@@ -30,6 +30,8 @@ jobs:
           functions/test/edge_match_delivery.test.ts functions/test/edge_database.test.ts
           functions/test/edge_public_profiles.test.ts functions/test/edge_account_deletion.test.ts
           functions/test/edge_firebase_identity.test.ts
+          functions/test/edge_deletion_job_store.test.ts
+          functions/test/edge_deletion_access.test.ts
           functions/test/unity_web_startup.test.js functions/test/web_build_versioning.test.mjs
           functions/test/release_pages.test.mjs
       - uses: actions/setup-java@v4

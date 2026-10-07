@@ -8,6 +8,7 @@ import { roomSummary } from "./room_summary.ts";
 import { rewardPlan } from "./match_rewards.ts";
 import { createFirestoreRewardStore } from "./firestore_rewards.ts";
 import { createPublicProfileStore } from "./public_profiles.ts";
+import { assertNotDeletionBlocked } from "./deletion_access.ts";
 import { createDatabaseRunner, databaseConnectionString } from "./database.ts";
 import { commitAndDeliver, deliverLatestRoom, matchMirrorUpdates, participantSnapshot, publicMatchState } from "./match_delivery.ts";
 
@@ -284,6 +285,7 @@ Deno.serve(async (request) => {
 
   try {
     const user = await firebaseUser(request);
+    await assertNotDeletionBlocked(user.uid, path => firebaseRequest(path));
     const body = await request.json() as {
       action?: string;
       toUid?: unknown;
@@ -327,6 +329,13 @@ Deno.serve(async (request) => {
         }
     }
     return await withDatabase(async (connection) => {
+      // Defense in depth: once durable deletion is accepted, no ordinary API
+      // request can bootstrap the deleted profile again. Receipt/worker actions
+      // will use a separate authorized path rather than this normal upsert.
+      const blocked = await connection.queryObject`
+        select 1 from halabessa.account_deletion_jobs where firebase_uid = ${user.uid}
+      `;
+      if (blocked.rows.length) return reply({error:'unauthenticated'},401,origin);
       await connection.queryObject`
         insert into halabessa.user_profiles (firebase_uid, email, display_name)
         values (${user.uid}, ${user.email}, ${user.name})
