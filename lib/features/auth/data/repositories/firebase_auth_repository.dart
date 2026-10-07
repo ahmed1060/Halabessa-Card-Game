@@ -1,4 +1,5 @@
 import 'profile_update.dart';
+import 'session_profile_stream.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_database/firebase_database.dart';
@@ -143,11 +144,10 @@ class FirebaseAuthRepository implements AuthRepository {
 
   @override
   Stream<AppUser?> get authStateChanges {
-    return _firebaseAuth.userChanges().asyncExpand((firebaseUser) {
-      // asyncExpand treats a null stream as "emit nothing". Emit null as a
-      // data event so signed-out users leave the loading state and reach the
-      // sign-in / guest entry screen.
-      if (firebaseUser == null) return Stream<AppUser?>.value(null);
+    return sessionProfileStream<
+      firebase_auth.User,
+      AppUser
+    >(_firebaseAuth.userChanges(), (firebaseUser) {
       return FirebaseFirestore.instance
           .collection('users')
           .doc(firebaseUser.uid)

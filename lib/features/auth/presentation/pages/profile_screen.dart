@@ -16,6 +16,7 @@ import '../widgets/guest_progress_panel.dart';
 import '../widgets/profile_identity_title.dart';
 import '../../../game/presentation/widgets/table_style.dart';
 import '../../domain/models/app_user.dart';
+import '../../../../core/utils/error_handler.dart';
 
 class ProfileAchievement {
   final String id;
@@ -449,10 +450,34 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                               backgroundColor: Colors.redAccent,
                               foregroundColor: Colors.white,
                             ),
-                            onPressed: () {
-                              ref.read(authRepositoryProvider).signOut();
+                            onPressed: () async {
+                              final navigator = Navigator.of(context);
+                              final messenger = ScaffoldMessenger.of(context);
                               Navigator.pop(ctx);
-                              Navigator.pop(context);
+                              try {
+                                await ref
+                                    .read(authRepositoryProvider)
+                                    .signOut();
+                                // Drop every authenticated route, not just the
+                                // profile page. A deep-linked profile may have
+                                // no AuthWrapper underneath it.
+                                if (navigator.mounted) {
+                                  navigator.pushNamedAndRemoveUntil(
+                                    '/',
+                                    (_) => false,
+                                  );
+                                }
+                              } catch (error) {
+                                if (messenger.mounted) {
+                                  messenger.showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        ErrorHandler.getAuthErrorMessage(error),
+                                      ),
+                                    ),
+                                  );
+                                }
+                              }
                             },
                             child: Text('log_out'.tr()),
                           ),

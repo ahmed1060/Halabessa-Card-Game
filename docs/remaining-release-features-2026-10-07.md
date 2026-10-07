@@ -135,3 +135,46 @@ part of this work. Keep the requested single final push until the batch is ready
   device checks and signed-store/provider configuration still require the
   publisher's devices and accounts; neither store acceptance nor legal review is
   implied by these engineering tests.
+
+## Fifth batch — identity adapter and deployment diagnosis
+
+- Added a server-only Firebase Identity Toolkit adapter with scoped one-UID
+  lookup, minimized live identity data, disabled/revoked-session validation,
+  disable-and-revoke and idempotent identity removal. Linked credentials are
+  checked against the live account, not stale anonymous-provider token claims.
+- Eight adapter tests plus six deletion-contract tests passed. These use mocked
+  HTTP transport; no production user was disabled, revoked or deleted.
+- The adapter is not wired into the Edge endpoint. Before activation it needs
+  an OAuth token with the identitytoolkit scope and the existing service
+  account's corresponding Auth permissions. Its active-session helper must be
+  integrated with the durable deletion guard; adding this module alone does not
+  change current JWT acceptance.
+- Production deletion still needs private durable jobs/cross-worker locking,
+  receipt-based retry after revocation, room/reward/social/avatar cleanup,
+  old-token guards in both Firebase and Edge, native reauthentication/Apple
+  revocation, confirmation/status UI, and the approved isolated live QA.
+- Hosting run 37600507043 again failed specifically on Firestore index IAM
+  permission after passing its tests. Android run 37600506984 succeeded; iOS
+  run 37600506987 was still running at this check. Instructions for the narrow
+  index-role fix are in manual-hosting-deploy.md. No permission gate was bypassed.
+
+## Reported logout permission screen
+
+- Found `userChanges().asyncExpand(...)` subscribing to an endless Firestore
+  profile stream. `asyncExpand` pauses the auth source while its inner stream is
+  active, so sign-out/account-switch events can be held behind the old profile
+  listener; the listener then fails permission checks when Firebase signs out.
+- Replaced it with a cancellable, generation-guarded session/profile switch.
+  Auth changes are not blocked by profile enrichment, and obsolete profile
+  results/errors cannot overwrite the signed-out or new-account state.
+- Logout now awaits Firebase sign-out, reports an actual sign-out failure without
+  abandoning the current route, and clears all authenticated routes on success.
+- Three stream regression tests cover endless profiles, pending asynchronous
+  enrichment, late permission errors, account switches and listener disposal.
+  Seven existing social-auth regression tests also passed. Live-site verification
+  still depends on unblocking Hosting deployment; this is not a deployed fix yet.
+- Complete regression run after the logout fix: 348 Flutter tests and 114
+  server/page tests passed. Analysis reported no errors; the existing 261
+  warnings/informational lint notices remain.
+- Release JavaScript web build succeeded. Optional Wasm dry-run warnings from
+  existing web plugins do not imply a successful Wasm target or physical QA.
