@@ -26,12 +26,15 @@ class MultiplayerSyncService {
   /// Nesting hands under matches/$matchId would inherit that open read
   /// instead -- RTDB read access only ever widens going down a path, it
   /// can't be narrowed by a rule on a child. See HAL-05.
-  DatabaseReference _handsRef(String matchId) => _db.ref('matchHands').child(matchId);
+  DatabaseReference _handsRef(String matchId) =>
+      _db.ref('matchHands').child(matchId);
 
   Map<String, dynamic> _handUpdates(MatchState matchState) {
     final updates = <String, dynamic>{};
     matchState.handCards.forEach((uid, cards) {
-      updates['matchHands/${matchState.id}/$uid'] = cards.map((c) => c.toJson()).toList();
+      updates['matchHands/${matchState.id}/$uid'] = cards
+          .map((c) => c.toJson())
+          .toList();
     });
     return updates;
   }
@@ -76,17 +79,26 @@ class MultiplayerSyncService {
   /// Creates a room through the server so the caller cannot choose another
   /// user's identity or race another room creator for the same id.
   Future<MatchState> createMatch(MatchState matchState) async {
-    final data = await SupabaseBackendService.call('createRoom', data: {
-      'mode': matchState.mode.name,
-      'maxPoints': matchState.maxPoints,
-      'timerDurationSeconds': matchState.timerDurationSeconds,
-      'isPublic': matchState.isPublic,
-      'displayName': matchState.playerNames.isEmpty ? '' : matchState.playerNames.values.first,
-      // Creation policy never rewrites an existing room's saved protocol.
-      'protocolVersion': newOnlineRoomProtocol,
-      'cardBackId': matchState.playerSkins.isEmpty ? '' : matchState.playerSkins.values.first,
-      'avatarUrl': matchState.playerAvatars.isEmpty ? '' : matchState.playerAvatars.values.first,
-    });
+    final data = await SupabaseBackendService.call(
+      'createRoom',
+      data: {
+        'mode': matchState.mode.name,
+        'maxPoints': matchState.maxPoints,
+        'timerDurationSeconds': matchState.timerDurationSeconds,
+        'isPublic': matchState.isPublic,
+        'displayName': matchState.playerNames.isEmpty
+            ? ''
+            : matchState.playerNames.values.first,
+        // Creation policy never rewrites an existing room's saved protocol.
+        'protocolVersion': newOnlineRoomProtocol,
+        'cardBackId': matchState.playerSkins.isEmpty
+            ? ''
+            : matchState.playerSkins.values.first,
+        'avatarUrl': matchState.playerAvatars.isEmpty
+            ? ''
+            : matchState.playerAvatars.values.first,
+      },
+    );
     return MatchState.fromJson(Map<String, dynamic>.from(data['match'] as Map));
   }
 
@@ -101,33 +113,50 @@ class MultiplayerSyncService {
     String? actorUid,
     String? commandId,
   }) async {
-    final data = await sendIdempotentMatchRequest({
+    final data = await sendIdempotentMatchRequest(
+      {
         'roomId': matchState.id,
         'commandId': commandId ?? _newCommandId(),
         'commandType': commandType,
         'expectedVersion': matchState.serverVersion,
         'commandPayload': payload,
         if (actorUid != null) 'actorUid': actorUid,
-      }, (intent) => SupabaseBackendService.call('submitMatchCommand', data: intent,
-        timeout: const Duration(seconds: 20)));
+      },
+      (intent) => SupabaseBackendService.call(
+        'submitMatchCommand',
+        data: intent,
+        timeout: const Duration(seconds: 20),
+      ),
+    );
     return commandSnapshot(data, callerUid);
   }
 
   /// Private/public state in a command response belongs to one SQL revision.
-  static MatchState commandSnapshot(Map<String, dynamic> data, String callerUid) {
+  static MatchState commandSnapshot(
+    Map<String, dynamic> data,
+    String callerUid,
+  ) {
     final publicValue = data['state'];
     if (publicValue is! Map) {
       throw const SupabaseBackendException('invalid_match_response');
     }
     final merged = Map<String, dynamic>.from(publicValue);
     final ownHand = data['hand'];
-    merged['handCards'] = {callerUid: ownHand is List || ownHand is Map ? ownHand : []};
+    merged['handCards'] = {
+      callerUid: ownHand is List || ownHand is Map ? ownHand : [],
+    };
     return MatchState.fromJson(merged);
   }
 
-  Future<MatchState> getCommandSnapshot(String matchId, String callerUid) async {
-    final data = await SupabaseBackendService.call('getMatchSnapshot',
-      data: {'roomId': matchId}, timeout: const Duration(seconds: 20));
+  Future<MatchState> getCommandSnapshot(
+    String matchId,
+    String callerUid,
+  ) async {
+    final data = await SupabaseBackendService.call(
+      'getMatchSnapshot',
+      data: {'roomId': matchId},
+      timeout: const Duration(seconds: 20),
+    );
     return commandSnapshot(data, callerUid);
   }
 
@@ -137,12 +166,18 @@ class MultiplayerSyncService {
     var current = matchState;
     for (var attempt = 0; attempt < 3; attempt++) {
       try {
-        await submitMatchCommand(matchState: current,
-          commandType: 'leave', callerUid: callerUid);
+        await submitMatchCommand(
+          matchState: current,
+          commandType: 'leave',
+          callerUid: callerUid,
+        );
         return;
       } on SupabaseBackendException catch (error) {
-        if (error.code == 'not_room_participant' || error.code == 'room_not_found') return;
-        if (error.code != 'version_conflict' || error.details['state'] is! Map) rethrow;
+        if (error.code == 'not_room_participant' ||
+            error.code == 'room_not_found')
+          return;
+        if (error.code != 'version_conflict' || error.details['state'] is! Map)
+          rethrow;
         current = commandSnapshot(error.details, callerUid);
         if (!current.playerIds.contains(callerUid)) return;
         if (attempt == 2) rethrow;
@@ -152,13 +187,21 @@ class MultiplayerSyncService {
 
   /// Only completed server-protocol rooms can award trusted profile changes.
   /// The server's immutable match receipt makes a lost response safe to retry.
-  Future<MatchState> settleMatchRewards(MatchState matchState, String callerUid) async {
+  Future<MatchState> settleMatchRewards(
+    MatchState matchState,
+    String callerUid,
+  ) async {
     if (matchState.protocolVersion != 1) {
       throw const SupabaseBackendException('rewards_not_ready');
     }
-    final data = await sendIdempotentMatchRequest({'roomId': matchState.id},
-      (intent) => SupabaseBackendService.call('settleMatchRewards', data: intent,
-        timeout: const Duration(seconds: 40)));
+    final data = await sendIdempotentMatchRequest(
+      {'roomId': matchState.id},
+      (intent) => SupabaseBackendService.call(
+        'settleMatchRewards',
+        data: intent,
+        timeout: const Duration(seconds: 40),
+      ),
+    );
     return commandSnapshot(data, callerUid);
   }
 
@@ -167,13 +210,18 @@ class MultiplayerSyncService {
     final bytes = List<int>.generate(16, (_) => random.nextInt(256));
     bytes[6] = (bytes[6] & 0x0f) | 0x40;
     bytes[8] = (bytes[8] & 0x3f) | 0x80;
-    final hex = bytes.map((byte) => byte.toRadixString(16).padLeft(2, '0')).join();
+    final hex = bytes
+        .map((byte) => byte.toRadixString(16).padLeft(2, '0'))
+        .join();
     return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-${hex.substring(12, 16)}-'
         '${hex.substring(16, 20)}-${hex.substring(20)}';
   }
 
   /// Update an entire existing match state
-  Future<void> updateMatchState(MatchState matchState, {bool refreshRoomIndex = false}) async {
+  Future<void> updateMatchState(
+    MatchState matchState, {
+    bool refreshRoomIndex = false,
+  }) async {
     validateLegacyWrite(matchState);
     // The public state and private hands must change in the same RTDB update.
     // Two sequential writes briefly exposed a new turn with old cards and
@@ -194,7 +242,8 @@ class MultiplayerSyncService {
     } catch (e) {
       // Index refresh must not roll back a successfully persisted move; the
       // next state update or scheduled cleanup will reconcile it.
-      if (kDebugMode) debugPrint('Could not refresh room index for ${matchState.id}: $e');
+      if (kDebugMode)
+        debugPrint('Could not refresh room index for ${matchState.id}: $e');
     }
   }
 
@@ -217,13 +266,18 @@ class MultiplayerSyncService {
     required String avatarUrl,
     required String callerUid,
   }) async {
-    final data = await SupabaseBackendService.call('joinRoom', data: {
-      'roomId': roomId,
-      'displayName': displayName,
-      'cardBackId': cardBackId,
-      'avatarUrl': avatarUrl,
-    });
-    final joined = MatchState.fromJson(Map<String, dynamic>.from(data['match'] as Map));
+    final data = await SupabaseBackendService.call(
+      'joinRoom',
+      data: {
+        'roomId': roomId,
+        'displayName': displayName,
+        'cardBackId': cardBackId,
+        'avatarUrl': avatarUrl,
+      },
+    );
+    final joined = MatchState.fromJson(
+      Map<String, dynamic>.from(data['match'] as Map),
+    );
     // The join response's hand must not be dropped for active replacements.
     return joined.usesServerCommands
         ? commandSnapshot({...data, 'state': data['match']}, callerUid)
@@ -235,11 +289,17 @@ class MultiplayerSyncService {
   /// two-subscription merge rather than combining via a Stream library --
   /// this file has no reactive-streams dependency to reach for, and the
   /// merge itself is small enough not to need one.
-  Stream<MatchState?> watchMatch(String matchId, {String? callerUid, bool spectator = false}) async* {
+  Stream<MatchState?> watchMatch(
+    String matchId, {
+    String? callerUid,
+    bool spectator = false,
+  }) async* {
     if (spectator) {
       yield* matchRef.child(matchId).onValue.map((event) {
         final value = event.snapshot.value;
-        return value is Map ? publicSnapshot(Map<String, dynamic>.from(value)) : null;
+        return value is Map
+            ? publicSnapshot(Map<String, dynamic>.from(value))
+            : null;
       });
       return;
     }
@@ -288,32 +348,48 @@ class MultiplayerSyncService {
             : Map<String, dynamic>.from(latestPublic!);
         controller.add(MatchState.fromJson(merged));
       } catch (e) {
-        if (kDebugMode) debugPrint('CRITICAL: Error parsing match state for $matchId: $e');
+        if (kDebugMode)
+          debugPrint('CRITICAL: Error parsing match state for $matchId: $e');
         controller.addError(e);
       }
     }
 
-    final publicSub = matchRef.child(matchId).onValue.listen((event) {
-      final value = event.snapshot.value;
-      havePublic = true;
-      latestPublic = (value is Map) ? Map<String, dynamic>.from(value) : null;
-      emit();
-    }, onError: (error) {
-      if (kDebugMode) debugPrint('STREAM ERROR for match $matchId: $error');
-      controller.addError(error);
-    });
+    final publicSub = matchRef
+        .child(matchId)
+        .onValue
+        .listen(
+          (event) {
+            final value = event.snapshot.value;
+            havePublic = true;
+            latestPublic = (value is Map)
+                ? Map<String, dynamic>.from(value)
+                : null;
+            emit();
+          },
+          onError: (error) {
+            if (kDebugMode)
+              debugPrint('STREAM ERROR for match $matchId: $error');
+            controller.addError(error);
+          },
+        );
 
-    final handsSub = _handsRef(matchId).onValue.listen((event) {
-      final value = event.snapshot.value;
-      latestHands = (value is Map) ? value : null;
-      haveHandsSnapshot = true;
-      if (havePublic) emit();
-    }, onError: (error) {
-      // Expected before you've joined a match (matchHands read is
-      // participant-only) -- leave handCards empty rather than surfacing it.
-      if (kDebugMode) debugPrint('Hands stream error for $matchId (not a participant yet?): $error');
-      latestHands = null;
-    });
+    final handsSub = _handsRef(matchId).onValue.listen(
+      (event) {
+        final value = event.snapshot.value;
+        latestHands = (value is Map) ? value : null;
+        haveHandsSnapshot = true;
+        if (havePublic) emit();
+      },
+      onError: (error) {
+        // Expected before you've joined a match (matchHands read is
+        // participant-only) -- leave handCards empty rather than surfacing it.
+        if (kDebugMode)
+          debugPrint(
+            'Hands stream error for $matchId (not a participant yet?): $error',
+          );
+        latestHands = null;
+      },
+    );
 
     controller.onCancel = () {
       publicSub.cancel();
@@ -329,7 +405,10 @@ class MultiplayerSyncService {
 
   /// Sync presence for a player: sets online status and removes it on disconnect
   Future<void> syncPresence(String matchId, String playerId) async {
-    final presenceRef = matchRef.child(matchId).child('presence').child(playerId);
+    final presenceRef = matchRef
+        .child(matchId)
+        .child('presence')
+        .child(playerId);
     // Set online status to true
     await presenceRef.set(true);
     // Set onDisconnect behavior
@@ -339,12 +418,20 @@ class MultiplayerSyncService {
   /// Remove presence for a player manually
   Future<void> removePresence(String matchId, String playerId) async {
     await matchRef.child(matchId).child('presence').child(playerId).remove();
-    await matchRef.child(matchId).child('playerLastActive').child(playerId).remove();
+    await matchRef
+        .child(matchId)
+        .child('playerLastActive')
+        .child(playerId)
+        .remove();
   }
 
   /// Update heartbeat timestamp for AFK detection
   Future<void> heartbeat(String matchId, String playerId) async {
-    await matchRef.child(matchId).child('playerLastActive').child(playerId).set(DateTime.now().toIso8601String());
+    await matchRef
+        .child(matchId)
+        .child('playerLastActive')
+        .child(playerId)
+        .set(DateTime.now().toIso8601String());
   }
 
   /// Watch presence changes for all players in a match
@@ -352,7 +439,9 @@ class MultiplayerSyncService {
     return matchRef.child(matchId).child('presence').onValue.map((event) {
       final value = event.snapshot.value;
       if (value == null || value is! Map) return <String, bool>{};
-      return Map<String, bool>.from(value.map((k, v) => MapEntry(k.toString(), v == true)));
+      return Map<String, bool>.from(
+        value.map((k, v) => MapEntry(k.toString(), v == true)),
+      );
     });
   }
 
@@ -404,7 +493,11 @@ class MultiplayerSyncService {
   }
 
   /// Add a specific action/move event to a log (if needed for replay or verification)
-  Future<void> submitAction(String matchId, String playerId, Map<String, dynamic> actionData) async {
+  Future<void> submitAction(
+    String matchId,
+    String playerId,
+    Map<String, dynamic> actionData,
+  ) async {
     final actionRef = matchRef.child(matchId).child('actions').push();
     await actionRef.set({
       'playerId': playerId,
@@ -428,21 +521,25 @@ class MultiplayerSyncService {
     try {
       final lowercaseQuery = query.toLowerCase().replaceAll('@', '').trim();
       final firestore = FirebaseFirestore.instance;
-      
-      final snapshot = await firestore.collection('users')
+
+      final snapshot = await firestore
+          .collection('users')
           .where('searchName', isGreaterThanOrEqualTo: lowercaseQuery)
           .where('searchName', isLessThanOrEqualTo: '$lowercaseQuery\uf8ff')
           .limit(20)
           .get();
-      
-      return snapshot.docs.map((doc) {
-        try {
-          return AppUser.fromJson(doc.data(), doc.id);
-        } catch (e) {
-          debugPrint('Error parsing user ${doc.id}: $e');
-          return null;
-        }
-      }).whereType<AppUser>().toList();
+
+      return snapshot.docs
+          .map((doc) {
+            try {
+              return AppUser.fromJson(doc.data(), doc.id);
+            } catch (e) {
+              debugPrint('Error parsing user ${doc.id}: $e');
+              return null;
+            }
+          })
+          .whereType<AppUser>()
+          .toList();
     } catch (e) {
       debugPrint('Error searching users: $e');
       return [];
@@ -462,7 +559,10 @@ class MultiplayerSyncService {
   /// compatibility with existing call sites -- the function trusts only
   /// request.auth.uid, never a client-supplied sender id.
   Future<void> sendFriendRequest(String fromUid, String toUid) async {
-    await SupabaseBackendService.call('sendFriendRequest', data: {'toUid': toUid});
+    await SupabaseBackendService.call(
+      'sendFriendRequest',
+      data: {'toUid': toUid},
+    );
   }
 
   /// Accept a friend request. See sendFriendRequest for why this is a
@@ -484,50 +584,87 @@ class MultiplayerSyncService {
   }
 
   /// CHAT: Send a message to the match chat
-  Future<void> sendChatMessage(String matchId, ChatMessage message) async {
+  Future<void> sendChatMessage(
+    String matchId,
+    ChatMessage message, {
+    String channel = 'public',
+    bool legacy = false,
+  }) async {
     if (matchId.isEmpty || matchId.startsWith('OFFLINE_')) return;
-    final chatRef = matchRef.child(matchId).child('chat').push();
-    await chatRef.set(message.toJson());
+    if (!['public', 'teamA', 'teamB'].contains(channel))
+      throw StateError('invalid_chat_channel');
+    if (legacy) {
+      if (channel != 'public') throw StateError('legacy_team_chat_unavailable');
+      final chatRef = matchRef.child(matchId).child('chat').push();
+      await chatRef.set({...message.toJson(), 'id': chatRef.key});
+      return;
+    }
+    final root = _db.ref('matchChat').child(matchId);
+    final chatRef = root.child(channel).push();
+    await root.update({
+      '$channel/${chatRef.key}': {
+        ...message.toJson(),
+        'id': chatRef.key,
+        'timestamp': ServerValue.timestamp,
+      },
+      'rate/${message.senderId}': ServerValue.timestamp,
+    });
   }
 
-  Stream<List<ChatMessage>> watchChatMessages(String matchId) {
-    if (matchId.isEmpty || matchId.startsWith('OFFLINE_')) return Stream.value([]);
-    
-    return matchRef.child(matchId).child('chat')
-      .orderByKey()
-      .limitToLast(50)
-      .onValue.map((event) {
-        final value = event.snapshot.value;
-        if (value == null) return <ChatMessage>[];
-        
-        Map<dynamic, dynamic> messages;
-        if (value is List) {
-          messages = value.asMap();
-        } else if (value is Map) {
-          messages = value;
-        } else {
-          debugPrint('Chat data is not a Map or List: ${value.runtimeType}');
-          return <ChatMessage>[];
-        }
-        
-        final list = messages.entries.map((entry) {
-          final val = entry.value;
-          if (val == null || val is! Map) return null;
-          try {
-            return ChatMessage.fromJson(Map<String, dynamic>.from(val), entry.key.toString());
-          } catch (e) {
-            debugPrint('Error parsing chat message at ${entry.key}: $e');
-            return null;
+  Stream<List<ChatMessage>> watchChatMessages(
+    String matchId, {
+    String channel = 'public',
+    bool legacy = false,
+  }) {
+    if (matchId.isEmpty || matchId.startsWith('OFFLINE_'))
+      return Stream.value([]);
+
+    if (!['public', 'teamA', 'teamB'].contains(channel))
+      return Stream.error(StateError('invalid_chat_channel'));
+    return (legacy
+            ? matchRef.child(matchId).child('chat')
+            : _db.ref('matchChat').child(matchId).child(channel))
+        .orderByKey()
+        .limitToLast(50)
+        .onValue
+        .map((event) {
+          final value = event.snapshot.value;
+          if (value == null) return <ChatMessage>[];
+
+          Map<dynamic, dynamic> messages;
+          if (value is List) {
+            messages = value.asMap();
+          } else if (value is Map) {
+            messages = value;
+          } else {
+            debugPrint('Chat data is not a Map or List: ${value.runtimeType}');
+            return <ChatMessage>[];
           }
-        }).whereType<ChatMessage>().toList();
-        
-        // Ensure consistent chronological order
-        list.sort((a, b) => a.timestamp.compareTo(b.timestamp));
-        return list;
-      }).handleError((error) {
-        debugPrint('CHAT STREAM ERROR for $matchId: $error');
-        return <ChatMessage>[];
-      });
+
+          final list = messages.entries
+              .map((entry) {
+                final val = entry.value;
+                if (val == null || val is! Map) return null;
+                try {
+                  return ChatMessage.fromJson(
+                    Map<String, dynamic>.from(val),
+                    entry.key.toString(),
+                  );
+                } catch (e) {
+                  debugPrint('Error parsing chat message at ${entry.key}: $e');
+                  return null;
+                }
+              })
+              .whereType<ChatMessage>()
+              .toList();
+
+          // Ensure consistent chronological order
+          list.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+          return list;
+        })
+        .handleError((error) {
+          debugPrint('CHAT STREAM ERROR for $matchId: $error');
+          return <ChatMessage>[];
+        });
   }
 }
-

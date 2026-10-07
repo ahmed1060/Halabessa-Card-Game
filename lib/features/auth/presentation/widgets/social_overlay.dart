@@ -7,6 +7,7 @@ import '../../../auth/domain/models/app_user.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../game/domain/providers/game_providers.dart';
 import '../../../../core/utils/error_handler.dart';
+import '../../../../core/services/player_presence.dart';
 
 class SocialOverlay extends ConsumerStatefulWidget {
   const SocialOverlay({super.key});
@@ -19,6 +20,7 @@ class _SocialOverlayState extends ConsumerState<SocialOverlay> {
   final TextEditingController _searchController = TextEditingController();
   List<AppUser> _searchResults = [];
   bool _isSearching = false;
+  String _presenceFilter = 'all';
   final Set<String> _actionLoadingUserIds =
       {}; // Tracks loading for Add/Accept/Reject
 
@@ -200,6 +202,17 @@ class _SocialOverlayState extends ConsumerState<SocialOverlay> {
       controller: scrollController,
       padding: const EdgeInsets.all(16),
       children: [
+        Wrap(
+          spacing: 8,
+          children: [
+            for (final filter in ['all', 'online', 'offline'])
+              ChoiceChip(
+                label: Text('ui_presence_$filter'.tr()),
+                selected: _presenceFilter == filter,
+                onSelected: (_) => setState(() => _presenceFilter = filter),
+              ),
+          ],
+        ),
         // Game Invitations Section
         if (currentUser.friendInvites.isNotEmpty) ...[
           Padding(
@@ -303,7 +316,28 @@ class _SocialOverlayState extends ConsumerState<SocialOverlay> {
                     if (user == null) {
                       return _buildErrorState('user_not_found'.tr());
                     }
-                    return _buildUserTile(user, isFriend: true);
+                    final online = hasFreshPresence(
+                      ref.watch(playerPresenceProvider(friendUid)).value,
+                      ref.watch(presenceClockProvider).value ?? DateTime.now(),
+                    );
+                    if ((_presenceFilter == 'online' && !online) ||
+                        (_presenceFilter == 'offline' && online))
+                      return const SizedBox.shrink();
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          (online
+                                  ? 'ui_presence_online'
+                                  : 'ui_presence_offline')
+                              .tr(),
+                          style: TextStyle(
+                            color: online ? TableStyle.mint : Colors.white54,
+                          ),
+                        ),
+                        _buildUserTile(user, isFriend: true),
+                      ],
+                    );
                   },
                   loading: () => const SizedBox(
                     height: 72,

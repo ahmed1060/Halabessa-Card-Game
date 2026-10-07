@@ -52,3 +52,38 @@ must not be confused with production rollout or physical-device acceptance.
   simultaneous-provider protection. This does not establish live Apple success.
 - Added public support page and in-app publisher/email with copy action.
 - Other features above remain in progress, not implemented by this batch.
+
+## Second implementation batch (local; not yet pushed or deployed)
+
+- Per-capture awarded points now travel with server/offline capture history.
+  Completed-round UI shows capture points, Tafweet bonus, majority bonus and
+  this-round total. Legacy/incomplete awards are hidden rather than guessed.
+- Weekly standings are recorded in the same conditional Firestore commit as
+  the exactly-once reward receipt. UTC Monday boundaries and late settlement
+  are tested. Three indexes and deployment configuration are prepared.
+- Rankings no longer substitute fictional players on query failure or append
+  a non-top-50 player as though their global rank were 51. Retry UI is explicit.
+- Online/offline friend filters use per-connection heartbeat/disconnect presence,
+  expire stale status, and keep the presence session across route changes.
+- Match-only Public/private Team storage is separate from broadly readable match
+  state. Read/write rules verify present seat membership, sender, timestamps and
+  rate limits. Game events are read-only. Legacy rooms retain public chat only;
+  offline training does not pretend to send multiplayer messages.
+- Nineteen Firebase emulator access-control tests passed, including private chat
+  and weekly-ranking forgery protection. Emulator processes shut down cleanly.
+- Full Flutter regression suite: 334 tests passed. Full CI server/settlement/web
+  startup suite: 92 tests passed. Final release web build succeeded. Analysis
+  reported no errors; existing informational lint/deprecation notices remain.
+- Five ranking widget tests and eight round-summary layout tests cover period
+  values, query failure, portrait/landscape, RTL/LTR and enlarged score-panel text.
+  These are isolated fixtures, not a claim of production or physical-device QA.
+
+## Newly confirmed release scope
+
+The audience includes children; first markets are Egypt, Saudi Arabia, USA and
+Canada. Under-13 inclusion remains unanswered. Public legal pages must not be
+published as an adult-only policy. See account-data-release-review-2026-10-07.md
+for the actual data inventory, deletion safety contract and child-release gates.
+Account deletion, child-account safeguards, final legal publication, production
+rollout and physical/native acceptance remain unfinished. No mass user reset is
+part of this work. Keep the requested single final push until the batch is ready.

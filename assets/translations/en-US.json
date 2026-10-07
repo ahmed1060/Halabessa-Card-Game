@@ -1,4 +1,15 @@
 {
+    "ui_presence_all": "All",
+    "ui_presence_online": "Online",
+    "ui_presence_offline": "Offline",
+    "ui_chat_public": "Public",
+    "ui_chat_team": "Team",
+    "ui_chat_game": "Game",
+    "ui_game_card_played": "Card played: {}",
+    "ui_chat_send_failed": "Message not sent. Wait a moment and retry.",
+    "ui_all_time": "All time",
+    "ui_this_week": "This week",
+    "ui_week_resets": "Resets in {} hours · Monday 00:00 UTC",
     "ui_practice_ended": "This practice session has ended",
     "ui_seconds_short": "{}s",
     "ui_seconds_remaining": "{} seconds remaining",
@@ -20,6 +31,10 @@
     "ui_private_detail": "Only players with the code can join",
     "ui_round_captures": "Capture plays this round",
     "ui_round_cards": "Cards collected",
+    "ui_capture_points": "Capture points",
+    "ui_tafweet_bonus": "Tafweet bonus",
+    "ui_majority_bonus": "Most cards bonus",
+    "ui_round_points": "Points this round",
     "ui_round_score": "Match score",
     "ui_featured": "Featured deck",
     "ui_guest_save": "Link your guest account to keep your profile and progress across devices. Linking keeps your current player ID.",
@@ -538,5 +553,6 @@
     "bot_strategy_easy": "Basic captures with occasional mistakes",
     "bot_strategy_medium": "Captures and simple hand planning",
     "bot_strategy_hard": "Remembers exposed cards and avoids risky ranks",
-    "bot_strategy_expert": "Card counting and teammate-aware decisions"
+    "bot_strategy_expert": "Card counting and teammate-aware decisions",
+    "ui_leaderboard_unavailable": "Rankings could not be loaded. Please try again."
 }

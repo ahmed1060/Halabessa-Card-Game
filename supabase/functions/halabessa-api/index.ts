@@ -805,6 +805,7 @@ Deno.serve(async (request) => {
             [`matches/${id}`]: null,
             [`matchHands/${id}`]: null,
             [`matchSecrets/${id}`]: null,
+            [`matchChat/${id}`]: null,
             [`rooms/${id}`]: null,
           });
           if (deleted.status < 200 || deleted.status >= 300) throw new Error("room_delete_failed");

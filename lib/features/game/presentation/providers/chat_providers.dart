@@ -3,23 +3,71 @@ import '../../domain/models/chat_message.dart';
 import '../../domain/providers/game_providers.dart';
 import 'dart:async';
 import '../../../auth/presentation/providers/auth_providers.dart';
+import 'package:easy_localization/easy_localization.dart';
 
-final chatMessagesProvider = StreamProvider.autoDispose<List<ChatMessage>>((ref) {
+final chatChannelProvider = StateProvider.autoDispose<ChatChannel>(
+  (ref) => ChatChannel.public,
+);
+
+final chatMessagesProvider = StreamProvider.autoDispose<List<ChatMessage>>((
+  ref,
+) {
   // Use select to only watch the ID, preventing stream recreation on every score/state change
   final matchId = ref.watch(matchStateProvider.select((s) => s?.id));
   if (matchId == null) return Stream.value([]);
-  
-  return ref.read(multiplayerSyncServiceProvider).watchChatMessages(matchId);
+  final channel = ref.watch(chatChannelProvider);
+  final uid = ref.watch(currentUserProvider.select((user) => user?.uid));
+  if (channel == ChatChannel.game) {
+    final state = ref.watch(matchStateProvider);
+    final history = state?.playHistory ?? [];
+    const suits = {'hearts': '♥', 'diamonds': '♦', 'clubs': '♣', 'spades': '♠'};
+    final time =
+        state?.phaseStartedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+    return Stream.value(
+      history
+          .asMap()
+          .entries
+          .map(
+            (entry) => ChatMessage(
+              id: 'game-${state?.roundCount}-${entry.key}',
+              senderId: 'system',
+              senderName: 'ui_chat_game'.tr(),
+              text: 'ui_game_card_played'.tr(
+                args: [
+                  '${{11: 'J', 12: 'Q', 13: 'K', 14: 'A'}[entry.value.rank.value] ?? entry.value.rank.value}${suits[entry.value.suit.name]}',
+                ],
+              ),
+              timestamp: time,
+            ),
+          )
+          .toList(),
+    );
+  }
+  final (seat, protocol) = ref.watch(
+    matchStateProvider.select(
+      (state) => (
+        state?.playerIds.indexOf(uid ?? '') ?? -1,
+        state?.protocolVersion ?? 0,
+      ),
+    ),
+  );
+  if (seat < 0) return Stream.value([]);
+  if (protocol == 0 && channel == ChatChannel.team) return Stream.value([]);
+  final storage = channel == ChatChannel.team
+      ? (seat.isEven ? 'teamA' : 'teamB')
+      : 'public';
+
+  return ref
+      .read(multiplayerSyncServiceProvider)
+      .watchChatMessages(matchId, channel: storage, legacy: protocol == 0);
 });
 
 class ChatState {
   final bool isOverlayOpen;
   final DateTime lastSeenTimestamp;
 
-  ChatState({
-    this.isOverlayOpen = false, 
-    DateTime? lastSeenTimestamp
-  }) : lastSeenTimestamp = lastSeenTimestamp ?? DateTime.now();
+  ChatState({this.isOverlayOpen = false, DateTime? lastSeenTimestamp})
+    : lastSeenTimestamp = lastSeenTimestamp ?? DateTime.now();
 
   ChatState copyWith({bool? isOverlayOpen, DateTime? lastSeenTimestamp}) {
     return ChatState(
@@ -52,9 +100,10 @@ class ChatNotifier extends StateNotifier<ChatState> {
   }
 }
 
-final chatStateProvider = StateNotifierProvider.autoDispose<ChatNotifier, ChatState>((ref) {
-  return ChatNotifier();
-});
+final chatStateProvider =
+    StateNotifierProvider.autoDispose<ChatNotifier, ChatState>((ref) {
+      return ChatNotifier();
+    });
 
 // Map of userId -> latest ChatMessage that should be shown in a bubble
 class ChatBubblesState {
@@ -72,11 +121,16 @@ class ChatBubblesNotifier extends StateNotifier<ChatBubblesState> {
 
   ChatBubblesNotifier(this.ref) : super(ChatBubblesState()) {
     // Listen to new messages and update bubbles
-    ref.listen<AsyncValue<List<ChatMessage>>>(chatMessagesProvider, (prev, next) {
+    ref.listen<AsyncValue<List<ChatMessage>>>(chatMessagesProvider, (
+      prev,
+      next,
+    ) {
       next.whenData((messages) {
-        if (messages.isEmpty) return;
+        if (messages.isEmpty ||
+            ref.read(chatChannelProvider) == ChatChannel.game)
+          return;
         final latest = messages.last;
-        
+
         // Only show bubbles for messages sent in the last 2 seconds to avoid old messages popping up on load
         if (DateTime.now().difference(latest.timestamp).inSeconds.abs() < 2) {
           _updateBubble(latest);
@@ -87,15 +141,15 @@ class ChatBubblesNotifier extends StateNotifier<ChatBubblesState> {
 
   void _updateBubble(ChatMessage message) {
     final userId = message.senderId;
-    
+
     // Cancel existing timer for this user
     _timers[userId]?.cancel();
-    
+
     // Update state
     final newBubbles = Map<String, ChatMessage>.from(state.bubbles);
     newBubbles[userId] = message;
     state = state.copyWith(bubbles: newBubbles);
-    
+
     // Set new timer to clear
     _timers[userId] = Timer(const Duration(seconds: 5), () {
       final updatedBubbles = Map<String, ChatMessage>.from(state.bubbles);
@@ -114,12 +168,18 @@ class ChatBubblesNotifier extends StateNotifier<ChatBubblesState> {
   }
 }
 
-final chatBubblesProvider = StateNotifierProvider.autoDispose<ChatBubblesNotifier, ChatBubblesState>((ref) {
-  return ChatBubblesNotifier(ref);
-});
+final chatBubblesProvider =
+    StateNotifierProvider.autoDispose<ChatBubblesNotifier, ChatBubblesState>((
+      ref,
+    ) {
+      return ChatBubblesNotifier(ref);
+    });
 
 // Deprecated: keeping for compatibility but redirects to chatBubblesProvider
-final lastMessageForUserProvider = Provider.family<ChatMessage?, String>((ref, userId) {
+final lastMessageForUserProvider = Provider.family<ChatMessage?, String>((
+  ref,
+  userId,
+) {
   final bubbles = ref.watch(chatBubblesProvider).bubbles;
   return bubbles[userId];
 });
@@ -129,14 +189,14 @@ final unreadMessagesCountProvider = Provider.autoDispose<int>((ref) {
   final messagesAsync = ref.watch(chatMessagesProvider);
   final chatState = ref.watch(chatStateProvider);
   final currentUser = ref.read(currentUserProvider);
-  
+
   if (chatState.isOverlayOpen) return 0;
 
   return messagesAsync.when(
     data: (messages) {
       if (messages.isEmpty) return 0;
       final myUid = currentUser?.uid;
-      
+
       // We only count messages sent by OTHERS that arrived AFTER we started/last saw the chat
       return messages.where((m) {
         final isFromMe = myUid != null && m.senderId == myUid;

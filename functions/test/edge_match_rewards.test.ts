@@ -5,6 +5,7 @@ import { createFirestoreRewardStore } from "../../supabase/functions/halabessa-a
 import type { MatchState } from "../../supabase/functions/halabessa-api/match_engine.ts";
 import { releasePlayer } from "../../supabase/functions/halabessa-api/turn_policy.ts";
 import { advanceMatch } from "../../supabase/functions/halabessa-api/match_lifecycle.ts";
+import { utcWeekStart, weeklyRanking } from '../../supabase/functions/halabessa-api/weekly_ranking.ts';
 
 const base = "projects/test/databases/(default)/documents";
 function match(): MatchState {
@@ -12,6 +13,29 @@ function match(): MatchState {
     rewardRoster: ["a", "b", "c", "bot_4"], rewardScores: { teamA: 42, teamB: 33 }, matchSequence: 0 };
 }
 const created = "2026-10-04 10:00:00+00";
+test('weekly ranking boundary uses UTC Monday and never overwrites a newer period', () => {
+  assert.equal(utcWeekStart('2026-10-05T01:00:00+03:00'), '2026-09-28');
+  assert.equal(utcWeekStart('2026-10-05T00:00:00Z'), '2026-10-05');
+  assert.equal(weeklyRanking({week: '2026-10-12'}, '2026-10-05', {points: 50, won: true, teamScore: 42}), null);
+});
+test('weekly totals start fresh and are in the same conditional commit as the reward receipt', async () => {
+  const plan = await rewardPlan({...match(), rewardCompletedAt: '2026-10-07T10:00:00Z'}, created);
+  assert.equal(plan.weekStart, '2026-10-05');
+  const writes = rewardWrites(base, plan, [profile('a', 3450), profile('b'), profile('c')]) as any[];
+  assert.equal(writes[0].update.fields.weeklyRanking.mapValue.fields.points.integerValue, '50');
+  assert.equal(writes[0].update.fields.weeklyRanking.mapValue.fields.wins.integerValue, '1');
+  assert.equal(writes[1].update.fields.weeklyRanking.mapValue.fields.points.integerValue, '0');
+  assert.equal(writes[0].updateMask.fieldPaths.includes('weeklyRanking'), true);
+  assert.deepEqual(writes.at(-1).currentDocument, {exists: false});
+  const legacy = await rewardPlan(match(), created);
+  assert.equal(legacy.weekStart, undefined);
+});
+test('same-week results accumulate without changing all-time wallet semantics', () => {
+  const prior = {week: '2026-10-05', points: 100, wins: 2, losses: 1, gamesPlayed: 3, bestScore: 60};
+  assert.deepEqual(weeklyRanking(prior, '2026-10-05', {points: -30, won: false, teamScore: 41}),
+    {week: '2026-10-05', points: 70, wins: 2, losses: 2, gamesPlayed: 4, bestScore: 60});
+  assert.equal(weeklyRanking(prior, '2026-10-12', {points: 50, won: true, teamScore: 42})!.points, 50);
+});
 function profile(uid: string, points = 20): ProfileDocument {
   return { name: `${base}/users/${uid}`, updateTime: "2026-10-04T10:00:00Z",
     fields: { points: { integerValue: String(points) }, coins: { integerValue: "200" },

@@ -8,6 +8,8 @@ import 'core/routes/app_routes.dart';
 import 'core/theme/theme_config.dart';
 import 'core/providers/settings_provider.dart';
 import 'core/services/multimedia_service.dart';
+import 'core/services/player_presence.dart';
+import 'features/auth/presentation/providers/auth_providers.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/services.dart';
 import 'core/utils/web_registry.dart';
@@ -59,6 +61,7 @@ class HalabessaApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final settings = ref.watch(settingsProvider);
+    final uid = ref.watch(authStateChangesProvider).valueOrNull?.uid;
 
     return MaterialApp(
       title: 'Halabessa',
@@ -86,7 +89,13 @@ class HalabessaApp extends ConsumerWidget {
                   behavior: HitTestBehavior.translucent,
                   onPointerDown: (_) =>
                       ref.read(multimediaServiceProvider).handleInteraction(),
-                  child: child,
+                  child: uid == null
+                      ? child
+                      : PlayerPresenceSession(
+                          key: ValueKey(uid),
+                          uid: uid,
+                          child: child,
+                        ),
                 ),
             ],
           ),

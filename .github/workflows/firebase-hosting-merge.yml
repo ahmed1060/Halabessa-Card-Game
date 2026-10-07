@@ -47,7 +47,7 @@ jobs:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/firebase-service-account.json
         run: |
           echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_HALABESSA_CARD_GAME1 }}' > "$GOOGLE_APPLICATION_CREDENTIALS"
-          npx firebase-tools deploy --only firestore:rules,database --project halabessa-card-game1 --non-interactive
+          npx firebase-tools deploy --only firestore:rules,firestore:indexes,database --project halabessa-card-game1 --non-interactive
           rm -f "$GOOGLE_APPLICATION_CREDENTIALS"
       - run: flutter build web --release --base-href / --pwa-strategy=none
       - name: Fingerprint Flutter entrypoints

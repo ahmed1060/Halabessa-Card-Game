@@ -1,3 +1,5 @@
+enum ChatChannel { public, team, game }
+
 class ChatMessage {
   final String id;
   final String senderId;

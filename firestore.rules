@@ -23,7 +23,8 @@ service cloud.firestore {
         && request.resource.data.get('pendingFriendRequests', []) == []
         && request.resource.data.get('sentFriendRequests', []) == []
         && request.resource.data.get('friendInvites', {}) == {}
-        && request.resource.data.get('dailyReward', {}) == {};
+        && request.resource.data.get('dailyReward', {}) == {}
+        && request.resource.data.get('weeklyRanking', {}) == {};
 
       allow update: if request.auth != null && request.auth.uid == uid
         && request.resource.data.get('isAdmin', false) == resource.data.get('isAdmin', false)
@@ -31,7 +32,8 @@ service cloud.firestore {
         && request.resource.data.get('pendingFriendRequests', []) == resource.data.get('pendingFriendRequests', [])
         && request.resource.data.get('sentFriendRequests', []) == resource.data.get('sentFriendRequests', [])
         && request.resource.data.get('friendInvites', {}) == resource.data.get('friendInvites', {})
-        && request.resource.data.get('dailyReward', {}) == resource.data.get('dailyReward', {});
+        && request.resource.data.get('dailyReward', {}) == resource.data.get('dailyReward', {})
+        && request.resource.data.get('weeklyRanking', {}) == resource.data.get('weeklyRanking', {});
     }
 
     // Username reservations (uniqueness index for the users collection).

@@ -1,8 +1,9 @@
 import type { MatchState } from "./match_engine.ts";
+import { utcWeekStart, weeklyRanking } from './weekly_ranking.ts';
 
 export type Reward = { uid: string; points: number; coins: number; won: boolean; teamScore: number };
 export type ProfileDocument = { name: string; updateTime: string; fields: Record<string, Record<string, unknown>> };
-export type RewardPlan = { receiptId: string; fingerprint: string; rewards: Reward[] };
+export type RewardPlan = { receiptId: string; fingerprint: string; rewards: Reward[]; weekStart?: string };
 const statFields = ["points", "coins", "wins", "losses", "gamesPlayed", "bestScore"];
 function integer(value: unknown) {
   if (!Number.isSafeInteger(value) || Number(value) < 0) throw new Error("invalid_reward_state");
@@ -39,7 +40,8 @@ export async function rewardPlan(state: MatchState, roomCreatedAt: string): Prom
   });
   const receiptId = await digest(`${state.id}\0${roomCreatedAt}\0${sequence}`);
   const fingerprint = await digest(JSON.stringify({ roomId: state.id, sequence, a, b, roster, rewards }));
-  return { receiptId, fingerprint, rewards };
+  return { receiptId, fingerprint, rewards,
+    ...(typeof state.rewardCompletedAt === 'string' ? { weekStart: utcWeekStart(state.rewardCompletedAt) } : {}) };
 }
 
 function stat(document: ProfileDocument, field: string) {
@@ -64,9 +66,22 @@ export function rewardWrites(base: string, plan: RewardPlan, profiles: ProfileDo
       bestScore: Math.max(stat(profile, "bestScore"), reward.teamScore),
     };
     if (Object.values(values).some(value => !Number.isSafeInteger(value))) throw new Error("invalid_reward_profile");
-    return { update: { name: profile.name, fields: Object.fromEntries(Object.entries(values)
-      .map(([field, value]) => [field, { integerValue: String(value) }])) },
-      updateMask: { fieldPaths: statFields }, currentDocument: { updateTime: profile.updateTime } };
+    const fields: Record<string, unknown> = Object.fromEntries(Object.entries(values)
+      .map(([field, value]) => [field, { integerValue: String(value) }]));
+    const masks = [...statFields];
+    if (plan.weekStart) {
+      const stored = (profile.fields.weeklyRanking?.mapValue as { fields?: Record<string, any> } | undefined)?.fields ?? {};
+      const prior = Object.fromEntries(Object.entries(stored).map(([key, value]) =>
+        [key, key === 'week' ? value.stringValue : Number(value.integerValue)]));
+      const weekly = weeklyRanking(prior, plan.weekStart, reward);
+      if (weekly) {
+        fields.weeklyRanking = { mapValue: { fields: Object.fromEntries(Object.entries(weekly).map(([key, value]) =>
+          [key, typeof value === 'string' ? { stringValue: value } : { integerValue: String(value) }])) } };
+        masks.push('weeklyRanking');
+      }
+    }
+    return { update: { name: profile.name, fields },
+      updateMask: { fieldPaths: masks }, currentDocument: { updateTime: profile.updateTime } };
   });
   writes.push({ update: { name: `${base}/matchRewardReceipts/${plan.receiptId}`,
     fields: { fingerprint: { stringValue: plan.fingerprint } } },

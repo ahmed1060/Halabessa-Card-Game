@@ -1,4 +1,17 @@
 {
-  "indexes": [],
+  "indexes": [
+    { "collectionGroup": "users", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "weeklyRanking.week", "order": "ASCENDING" },
+      { "fieldPath": "weeklyRanking.points", "order": "DESCENDING" }
+    ]},
+    { "collectionGroup": "users", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "weeklyRanking.week", "order": "ASCENDING" },
+      { "fieldPath": "weeklyRanking.wins", "order": "DESCENDING" }
+    ]},
+    { "collectionGroup": "users", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "weeklyRanking.week", "order": "ASCENDING" },
+      { "fieldPath": "weeklyRanking.bestScore", "order": "DESCENDING" }
+    ]}
+  ],
   "fieldOverrides": []
 }

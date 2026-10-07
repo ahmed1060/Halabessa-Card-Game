@@ -123,6 +123,7 @@ test("matching the top rank sweeps the board into the actor's team harvest", () 
   const captures = result.harvestStacks as Record<string, unknown[]>;
   assert.deepEqual(result.board, []);
   assert.equal(captures.teamA.length, 1);
+  assert.equal((captures.teamA[0] as { awardedPoints: number }).awardedPoints, 1);
   assert.equal(result.teamAScore, 1);
   assert.equal(result.lastCaptureTeam, "teamA");
 });

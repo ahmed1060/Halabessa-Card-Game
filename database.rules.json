@@ -1,5 +1,106 @@
 {
   "rules": {
+  "matchChat": {
+    "$matchId": {
+      "public": {
+        ".read": "auth != null && root.child('matches').child($matchId).child('protocolVersion').val() == 1 && root.child('matches').child($matchId).child('players').hasChild(auth.uid)",
+        "$messageId": {
+          ".write": "auth != null && root.child('matches').child($matchId).child('protocolVersion').val() == 1 && root.child('matches').child($matchId).child('players').hasChild(auth.uid) && !data.exists() && newData.hasChildren(['id','senderId','senderName','text','timestamp','isQuickChat']) && newData.child('id').val() == $messageId && newData.child('senderId').val() == auth.uid && newData.parent().parent().child('rate').child(auth.uid).val() == now && (!data.parent().parent().child('rate').child(auth.uid).exists() || data.parent().parent().child('rate').child(auth.uid).val() <= now - 1000)",
+          "id": {
+            ".validate": "newData.isString() && newData.val().length <= 128"
+          },
+          "senderId": {
+            ".validate": "newData.isString()"
+          },
+          "senderName": {
+            ".validate": "newData.isString() && newData.val().length <= 80"
+          },
+          "text": {
+            ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 300"
+          },
+          "timestamp": {
+            ".validate": "newData.isNumber() && newData.val() == now"
+          },
+          "isQuickChat": {
+            ".validate": "newData.isBoolean()"
+          },
+          "$other": {
+            ".validate": false
+          }
+        }
+      },
+      "teamA": {
+        ".read": "auth != null && root.child('matches').child($matchId).child('protocolVersion').val() == 1 && root.child('matches').child($matchId).child('players').hasChild(auth.uid) && (root.child('matches').child($matchId).child('playerIds').child('0').val() == auth.uid || root.child('matches').child($matchId).child('playerIds').child('2').val() == auth.uid)",
+        "$messageId": {
+          ".write": "auth != null && root.child('matches').child($matchId).child('protocolVersion').val() == 1 && root.child('matches').child($matchId).child('players').hasChild(auth.uid) && (root.child('matches').child($matchId).child('playerIds').child('0').val() == auth.uid || root.child('matches').child($matchId).child('playerIds').child('2').val() == auth.uid) && !data.exists() && newData.hasChildren(['id','senderId','senderName','text','timestamp','isQuickChat']) && newData.child('id').val() == $messageId && newData.child('senderId').val() == auth.uid && newData.parent().parent().child('rate').child(auth.uid).val() == now && (!data.parent().parent().child('rate').child(auth.uid).exists() || data.parent().parent().child('rate').child(auth.uid).val() <= now - 1000)",
+          "id": {
+            ".validate": "newData.isString() && newData.val().length <= 128"
+          },
+          "senderId": {
+            ".validate": "newData.isString()"
+          },
+          "senderName": {
+            ".validate": "newData.isString() && newData.val().length <= 80"
+          },
+          "text": {
+            ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 300"
+          },
+          "timestamp": {
+            ".validate": "newData.isNumber() && newData.val() == now"
+          },
+          "isQuickChat": {
+            ".validate": "newData.isBoolean()"
+          },
+          "$other": {
+            ".validate": false
+          }
+        }
+      },
+      "teamB": {
+        ".read": "auth != null && root.child('matches').child($matchId).child('protocolVersion').val() == 1 && root.child('matches').child($matchId).child('players').hasChild(auth.uid) && (root.child('matches').child($matchId).child('playerIds').child('1').val() == auth.uid || root.child('matches').child($matchId).child('playerIds').child('3').val() == auth.uid)",
+        "$messageId": {
+          ".write": "auth != null && root.child('matches').child($matchId).child('protocolVersion').val() == 1 && root.child('matches').child($matchId).child('players').hasChild(auth.uid) && (root.child('matches').child($matchId).child('playerIds').child('1').val() == auth.uid || root.child('matches').child($matchId).child('playerIds').child('3').val() == auth.uid) && !data.exists() && newData.hasChildren(['id','senderId','senderName','text','timestamp','isQuickChat']) && newData.child('id').val() == $messageId && newData.child('senderId').val() == auth.uid && newData.parent().parent().child('rate').child(auth.uid).val() == now && (!data.parent().parent().child('rate').child(auth.uid).exists() || data.parent().parent().child('rate').child(auth.uid).val() <= now - 1000)",
+          "id": {
+            ".validate": "newData.isString() && newData.val().length <= 128"
+          },
+          "senderId": {
+            ".validate": "newData.isString()"
+          },
+          "senderName": {
+            ".validate": "newData.isString() && newData.val().length <= 80"
+          },
+          "text": {
+            ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 300"
+          },
+          "timestamp": {
+            ".validate": "newData.isNumber() && newData.val() == now"
+          },
+          "isQuickChat": {
+            ".validate": "newData.isBoolean()"
+          },
+          "$other": {
+            ".validate": false
+          }
+        }
+      },
+      "rate": {
+        "$uid": {
+          ".write": "auth != null && root.child('matches').child($matchId).child('protocolVersion').val() == 1 && root.child('matches').child($matchId).child('players').hasChild(auth.uid) && auth.uid == $uid && newData.isNumber() && newData.val() == now"
+        }
+      }
+    }
+  },
+    "userPresence": {
+      "$uid": {
+        ".read": "auth != null",
+        "$connection": {
+          ".write": "auth != null && auth.uid == $uid",
+          ".validate": "newData.hasChildren(['lastSeen'])",
+          "lastSeen": { ".validate": "newData.isNumber() && newData.val() == now" },
+          "$other": { ".validate": false }
+        }
+      }
+    },
     "matches": {
       "$matchId": {
         ".read": "auth != null",

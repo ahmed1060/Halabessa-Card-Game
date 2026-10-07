@@ -18,6 +18,8 @@ class ChatOverlay extends ConsumerStatefulWidget {
 class _ChatOverlayState extends ConsumerState<ChatOverlay> {
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  bool _sending = false;
+  String? _sendError;
 
   @override
   void dispose() {
@@ -26,7 +28,8 @@ class _ChatOverlayState extends ConsumerState<ChatOverlay> {
     super.dispose();
   }
 
-  void _sendMessage(String text, {bool isQuickChat = false}) {
+  Future<void> _sendMessage(String text, {bool isQuickChat = false}) async {
+    if (_sending || ref.read(chatChannelProvider) == ChatChannel.game) return;
     final safeText = text.trim();
     if (safeText.isEmpty) return;
     final limitedText = safeText.length > 60
@@ -36,7 +39,15 @@ class _ChatOverlayState extends ConsumerState<ChatOverlay> {
     final matchState = ref.read(matchStateProvider);
     final currentUser = ref.read(currentUserProvider);
 
-    if (matchState == null || currentUser == null) return;
+    if (matchState == null ||
+        currentUser == null ||
+        matchState.id.startsWith('OFFLINE_'))
+      return;
+    final seat = matchState.playerIds.indexOf(currentUser.uid);
+    if (seat < 0) return;
+    final channel = ref.read(chatChannelProvider) == ChatChannel.team
+        ? (seat.isEven ? 'teamA' : 'teamB')
+        : 'public';
 
     final message = ChatMessage(
       id: '', // Will be set by Firebase push()
@@ -47,14 +58,30 @@ class _ChatOverlayState extends ConsumerState<ChatOverlay> {
       isQuickChat: isQuickChat,
     );
 
-    ref
-        .read(multiplayerSyncServiceProvider)
-        .sendChatMessage(matchState.id, message);
-    _controller.clear();
+    setState(() {
+      _sending = true;
+      _sendError = null;
+    });
+    try {
+      await ref
+          .read(multiplayerSyncServiceProvider)
+          .sendChatMessage(
+            matchState.id,
+            message,
+            channel: channel,
+            legacy: !matchState.usesServerCommands,
+          );
+      if (!mounted) return;
+      _controller.clear();
 
-    // Auto-close overlay if it was a quick chat
-    if (isQuickChat) {
-      ref.read(chatStateProvider.notifier).setOverlayOpen(false);
+      // Auto-close overlay if it was a quick chat
+      if (isQuickChat) {
+        ref.read(chatStateProvider.notifier).setOverlayOpen(false);
+      }
+    } catch (_) {
+      if (mounted) setState(() => _sendError = 'ui_chat_send_failed'.tr());
+    } finally {
+      if (mounted) setState(() => _sending = false);
     }
   }
 
@@ -62,6 +89,9 @@ class _ChatOverlayState extends ConsumerState<ChatOverlay> {
   Widget build(BuildContext context) {
     final chatState = ref.watch(chatStateProvider);
     final messagesAsync = ref.watch(chatMessagesProvider);
+    final channel = ref.watch(chatChannelProvider);
+    final match = ref.watch(matchStateProvider);
+    final offline = match == null || match.id.startsWith('OFFLINE_');
     final size = MediaQuery.of(context).size;
     final panelWidth = size.width * 0.8 > 350 ? 350.0 : size.width * 0.8;
 
@@ -114,25 +144,50 @@ class _ChatOverlayState extends ConsumerState<ChatOverlay> {
               ),
 
               const Divider(color: Colors.white10),
+              Wrap(
+                spacing: 4,
+                children: [
+                  for (final option in ChatChannel.values)
+                    ChoiceChip(
+                      label: Text('ui_chat_${option.name}'.tr()),
+                      selected: channel == option,
+                      onSelected:
+                          _sending ||
+                              (option != ChatChannel.game && offline) ||
+                              (option == ChatChannel.team &&
+                                  !(match?.usesServerCommands ?? false))
+                          ? null
+                          : (_) =>
+                                ref.read(chatChannelProvider.notifier).state =
+                                    option,
+                    ),
+                ],
+              ),
+              if (_sendError != null)
+                Text(
+                  _sendError!,
+                  style: const TextStyle(color: TableStyle.red),
+                ),
 
               // Quick Chat Presets
-              SizedBox(
-                height: 50,
-                child: ListView(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
+              if (channel != ChatChannel.game && !offline)
+                SizedBox(
+                  height: 50,
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    children: [
+                      _buildQuickChatChip('msg_gg'.tr()),
+                      _buildQuickChatChip('msg_nice_play'.tr()),
+                      _buildQuickChatChip('msg_your_turn'.tr()),
+                      _buildQuickChatChip('msg_hala8essa'.tr()),
+                      _buildQuickChatChip('msg_oops'.tr()),
+                    ],
                   ),
-                  children: [
-                    _buildQuickChatChip('msg_gg'.tr()),
-                    _buildQuickChatChip('msg_nice_play'.tr()),
-                    _buildQuickChatChip('msg_your_turn'.tr()),
-                    _buildQuickChatChip('msg_hala8essa'.tr()),
-                    _buildQuickChatChip('msg_oops'.tr()),
-                  ],
                 ),
-              ),
 
               const Divider(color: Colors.white10),
 
@@ -230,39 +285,43 @@ class _ChatOverlayState extends ConsumerState<ChatOverlay> {
               ),
 
               // Input Field
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        decoration: BoxDecoration(
-                          color: Colors.white10,
-                          borderRadius: BorderRadius.circular(25),
-                        ),
-                        child: TextField(
-                          controller: _controller,
-                          maxLength: 60,
-                          style: const TextStyle(color: Colors.white),
-                          decoration: InputDecoration(
-                            hintText: 'tap_to_type'.tr(),
-                            hintStyle: const TextStyle(color: Colors.white30),
-                            border: InputBorder.none,
-                            counterText: "",
+              if (channel != ChatChannel.game && !offline)
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          decoration: BoxDecoration(
+                            color: Colors.white10,
+                            borderRadius: BorderRadius.circular(25),
                           ),
-                          onSubmitted: (val) => _sendMessage(val),
+                          child: TextField(
+                            controller: _controller,
+                            enabled: !_sending,
+                            maxLength: 60,
+                            style: const TextStyle(color: Colors.white),
+                            decoration: InputDecoration(
+                              hintText: 'tap_to_type'.tr(),
+                              hintStyle: const TextStyle(color: Colors.white30),
+                              border: InputBorder.none,
+                              counterText: "",
+                            ),
+                            onSubmitted: (val) => _sendMessage(val),
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    IconButton(
-                      icon: const Icon(Icons.send, color: TableStyle.mint),
-                      onPressed: () => _sendMessage(_controller.text),
-                    ),
-                  ],
+                      const SizedBox(width: 8),
+                      IconButton(
+                        icon: const Icon(Icons.send, color: TableStyle.mint),
+                        onPressed: _sending
+                            ? null
+                            : () => _sendMessage(_controller.text),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
             ],
           ),
         ),

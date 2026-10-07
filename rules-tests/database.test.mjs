@@ -2,7 +2,7 @@ import { after, before, beforeEach, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
-import { ref, get, set, update, remove } from 'firebase/database';
+import { ref, get, set, update, remove, serverTimestamp } from 'firebase/database';
 
 // Rules tests must never reach production or a remote emulator host.
 assert.match(process.env.FIREBASE_DATABASE_EMULATOR_HOST ?? '', /^(127\.0\.0\.1|localhost):\d+$/);
@@ -30,6 +30,41 @@ after(async () => { await env?.cleanup(); });
 const db = uid => env.authenticatedContext(uid).database();
 const message = (senderId = 'alice') => ({ id: 'client-id', senderId, senderName: 'Alice',
   text: 'Hello', timestamp: Date.now(), isQuickChat: false });
+test('new team chat excludes opponents, outsiders and released seats', async () => {
+  await env.withSecurityRulesDisabled(async context => {
+    await set(ref(context.database(), 'matchChat/SERVER/teamA/one'), {...message(), id: 'one'});
+  });
+  await assertSucceeds(get(ref(db('alice'), 'matchChat/SERVER/teamA')));
+  await assertFails(get(ref(db('bob'), 'matchChat/SERVER/teamA')));
+  await assertFails(get(ref(db('stranger'), 'matchChat/SERVER/teamA')));
+  await assertFails(get(ref(db('alice'), 'matchChat/SERVER')));
+  await assertSucceeds(get(ref(db('bob'), 'matchChat/SERVER/public')));
+  await assertFails(get(ref(db('stranger'), 'matchChat/SERVER/public')));
+  await env.withSecurityRulesDisabled(async context => {
+    await update(ref(context.database(), 'matches/SERVER'), {players: {bob: true}, playerIds: ['bot_replacement','bob','bot_1','bot_2']});
+  });
+  await assertFails(get(ref(db('alice'), 'matchChat/SERVER/teamA')));
+});
+test('chat sender, server timestamp and rate guard are enforced atomically', async () => {
+  const root = ref(db('alice'), 'matchChat/SERVER');
+  const send = (id, channel = 'public', sender = 'alice') => update(root, {
+    [`${channel}/${id}`]: {...message(sender), id, timestamp: serverTimestamp()},
+    'rate/alice': serverTimestamp(),
+  });
+  await assertFails(send('opponent', 'teamB'));
+  await assertFails(send('spoof', 'public', 'bob'));
+  await assertSucceeds(send('valid', 'teamA'));
+  await assertFails(send('too-fast'));
+  await assertFails(set(ref(db('alice'), 'matchChat/SERVER/public/no-rate'), {...message(), id:'no-rate'}));
+  await assertFails(set(ref(db('alice'), 'matchChat/SERVER/game/fake'), {...message(), id:'fake'}));
+});
+test('presence accepts only own server-timestamp connections', async () => {
+  await assertSucceeds(set(ref(db('alice'), 'userPresence/alice/browser'), {lastSeen: serverTimestamp()}));
+  await assertFails(set(ref(db('bob'), 'userPresence/alice/browser'), {lastSeen: serverTimestamp()}));
+  await assertFails(set(ref(db('alice'), 'userPresence/alice/forged'), {lastSeen: 9999999999999}));
+  await assertFails(set(ref(db('alice'), 'userPresence/alice/extra'), {lastSeen: serverTimestamp(), name: 'fake'}));
+  await assertSucceeds(remove(ref(db('alice'), 'userPresence/alice/browser')));
+});
 
 test('seated player reads only their own server hand, not parent or opponents', async () => {
   const alice = db('alice');

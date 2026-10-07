@@ -8,6 +8,8 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:halabessa/core/theme/theme_config.dart';
 import 'package:halabessa/core/widgets/user_avatar.dart';
 import 'package:halabessa/features/auth/domain/models/app_user.dart';
+import 'package:halabessa/features/auth/domain/models/ranking_period.dart';
+import 'dart:async';
 import 'package:halabessa/features/auth/presentation/providers/auth_providers.dart';
 
 class LeaderboardScreen extends ConsumerStatefulWidget {
@@ -19,11 +21,40 @@ class LeaderboardScreen extends ConsumerStatefulWidget {
 
 class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
   LeaderboardCategory _selectedCategory = LeaderboardCategory.stars;
+  bool _weekly = false;
+  late final Timer _periodTimer;
+  String _week = RankingPeriod.key(DateTime.now());
+
+  @override
+  void initState() {
+    super.initState();
+    _periodTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+      final week = RankingPeriod.key(DateTime.now());
+      if (week != _week) {
+        _week = week;
+        ref.invalidate(weeklyLeaderboardProvider);
+      }
+      if (mounted && _weekly) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _periodTimer.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final leaderboardAsync = ref.watch(leaderboardProvider(_selectedCategory));
+    final provider = _weekly
+        ? weeklyLeaderboardProvider(_selectedCategory)
+        : leaderboardProvider(_selectedCategory);
+    final leaderboardAsync = ref.watch(provider);
     final currentUser = ref.watch(currentUserProvider);
+    AppUser? rankedUser;
+    for (final player in leaderboardAsync.valueOrNull ?? <AppUser>[]) {
+      if (player.uid == currentUser?.uid) rankedUser = player;
+    }
 
     return LanternPageFrame(
       child: Scaffold(
@@ -52,6 +83,36 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
           child: Column(
             children: [
               const SizedBox(height: 8),
+              Wrap(
+                spacing: 12,
+                children: [
+                  ChoiceChip(
+                    label: Text('ui_all_time'.tr()),
+                    selected: !_weekly,
+                    onSelected: (_) => setState(() => _weekly = false),
+                  ),
+                  ChoiceChip(
+                    label: Text('ui_this_week'.tr()),
+                    selected: _weekly,
+                    onSelected: (_) => setState(() => _weekly = true),
+                  ),
+                ],
+              ),
+              if (_weekly)
+                Padding(
+                  padding: const EdgeInsets.all(8),
+                  child: Text(
+                    'ui_week_resets'.tr(
+                      args: [
+                        RankingPeriod.end(
+                          DateTime.now(),
+                        ).difference(DateTime.now().toUtc()).inHours.toString(),
+                      ],
+                    ),
+                    style: TableStyle.detail,
+                    textAlign: TextAlign.center,
+                  ),
+                ),
               // Category Tabs
               _buildCategoryTabs(),
               const SizedBox(height: 14),
@@ -65,9 +126,21 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
                     ),
                   ),
                   error: (err, stack) => Center(
-                    child: Text(
-                      'error_prefix'.tr(args: [err.toString()]),
-                      style: const TextStyle(color: Colors.white70),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'ui_leaderboard_unavailable'.tr(),
+                          style: TableStyle.detail,
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 12),
+                        TextButton.icon(
+                          onPressed: () => ref.invalidate(provider),
+                          icon: const Icon(Icons.refresh),
+                          label: Text('retry'.tr()),
+                        ),
+                      ],
                     ),
                   ),
                   data: (users) {
@@ -86,7 +159,8 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
                     return RefreshIndicator(
                       color: ThemeConfig.goldAccent,
                       onRefresh: () async {
-                        ref.invalidate(leaderboardProvider(_selectedCategory));
+                        ref.invalidate(provider);
+                        await ref.read(provider.future);
                       },
                       child: ListView(
                         padding: const EdgeInsets.symmetric(
@@ -118,8 +192,8 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
             ],
           ),
         ),
-        bottomSheet: currentUser != null
-            ? _buildStickyUserRank(currentUser)
+        bottomSheet: rankedUser != null
+            ? _buildStickyUserRank(rankedUser)
             : null,
       ),
     );
@@ -198,12 +272,15 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
                 color: isSelected ? TableStyle.ink : TableStyle.ivory,
               ),
               const SizedBox(width: 6),
-              Text(
-                title,
-                style: TextStyle(
-                  color: isSelected ? TableStyle.ink : TableStyle.ivory,
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                  fontSize: 12,
+              Flexible(
+                child: Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: isSelected ? TableStyle.ink : TableStyle.ivory,
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                    fontSize: 12,
+                  ),
                 ),
               ),
             ],

@@ -1,4 +1,15 @@
 {
+    "ui_presence_all": "الكل",
+    "ui_presence_online": "متصل",
+    "ui_presence_offline": "غير متصل",
+    "ui_chat_public": "الغرفة",
+    "ui_chat_team": "الفريق",
+    "ui_chat_game": "اللعبة",
+    "ui_game_card_played": "تم لعب ورقة: {}",
+    "ui_chat_send_failed": "لم يتم إرسال الرسالة. انتظر لحظة ثم أعد المحاولة.",
+    "ui_all_time": "كل الوقت",
+    "ui_this_week": "هذا الأسبوع",
+    "ui_week_resets": "يتجدد بعد {} ساعة · الاثنين 00:00 UTC",
     "ui_practice_ended": "انتهت جلسة التدريب",
     "ui_seconds_short": "{}ث",
     "ui_seconds_remaining": "متبقي {} ثانية",
@@ -20,6 +31,10 @@
     "ui_private_detail": "يمكن الانضمام باستخدام رمز الغرفة فقط",
     "ui_round_captures": "مرات الجمع في الجولة",
     "ui_round_cards": "الورق المجموع",
+    "ui_capture_points": "نقاط الجمع",
+    "ui_tafweet_bonus": "مكافأة التفويت",
+    "ui_majority_bonus": "مكافأة أكثر أوراق",
+    "ui_round_points": "نقاط هذه الجولة",
     "ui_round_score": "نتيجة المباراة",
     "ui_featured": "مجموعة مميزة",
     "ui_guest_save": "اربط حساب الضيف للاحتفاظ بملفك وتقدمك عبر أجهزتك. يحافظ الربط على معرّف اللاعب الحالي.",
@@ -531,5 +546,6 @@
     "bot_strategy_easy": "جمع بسيط مع أخطاء أحيانًا",
     "bot_strategy_medium": "جمع وتخطيط بسيط لورق اليد",
     "bot_strategy_hard": "يتذكر الورق المكشوف ويتجنب المخاطرة",
-    "bot_strategy_expert": "عدّ الورق وقرارات تراعي زميل الفريق"
+    "bot_strategy_expert": "عدّ الورق وقرارات تراعي زميل الفريق",
+    "ui_leaderboard_unavailable": "تعذّر تحميل الترتيب. يرجى المحاولة مجددًا."
 }

@@ -139,7 +139,7 @@ class GameEngine {
       // operation: Cannot add to an unmodifiable list.
       harvest[teamId] = [
         ...?harvest[teamId],
-        Capture(leadingCard: card, capturedCards: harvestedCards),
+        Capture(leadingCard: card, capturedCards: harvestedCards, awardedPoints: pointsEarned),
       ];
 
       return GameEngineResult(

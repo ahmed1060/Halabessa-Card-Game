@@ -40,7 +40,7 @@ function nextRound(state: MatchState, shuffle: boolean, now: number): Transition
   started.state = { ...started.state, roundsSinceLastShuffle: shuffle ? 0 : integer(state.roundsSinceLastShuffle) + 1,
     turnStartTime: new Date(now).toISOString(), capturingCards: [], capturingTeam: null,
     capturingStage: 0, playHistory: [], earnedStars: {}, earnedCoins: {}, expireAt: null,
-    settlementPending: false, rewardRoster: [], rewardScores: null, rewardReceiptId: null };
+    settlementPending: false, rewardRoster: [], rewardScores: null, rewardReceiptId: null, rewardCompletedAt: null };
   return stamp({ ...started, state: assignBotDifficulties(started.state) }, now);
 }
 function finishRound(state: MatchState, deck: Card[], now: number): Transition {
@@ -127,6 +127,7 @@ export function advanceMatch(state: MatchState, deck: Card[], now = Date.now()):
         }});
         return stamp({ state: { ...state, phase: "rematchVoting", rematchVotes: {},
           earnedStars: stars, earnedCoins: coins, settlementPending: true,
+          rewardCompletedAt: new Date(now).toISOString(),
           rewardRoster: [...ids], rewardScores: { teamA: integer(state.teamAScore), teamB: integer(state.teamBScore) } }, deck }, now);
       }
       const rounds = integer(state.roundsSinceLastShuffle);

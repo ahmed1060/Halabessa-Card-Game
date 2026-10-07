@@ -7,6 +7,16 @@ import { doc, getDoc, setDoc, updateDoc, writeBatch } from 'firebase/firestore';
 // Never run these tests against a real project or an arbitrary remote host.
 assert.match(process.env.FIRESTORE_EMULATOR_HOST ?? '', /^(127\.0\.0\.1|localhost):\d+$/);
 const rules = await readFile(new URL('../firestore.rules', import.meta.url), 'utf8');
+test('weekly ranking cannot be created, forged or erased by its profile owner', async () => {
+  const db = env.authenticatedContext('guest').firestore();
+  await assertFails(setDoc(doc(db, 'users/guest'), {weeklyRanking: {week: '2026-10-05', points: 999}}));
+  await env.withSecurityRulesDisabled(async context => {
+    await setDoc(doc(context.firestore(), 'users/guest'), {displayName: 'Guest', weeklyRanking: {week: '2026-10-05', points: 50}});
+  });
+  await assertFails(updateDoc(doc(db, 'users/guest'), {'weeklyRanking.points': 999}));
+  await assertFails(setDoc(doc(db, 'users/guest'), {displayName: 'Guest'}));
+  await assertSucceeds(updateDoc(doc(db, 'users/guest'), {displayName: 'New name'}));
+});
 let env;
 before(async () => { env = await initializeTestEnvironment({
   projectId: 'demo-halabessa-ui', firestore: { rules },

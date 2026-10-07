@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:easy_localization/easy_localization.dart';
 import '../../domain/models/match_state.dart';
+import '../../domain/models/round_score_breakdown.dart';
 import 'table_style.dart';
 
 /// Only public, real totals. Tafweet bonuses cannot be inferred from card count.
@@ -64,6 +65,7 @@ class RoundSummaryPanel extends StatelessWidget {
     ),
   );
   Widget _team(String id, String label, Color color) {
+    final breakdown = RoundScoreBreakdown.forTeam(state, id);
     final captures = state.harvestStacks[id] ?? [];
     final plays = captures.where((capture) => !capture.isRoundAward).length;
     final cards = captures.fold<int>(
@@ -91,6 +93,29 @@ class RoundSummaryPanel extends StatelessWidget {
           style: TableStyle.detail,
         ),
         const SizedBox(height: 4),
+        if (breakdown != null) ...[
+          Text(
+            '${'ui_capture_points'.tr()}: ${breakdown.captures}',
+            textAlign: TextAlign.center,
+            style: TableStyle.detail,
+          ),
+          if (state.mode == GameMode.tafweet)
+            Text(
+              '${'ui_tafweet_bonus'.tr()}: ${breakdown.tafweetBonus}',
+              textAlign: TextAlign.center,
+              style: TableStyle.detail,
+            ),
+          Text(
+            '${'ui_majority_bonus'.tr()}: ${breakdown.majorityBonus}',
+            textAlign: TextAlign.center,
+            style: TableStyle.detail,
+          ),
+          Text(
+            '${'ui_round_points'.tr()}: ${breakdown.total}',
+            textAlign: TextAlign.center,
+            style: TableStyle.label.copyWith(color: color),
+          ),
+        ],
         Text(
           '${'ui_round_score'.tr()}: ${id == 'teamA' ? state.teamAScore : state.teamBScore}',
           textAlign: TextAlign.center,

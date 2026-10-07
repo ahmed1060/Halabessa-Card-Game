@@ -238,7 +238,7 @@ export function playCard(state: MatchState, actorUid: string, value: unknown) {
     }
   }
   const harvest = objectValue<unknown[]>(state.harvestStacks);
-  harvest[team] = [...(harvest[team] ?? []), { leadingCard: card, capturedCards: board }];
+  harvest[team] = [...(harvest[team] ?? []), { leadingCard: card, capturedCards: board, awardedPoints: points }];
   return {
     ...state,
     board: [],

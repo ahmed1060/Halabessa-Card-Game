@@ -62,9 +62,7 @@ class _AuthWrapperState extends ConsumerState<AuthWrapper> {
         progressStream: ref.read(assetPreloaderServiceProvider).loadProgress,
       ),
       error: (error, stackTrace) => Scaffold(
-        body: Center(
-          child: Text(ErrorHandler.getAuthErrorMessage(error)),
-        ),
+        body: Center(child: Text(ErrorHandler.getAuthErrorMessage(error))),
       ),
     );
   }
