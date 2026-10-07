@@ -8,10 +8,12 @@ import '../../../game/presentation/widgets/table_style.dart';
 /// that could silently replace the guest's account and progress.
 class GuestProgressPanel extends StatefulWidget {
   final Future<bool> Function() onGoogle, onFacebook;
+  final Future<bool> Function()? onApple;
   const GuestProgressPanel({
     super.key,
     required this.onGoogle,
     required this.onFacebook,
+    this.onApple,
   });
   @override
   State<GuestProgressPanel> createState() => _GuestProgressPanelState();
@@ -63,6 +65,8 @@ class _GuestProgressPanelState extends State<GuestProgressPanel> {
         for (final entry in [
           ('Google', Icons.g_mobiledata_rounded, widget.onGoogle),
           ('Facebook', Icons.facebook_rounded, widget.onFacebook),
+          if (widget.onApple != null)
+            ('Apple', Icons.apple_rounded, widget.onApple!),
         ]) ...[
           FilledButton.icon(
             key: ValueKey('guest-link-${entry.$1}'),

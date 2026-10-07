@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:easy_localization/easy_localization.dart';
 import '../../features/game/presentation/widgets/table_style.dart';
 import 'lantern_page_frame.dart';
@@ -45,6 +46,27 @@ class AccountInformationScreen extends StatelessWidget {
                           .tr(),
                       style: TableStyle.label.copyWith(color: TableStyle.ink),
                     ),
+                    const SizedBox(height: 20),
+                    SelectableText(
+                      'WeirdPuzz · weirdpuzz@gmail.com',
+                      textAlign: TextAlign.center,
+                      style: TableStyle.label.copyWith(color: TableStyle.ink),
+                    ),
+                    if (support) ...[
+                      const SizedBox(height: 12),
+                      IconButton(
+                        tooltip: MaterialLocalizations.of(
+                          context,
+                        ).copyButtonLabel,
+                        onPressed: () => Clipboard.setData(
+                          const ClipboardData(text: 'weirdpuzz@gmail.com'),
+                        ),
+                        icon: const Icon(
+                          Icons.copy_rounded,
+                          color: TableStyle.ink,
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 20),
                     if (!support)
                       Text(

@@ -5,6 +5,47 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:halabessa/features/auth/presentation/widgets/guest_progress_panel.dart';
 
 void main() {
+  testWidgets(
+    'Apple action is available only when supplied and observes pending guard',
+    (tester) async {
+      final pending = Completer<bool>();
+      var apple = 0;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: GuestProgressPanel(
+              onGoogle: () => pending.future,
+              onFacebook: () async => false,
+              onApple: () async {
+                apple++;
+                return false;
+              },
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.byKey(const ValueKey('guest-link-Google')));
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('guest-link-Apple')));
+      expect(apple, 0);
+      pending.complete(false);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('guest-link-Apple')));
+      await tester.pumpAndSettle();
+      expect(apple, 1);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: GuestProgressPanel(
+              onGoogle: () async => false,
+              onFacebook: () async => false,
+            ),
+          ),
+        ),
+      );
+      expect(find.byKey(const ValueKey('guest-link-Apple')), findsNothing);
+    },
+  );
   testWidgets('guest linking cannot submit a second provider while pending', (
     tester,
   ) async {

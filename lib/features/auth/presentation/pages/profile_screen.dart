@@ -1,11 +1,11 @@
 import 'package:halabessa/core/widgets/lantern_page_frame.dart';
 import 'package:halabessa/core/widgets/lantern_navigation_dock.dart';
 import 'dart:math';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easy_localization/easy_localization.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:halabessa/core/theme/theme_config.dart';
 import 'package:halabessa/core/widgets/user_avatar.dart';
 import 'package:halabessa/core/services/daily_streak_service.dart';
@@ -197,6 +197,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 if (ref.watch(firebaseAuthProvider).currentUser?.isAnonymous ==
                     true) ...[
                   GuestProgressPanel(
+                    onApple:
+                        kIsWeb || defaultTargetPlatform == TargetPlatform.iOS
+                        ? () async =>
+                              await ref
+                                  .read(authRepositoryProvider)
+                                  .signInWithApple() !=
+                              null
+                        : null,
                     onGoogle: () async =>
                         await ref
                             .read(authRepositoryProvider)

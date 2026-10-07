@@ -11,15 +11,18 @@ import '../../domain/models/app_user.dart';
 import '../../domain/repositories/auth_repository.dart';
 
 class FirebaseAuthRepository implements AuthRepository {
-  static const googleWebClientId = '54223815037-gg8pie8gu740lhci35i8df8f37mga6i2.apps.googleusercontent.com';
-  static const googleIosClientId = '54223815037-647c34d72d4dih6mgv9j18btb8867crt.apps.googleusercontent.com';
+  static const googleWebClientId =
+      '54223815037-gg8pie8gu740lhci35i8df8f37mga6i2.apps.googleusercontent.com';
+  static const googleIosClientId =
+      '54223815037-647c34d72d4dih6mgv9j18btb8867crt.apps.googleusercontent.com';
   final firebase_auth.FirebaseAuth _firebaseAuth;
 
   FirebaseAuthRepository(this._firebaseAuth);
 
   @visibleForTesting
   Future<firebase_auth.UserCredential> signInOrLinkCredential(
-      firebase_auth.AuthCredential credential) {
+    firebase_auth.AuthCredential credential,
+  ) {
     final current = _firebaseAuth.currentUser;
     // Upgrading a guest must retain their UID, profile, purchases and room.
     // An already-used credential is surfaced, not silently switched to a
@@ -31,11 +34,22 @@ class FirebaseAuthRepository implements AuthRepository {
 
   @visibleForTesting
   Future<firebase_auth.UserCredential> signInOrLinkPopup(
-      firebase_auth.AuthProvider provider) {
+    firebase_auth.AuthProvider provider,
+  ) {
     final current = _firebaseAuth.currentUser;
     return current?.isAnonymous == true
         ? current!.linkWithPopup(provider)
         : _firebaseAuth.signInWithPopup(provider);
+  }
+
+  @visibleForTesting
+  Future<firebase_auth.UserCredential> signInOrLinkProvider(
+    firebase_auth.AuthProvider provider,
+  ) {
+    final current = _firebaseAuth.currentUser;
+    return current?.isAnonymous == true
+        ? current!.linkWithProvider(provider)
+        : _firebaseAuth.signInWithProvider(provider);
   }
 
   // Cache the server-owned admin status per user so authStateChanges does not
@@ -59,10 +73,15 @@ class FirebaseAuthRepository implements AuthRepository {
     }
   }
 
-  Future<void> _syncUserToDatabase(AppUser user, {bool isFullUpdate = false}) async {
+  Future<void> _syncUserToDatabase(
+    AppUser user, {
+    bool isFullUpdate = false,
+  }) async {
     try {
-      final docRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
-      
+      final docRef = FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid);
+
       // Check if user exists to preserve stats, or initialize if new
       final doc = await docRef.get();
       if (!doc.exists) {
@@ -113,7 +132,10 @@ class FirebaseAuthRepository implements AuthRepository {
     return AppUser(
       uid: user.uid,
       email: user.email ?? '',
-      displayName: (user.displayName != null && user.displayName!.trim().isNotEmpty) ? user.displayName! : 'Player',
+      displayName:
+          (user.displayName != null && user.displayName!.trim().isNotEmpty)
+          ? user.displayName!
+          : 'Player',
       avatarUrl: user.photoURL,
       isAdmin: false,
     );
@@ -131,41 +153,45 @@ class FirebaseAuthRepository implements AuthRepository {
           .doc(firebaseUser.uid)
           .snapshots()
           .asyncMap((doc) async {
-        AppUser? user;
-        if (doc.exists && doc.data() != null) {
-          user = AppUser.fromJson(doc.data()!, firebaseUser.uid);
-        }
-        user ??= _userFromFirebase(firebaseUser);
-        if (user == null) return null;
+            AppUser? user;
+            if (doc.exists && doc.data() != null) {
+              user = AppUser.fromJson(doc.data()!, firebaseUser.uid);
+            }
+            user ??= _userFromFirebase(firebaseUser);
+            if (user == null) return null;
 
-        // Authorization comes from the live custom claim, not whatever
-        // Firestore's isAdmin mirror currently says -- overriding it here
-        // means a stale or (pre-fix) tampered mirror can never grant more
-        // than the claim actually allows. See HAL-08.
-        final isAdmin = await _syncAdminClaim(firebaseUser.uid);
-        // Friend state is server-owned in Supabase. Firebase Auth and
-        // Firestore remain the identity/profile layer during the migration.
-        try {
-          final social = await SupabaseBackendService.call('getSocialGraph');
-          return user.copyWith(
-            isAdmin: isAdmin,
-            friends: List<String>.from(social['friends'] as List? ?? const []),
-            pendingFriendRequests: List<String>.from(
-              social['pendingFriendRequests'] as List? ?? const [],
-            ),
-            sentFriendRequests: List<String>.from(
-              social['sentFriendRequests'] as List? ?? const [],
-            ),
-            friendInvites: Map<String, String>.from(
-              social['friendInvites'] as Map? ?? const {},
-            ),
-          );
-        } catch (_) {
-          // Keep the existing Firestore-backed values available offline or
-          // while the Edge Function is temporarily unavailable.
-          return user.copyWith(isAdmin: isAdmin);
-        }
-      });
+            // Authorization comes from the live custom claim, not whatever
+            // Firestore's isAdmin mirror currently says -- overriding it here
+            // means a stale or (pre-fix) tampered mirror can never grant more
+            // than the claim actually allows. See HAL-08.
+            final isAdmin = await _syncAdminClaim(firebaseUser.uid);
+            // Friend state is server-owned in Supabase. Firebase Auth and
+            // Firestore remain the identity/profile layer during the migration.
+            try {
+              final social = await SupabaseBackendService.call(
+                'getSocialGraph',
+              );
+              return user.copyWith(
+                isAdmin: isAdmin,
+                friends: List<String>.from(
+                  social['friends'] as List? ?? const [],
+                ),
+                pendingFriendRequests: List<String>.from(
+                  social['pendingFriendRequests'] as List? ?? const [],
+                ),
+                sentFriendRequests: List<String>.from(
+                  social['sentFriendRequests'] as List? ?? const [],
+                ),
+                friendInvites: Map<String, String>.from(
+                  social['friendInvites'] as Map? ?? const {},
+                ),
+              );
+            } catch (_) {
+              // Keep the existing Firestore-backed values available offline or
+              // while the Edge Function is temporarily unavailable.
+              return user.copyWith(isAdmin: isAdmin);
+            }
+          });
     });
   }
 
@@ -186,7 +212,7 @@ class FirebaseAuthRepository implements AuthRepository {
       return user;
     } on firebase_auth.FirebaseAuthException catch (e) {
       debugPrint("Email Login failed: ${e.code}");
-      
+
       // If Firebase returns generic "invalid-credential" (common with email enumeration protection),
       // we manually check Firestore to give the specific message the user wants.
       if (e.code == 'invalid-credential') {
@@ -196,7 +222,7 @@ class FirebaseAuthRepository implements AuthRepository {
               .where('email', isEqualTo: email)
               .limit(1)
               .get();
-              
+
           if (snapshot.docs.isEmpty) {
             // No user found with this email in our database
             throw firebase_auth.FirebaseAuthException(
@@ -225,24 +251,27 @@ class FirebaseAuthRepository implements AuthRepository {
 
   @override
   Future<AppUser?> signUpWithEmail(
-      String email, String password, String displayName) async {
+    String email,
+    String password,
+    String displayName,
+  ) async {
     try {
       final credential = await _firebaseAuth.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
-      
+
       // Assign Random Default Avatar
       final random = Random();
       final avatarIndex = random.nextInt(6) + 1;
       final defaultAvatar = 'assets/images/avatars/avatar$avatarIndex.png';
-      
+
       await credential.user?.updateDisplayName(displayName);
       await credential.user?.updatePhotoURL(defaultAvatar);
-      
+
       // Reload to ensure we have the photoURL
       await credential.user?.reload();
-      
+
       final user = _userFromFirebase(_firebaseAuth.currentUser);
       if (user != null) await _syncUserToDatabase(user);
       return user;
@@ -264,12 +293,15 @@ class FirebaseAuthRepository implements AuthRepository {
       }
 
       final GoogleSignInAccount? googleUser = await GoogleSignIn(
-        clientId: defaultTargetPlatform == TargetPlatform.iOS ? googleIosClientId : null,
+        clientId: defaultTargetPlatform == TargetPlatform.iOS
+            ? googleIosClientId
+            : null,
         serverClientId: googleWebClientId,
       ).signIn();
       if (googleUser == null) return null;
 
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
       if (googleAuth.idToken == null) {
         throw firebase_auth.FirebaseAuthException(code: 'google-token-missing');
       }
@@ -283,7 +315,9 @@ class FirebaseAuthRepository implements AuthRepository {
       if (user != null) await _syncUserToDatabase(user);
       return user;
     } catch (e) {
-      if (e is firebase_auth.FirebaseAuthException && e.code == 'popup-closed-by-user') return null;
+      if (e is firebase_auth.FirebaseAuthException &&
+          e.code == 'popup-closed-by-user')
+        return null;
       debugPrint("Google Sign In failed: $e");
       rethrow;
     }
@@ -302,18 +336,24 @@ class FirebaseAuthRepository implements AuthRepository {
 
       final LoginResult result = await FacebookAuth.instance.login();
       if (result.status == LoginStatus.success) {
-        final credential = firebase_auth.FacebookAuthProvider.credential(result.accessToken!.tokenString);
+        final credential = firebase_auth.FacebookAuthProvider.credential(
+          result.accessToken!.tokenString,
+        );
         final userCredential = await signInOrLinkCredential(credential);
         final user = _userFromFirebase(userCredential.user);
         if (user != null) await _syncUserToDatabase(user);
         return user;
       }
       if (result.status != LoginStatus.cancelled) {
-        throw firebase_auth.FirebaseAuthException(code: 'facebook-login-failed');
+        throw firebase_auth.FirebaseAuthException(
+          code: 'facebook-login-failed',
+        );
       }
       return null;
     } catch (e) {
-      if (e is firebase_auth.FirebaseAuthException && e.code == 'popup-closed-by-user') return null;
+      if (e is firebase_auth.FirebaseAuthException &&
+          e.code == 'popup-closed-by-user')
+        return null;
       debugPrint("Facebook Sign In failed: $e");
       rethrow;
     }
@@ -327,12 +367,18 @@ class FirebaseAuthRepository implements AuthRepository {
       // token, which cannot be relied on for Firebase sign-in.
       final provider = firebase_auth.AppleAuthProvider();
       final credential = kIsWeb
-          ? await _firebaseAuth.signInWithPopup(provider)
-          : await _firebaseAuth.signInWithProvider(provider);
+          ? await signInOrLinkPopup(provider)
+          : await signInOrLinkProvider(provider);
       final user = _userFromFirebase(credential.user);
       if (user != null) await _syncUserToDatabase(user);
       return user;
     } catch (e) {
+      if (e is firebase_auth.FirebaseAuthException &&
+          (e.code == 'popup-closed-by-user' ||
+              e.code == 'web-context-canceled' ||
+              e.code == 'canceled')) {
+        return null;
+      }
       debugPrint("Apple Sign In failed: $e");
       rethrow;
     }
@@ -342,7 +388,7 @@ class FirebaseAuthRepository implements AuthRepository {
   Future<AppUser?> signInAnonymously({String? displayName}) async {
     try {
       final credential = await _firebaseAuth.signInAnonymously();
-      
+
       // Assign Random Default Avatar if not set
       if (credential.user?.photoURL == null) {
         final random = Random();
@@ -354,10 +400,10 @@ class FirebaseAuthRepository implements AuthRepository {
       if (displayName != null && displayName.trim().isNotEmpty) {
         await credential.user?.updateDisplayName(displayName.trim());
       }
-      
+
       // Reload to ensure we have the updated info
       await credential.user?.reload();
-      
+
       // Re-fetch the current user instance from Firebase after reload
       final updatedUser = _firebaseAuth.currentUser;
       final user = _userFromFirebase(updatedUser);
@@ -404,43 +450,61 @@ class FirebaseAuthRepository implements AuthRepository {
   }
 
   @override
-  Future<void> updateProfile({String? displayName, String? username, String? avatarUrl}) async {
+  Future<void> updateProfile({
+    String? displayName,
+    String? username,
+    String? avatarUrl,
+  }) async {
     final user = _firebaseAuth.currentUser;
     if (user == null) throw StateError('unauthenticated');
     final db = FirebaseFirestore.instance;
     final profileRef = db.collection('users').doc(user.uid);
     final requestedUsername = username?.trim();
-    final claims = requestedUsername == null ? null : await user.getIdTokenResult();
+    final claims = requestedUsername == null
+        ? null
+        : await user.getIdTokenResult();
     final canRenameWithoutTicket = claims?.claims?['admin'] == true;
 
     // The reservation and the profile either both commit, or neither does.
     // In particular, never report success after a permission-denied profile write.
-    final savedFields = await db.runTransaction<Map<String, dynamic>>((transaction) async {
+    final savedFields = await db.runTransaction<Map<String, dynamic>>((
+      transaction,
+    ) async {
       final snapshot = await transaction.get(profileRef);
       final current = snapshot.data() ?? _userFromFirebase(user)!.toJson();
-      final update = profileUpdate(current: current, displayName: displayName,
-        username: requestedUsername, avatarUrl: avatarUrl,
-        canRenameWithoutTicket: canRenameWithoutTicket);
+      final update = profileUpdate(
+        current: current,
+        displayName: displayName,
+        username: requestedUsername,
+        avatarUrl: avatarUrl,
+        canRenameWithoutTicket: canRenameWithoutTicket,
+      );
       final oldUsername = current['username'] as String?;
       DocumentReference<Map<String, dynamic>>? reservationRef;
       DocumentReference<Map<String, dynamic>>? oldReservationRef;
       bool deleteOld = false;
       if (requestedUsername != null) {
-        reservationRef = db.collection('usernames').doc(requestedUsername.toLowerCase());
+        reservationRef = db
+            .collection('usernames')
+            .doc(requestedUsername.toLowerCase());
         final reservation = await transaction.get(reservationRef);
         if (reservation.exists && reservation.data()?['uid'] != user.uid) {
           throw StateError('username_taken');
         }
-        if (oldUsername != null && oldUsername.isNotEmpty &&
+        if (oldUsername != null &&
+            oldUsername.isNotEmpty &&
             oldUsername.toLowerCase() != requestedUsername.toLowerCase()) {
-          oldReservationRef = db.collection('usernames').doc(oldUsername.toLowerCase());
+          oldReservationRef = db
+              .collection('usernames')
+              .doc(oldUsername.toLowerCase());
           final oldReservation = await transaction.get(oldReservationRef);
           deleteOld = oldReservation.data()?['uid'] == user.uid;
         }
       }
       // All reads precede writes; Firestore may retry this callback.
       if (deleteOld) transaction.delete(oldReservationRef!);
-      if (reservationRef != null) transaction.set(reservationRef, {'uid': user.uid});
+      if (reservationRef != null)
+        transaction.set(reservationRef, {'uid': user.uid});
       if (snapshot.exists) {
         transaction.update(profileRef, update);
       } else {
@@ -454,28 +518,33 @@ class FirebaseAuthRepository implements AuthRepository {
     try {
       if (displayName != null) await user.updateDisplayName(displayName);
       if (avatarUrl != null) await user.updatePhotoURL(avatarUrl);
-      await FirebaseDatabase.instance.ref('users').child(user.uid).update(savedFields);
+      await FirebaseDatabase.instance
+          .ref('users')
+          .child(user.uid)
+          .update(savedFields);
     } catch (error) {
       debugPrint('Profile saved; legacy mirror update failed: $error');
     }
   }
 
   @override
-  Future<bool> isUsernameAvailable(String username, {String? currentUid}) async {
+  Future<bool> isUsernameAvailable(
+    String username, {
+    String? currentUid,
+  }) async {
     final doc = await FirebaseFirestore.instance
         .collection('usernames')
         .doc(username.toLowerCase())
         .get();
-    
+
     if (!doc.exists) return true;
-    
+
     // Ownership Check: If it's taken, check if it's taken by ME
     final data = doc.data();
     if (data != null && currentUid != null && data['uid'] == currentUid) {
       return true; // It's mine, I can re-claim it
     }
-    
+
     return false;
   }
 }
-
