@@ -9,6 +9,7 @@ import { rewardPlan } from "./match_rewards.ts";
 import { createFirestoreRewardStore } from "./firestore_rewards.ts";
 import { createPublicProfileStore } from "./public_profiles.ts";
 import { assertNotDeletionBlocked } from "./deletion_access.ts";
+import { assertAvatarUpload } from "./avatar_upload_policy.ts";
 import { createDatabaseRunner, databaseConnectionString } from "./database.ts";
 import { commitAndDeliver, deliverLatestRoom, matchMirrorUpdates, participantSnapshot, publicMatchState } from "./match_delivery.ts";
 
@@ -241,6 +242,7 @@ async function uploadAsset(
       typeof body.contentType !== "string" || !assetExtensions.has(body.contentType)) {
     throw new Error("invalid_asset");
   }
+  assertAvatarUpload(body.kind, body.contentType, user.uid);
   const extension = assetExtensions.get(body.contentType)!;
   const maximumBytes = body.kind === "avatar" ? 2 * 1024 * 1024 : 4 * 1024 * 1024;
   const bytes = decodeAsset(body.base64, maximumBytes);
@@ -257,6 +259,7 @@ async function uploadAsset(
   const objectPath = path.split("/").map(encodeURIComponent).join("/");
   const response = await fetch(`${supabaseUrl}/storage/v1/object/${assetBucket}/${objectPath}`, {
     method: "POST",
+    signal: AbortSignal.timeout(12_000),
     headers: {
       Authorization: `Bearer ${serviceRoleKey}`,
       apikey: serviceRoleKey,
@@ -924,6 +927,11 @@ Deno.serve(async (request) => {
       });
     }
     if (message.includes("already_claimed")) return reply({ error: "already_claimed" }, 409, origin);
+    if (error && typeof error === 'object' && 'fields' in error &&
+        (error.fields as {code?: string; message?: string} | undefined)?.code === 'P0001' &&
+        (error.fields as {message?: string} | undefined)?.message === 'account_unavailable') {
+      return reply({error:'account_unavailable'},409,origin);
+    }
     return reply({ error: message === "unauthenticated" ? message : "internal_error" }, message === "unauthenticated" ? 401 : 500, origin);
   }
 });

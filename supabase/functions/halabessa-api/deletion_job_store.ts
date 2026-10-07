@@ -27,7 +27,7 @@ export async function deletionReceiptHash(receipt: unknown) {
   return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2,'0')).join('');
 }
 
-export function createDeletionJobStore(query: DeletionQuery, receiptHash?: string): DeletionStore {
+export function createDeletionJobStore(query: DeletionQuery, receiptHash?: string): DeletionStore & {assertLease: (id: string) => void} {
   if (receiptHash !== undefined && !hashPattern.test(receiptHash)) throw new Error('invalid_deletion_receipt');
   let leasedId: string | null = null;
   function requireLease(id: string) {
@@ -38,6 +38,7 @@ export function createDeletionJobStore(query: DeletionQuery, receiptHash?: strin
     return job((await query(`select ${columns} from halabessa.account_deletion_jobs where id=$1::uuid`, [id]))[0]);
   }
   return {
+    assertLease: requireLease,
     async createOrGet(uid) {
       if (!receiptHash || !uid || uid.length > 128) throw new Error('invalid_deletion_receipt');
       await query('insert into halabessa.account_deletion_jobs (firebase_uid,receipt_hash) values ($1,$2) on conflict (firebase_uid) do nothing', [uid,receiptHash]);

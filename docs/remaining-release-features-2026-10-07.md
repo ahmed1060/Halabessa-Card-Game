@@ -4,6 +4,23 @@ The user approved all previously deferred features. Preserve the lantern-café U
 existing player data, free hosting and authoritative game rules. Implementation
 must not be confused with production rollout or physical-device acceptance.
 
+## Current status — latest verified state
+
+The historical batches below describe their status when written. They are not
+the current deployment status. Hosting 37615672940, Android 37615673050 and iOS
+37615672866 all succeeded for 212e3365. The granted Datastore Index Admin role
+resolved the index-deployment blocker; the logout fix, profile privacy rules,
+age gate, release notices and earlier feature work are deployed.
+
+Automatic account deletion is still NOT enabled. Tested cleanup adapters are
+being added, but activation still requires integration of the authenticated
+acceptance/status endpoints, independent scheduled recovery, complete legacy
+data/peer/chat inventory, native recent-authentication and Apple revocation,
+confirmation/status UI, and the approved isolated live guest deletion test.
+Fresh browser interaction/visual acceptance remains blocked by browser-tool
+initialization; hardware/provider/store acceptance requires publisher devices
+and configuration. Existing players and balances have not been reset/deleted.
+
 ## Confirmed decisions
 
 - Publisher: WeirdPuzz; public contact: weirdpuzz@gmail.com.
@@ -215,3 +232,49 @@ part of this work. Keep the requested single final push until the batch is ready
   initialization with a missing kernel-assets path. No browser interaction or
   new guest creation occurred. Existing G1 mockup/local screenshot comparison
   is not a substitute for a fresh deployed visual/interaction check.
+
+## Targeted cleanup adapters and profile-recreation guard
+
+- Added a private invoker trigger preventing ALL shadow-profile insert/update
+  paths from recreating an account with a pending/completed deletion job. This
+  includes another player's social/invite request, not only the deleting caller.
+  Applied its migration and verified update/recreation refusal in a rollback-only
+  live SQL test. Both temporary QA rows and the temporary job were rolled back;
+  post-test counts were zero. No real Firebase account was involved.
+- Added bounded Firestore social-field transforms, conditional username cleanup
+  and owner-profile removal. Update-time preconditions preserve reassigned names
+  and changed peers; absence is idempotent, denied/conflicting writes stay pending.
+- Added Storage API cleanup for all six historically allowed owned avatar
+  variants, including audio accidentally permitted by the old upload endpoint.
+  New avatar uploads reject audio MIME types and ambiguous sanitized UID paths.
+  No bucket-wide delete or metadata-only SQL deletion occurs. Ambiguous legacy
+  sanitized/truncated UID paths fail closed for manual ownership review. Removing
+  origin objects does not promise immediate expiry of browser/CDN caches.
+- Added RTDB cleanup of own mirrors/presence, per-field ETag social removals,
+  bounded authored-message removal across public/team/legacy channels and chat
+  indexes. Tests verify that indexes do not bypass private-team authorization.
+  These adapters need a complete server-derived peer/room inventory at integration;
+  consumer-supplied target lists must never authorize cleanup.
+- Added a private room-delivery outbox and a leased SQL room adapter. Frozen
+  rewards settle before anonymization; leave/bot takeover preserves cards/teams;
+  SQL ownership transfers to a surviving player or a non-Auth anonymous stub.
+  SQL changes and delivery intent persist together. A later pass publishes the
+  latest committed room under its lock, so failed delivery can resume without
+  repeating takeover or publishing uncommitted/stale state. Peer command IDs
+  remain valid while their redundant cached snapshots/private hands are removed.
+  Unsupported legacy matches remain pending rather than being erased.
+- Corrected anonymization to operate on schema-defined identity fields only.
+  Custom UIDs matching a card rank or another player's name do not corrupt them.
+- Current local verification: 148 server/page tests, 24 isolated Firebase rule
+  tests; deletion adapter TypeScript checking is now a CI gate. Room adapter
+  tests use an injected query layer, not a live end-to-end deletion claim.
+  Security advisors reported no findings; both private deletion tables have RLS
+  enabled with no client read grants. Queue/outbox counts remain zero.
+- None of these cleanup adapters is exposed as an active deletion endpoint yet.
+  Production cleanup execution, scheduled recovery, client flow and approved
+  end-to-end deletion QA still need completion. No existing player was deleted.
+- Edge revision 29 is active with the upload-policy fix and safe unavailable-
+  account response. Live health returned 200; unauthenticated bootstrap returned
+  401. The new SQL profile guard/outbox migrations are deployed, with zero jobs,
+  zero outbox rows and zero remaining rollback-test profiles. Firebase chat
+  indexes are included in this batch's next Hosting deployment.

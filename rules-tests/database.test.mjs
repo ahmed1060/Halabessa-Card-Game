@@ -2,7 +2,7 @@ import { after, before, beforeEach, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
-import { ref, get, set, update, remove, serverTimestamp } from 'firebase/database';
+import { ref, get, set, update, remove, serverTimestamp, query, orderByChild, equalTo, limitToFirst } from 'firebase/database';
 
 // Rules tests must never reach production or a remote emulator host.
 assert.match(process.env.FIREBASE_DATABASE_EMULATOR_HOST ?? '', /^(127\.0\.0\.1|localhost):\d+$/);
@@ -50,6 +50,19 @@ test('legacy profile mirror is private and its root cannot be enumerated', async
 });
 const message = (senderId = 'alice') => ({ id: 'client-id', senderId, senderName: 'Alice',
   text: 'Hello', timestamp: Date.now(), isQuickChat: false });
+test('sender-indexed chat queries remain bounded and cannot bypass team privacy', async () => {
+  await env.withSecurityRulesDisabled(async context => {
+    await set(ref(context.database(),'matchChat/SERVER/public'),{
+      mine:{...message('alice'),id:'mine'}, other:{...message('bob'),id:'other'},
+    });
+    await set(ref(context.database(),'matchChat/SERVER/teamA/mine'),{...message(),id:'mine'});
+  });
+  const authored = (database,path) => query(ref(database,path),orderByChild('senderId'),equalTo('alice'),limitToFirst(40));
+  const found = await assertSucceeds(get(authored(db('alice'),'matchChat/SERVER/public')));
+  assert.deepEqual(Object.keys(found.val()),['mine']);
+  await assertFails(get(authored(db('bob'),'matchChat/SERVER/teamA')));
+  await assertFails(get(authored(db('stranger'),'matchChat/SERVER/public')));
+});
 test('new team chat excludes opponents, outsiders and released seats', async () => {
   await env.withSecurityRulesDisabled(async context => {
     await set(ref(context.database(), 'matchChat/SERVER/teamA/one'), {...message(), id: 'one'});

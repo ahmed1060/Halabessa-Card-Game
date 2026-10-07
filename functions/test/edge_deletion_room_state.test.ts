@@ -37,3 +37,17 @@ test('departed players are anonymized without evicting their replacements',()=>{
   assert.equal(JSON.stringify(result).includes('alice'),false);
   assert.equal((result.captures as any)[0].playerName,'Deleted player');
 });
+test('custom UIDs matching card ranks or another player name cannot corrupt unrelated data',()=>{
+  const input=state();
+  input.playerIds[0]='king';
+  input.handCards={king:[{rank:'king',suit:'hearts'}],bob:[{rank:'king',suit:'clubs'}]} as any;
+  input.playerNames={king:'Private name',bob:'king'};
+  input.captures=[{playedBy:'king',playerName:'Private name',leadingCard:{rank:'king',suit:'hearts'}}];
+  const result=anonymizeDeletedPlayer(input,'king',anonymous);
+  const bot=result.playerIds![0];
+  assert.equal(result.handCards?.[bot][0].rank,'king');
+  assert.equal(result.handCards?.bob[0].rank,'king');
+  assert.equal((result.playerNames as any).bob,'king');
+  assert.equal((result.captures as any)[0].leadingCard.rank,'king');
+  assert.equal((result.captures as any)[0].playedBy,anonymous);
+});

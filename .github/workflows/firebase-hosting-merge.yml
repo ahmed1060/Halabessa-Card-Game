@@ -20,6 +20,17 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "24"
+      - name: Typecheck deletion adapters
+        run: >-
+          npm exec --yes --package=typescript@5.9.3 -- tsc --noEmit
+          --allowImportingTsExtensions --target es2022 --module esnext
+          --moduleResolution bundler --lib es2023,dom --skipLibCheck
+          supabase/functions/halabessa-api/deletion_firebase_data.ts
+          supabase/functions/halabessa-api/deletion_avatars.ts
+          supabase/functions/halabessa-api/deletion_realtime_data.ts
+          supabase/functions/halabessa-api/deletion_rooms.ts
+          supabase/functions/halabessa-api/deletion_job_store.ts
+          supabase/functions/halabessa-api/avatar_upload_policy.ts
       - name: Test authoritative match engines and database lifecycle
         run: >-
           node --test functions/test/match_engine.test.js
@@ -33,6 +44,11 @@ jobs:
           functions/test/edge_deletion_job_store.test.ts
           functions/test/edge_deletion_access.test.ts
           functions/test/edge_deletion_room_state.test.ts
+          functions/test/edge_deletion_rooms.test.ts
+          functions/test/edge_deletion_firebase_data.test.ts
+          functions/test/edge_deletion_avatars.test.ts
+          functions/test/edge_avatar_upload_policy.test.ts
+          functions/test/edge_deletion_realtime_data.test.ts
           functions/test/unity_web_startup.test.js functions/test/web_build_versioning.test.mjs
           functions/test/release_pages.test.mjs
       - uses: actions/setup-java@v4
