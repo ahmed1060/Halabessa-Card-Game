@@ -15,7 +15,8 @@ service cloud.firestore {
     // respondToFriendRequest), which bypasses these rules and validates the
     // caller server-side. See HAL-07 and HAL-08.
     match /users/{uid} {
-      allow read: if request.auth != null;
+      allow read: if request.auth != null &&
+        (request.auth.uid == uid || request.auth.token.get('admin', false) == true);
 
       allow create: if request.auth != null && request.auth.uid == uid
         && request.resource.data.get('isAdmin', false) == false

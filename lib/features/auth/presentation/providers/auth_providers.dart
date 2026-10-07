@@ -1,6 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../../../core/services/supabase_backend_service.dart';
 
 import '../../domain/models/app_user.dart';
 import '../../domain/models/ranking_period.dart';
@@ -27,19 +27,19 @@ final currentUserProvider = Provider<AppUser?>((ref) {
   return ref.watch(authStateChangesProvider).value;
 });
 
-// 5. Fetches any user's profile from Firestore
+// 5. Discovery receives the server's allowlisted public view, never email/wallets.
 final userProfileProvider = FutureProvider.family<AppUser?, String>((
   ref,
   uid,
 ) async {
-  final doc = await FirebaseFirestore.instance
-      .collection('users')
-      .doc(uid)
-      .get();
-  if (doc.exists) {
-    return AppUser.fromJson(doc.data()!, uid);
-  }
-  return null;
+  final result = await SupabaseBackendService.call(
+    'getPublicProfile',
+    data: {'uid': uid},
+  );
+  final profile = result['profile'];
+  return profile is Map
+      ? AppUser.fromJson(Map<String, dynamic>.from(profile), uid)
+      : null;
 });
 
 // 6. Leaderboard Category Enum & Provider
@@ -55,19 +55,14 @@ final weeklyLeaderboardProvider =
         LeaderboardCategory.wins => 'wins',
         LeaderboardCategory.bestScore => 'bestScore',
       };
-      final query = await FirebaseFirestore.instance
-          .collection('users')
-          .where(
-            'weeklyRanking.week',
-            isEqualTo: RankingPeriod.key(DateTime.now()),
-          )
-          .orderBy('weeklyRanking.$field', descending: true)
-          .limit(50)
-          .get();
-      return query.docs.map((doc) {
-        final data = doc.data();
+      final result = await SupabaseBackendService.call(
+        'queryPublicProfiles',
+        data: {'category': field, 'week': RankingPeriod.key(DateTime.now())},
+      );
+      return (result['profiles'] as List).map((raw) {
+        final data = Map<String, dynamic>.from(raw as Map);
         final weekly = Map<String, dynamic>.from(data['weeklyRanking'] as Map);
-        return AppUser.fromJson(data, doc.id).copyWith(
+        return AppUser.fromJson(data, data['uid'] as String).copyWith(
           points: weekly['points'] as int? ?? 0,
           wins: weekly['wins'] as int? ?? 0,
           losses: weekly['losses'] as int? ?? 0,
@@ -97,15 +92,14 @@ final leaderboardProvider =
 
       List<AppUser> users = [];
 
-      final query = await FirebaseFirestore.instance
-          .collection('users')
-          .orderBy(field, descending: true)
-          .limit(50)
-          .get();
-
-      users = query.docs
-          .map((doc) => AppUser.fromJson(doc.data(), doc.id))
-          .toList();
+      final result = await SupabaseBackendService.call(
+        'queryPublicProfiles',
+        data: {'category': field},
+      );
+      users = (result['profiles'] as List).map((raw) {
+        final data = Map<String, dynamic>.from(raw as Map);
+        return AppUser.fromJson(data, data['uid'] as String);
+      }).toList();
 
       // Re-sort based on category
       users.sort((a, b) {

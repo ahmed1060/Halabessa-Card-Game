@@ -2,7 +2,7 @@
 
 Publisher: WeirdPuzz. Public contact: weirdpuzz@gmail.com.
 Initial countries confirmed by the publisher: Egypt, Saudi Arabia, USA, Canada.
-The audience includes children. Inclusion of under-13s is NOT yet confirmed.
+The current audience is ages 13+ only, as subsequently confirmed by the user.
 This is an engineering inventory, not a published privacy policy or legal opinion.
 
 ## Verified implementation inventory
@@ -19,11 +19,13 @@ This is an engineering inventory, not a published privacy policy or legal opinio
 | Device/browser | Sign-in session, preferences, cached assets | Sign out and clear user-specific local state without resetting another account |
 | Operational services | Firebase/Supabase requests and logs | Confirm actual retention and recovery behavior; do not promise immediate backup/log erasure |
 
-The Firebase profile read rule currently allows every authenticated user to read
-the whole `users` document, including its stored email. A privacy policy must not
-describe email as private under this model. Split public discovery/ranking fields
-from private account records, migrate safely and test the read boundary before
-a child-inclusive release. No existing data was deleted during this inventory.
+The deployed Firebase profile rules previously allowed authenticated users to
+read whole profiles, including email. The next local batch restricts Firestore
+and RTDB profile reads to their owner or a custom-claim admin. Rankings and friend
+search use an allowlisted Edge API projection of names, avatars and statistics;
+email, balances, inventory and social edges are omitted. Nested and malformed
+fields are filtered too. This is tested locally, not yet deployed: deploy the
+new backend before these dependent clients/rules. No existing data was deleted.
 
 ## Deletion acceptance contract
 
@@ -51,10 +53,12 @@ a child-inclusive release. No existing data was deleted during this inventory.
 This contract is not yet an operational deletion endpoint. Do not expose a button
 that claims instant deletion or mark store-deletion requirements complete.
 
-## Child-inclusive release decision
+## Current audience decision: ages 13+
 
-Before publication, confirm minimum age and whether under-13s can participate.
-Then choose the actual child-account/parental-consent design, not just wording.
+The user confirmed a minimum age of 13 for this release. Under-13 participation
+is not supported. A neutral device-local birthday check precedes the app's auth
+stream and routes; only eligibility is retained, not a birthday. This is a
+self-declaration gate and does not prove age, consent or compliance.
 Review all four markets with qualified advice as needed. US COPPA is relevant
 to child-directed under-13 services and knowing collection from under-13 users.
 Google Families also imposes safeguards for children's social features.

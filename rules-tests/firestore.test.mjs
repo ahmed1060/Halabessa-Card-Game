@@ -2,7 +2,7 @@ import { after, before, beforeEach, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
-import { doc, getDoc, setDoc, updateDoc, writeBatch } from 'firebase/firestore';
+import { doc, getDoc, getDocs, collection, setDoc, updateDoc, writeBatch } from 'firebase/firestore';
 
 // Never run these tests against a real project or an arbitrary remote host.
 assert.match(process.env.FIRESTORE_EMULATOR_HOST ?? '', /^(127\.0\.0\.1|localhost):\d+$/);
@@ -23,6 +23,17 @@ before(async () => { env = await initializeTestEnvironment({
 }); });
 beforeEach(async () => { await env.clearFirestore(); });
 after(async () => { await env?.cleanup(); });
+
+test('private profiles and emails are readable only by their owner or a verified admin', async () => {
+  await env.withSecurityRulesDisabled(async context => {
+    await setDoc(doc(context.firestore(), 'users/owner'), { email: 'private@example.test', displayName: 'Public name' });
+  });
+  await assertSucceeds(getDoc(doc(env.authenticatedContext('owner').firestore(), 'users/owner')));
+  await assertFails(getDoc(doc(env.authenticatedContext('other').firestore(), 'users/owner')));
+  await assertFails(getDocs(collection(env.authenticatedContext('other').firestore(), 'users')));
+  await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), 'users/owner')));
+  await assertSucceeds(getDocs(collection(env.authenticatedContext('admin', {admin: true}).firestore(), 'users')));
+});
 
 test('original missing-isAdmin rule reproduces the rejected profile update', async () => {
   const original = await initializeTestEnvironment({ projectId: 'demo-halabessa-legacy', firestore: {

@@ -28,6 +28,14 @@ beforeEach(async () => {
 });
 after(async () => { await env?.cleanup(); });
 const db = uid => env.authenticatedContext(uid).database();
+test('legacy profile mirror is private and its root cannot be enumerated', async () => {
+  await env.withSecurityRulesDisabled(async context => {
+    await set(ref(context.database(), 'users/alice'), {email: 'private@example.test'});
+  });
+  await assertSucceeds(get(ref(db('alice'), 'users/alice')));
+  await assertFails(get(ref(db('bob'), 'users/alice')));
+  await assertFails(get(ref(db('alice'), 'users')));
+});
 const message = (senderId = 'alice') => ({ id: 'client-id', senderId, senderName: 'Alice',
   text: 'Hello', timestamp: Date.now(), isQuickChat: false });
 test('new team chat excludes opponents, outsiders and released seats', async () => {

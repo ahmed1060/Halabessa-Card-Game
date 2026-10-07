@@ -80,10 +80,30 @@ must not be confused with production rollout or physical-device acceptance.
 
 ## Newly confirmed release scope
 
-The audience includes children; first markets are Egypt, Saudi Arabia, USA and
-Canada. Under-13 inclusion remains unanswered. Public legal pages must not be
-published as an adult-only policy. See account-data-release-review-2026-10-07.md
+The user subsequently confirmed ages 13+ only for the current release; first
+markets are Egypt, Saudi Arabia, USA and Canada. Under-13 access is out of scope.
+A device-local eligibility gate checks the full birthday before sign-in and
+stores only eligibility, not the birth date. This is self-declaration, not verified
+identity or proof of legal compliance. See account-data-release-review-2026-10-07.md
 for the actual data inventory, deletion safety contract and child-release gates.
 Account deletion, child-account safeguards, final legal publication, production
 rollout and physical/native acceptance remain unfinished. No mass user reset is
 part of this work. Keep the requested single final push until the batch is ready.
+
+## Third implementation batch (local; not yet pushed or deployed)
+
+- Added a 13+ eligibility gate before the auth stream, account routes, presence
+  and game overlay mount. Full birthday boundaries, future dates, persisted
+  refusal, concurrent submissions and blocked layouts are tested. It stores only
+  eligibility, never the date of birth. This is not identity-based age verification.
+- Private Firestore/RTDB profiles are owner/admin-readable only. Public profile
+  previews, rankings and friend search use the server's scalar allowlist. These
+  Firestore-only requests do not open a Postgres connection.
+- All 341 Flutter tests passed, including seven age-gate tests; all 21 Firebase
+  emulator tests passed. Four profile projection tests passed. Analysis has no
+  errors; existing warnings/informational notices remain.
+- The full CI server suite passed all 96 tests and the release web build succeeded.
+  Its optional Wasm dry run reports existing plugin incompatibilities; the shipped
+  JavaScript web target builds successfully. Native targets were not built here.
+- Account deletion, public policy/terms publication, production rollout and
+  physical/native verification still remain. No live deletion or user reset ran.

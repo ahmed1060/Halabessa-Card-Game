@@ -9,6 +9,8 @@ import 'core/theme/theme_config.dart';
 import 'core/providers/settings_provider.dart';
 import 'core/services/multimedia_service.dart';
 import 'core/services/player_presence.dart';
+import 'core/providers/age_eligibility_provider.dart';
+import 'core/widgets/age_eligibility_screen.dart';
 import 'features/auth/presentation/providers/auth_providers.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/services.dart';
@@ -61,9 +63,27 @@ class HalabessaApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final settings = ref.watch(settingsProvider);
+    // Gate every route (including deep links) before reading the auth stream or
+    // mounting provider buttons, account screens, presence or the Unity overlay.
+    if (ref.watch(ageEligibilityProvider) != AgeEligibility.eligible) {
+      return MaterialApp(
+        key: const ValueKey('age-gate'),
+        title: 'Halabessa',
+        initialRoute: '/',
+        localizationsDelegates: context.localizationDelegates,
+        supportedLocales: context.supportedLocales,
+        locale: context.locale,
+        theme: ThemeConfig.lightTheme,
+        darkTheme: ThemeConfig.darkTheme,
+        themeMode: settings.themeMode,
+        debugShowCheckedModeBanner: false,
+        home: const AgeEligibilityScreen(),
+      );
+    }
     final uid = ref.watch(authStateChangesProvider).valueOrNull?.uid;
 
     return MaterialApp(
+      key: const ValueKey('game-app'),
       title: 'Halabessa',
       localizationsDelegates: context.localizationDelegates,
       supportedLocales: context.supportedLocales,

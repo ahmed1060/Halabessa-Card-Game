@@ -554,5 +554,11 @@
     "bot_strategy_medium": "Captures and simple hand planning",
     "bot_strategy_hard": "Remembers exposed cards and avoids risky ranks",
     "bot_strategy_expert": "Card counting and teammate-aware decisions",
-    "ui_leaderboard_unavailable": "Rankings could not be loaded. Please try again."
+    "ui_leaderboard_unavailable": "Rankings could not be loaded. Please try again.",
+    "ui_age_title": "Halabessa is for ages 13+",
+    "ui_age_detail": "Enter your date of birth to check eligibility. This check happens on your device; your birth date is not stored or sent to our servers.",
+    "ui_age_date": "Choose date of birth",
+    "ui_age_continue": "Continue",
+    "ui_age_blocked_title": "You must be at least 13",
+    "ui_age_blocked_detail": "Halabessa is not available to children under 13. Sign-in and gameplay are unavailable on this device after this check."
 }

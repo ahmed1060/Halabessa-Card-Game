@@ -7,6 +7,7 @@ import { joinCommandRoom } from "./room_seating.ts";
 import { roomSummary } from "./room_summary.ts";
 import { rewardPlan } from "./match_rewards.ts";
 import { createFirestoreRewardStore } from "./firestore_rewards.ts";
+import { createPublicProfileStore } from "./public_profiles.ts";
 import { createDatabaseRunner, databaseConnectionString } from "./database.ts";
 import { commitAndDeliver, deliverLatestRoom, matchMirrorUpdates, participantSnapshot, publicMatchState } from "./match_delivery.ts";
 
@@ -308,7 +309,23 @@ Deno.serve(async (request) => {
       expectedVersion?: unknown;
       commandPayload?: unknown;
       actorUid?: unknown;
+      uid?: unknown;
+      search?: unknown;
+      category?: unknown;
+      week?: unknown;
     };
+    // Firestore-only discovery must not hold a scarce Postgres connection.
+    if (body.action === 'getPublicProfile' || body.action === 'queryPublicProfiles') {
+        const store = createPublicProfileStore(firebaseProject, firebaseAccessToken);
+        try {
+          return body.action === 'getPublicProfile'
+            ? reply({ profile: await store.get(body.uid) }, 200, origin)
+            : reply({ profiles: await store.query(body) }, 200, origin);
+        } catch (error) {
+          if (error instanceof Error && error.message === 'invalid_profile_query') return reply({error: error.message}, 400, origin);
+          throw error;
+        }
+    }
     return await withDatabase(async (connection) => {
       await connection.queryObject`
         insert into halabessa.user_profiles (firebase_uid, email, display_name)

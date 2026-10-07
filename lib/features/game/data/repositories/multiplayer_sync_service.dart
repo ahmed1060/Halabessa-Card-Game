@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_database/firebase_database.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:halabessa/core/services/supabase_backend_service.dart';
 import 'package:halabessa/core/services/idempotent_match_request.dart';
 import 'command_snapshot_stream.dart';
@@ -520,21 +519,18 @@ class MultiplayerSyncService {
   Future<List<AppUser>> searchUsers(String query) async {
     try {
       final lowercaseQuery = query.toLowerCase().replaceAll('@', '').trim();
-      final firestore = FirebaseFirestore.instance;
-
-      final snapshot = await firestore
-          .collection('users')
-          .where('searchName', isGreaterThanOrEqualTo: lowercaseQuery)
-          .where('searchName', isLessThanOrEqualTo: '$lowercaseQuery\uf8ff')
-          .limit(20)
-          .get();
-
-      return snapshot.docs
-          .map((doc) {
+      if (lowercaseQuery.length < 2) return [];
+      final result = await SupabaseBackendService.call(
+        'queryPublicProfiles',
+        data: {'search': lowercaseQuery},
+      );
+      return (result['profiles'] as List)
+          .map((raw) {
             try {
-              return AppUser.fromJson(doc.data(), doc.id);
+              final data = Map<String, dynamic>.from(raw as Map);
+              return AppUser.fromJson(data, data['uid'] as String);
             } catch (e) {
-              debugPrint('Error parsing user ${doc.id}: $e');
+              debugPrint('Error parsing public profile: $e');
               return null;
             }
           })
