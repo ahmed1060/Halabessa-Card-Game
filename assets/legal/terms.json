@@ -1,0 +1,24 @@
+{
+  "en": {
+    "title":"Halabessa rules of use",
+    "updated":"Updated 7 October 2026",
+    "sections":[
+      {"title":"Who can play", "body":"Halabessa is operated by WeirdPuzz and is currently for ages 13 and over. Do not use another person's account or misrepresent your age. If local rules require a parent or guardian's permission, obtain it before using the game. The age check is not a substitute for required permission."},
+      {"title":"Play fairly", "body":"Do not cheat, exploit bugs, manipulate rewards, impersonate others or disrupt matches. Server-controlled rules determine valid moves and rewards. A turn timeout may play a card automatically; three consecutive timeout plays remove an inactive player. Leaving or removal allows a bot replacement. Updates may correct errors in game state or rewards."},
+      {"title":"Names, images and chat", "body":"Use respectful names, avatars and messages. Do not send threats, harassment, sexual content, hateful content, scams or another person's private information. Public means the current match, not the whole lobby. Team messages are for current teammates. Report misuse to weirdpuzz@gmail.com with the room code and approximate time; do not include passwords or sign-in tokens."},
+      {"title":"Progress and availability", "body":"Virtual coins, diamonds and items are game features, not cash or a promise of cash redemption. Guest progress belongs to the guest identity; losing that session may prevent recovery unless it was linked to a supported sign-in account. Network failures and service limits can interrupt play. Signing out or uninstalling does not delete your account."},
+      {"title":"Support and data", "body":"For gameplay or account questions contact WeirdPuzz at weirdpuzz@gmail.com. Read the privacy notice for the data used to run the game and the current deletion-request process. These rules do not state that the game has been approved by Apple or Google, and do not limit rights provided by applicable law."}
+    ]
+  },
+  "ar": {
+    "title":"قواعد استخدام حلبسه",
+    "updated":"آخر تحديث: 7 أكتوبر 2026",
+    "sections":[
+      {"title":"من يمكنه اللعب", "body":"تشغّل WeirdPuzz حلبسه وهي حاليًا للأعمار من 13 سنة. لا تستخدم حساب شخص آخر ولا تقدم عمرًا غير صحيح. إذا كانت القواعد المحلية تتطلب موافقة ولي الأمر، احصل عليها قبل الاستخدام. التحقق من العمر لا يغني عن الموافقة المطلوبة."},
+      {"title":"اللعب النزيه", "body":"لا تغش أو تستغل الأخطاء أو تتلاعب بالمكافآت أو تنتحل هوية الآخرين أو تعطل المباريات. تحدد قواعد الخادم الحركات والمكافآت الصحيحة. قد تُلعب ورقة تلقائيًا عند انتهاء وقت الدور؛ وبعد ثلاث مرات متتالية يُزال اللاعب بسبب عدم النشاط. يسمح المغادرة أو الإزالة باستبدال اللاعب ببوت. قد تصحح التحديثات أخطاء حالة المباراة أو المكافآت."},
+      {"title":"الأسماء والصور والدردشة", "body":"استخدم أسماء وصورًا ورسائل محترمة. لا ترسل تهديدات أو تحرشًا أو محتوى جنسيًا أو كراهية أو احتيالًا أو بيانات خاصة بالآخرين. الدردشة العامة للمباراة الحالية وليست لكل اللاعبين؛ رسائل الفريق لزملائك الحاليين. أبلغ عن الإساءة عبر weirdpuzz@gmail.com مع رمز الغرفة والوقت التقريبي، دون كلمات مرور أو رموز دخول."},
+      {"title":"التقدم وتوفر الخدمة", "body":"العملات والجواهر والعناصر الافتراضية ميزات داخل اللعبة وليست نقودًا ولا وعدًا باستبدالها بنقود. يرتبط تقدم الضيف بهويته؛ وقد يتعذر استعادته إذا ضاعت الجلسة ولم تُربط بحساب دخول مدعوم. قد تتسبب مشاكل الشبكة وحدود الخدمات في توقف اللعب. تسجيل الخروج أو إزالة التطبيق لا يحذف الحساب."},
+      {"title":"الدعم والبيانات", "body":"لاستفسارات اللعب والحساب تواصل مع WeirdPuzz عبر weirdpuzz@gmail.com. اقرأ إشعار الخصوصية لمعرفة البيانات المستخدمة وطريقة طلب الحذف الحالية. لا تعني هذه القواعد أن Apple أو Google وافقت على اللعبة، ولا تحدّ من حقوقك بموجب القانون المعمول به."}
+    ]
+  }
+}

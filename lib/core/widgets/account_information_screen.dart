@@ -4,6 +4,7 @@ import 'package:easy_localization/easy_localization.dart';
 import '../../features/game/presentation/widgets/table_style.dart';
 import 'lantern_page_frame.dart';
 import 'lantern_panel.dart';
+import 'release_policy_screen.dart';
 
 /// Existing data practices and gameplay help, not a fabricated legal policy or
 /// an unconfigured contact form. Account deletion remains an explicit gap.
@@ -75,6 +76,7 @@ class AccountInformationScreen extends StatelessWidget {
                           color: TableStyle.ink,
                         ),
                       ),
+                    const ReleasePolicyLinks(),
                     if (support)
                       FilledButton.icon(
                         style: FilledButton.styleFrom(

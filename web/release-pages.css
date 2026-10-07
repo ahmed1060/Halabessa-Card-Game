@@ -1,0 +1,10 @@
+@font-face{font-family:Lantern;src:url('/assets/assets/fonts/Cairo.ttf') format('truetype');font-display:swap}
+:root{color-scheme:dark;background:#3b274c;color:#fff6e7;font-family:Lantern,Tahoma,sans-serif;font-size:18px;line-height:1.7}
+body{margin:0}main{max-width:44rem;margin:auto;padding:clamp(1rem,4vw,2rem)}
+nav{display:flex;flex-wrap:wrap;gap:.7rem 1.2rem;padding-block:1rem 2rem;border-bottom:1px solid #ffc65b}
+a{color:#78d2af;overflow-wrap:anywhere}a:focus-visible{outline:3px solid #ffc65b;outline-offset:5px}
+article{padding-block:1rem 2rem}article+article{border-top:1px solid #ffc65b}
+h1{color:#ffc65b;font-size:clamp(1.7rem,4vw,2.5rem);line-height:1.35}h2{font-size:1.15rem;color:#ffc65b;margin-block:1.5rem .3rem}
+p{margin-block:.5rem 1rem}section p{max-width:70ch}footer{border-top:1px solid #ccc3d4;padding-block:1.5rem}
+.skip{position:absolute;inset-inline-start:1rem;top:-10rem;background:#192638;padding:.6rem}.skip:focus{top:1rem}
+@media print{:root{background:white;color:black}h1,h2,a{color:black}nav,.skip{display:none}}

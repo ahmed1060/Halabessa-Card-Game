@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/age_eligibility_provider.dart';
 import 'lantern_page_frame.dart';
+import 'release_policy_screen.dart';
 import '../../features/game/presentation/widgets/table_style.dart';
 
 class AgeEligibilityScreen extends ConsumerStatefulWidget {
@@ -54,6 +55,8 @@ class _AgeEligibilityScreenState extends ConsumerState<AgeEligibilityScreen> {
                               .tr(),
                           style: TableStyle.label,
                         ),
+                        const SizedBox(height: 16),
+                        const ReleasePolicyLinks(),
                         if (!blocked) ...[
                           const SizedBox(height: 24),
                           OutlinedButton.icon(

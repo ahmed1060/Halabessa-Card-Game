@@ -107,3 +107,31 @@ part of this work. Keep the requested single final push until the batch is ready
   JavaScript web target builds successfully. Native targets were not built here.
 - Account deletion, public policy/terms publication, production rollout and
   physical/native verification still remain. No live deletion or user reset ran.
+
+## Rollout and fourth batch — 7 October 2026
+
+- Commits through 91717f17 were pushed to main. Supabase Edge version 27 was
+  deployed first, with the profile projection and weekly scoring dependencies.
+  Live health returned 200 and an unauthenticated profile query returned 401.
+- Hosting run 37598005302 passed server tests, 21 emulator tests, analysis and
+  all 341 Flutter tests. Deployment stopped with HTTP 403 while listing Firestore
+  indexes. The GitHub deployment principal needs roles/datastore.indexAdmin;
+  no IAM permissions were silently granted or failed gates bypassed. Hosting
+  did not update in this run. Indexes now deploy before dependent rules.
+- Prepared public privacy/rules-of-use pages in English and Arabic, matching the
+  same JSON text bundled in native screens. Notices are readable before sign-in.
+  A public account-deletion page describes the current publisher-email request
+  route honestly; it does not claim automatic in-app deletion exists.
+- Four web-page consistency/link tests and four unauthenticated native-notice
+  layout tests passed. The notices follow the approved lantern-café palette.
+- Six deletion execution-contract tests passed: self-only and recent-auth
+  authorization, protected admin identity, confirmed guest handling, durable
+  acceptance before revocation, bounded restartable stages, failure handling and
+  serialized workers. This module is not wired to an HTTP action: production
+  storage/lease/cleanup adapters and in-app confirmation are still required.
+- The updated complete Flutter suite passed all 345 tests; release web build
+  succeeded with the notices bundled. No physical-device validation is implied.
+- Automatic deletion and its live isolated QA test remain unfinished. Physical
+  device checks and signed-store/provider configuration still require the
+  publisher's devices and accounts; neither store acceptance nor legal review is
+  implied by these engineering tests.
