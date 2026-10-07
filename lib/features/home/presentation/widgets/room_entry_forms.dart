@@ -130,22 +130,99 @@ class _RoomCreationFormState extends State<RoomCreationForm> {
         color: selected ? TableStyle.ink : TableStyle.ivory,
       ),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      label: value is GameMode
-          ? Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const SizedBox(
-                  width: 112,
-                  height: 76,
-                  child: FittedBox(child: LanternCardFan()),
-                ),
-                Text(label),
-              ],
-            )
-          : Text(label),
+      label: Text(label),
       onSelected: _pending ? null : (_) => setState(() => onSelected(value)),
     );
   }
+
+  Widget _illustratedChoice({
+    required Key key,
+    required String label,
+    required String detail,
+    required bool selected,
+    required VoidCallback onSelect,
+    IconData? icon,
+  }) => Semantics(
+    button: true,
+    selected: selected,
+    enabled: !_pending,
+    child: Material(
+      key: key,
+      color: TableStyle.ink,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        onTap: _pending ? null : onSelect,
+        borderRadius: BorderRadius.circular(18),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: selected ? TableStyle.mint : TableStyle.muted,
+              width: selected ? 2.5 : 1,
+            ),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Align(
+                alignment: AlignmentDirectional.centerEnd,
+                child: Icon(
+                  selected ? Icons.check_circle : Icons.circle_outlined,
+                  color: selected ? TableStyle.mint : TableStyle.muted,
+                  size: 22,
+                ),
+              ),
+              if (icon == null)
+                const SizedBox(
+                  width: 112,
+                  height: 70,
+                  child: FittedBox(child: LanternCardFan()),
+                )
+              else
+                Padding(
+                  padding: const EdgeInsets.all(8),
+                  child: Icon(icon, color: TableStyle.mint, size: 30),
+                ),
+              Text(
+                label,
+                textAlign: TextAlign.center,
+                style: TableStyle.label.copyWith(fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                detail,
+                textAlign: TextAlign.center,
+                style: TableStyle.detail,
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+
+  Widget _choicePair(List<Widget> choices) => LayoutBuilder(
+    builder: (context, constraints) {
+      if (constraints.maxWidth < 280 ||
+          MediaQuery.textScalerOf(context).scale(14) > 21) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [choices[0], const SizedBox(height: 10), choices[1]],
+        );
+      }
+      return IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(child: choices[0]),
+            const SizedBox(width: 10),
+            Expanded(child: choices[1]),
+          ],
+        ),
+      );
+    },
+  );
 
   @override
   Widget build(BuildContext context) => Column(
@@ -164,26 +241,22 @@ class _RoomCreationFormState extends State<RoomCreationForm> {
       const SizedBox(height: 24),
       Text(widget.text('select_game_mode'), style: TableStyle.label),
       const SizedBox(height: 8),
-      Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: [
-          _choice(
-            key: const ValueKey('mode_classic'),
-            value: GameMode.classic,
-            current: _mode,
-            label: widget.text('classic_mode'),
-            onSelected: (value) => _mode = value,
-          ),
-          _choice(
-            key: const ValueKey('mode_tafweet'),
-            value: GameMode.tafweet,
-            current: _mode,
-            label: widget.text('tafweet_mode'),
-            onSelected: (value) => _mode = value,
-          ),
-        ],
-      ),
+      _choicePair([
+        _illustratedChoice(
+          key: const ValueKey('mode_classic'),
+          label: widget.text('classic_mode'),
+          detail: widget.text('ui_mode_classic'),
+          selected: _mode == GameMode.classic,
+          onSelect: () => setState(() => _mode = GameMode.classic),
+        ),
+        _illustratedChoice(
+          key: const ValueKey('mode_tafweet'),
+          label: widget.text('tafweet_mode'),
+          detail: widget.text('ui_mode_tafweet'),
+          selected: _mode == GameMode.tafweet,
+          onSelect: () => setState(() => _mode = GameMode.tafweet),
+        ),
+      ]),
       const SizedBox(height: 20),
       Text(widget.text('select_target_score'), style: TableStyle.label),
       const SizedBox(height: 8),
@@ -219,22 +292,24 @@ class _RoomCreationFormState extends State<RoomCreationForm> {
         ],
       ),
       const SizedBox(height: 20),
-      Material(
-        color: TableStyle.felt,
-        borderRadius: BorderRadius.circular(12),
-        child: SwitchListTile.adaptive(
-          title: Text(widget.text('public_room'), style: TableStyle.label),
-          subtitle: Text(
-            widget.text('public_room_desc'),
-            style: TableStyle.detail,
-          ),
-          value: _public,
-          activeColor: TableStyle.brass,
-          onChanged: _pending
-              ? null
-              : (value) => setState(() => _public = value),
+      _choicePair([
+        _illustratedChoice(
+          key: const ValueKey('visibility_public'),
+          label: widget.text('public_room'),
+          detail: widget.text('public_room_desc'),
+          selected: _public,
+          icon: Icons.public,
+          onSelect: () => setState(() => _public = true),
         ),
-      ),
+        _illustratedChoice(
+          key: const ValueKey('visibility_private'),
+          label: widget.text('ui_private'),
+          detail: widget.text('ui_private_detail'),
+          selected: !_public,
+          icon: Icons.lock_outline,
+          onSelect: () => setState(() => _public = false),
+        ),
+      ]),
       if (_errorKey != null) ...[
         const SizedBox(height: 12),
         Semantics(

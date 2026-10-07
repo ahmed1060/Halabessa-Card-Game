@@ -171,25 +171,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        backgroundColor: TableStyle.ink,
-                        foregroundColor: TableStyle.ivory,
-                        minimumSize: const Size.fromHeight(58),
-                        side: const BorderSide(color: TableStyle.mint),
-                      ),
-                      icon: const Icon(Icons.login_rounded),
-                      label: Text('join_room'.tr(), style: TableStyle.label),
-                      onPressed: user == null
-                          ? null
-                          : () => showModalBottomSheet(
-                              context: context,
-                              isScrollControlled: true,
-                              backgroundColor: Colors.transparent,
-                              builder: (_) => RoomEntrySheet(
-                                child: _buildJoinCodeBar(context, user),
-                              ),
-                            ),
+                    _lobbyAction(
+                      title: 'join_room'.tr(),
+                      subtitle: 'room_code'.tr(),
+                      icon: Icons.login_rounded,
+                      onTap: () {
+                        if (user == null) return;
+                        showModalBottomSheet(
+                          context: context,
+                          isScrollControlled: true,
+                          backgroundColor: Colors.transparent,
+                          builder: (_) => RoomEntrySheet(
+                            child: _buildJoinCodeBar(context, user),
+                          ),
+                        );
+                      },
                     ),
                     const SizedBox(height: 20),
                     Wrap(

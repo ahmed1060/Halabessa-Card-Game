@@ -470,6 +470,8 @@ class _StoreScreenState extends ConsumerState<StoreScreen> {
                                       ? TableStyle.mint
                                       : TableStyle.brass,
                                   foregroundColor: TableStyle.ink,
+                                  disabledBackgroundColor: TableStyle.ink,
+                                  disabledForegroundColor: TableStyle.mint,
                                   minimumSize: const Size.fromHeight(48),
                                 ),
                                 onPressed:
