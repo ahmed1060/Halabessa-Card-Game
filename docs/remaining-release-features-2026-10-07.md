@@ -205,3 +205,13 @@ part of this work. Keep the requested single final push until the batch is ready
   and receipt/worker endpoints; scheduled recovery; native confirmation,
   reauthentication/Apple revocation; and the approved isolated live QA are still
   required. The private queue is not an operational deletion feature by itself.
+- Added the room-state anonymization step: normal leave/bot takeover preserves
+  other seats, cards and scores; historical UID references and attributed names
+  are scrubbed. It refuses pending rewards or legacy snapshots rather than
+  silently changing settlement eligibility. Three focused tests passed; the
+  complete server/page suite now has 125 passing tests. SQL ownership transfer,
+  mirror delivery and legacy cleanup still need integration.
+- Live browser verification could not run: the browser tool failed twice during
+  initialization with a missing kernel-assets path. No browser interaction or
+  new guest creation occurred. Existing G1 mockup/local screenshot comparison
+  is not a substitute for a fresh deployed visual/interaction check.
