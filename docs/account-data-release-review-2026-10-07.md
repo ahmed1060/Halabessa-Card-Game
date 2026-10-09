@@ -57,9 +57,11 @@ notices explicitly disclose their retention without an invented deletion SLA.
    tokens are rejected and unrelated users, balances and matches survive.
 
 As of 9 October, this contract is integrated into the active Edge version 36
-endpoint and private scheduled worker. The containing client batch adds explicit
-confirmation, provider reauthentication and receipt-based recovery; rollout is
-subject to its Hosting workflow. The isolated live worker completed all six
+endpoint and private scheduled worker. Client commit 501a1b54 passed Hosting,
+Android and iOS CI, deploying explicit confirmation, provider reauthentication
+and receipt-based recovery. Read-only deployed Arabic desktop inspection passed;
+the cream-panel contrast follow-up has 365 passing Flutter tests but needs its
+own deployment/visual recheck. The isolated live worker completed all six
 stages, but the authenticated submission path and native Apple/provider behavior
 still need live acceptance. The UI must not claim instant deletion or that store
 requirements are certified complete. See account-deletion-verification-2026-10-09.md.

@@ -21,13 +21,17 @@ records were retained. No mass reset or deletion occurred.
 
 This batch includes the Lantern-themed confirmation/recovery UI, provider
 reauthentication and Apple revocation integration, public notices and CI gates.
-Its client rollout is subject to the Hosting workflow for the containing commit.
+Client commit 501a1b54 passed Hosting 37920115595, Android 37920115528 and iOS
+37920115683. Hosting is deployed; the APK is uploaded and the IPA is unsigned.
 The live QA job was accepted through exact-target trusted SQL because the original
 guest session was lost on resume: this proves the production worker, not the
 normal authenticated HTTP submission or native provider flow. A replacement
-live guest test awaits separate approval. Fresh interactive UI acceptance is
-blocked by the computer-use browser URL safety check; physical device, provider,
-signing, legal/store declarations and publisher acceptance remain release gates.
+live guest test awaits separate approval. Fresh deployed Arabic desktop inspection
+and the non-mutating status action succeeded. A cream-panel contrast issue was
+fixed without changing the Lantern design; 365 Flutter tests and 17 focused
+deletion tests passed. That follow-up requires its own deployment/visual recheck.
+Physical device, provider, signing, legal/store declarations and publisher
+acceptance remain release gates.
 See account-deletion-verification-2026-10-09.md for the evidence and limitations.
 
 ## Confirmed decisions

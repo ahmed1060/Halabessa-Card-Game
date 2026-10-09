@@ -257,7 +257,15 @@ class _AccountDeletionScreenState extends State<AccountDeletionScreen> {
                           if (!requiresApple && providers.length > 1)
                             DropdownButtonFormField<String>(
                               initialValue: _provider ?? providers.first,
+                              style: TableStyle.label.copyWith(
+                                color: TableStyle.ink,
+                              ),
+                              dropdownColor: TableStyle.ivory,
+                              iconEnabledColor: TableStyle.ink,
                               decoration: InputDecoration(
+                                labelStyle: TableStyle.label.copyWith(
+                                  color: TableStyle.ink,
+                                ),
                                 labelText: _text(
                                   'Verify with',
                                   'تأكيد الهوية بـ',
@@ -284,10 +292,17 @@ class _AccountDeletionScreenState extends State<AccountDeletionScreen> {
                                   'password')
                             TextField(
                               controller: _password,
+                              style: TableStyle.label.copyWith(
+                                color: TableStyle.ink,
+                              ),
+                              cursorColor: TableStyle.ink,
                               obscureText: true,
                               enableSuggestions: false,
                               autocorrect: false,
                               decoration: InputDecoration(
+                                labelStyle: TableStyle.label.copyWith(
+                                  color: TableStyle.ink,
+                                ),
                                 labelText: _text(
                                   'Current password',
                                   'كلمة السر الحالية',
@@ -298,6 +313,12 @@ class _AccountDeletionScreenState extends State<AccountDeletionScreen> {
                             color: Colors.transparent,
                             child: CheckboxListTile(
                               contentPadding: EdgeInsets.zero,
+                              activeColor: TableStyle.ink,
+                              checkColor: TableStyle.ivory,
+                              side: const BorderSide(
+                                color: TableStyle.ink,
+                                width: 1.5,
+                              ),
                               value: _confirmed,
                               title: Text(
                                 _text(
@@ -319,6 +340,10 @@ class _AccountDeletionScreenState extends State<AccountDeletionScreen> {
                             style: FilledButton.styleFrom(
                               backgroundColor: TableStyle.ink,
                               foregroundColor: TableStyle.ivory,
+                              disabledBackgroundColor: TableStyle.ink
+                                  .withValues(alpha: 0.10),
+                              disabledForegroundColor: TableStyle.ink
+                                  .withValues(alpha: 0.75),
                               minimumSize: const Size(48, 52),
                             ),
                             onPressed: _confirmed && !_busy ? _submit : null,
@@ -348,6 +373,9 @@ class _AccountDeletionScreenState extends State<AccountDeletionScreen> {
                             ),
                           ),
                           TextButton(
+                            style: TextButton.styleFrom(
+                              foregroundColor: TableStyle.ink,
+                            ),
                             onPressed: _busy
                                 ? null
                                 : () async {
@@ -382,6 +410,9 @@ class _AccountDeletionScreenState extends State<AccountDeletionScreen> {
                         ),
                         if (_canClose)
                           TextButton(
+                            style: TextButton.styleFrom(
+                              foregroundColor: TableStyle.ink,
+                            ),
                             onPressed: _busy ? null : _close,
                             child: Text(
                               _status == 'complete'

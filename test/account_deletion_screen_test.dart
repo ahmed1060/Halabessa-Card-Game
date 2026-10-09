@@ -4,6 +4,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:halabessa/core/services/account_deletion_service.dart';
 import 'package:halabessa/core/widgets/account_deletion_screen.dart';
+import 'package:halabessa/core/theme/theme_config.dart';
+import 'package:halabessa/features/game/presentation/widgets/table_style.dart';
 
 class DeletionGuest extends Fake implements User {
   @override
@@ -12,6 +14,22 @@ class DeletionGuest extends Fake implements User {
   bool get isAnonymous => true;
   @override
   List<UserInfo> get providerData => [];
+}
+
+class DeletionProviderInfo extends Fake implements UserInfo {
+  @override
+  final String providerId;
+  DeletionProviderInfo(this.providerId);
+}
+
+class DeletionLinkedUser extends DeletionGuest {
+  @override
+  bool get isAnonymous => false;
+  @override
+  List<UserInfo> get providerData => [
+    DeletionProviderInfo('password'),
+    DeletionProviderInfo('google.com'),
+  ];
 }
 
 void main() {
@@ -122,6 +140,51 @@ void main() {
     expect(await DeletionReceipt.load(), isNull);
     await tester.pumpWidget(const SizedBox());
   });
+  for (final dark in [false, true]) {
+    testWidgets('cream-panel controls remain legible with dark theme $dark', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: dark ? ThemeConfig.darkTheme : ThemeConfig.lightTheme,
+          home: AccountDeletionScreen(currentUser: () => DeletionLinkedUser()),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final button = tester.widget<FilledButton>(find.byType(FilledButton));
+      expect(button.onPressed, isNull);
+      final background = Color.alphaBlend(
+        button.style!.backgroundColor!.resolve({WidgetState.disabled})!,
+        TableStyle.ivory,
+      );
+      final foreground = Color.alphaBlend(
+        button.style!.foregroundColor!.resolve({WidgetState.disabled})!,
+        background,
+      );
+      final high = background.computeLuminance();
+      final low = foreground.computeLuminance();
+      expect((high + 0.05) / (low + 0.05), greaterThanOrEqualTo(4.5));
+      final cancel = tester.widget<TextButton>(
+        find.widgetWithText(TextButton, 'Cancel'),
+      );
+      expect(cancel.style!.foregroundColor!.resolve({}), TableStyle.ink);
+      final consent = tester.widget<CheckboxListTile>(
+        find.byType(CheckboxListTile),
+      );
+      expect(consent.side!.color, TableStyle.ink);
+      expect(consent.activeColor, TableStyle.ink);
+      final password = tester.widget<TextField>(find.byType(TextField));
+      expect(password.style!.color, TableStyle.ink);
+      expect(password.decoration!.labelStyle!.color, TableStyle.ink);
+      final provider = tester.widget<DropdownButtonFormField<String>>(
+        find.byType(DropdownButtonFormField<String>),
+      );
+      expect(provider.decoration.labelStyle!.color, TableStyle.ink);
+      expect(tester.takeException(), isNull);
+      expect(await DeletionReceipt.load(), isNull);
+      await tester.pumpWidget(const SizedBox());
+    });
+  }
   testWidgets(
     'a pending request blocks back navigation without dropping its receipt',
     (tester) async {

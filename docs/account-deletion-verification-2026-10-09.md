@@ -12,10 +12,11 @@ remains disabled intentionally because these are Firebase credentials. The
 worker requires its separate private Vault key and clients cannot read deletion
 tables. Receipt-only status cannot authenticate a player or select a target UID.
 
-The client changes are delivered in the commit containing this report. Hosting,
-Android and iOS CI must pass for that commit before claiming client rollout.
-The prior ff4bfe4e commit passed all three workflows; the iOS artifact is unsigned,
-not a TestFlight/App Store installable release.
+Client commit 501a1b54 passed Hosting run 37920115595, Android run 37920115528
+and iOS run 37920115683. Hosting deployed successfully. Android uploaded its
+release APK and built an AAB; iOS uploaded an unsigned IPA, not a TestFlight/
+App Store installable release. Build success does not establish provider,
+physical-device, publisher signing or store acceptance.
 
 ## Implementation
 
@@ -87,8 +88,9 @@ migration was replayed and the remote migration history was not repaired/rewritt
 
 ## Automated verification
 
-- Full Flutter suite: 363 passed; final focused receipt/confirmation/recovery
-  suite: 15 passed, including explicit guest consent and pending Back protection.
+- Full Flutter suite after the contrast follow-up: 365 passed; focused receipt/
+  confirmation/recovery suite: 17 passed, including explicit guest consent,
+  pending Back protection and light/dark-theme cream-panel contrast.
 - Full server/page suite: 155 passed, including bounded cleanup, outages,
   timestamp fairness, ETag/query behavior, legacy-key and receipt recovery tests.
 - Firebase emulator rules: 24 passed, including retained-token access refusal,
@@ -99,14 +101,29 @@ migration was replayed and the remote migration history was not repaired/rewritt
   warnings are not a claim of Wasm or native/hardware acceptance.
 - Supabase security advisors: no findings at the final check.
 
+## Deployed visual review and contrast follow-up
+
+A fresh browser session safely verified the deployed account/delete URL. The
+Arabic desktop screen and non-mutating Check status action were inspected.
+No consent was selected and no deletion was submitted for the existing account.
+The earlier browser URL-verification blocker did not recur in this session.
+
+The cream panel inherited dark-theme disabled/control colors: the disabled
+Delete label and mint Cancel text were faint. The follow-up sets explicit Lantern
+ink colors for those controls, consent and provider/password fields, preserving
+the approved palette and layout. Tests require at least 4.5:1 disabled-label
+contrast and verify that confirmation remains unchecked and deletion disabled.
+This follow-up still requires its own Hosting deployment and visual recheck;
+the observed desktop page is not physical iPhone/Android or live provider proof.
+
 ## Remaining acceptance gates
 
 1. One newly approved isolated guest can prove normal authenticated HTTP
    submission, duplicate submission and live old-token refusal. The current
    worker test must not be represented as that end-to-end acceptance.
-2. Fresh browser interaction/visual QA stopped when computer-use could not
-   verify the browser URL safely. No further UI input was sent; automated widget
-   fixtures are not a substitute for deployed interaction acceptance.
+2. Deployed Arabic desktop inspection and non-mutating status interaction passed.
+   Recheck the contrast follow-up after Hosting; full authenticated submission,
+   receipt recovery across a restart and native interaction remain unproven.
 3. Publisher-configured Google/Facebook/Apple live authentication, cancellation,
    conflicts and Apple revocation require provider accounts and native devices.
 4. Physical iPhone/Android touch, safe areas, rotation, background recovery,
