@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../widgets/lantern_help_screen.dart';
 import '../widgets/account_information_screen.dart';
 import '../widgets/release_policy_screen.dart';
+import '../widgets/account_deletion_screen.dart';
 
 import '../../features/auth/presentation/pages/auth_wrapper.dart';
 import '../../features/home/presentation/pages/home_screen.dart';
@@ -38,6 +39,7 @@ class AppRoutes {
     leaderboard: (context) => const LeaderboardScreen(),
     help: (context) => const LanternHelpScreen(),
     '/account/data': (context) => const AccountInformationScreen(),
+    '/account/delete': (context) => const AccountDeletionScreen(),
     '/privacy': (context) =>
         const ReleasePolicyScreen(policy: ReleasePolicy.privacy),
     '/terms': (context) =>

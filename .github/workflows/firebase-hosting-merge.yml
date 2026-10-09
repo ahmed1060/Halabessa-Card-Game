@@ -30,6 +30,7 @@ jobs:
           supabase/functions/halabessa-api/deletion_realtime_data.ts
           supabase/functions/halabessa-api/deletion_rooms.ts
           supabase/functions/halabessa-api/deletion_job_store.ts
+          supabase/functions/halabessa-api/deletion_worker.ts
           supabase/functions/halabessa-api/avatar_upload_policy.ts
       - name: Test authoritative match engines and database lifecycle
         run: >-
@@ -49,8 +50,11 @@ jobs:
           functions/test/edge_deletion_avatars.test.ts
           functions/test/edge_avatar_upload_policy.test.ts
           functions/test/edge_deletion_realtime_data.test.ts
+          functions/test/edge_deletion_worker.test.ts
           functions/test/unity_web_startup.test.js functions/test/web_build_versioning.test.mjs
           functions/test/release_pages.test.mjs
+      - name: Typecheck complete Edge entrypoint
+        run: npm exec --yes --package=deno@2.5.4 -- deno check supabase/functions/halabessa-api/index.ts
       - uses: actions/setup-java@v4
         with:
           distribution: temurin

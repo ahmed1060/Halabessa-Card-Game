@@ -1,10 +1,19 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createDeletionJobStore,deletionReceiptHash,deletionStatus,type DeletionQuery} from '../../supabase/functions/halabessa-api/deletion_job_store.ts';
+import {createDeletionJobStore,deletionReceiptHash,deletionStatus,recoverDeletion,type DeletionQuery} from '../../supabase/functions/halabessa-api/deletion_job_store.ts';
 import {continueDeletion,deletionStages,type DeletionEffects} from '../../supabase/functions/halabessa-api/account_deletion.ts';
 const id='10000000-0000-4000-8000-000000000001';
 const receipt='a'.repeat(64);
 const hash=await deletionReceiptHash(receipt);
+test('a lost acceptance response is recovered by hashed receipt without exposing identity',async()=>{
+  let call:any;
+  const recovered=await recoverDeletion(async(sql,args)=>{call={sql,args};return [{id,status:'pending',firebase_uid:'private-uid'}];},receipt);
+  assert.deepEqual(recovered,{id,status:'pending'});assert.deepEqual(call.args,[hash]);
+  assert.equal(await recoverDeletion(async()=>[],receipt).then(r=>r.status),'not_found');
+  const apple=await recoverDeletion(async()=>[{id,status:'pending',apple_required:true,apple_revoked:false}],receipt);
+  assert.equal(apple.status,'needs_apple_authorization');
+  await assert.rejects(recoverDeletion(async()=>{throw new Error('SQL must not run');},'invalid'),/invalid_deletion_receipt/);
+});
 function fixture() {
   let row: any;
   let locked=false;

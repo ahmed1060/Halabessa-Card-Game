@@ -194,7 +194,7 @@ export function lifecycleCommand(type: string, state: MatchState, deck: Card[], 
     if (state.phase !== "waitingForPlayers") throw new Error("room_not_waiting");
     const votes = { ...map<boolean>(state.botInjectionVotes), [uid]: true };
     const humans = state.playerIds!.filter(id => !id.startsWith("waiting_") && !id.startsWith("bot_"));
-    const next = { ...state, botInjectionVotes: votes };
+    const next: MatchState = { ...state, botInjectionVotes: votes };
     if (humans.every(id => votes[id])) {
       next.playerIds = state.playerIds!.map((id, seat) => id.startsWith("waiting_") ? `bot_${seat + 1}` : id);
       next.players = Object.fromEntries(next.playerIds.map(id => [id, true]));

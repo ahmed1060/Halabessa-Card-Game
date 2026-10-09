@@ -7,19 +7,28 @@ must not be confused with production rollout or physical-device acceptance.
 ## Current status — latest verified state
 
 The historical batches below describe their status when written. They are not
-the current deployment status. Hosting 37615672940, Android 37615673050 and iOS
-37615672866 all succeeded for 212e3365. The granted Datastore Index Admin role
+the current deployment status. Hosting 37619230171, Android 37619230099 and iOS
+37619230105 all succeeded for ff4bfe4e. The granted Datastore Index Admin role
 resolved the index-deployment blocker; the logout fix, profile privacy rules,
 age gate, release notices and earlier feature work are deployed.
 
-Automatic account deletion is still NOT enabled. Tested cleanup adapters are
-being added, but activation still requires integration of the authenticated
-acceptance/status endpoints, independent scheduled recovery, complete legacy
-data/peer/chat inventory, native recent-authentication and Apple revocation,
-confirmation/status UI, and the approved isolated live guest deletion test.
-Fresh browser interaction/visual acceptance remains blocked by browser-tool
-initialization; hardware/provider/store acceptance requires publisher devices
-and configuration. Existing players and balances have not been reset/deleted.
+The authenticated self-deletion endpoint, receipt-only status recovery and
+independent scheduled worker are now active in Supabase Edge version 36. The
+approved isolated QA job completed all six stages; its Firebase identity,
+profiles, username, avatar, presence and private room were removed. Existing
+player profiles and balances remained unchanged. Only disclosed deletion/security
+records were retained. No mass reset or deletion occurred.
+
+This batch includes the Lantern-themed confirmation/recovery UI, provider
+reauthentication and Apple revocation integration, public notices and CI gates.
+Its client rollout is subject to the Hosting workflow for the containing commit.
+The live QA job was accepted through exact-target trusted SQL because the original
+guest session was lost on resume: this proves the production worker, not the
+normal authenticated HTTP submission or native provider flow. A replacement
+live guest test awaits separate approval. Fresh interactive UI acceptance is
+blocked by the computer-use browser URL safety check; physical device, provider,
+signing, legal/store declarations and publisher acceptance remain release gates.
+See account-deletion-verification-2026-10-09.md for the evidence and limitations.
 
 ## Confirmed decisions
 
@@ -103,9 +112,10 @@ A device-local eligibility gate checks the full birthday before sign-in and
 stores only eligibility, not the birth date. This is self-declaration, not verified
 identity or proof of legal compliance. See account-data-release-review-2026-10-07.md
 for the actual data inventory, deletion safety contract and child-release gates.
-Account deletion, child-account safeguards, final legal publication, production
-rollout and physical/native acceptance remain unfinished. No mass user reset is
-part of this work. Keep the requested single final push until the batch is ready.
+At the time of that audience decision, account deletion, public notices and
+rollout were unfinished. Their latest state is described at the top of this
+document. The current 13+ scope does not authorize an under-13 rollout; physical,
+native and publisher/legal acceptance remains separate from implementation.
 
 ## Third implementation batch (local; not yet pushed or deployed)
 
@@ -278,3 +288,41 @@ part of this work. Keep the requested single final push until the batch is ready
   401. The new SQL profile guard/outbox migrations are deployed, with zero jobs,
   zero outbox rows and zero remaining rollback-test profiles. Firebase chat
   indexes are included in this batch's next Hosting deployment.
+
+## Integrated deletion batch — 9 October 2026
+
+- Durable authenticated acceptance derives its target only from the verified
+  Firebase user. Explicit confirmation and recent authentication are required;
+  the live credentialless-guest exception requires a freshly issued token.
+  Primary publisher/admin accounts cannot be removed by the consumer flow.
+- Linked Apple accounts require verified provider revocation before the worker
+  can proceed. Provider credentials are not persisted. Failed revocation is
+  recoverable and never presented as completed deletion.
+- A private Vault-backed Cron worker resumes one leased job/stage at a time.
+  Idle queues and requests awaiting Apple authorization make no Edge calls.
+  Normal bounded progress rotates the queue fairly without a false failure.
+- Peer/room/chat inventory is durable and server-derived. Cleanup preserves
+  peer fields, anonymizes authoritative shared matches and settles frozen rewards
+  before removal. Unsupported attributable legacy state fails closed for review.
+- Diagnosed a real live blocker: Firebase rejected shallow/query reads carrying
+  the ETag request header. Only unfiltered compare-and-set reads now request it.
+  Historical room keys are validated separately from current room codes. Batches
+  process up to five rooms per call rather than one room per minute.
+- The UI saves a random status-only receipt before submission, keeps it across
+  ambiguous network failures/restarts, distinguishes Pending from Complete and
+  supports guests. It reuses Lantern café components; RTL/portrait/landscape
+  fixtures and explicit confirmation/back-navigation behavior are tested.
+- Local verification: 363 Flutter tests, 155 server/page tests and 24 Firebase
+  emulator tests passed. Focused deletion tests passed after the final UI copy
+  change; changed Flutter files analyze cleanly, the full Deno entrypoint checks
+  and the release JavaScript web build succeeds. Security advisors found no
+  findings. This is not physical-device or signed-store acceptance.
+- The approved QA worker inspected 60 peer records and 157 room records. All
+  six stages completed, status recovery returned Complete, and an admin lookup
+  confirmed the Firebase identity was absent. A temporary private exact-target
+  cleanup action removed only the empty QA room/stub, then was removed immediately.
+  Production returned to 22 profiles and 27 rooms, with an unchanged existing-
+  profile/balance fingerprint, no pending jobs, and no cleanup inventory/outbox.
+- All 13 migration SQL sources were compared with applied history (differences
+  only formatting/comments). Filenames now use the actual applied timestamps;
+  no migration was replayed and no remote history was edited.

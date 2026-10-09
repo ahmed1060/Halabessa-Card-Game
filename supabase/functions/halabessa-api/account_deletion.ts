@@ -53,6 +53,7 @@ export interface DeletionStore {
   read(id: string): Promise<DeletionJob>;
   recordStage(id: string, stage: DeletionStage): Promise<void>;
   recordFailure(id: string, stage: DeletionStage): Promise<void>;
+  recordProgress?(id: string): Promise<void>;
   markComplete(id: string): Promise<void>;
 }
 export type DeletionEffects = Record<DeletionStage, (uid: string) => Promise<void>>;
@@ -99,9 +100,13 @@ export async function continueDeletion(store: DeletionStore, id: string,
       try {
         await effects[stage](job.uid);
         await store.recordStage(id, stage);
-      } catch {
+      } catch (error) {
         // Persist stage only, not untrusted exception text/tokens/private data.
-        await store.recordFailure(id, stage);
+        if (error instanceof Error && error.message === 'deletion_more_data' && store.recordProgress) {
+          await store.recordProgress(id);
+        } else {
+          await store.recordFailure(id, stage);
+        }
         return {status: 'pending'};
       }
     }

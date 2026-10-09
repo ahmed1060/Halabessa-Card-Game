@@ -10,6 +10,10 @@ import { createFirestoreRewardStore } from "./firestore_rewards.ts";
 import { createPublicProfileStore } from "./public_profiles.ts";
 import { assertNotDeletionBlocked } from "./deletion_access.ts";
 import { assertAvatarUpload } from "./avatar_upload_policy.ts";
+import { beginDeletion } from './account_deletion.ts';
+import { createDeletionJobStore, deletionReceiptHash, recoverDeletion } from './deletion_job_store.ts';
+import { createFirebaseIdentityStore, assertActiveIdentity } from './firebase_identity.ts';
+import { runDeletionWorker } from './deletion_worker.ts';
 import { createDatabaseRunner, databaseConnectionString } from "./database.ts";
 import { commitAndDeliver, deliverLatestRoom, matchMirrorUpdates, participantSnapshot, publicMatchState } from "./match_delivery.ts";
 
@@ -67,6 +71,8 @@ async function firebaseUser(request: Request) {
     email: typeof payload.email === "string" ? payload.email : null,
     name: typeof payload.name === "string" ? payload.name.slice(0, 64) : "Player",
     admin: payload.admin === true,
+    authTime: typeof payload.auth_time === 'number' ? payload.auth_time : null,
+    issuedAt: typeof payload.iat === 'number' ? payload.iat : null,
   };
 }
 
@@ -79,7 +85,7 @@ async function firebaseAccessToken() {
   const now = Math.floor(Date.now() / 1000);
   const key = await importPKCS8(account.private_key, "RS256");
   const assertion = await new SignJWT({
-    scope: "https://www.googleapis.com/auth/firebase.database https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/datastore",
+    scope: "https://www.googleapis.com/auth/firebase.database https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/datastore https://www.googleapis.com/auth/identitytoolkit",
   })
     .setProtectedHeader({ alg: "RS256", typ: "JWT" })
     .setIssuer(account.client_email)
@@ -287,15 +293,101 @@ Deno.serve(async (request) => {
   if (request.method !== "POST") return reply({ error: "method_not_allowed" }, 405, origin);
 
   try {
+    // Worker/receipt recovery must precede Firebase auth and normal profile
+    // upserts: a disabled/deleted identity cannot be required to finish cleanup.
+    const input = await request.json();
+    if (!input || typeof input !== 'object' || Array.isArray(input)) return reply({error:'invalid_request'},400,origin);
+    if (input.action === 'accountDeletionStatus') {
+      await deletionReceiptHash(input.receipt); // Reject malformed guesses before connecting.
+      return await withDatabase(async connection => reply(await recoverDeletion(
+        async (sql,args)=>(await connection.queryObject<Record<string,unknown>>(sql,args)).rows,
+        input.receipt),200,origin));
+    }
+    if (input.action === 'continueAccountDeletion') {
+      const workerKey=request.headers.get('x-deletion-worker');
+      if(!workerKey || !/^[a-f0-9]{64}$/.test(workerKey))return reply({error:'unauthenticated'},401,origin);
+      const keyHash=await deletionReceiptHash(workerKey);
+      return await withDatabase(async connection=>{
+        const query=async (sql:string,args:unknown[])=>(await connection.queryObject<Record<string,unknown>>(sql,args)).rows;
+        const permitted=await query('select 1 from halabessa.deletion_worker_config where key_hash=$1',[keyHash]);
+        if(!permitted.length)return reply({error:'unauthenticated'},401,origin);
+        const jobs=await query(`select id::text from halabessa.account_deletion_jobs
+          where status='pending' and (not apple_required or apple_revoked) order by updated_at limit 1`,[]);
+        if(!jobs[0])return reply({ok:true,idle:true},200,origin);
+        let status;
+        try { status=await runDeletionWorker(query,String(jobs[0].id),{
+          project:firebaseProject,databaseUrl:firebaseDatabaseUrl,
+          storageUrl:Deno.env.get('SUPABASE_URL')??'',storageKey:Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')??'',
+          token:firebaseAccessToken,
+          settle:async(state,createdAt)=>{
+            const plan=await rewardPlan(state,createdAt);
+            await createFirestoreRewardStore(firebaseProject,firebaseAccessToken).settle(plan);
+            return plan.receiptId;
+          },
+          publish:async(id,room)=>{
+            const result=await firebaseRequest('','PATCH',matchMirrorUpdates(id,room,roomSummary));
+            if(result.status<200 || result.status>=300)throw new Error('match_mirror_failed');
+          },
+        }); } catch(error) {
+          // A SQL failure rolls back the lease, including its failure marker.
+          // Rotate this pending job so one damaged/legacy record cannot starve
+          // all other users' requests. Never convert failure into completion.
+          if(!(error instanceof Error && error.message==='deletion_worker_busy')) {
+            await query("update halabessa.account_deletion_jobs set updated_at=now() where id=$1::uuid and status='pending'",[jobs[0].id]);
+          }
+          return reply({ok:true,status:'pending'},200,origin);
+        }
+        return reply({ok:true,...status},200,origin);
+      });
+    }
     const user = await firebaseUser(request);
+    if(input.action === 'requestAccountDeletion') {
+      const receiptHash=await deletionReceiptHash(input.receipt);
+      const identity=createFirebaseIdentityStore(firebaseProject,firebaseAccessToken);
+      const account=await identity.lookup(user.uid);
+      assertActiveIdentity(account,user.authTime);
+      return await withDatabase(async connection=>{
+        const query=async (sql:string,args:unknown[])=>(await connection.queryObject<Record<string,unknown>>(sql,args)).rows;
+        const actor={...user,email:account!.email,admin:user.admin || account!.admin || await isAdmin(connection,user),verifiedGuest:account!.verifiedGuest};
+        // Serialize acceptance with any existing profile mutation; no account
+        // revocation occurs before the job has committed.
+        await query('begin',[]);
+        let job;
+        try {
+          await query('select firebase_uid from halabessa.user_profiles where firebase_uid=$1 for update',[user.uid]);
+          job=await beginDeletion(createDeletionJobStore(query,receiptHash),actor,input,primaryAdminEmail,Math.floor(Date.now()/1000));
+          await query('update halabessa.account_deletion_jobs set apple_required=$2 where id=$1::uuid',[job.id,account!.providers.includes('apple.com')]);
+          await query('commit',[]);
+        } catch(error) {await query('rollback',[]);throw error;}
+        if(account!.providers.includes('apple.com')) {
+          // Never trust a client boolean claiming that Apple was revoked. Send
+          // its fresh credential to Firebase's revocation API, then persist the
+          // verified success. Do not log or retain provider credentials.
+          const apple=input.appleToken;
+          const type=input.appleTokenType;
+          if(typeof apple!=='string' || apple.length<1 || apple.length>8192 || !['CODE','ACCESS_TOKEN'].includes(type)) {
+            return reply({id:job.id,status:'needs_apple_authorization'},202,origin);
+          }
+          const response=await fetch('https://identitytoolkit.googleapis.com/v2/accounts:revokeToken?key=AIzaSyC0zJJ488zNCBcy1ndWob5bx41gGbPnU5k',{
+            method:'POST',signal:AbortSignal.timeout(12000),headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({providerId:'apple.com',tokenType:type,token:apple,
+              idToken:request.headers.get('authorization')!.slice(7)}),
+          });
+          if(!response.ok)return reply({id:job.id,status:'needs_apple_authorization'},202,origin);
+          await query('update halabessa.account_deletion_jobs set apple_revoked=true where id=$1::uuid',[job.id]);
+        }
+        return reply({id:job.id,status:job.status},202,origin);
+      });
+    }
     await assertNotDeletionBlocked(user.uid, path => firebaseRequest(path));
-    const body = await request.json() as {
+    const body = input as {
       action?: string;
       toUid?: unknown;
       fromUid?: unknown;
       accept?: unknown;
       roomId?: unknown;
       mode?: unknown;
+      protocolVersion?: unknown;
       maxPoints?: unknown;
       timerDurationSeconds?: unknown;
       isPublic?: unknown;
@@ -927,6 +1019,8 @@ Deno.serve(async (request) => {
       });
     }
     if (message.includes("already_claimed")) return reply({ error: "already_claimed" }, 409, origin);
+    if(['protected_account','requires_recent_login','deletion_confirmation_required','deletion_target_forbidden',
+      'invalid_deletion_receipt','deletion_receipt_conflict'].includes(message))return reply({error:message},400,origin);
     if (error && typeof error === 'object' && 'fields' in error &&
         (error.fields as {code?: string; message?: string} | undefined)?.code === 'P0001' &&
         (error.fields as {message?: string} | undefined)?.message === 'account_unavailable') {

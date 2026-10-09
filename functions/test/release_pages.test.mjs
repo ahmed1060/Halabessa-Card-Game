@@ -21,7 +21,10 @@ for (const kind of ['privacy', 'terms']) {
 }
 test('deletion page does not claim that a request means completed deletion', async () => {
   const html = await readFile(new URL('web/delete-account.html', root), 'utf8');
-  assert.match(html, /Automatic in-app deletion is still being completed/);
+  assert.match(html, /href="\/#\/account\/delete"/);
+  assert.match(html, /Pending until every cleanup stage succeeds/);
+  assert.match(html, /Security records retaining your user ID/);
+  assert.doesNotMatch(html, /Automatic in-app deletion is still being completed/);
   assert.match(html, /not confirmation that your account or data has been deleted/);
   assert.match(html, /Never send your password/);
   assert.match(html, /lang="ar" dir="rtl"/);

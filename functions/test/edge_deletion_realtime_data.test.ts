@@ -18,8 +18,8 @@ test('own mirror/presence cleanup leaves the persistent block and all other user
   assert.equal(calls.length,2);
 });
 test('peer mirror social cleanup uses a per-field ETag and preserves unrelated edges',async()=>{
-  const {store,calls}=fixture((_url,init)=>init.method==='GET'
-    ?Response.json(['alice','carol'],{headers:{etag:'"read-version"'}}):Response.json(['carol']));
+  const {store,calls}=fixture((url,init)=>init.method==='GET'
+    ?Response.json(url.pathname==='/users/bob.json'?{friends:['alice','carol']}:['alice','carol'],{headers:{etag:'"read-version"'}}):Response.json(['carol']));
   await store.removePeerSocialEdges('alice','bob');
   const writes=calls.filter(c=>c.init.method==='PUT');assert.equal(writes.length,3);
   for(const write of writes) {
@@ -29,10 +29,28 @@ test('peer mirror social cleanup uses a per-field ETag and preserves unrelated e
   }
 });
 test('concurrent mirror changes cannot be overwritten; ETag conflict stays pending',async()=>{
-  const {store,calls}=fixture((_url,init)=>init.method==='GET'
-    ?Response.json(['alice','carol'],{headers:{etag:'"old"'}}):new Response('{}',{status:412}));
+  const {store,calls}=fixture((url,init)=>init.method==='GET'
+    ?Response.json(url.pathname==='/users/bob.json'?{friends:['alice','carol']}:['alice','carol'],{headers:{etag:'"old"'}}):new Response('{}',{status:412}));
   await assert.rejects(store.removePeerSocialEdges('alice','bob'),/deletion_realtime_unavailable/);
-  assert.equal(calls.length,2);
+  assert.equal(calls.length,3);
+});
+
+test('inventory is shallow and never silently truncates; unrelated peers are read-only',async()=>{
+  const f=fixture(url=>Response.json(url.searchParams.get('shallow')==='true'?{alice:true,bob:true}:{friends:['carol'],coins:999}));
+  assert.deepEqual(await f.store.inventory('users'),['alice','bob']);
+  assert.equal(f.calls[0].init.headers['X-Firebase-ETag'],undefined);
+  await f.store.removePeerSocialEdges('alice','bob');
+  assert.equal(f.calls.length,2);assert.ok(f.calls.every(c=>c.init.method==='GET'));
+  const large=fixture(()=>Response.json(Object.fromEntries(Array.from({length:10001},(_,i)=>[`id${i}`,true]))));
+  await assert.rejects(large.store.inventory('users'),/deletion_inventory_too_large/);
+});
+
+test('legacy room checks distinguish identity from card/display-name strings',async()=>{
+  const safe=fixture(()=>Response.json({playerIds:['bob'],playerNames:{bob:'alice'},tableCards:[{rank:'alice'}]}));
+  assert.equal(await safe.store.legacyRoomReferences('alice','ABC12345'),false);
+  const legacy=fixture(()=>Response.json({handCards:{alice:[]}}));
+  assert.equal(await legacy.store.legacyRoomReferences('alice','ABC12345'),true);
+  assert.equal(await safe.store.legacyRoomReferences('alice','legacy-room'),false);
 });
 test('message cleanup deletes only authored messages across all four channels, not whole chats',async()=>{
   const {store,calls}=fixture((_url,init)=>Response.json(init.method==='GET'?{
@@ -41,6 +59,7 @@ test('message cleanup deletes only authored messages across all four channels, n
   assert.equal(await store.removeRoomMessages('alice','ABC12345'),true);
   const reads=calls.filter(c=>c.init.method==='GET');assert.equal(reads.length,4);
   for(const read of reads) {
+    assert.equal(read.init.headers['X-Firebase-ETag'],undefined);
     assert.equal(read.url.searchParams.get('orderBy'),'"senderId"');
     assert.equal(read.url.searchParams.get('equalTo'),'"alice"');
     assert.equal(read.url.searchParams.get('limitToFirst'),'40');

@@ -21,7 +21,11 @@ export function createFirebaseDeletionDataStore(project: string,
     } catch { throw new Error('deletion_data_unavailable'); }
     if (body === undefined && response.status === 404) return null;
     // Only GET absence is success. Permission failures/outages remain pending.
-    if (!response.ok) throw new Error('deletion_data_unavailable');
+    if (!response.ok) {
+      // Operational diagnosis only: never log identity, payload or credentials.
+      console.warn('deletion transport failed', {service:'firestore',operation:path.startsWith(':')?path:'document',status:response.status});
+      throw new Error('deletion_data_unavailable');
+    }
     try { return await response.json(); } catch { throw new Error('deletion_data_unavailable'); }
   }
   function document(value: any, collection: 'users' | 'usernames'): Document {
@@ -53,7 +57,7 @@ export function createFirebaseDeletionDataStore(project: string,
       await commit([{update: {name: `${base}/accountDeletionBlocked/${uid}`,
         fields: {blocked: {booleanValue: true}}}}]);
     },
-    async removeSocialEdges(uid: string) {
+    async removeSocialEdges(uid: string, beforeRemove: (peers:string[])=>Promise<void> = async()=>{}) {
       validUid(uid);
       for (const field of socialFields) {
         const rows = await query('users', field, uid, 'ARRAY_CONTAINS');
@@ -63,6 +67,9 @@ export function createFirebaseDeletionDataStore(project: string,
             throw new Error('invalid_deletion_document');
           }
         }
+        // Persist mirror-cleanup inventory BEFORE removing the only canonical
+        // association. A retry after a Firestore success must not lose peers.
+        await beforeRemove(rows.map(row=>row.name.slice(`${base}/users/`.length)));
         await commit(rows.map(row => ({
           // Field transforms preserve peers' wallets, statistics and concurrent
           // additions. The read-version precondition never resurrects a peer.

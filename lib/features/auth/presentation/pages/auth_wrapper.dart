@@ -7,6 +7,8 @@ import '../../../home/presentation/pages/home_screen.dart';
 import '../../../../core/utils/error_handler.dart';
 import '../../../../core/services/asset_preloader_service.dart';
 import '../../../../core/widgets/loading_screen.dart';
+import '../../../../core/services/account_deletion_service.dart';
+import '../../../../core/widgets/account_deletion_screen.dart';
 
 class AuthWrapper extends ConsumerStatefulWidget {
   const AuthWrapper({super.key});
@@ -17,11 +19,30 @@ class AuthWrapper extends ConsumerStatefulWidget {
 
 class _AuthWrapperState extends ConsumerState<AuthWrapper> {
   bool _assetsPreloaded = false;
+  bool _deletionChecked = false;
+  bool _hasDeletionReceipt = false;
+  bool _deletionReadFailed = false;
 
   @override
   void initState() {
     super.initState();
     _initAssets();
+    _checkDeletionReceipt();
+  }
+
+  Future<void> _checkDeletionReceipt() async {
+    try {
+      final receipt = await DeletionReceipt.load();
+      if (mounted) {
+        setState(() {
+          _deletionChecked = true;
+          _deletionReadFailed = false;
+          _hasDeletionReceipt = receipt != null;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _deletionReadFailed = true);
+    }
   }
 
   Future<void> _initAssets() async {
@@ -43,11 +64,28 @@ class _AuthWrapperState extends ConsumerState<AuthWrapper> {
 
   @override
   Widget build(BuildContext context) {
-    if (!_assetsPreloaded) {
+    if (_deletionReadFailed) {
+      final arabic = Localizations.localeOf(context).languageCode == 'ar';
+      return Scaffold(
+        body: Center(
+          child: FilledButton(
+            onPressed: _checkDeletionReceipt,
+            child: Text(
+              arabic
+                  ? 'إعادة مراجعة طلب الحذف المحفوظ'
+                  : 'Retry saved deletion check',
+            ),
+          ),
+        ),
+      );
+    }
+    if (!_assetsPreloaded || !_deletionChecked) {
       return LoadingScreen(
         progressStream: ref.read(assetPreloaderServiceProvider).loadProgress,
       );
     }
+
+    if (_hasDeletionReceipt) return const AccountDeletionScreen();
 
     final authState = ref.watch(authStateChangesProvider);
 

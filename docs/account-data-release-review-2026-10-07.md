@@ -19,13 +19,19 @@ This is an engineering inventory, not a published privacy policy or legal opinio
 | Device/browser | Sign-in session, preferences, cached assets | Sign out and clear user-specific local state without resetting another account |
 | Operational services | Firebase/Supabase requests and logs | Confirm actual retention and recovery behavior; do not promise immediate backup/log erasure |
 
-The deployed Firebase profile rules previously allowed authenticated users to
-read whole profiles, including email. The next local batch restricts Firestore
-and RTDB profile reads to their owner or a custom-claim admin. Rankings and friend
-search use an allowlisted Edge API projection of names, avatars and statistics;
-email, balances, inventory and social edges are omitted. Nested and malformed
-fields are filtered too. This is tested locally, not yet deployed: deploy the
-new backend before these dependent clients/rules. No existing data was deleted.
+The former Firebase rules allowed authenticated users to read whole profiles,
+including email. Deployed rules now restrict Firestore and RTDB profile reads
+to their owner or a custom-claim admin. Rankings and friend search use an
+allowlisted Edge API projection of names, avatars and statistics; email,
+balances, inventory and social edges are omitted. Nested and malformed fields
+are filtered too. Hosting, Android and iOS CI succeeded for ff4bfe4e; no existing
+player data was deleted by the privacy change.
+
+Private deletion jobs retain a user ID, receipt digest and ordered completion
+state; Firebase tombstones also retain the ID to block already-issued sessions.
+Temporary peer/room inventory and delivery outbox rows are discarded on successful
+completion. These are security records, not anonymized data, and the public
+notices explicitly disclose their retention without an invented deletion SLA.
 
 ## Deletion acceptance contract
 
@@ -50,8 +56,13 @@ new backend before these dependent clients/rules. No existing data was deleted.
 8. Use only separately approved temporary QA users to test deletion; prove old
    tokens are rejected and unrelated users, balances and matches survive.
 
-This contract is not yet an operational deletion endpoint. Do not expose a button
-that claims instant deletion or mark store-deletion requirements complete.
+As of 9 October, this contract is integrated into the active Edge version 36
+endpoint and private scheduled worker. The containing client batch adds explicit
+confirmation, provider reauthentication and receipt-based recovery; rollout is
+subject to its Hosting workflow. The isolated live worker completed all six
+stages, but the authenticated submission path and native Apple/provider behavior
+still need live acceptance. The UI must not claim instant deletion or that store
+requirements are certified complete. See account-deletion-verification-2026-10-09.md.
 
 ## Current audience decision: ages 13+
 

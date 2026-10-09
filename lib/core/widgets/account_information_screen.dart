@@ -7,7 +7,7 @@ import 'lantern_panel.dart';
 import 'release_policy_screen.dart';
 
 /// Existing data practices and gameplay help, not a fabricated legal policy or
-/// an unconfigured contact form. Account deletion remains an explicit gap.
+/// an unconfigured contact form. Deletion has a receipt-backed in-app flow.
 class AccountInformationScreen extends StatelessWidget {
   final bool support;
   const AccountInformationScreen({super.key, this.support = false});
@@ -70,10 +70,14 @@ class AccountInformationScreen extends StatelessWidget {
                     ],
                     const SizedBox(height: 20),
                     if (!support)
-                      Text(
-                        'ui_deletion_unavailable'.tr(),
-                        style: TableStyle.detail.copyWith(
-                          color: TableStyle.ink,
+                      OutlinedButton.icon(
+                        onPressed: () =>
+                            Navigator.pushNamed(context, '/account/delete'),
+                        icon: const Icon(Icons.person_remove_outlined),
+                        label: Text(
+                          context.locale.languageCode == 'ar'
+                              ? 'حذف حسابي'
+                              : 'Delete my account',
                         ),
                       ),
                     const ReleasePolicyLinks(),

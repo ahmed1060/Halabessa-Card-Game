@@ -81,6 +81,12 @@ export function createDeletionJobStore(query: DeletionQuery, receiptHash?: strin
       if (!deletionStages.includes(stage)) throw new Error('invalid_deletion_stage');
       await query('update halabessa.account_deletion_jobs set last_failed_stage=$2,updated_at=now() where id=$1::uuid and status=\'pending\'', [id,stage]);
     },
+    async recordProgress(id) {
+      requireLease(id);
+      // Ordinary bounded work is pending, not a cleanup failure. Rotating the
+      // timestamp also prevents a large inventory from starving other jobs.
+      await query("update halabessa.account_deletion_jobs set last_failed_stage=null,updated_at=now() where id=$1::uuid and status='pending'",[id]);
+    },
     async markComplete(id) {
       requireLease(id);
       const rows = await query(`update halabessa.account_deletion_jobs set status='complete',completed_at=now(),last_failed_stage=null,updated_at=now()
@@ -97,4 +103,17 @@ export async function deletionStatus(query: DeletionQuery, id: unknown, receipt:
   const row = (await query('select status from halabessa.account_deletion_jobs where id=$1::uuid and receipt_hash=$2', [id,hash]))[0];
   if (!row || !['pending','complete'].includes(String(row.status))) throw new Error('invalid_deletion_receipt');
   return {status:row.status as 'pending' | 'complete'};
+}
+
+// Recover acceptance even if its HTTP response was lost after the durable
+// insert. The random receipt, not an email/UID, is the only lookup credential.
+export async function recoverDeletion(query: DeletionQuery, receipt: unknown) {
+  const hash = await deletionReceiptHash(receipt);
+  const row = (await query('select id::text,status,apple_required,apple_revoked from halabessa.account_deletion_jobs where receipt_hash=$1', [hash]))[0];
+  if (!row) return {status:'not_found' as const};
+  if (typeof row.id !== 'string' || !uuid.test(row.id) || !['pending','complete'].includes(String(row.status))) {
+    throw new Error('invalid_deletion_job');
+  }
+  return {id:row.id,status:row.apple_required===true && row.apple_revoked!==true
+    ? 'needs_apple_authorization' as const : row.status as 'pending'|'complete'};
 }
