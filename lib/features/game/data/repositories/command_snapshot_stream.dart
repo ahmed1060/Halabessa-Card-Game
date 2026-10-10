@@ -14,6 +14,11 @@ Stream<MatchState?> watchCommandSnapshots({
   Stream<MatchState>? acceptedSnapshots,
   MatchState? initialSnapshot,
   Duration recoveryDelay = const Duration(milliseconds: 500),
+  List<Duration> recoveryRetryDelays = const [
+    Duration(seconds: 1),
+    Duration(seconds: 2),
+    Duration(seconds: 4),
+  ],
 }) {
   late StreamController<MatchState?> controller;
   StreamSubscription<Map<String, dynamic>?>? subscription;
@@ -29,6 +34,8 @@ Stream<MatchState?> watchCommandSnapshots({
   var deliveredVersion = -1;
   var fetching = false;
   var active = true;
+  var recoveryRetries = 0;
+  final retryDelays = List<Duration>.unmodifiable(recoveryRetryDelays);
 
   bool validSnapshot(MatchState snapshot) =>
       snapshot.id == roomId &&
@@ -46,9 +53,11 @@ Stream<MatchState?> watchCommandSnapshots({
       return;
     }
     if (snapshot.serverVersion < wantedVersion ||
-        snapshot.serverVersion <= deliveredVersion)
+        snapshot.serverVersion <= deliveredVersion) {
       return;
+    }
     deliveredVersion = snapshot.serverVersion;
+    recoveryRetries = 0;
     recovery?.cancel();
     controller.add(snapshot);
   }
@@ -67,7 +76,13 @@ Stream<MatchState?> watchCommandSnapshots({
   }
 
   Future<void> refresh() async {
-    if (!active || fetching || wantedVersion <= deliveredVersion) return;
+    if (!active ||
+        !haveRoom ||
+        released ||
+        fetching ||
+        wantedVersion <= deliveredVersion) {
+      return;
+    }
     fetching = true;
     final requestGeneration = generation;
     final requestedVersion = wantedVersion;
@@ -84,7 +99,8 @@ Stream<MatchState?> watchCommandSnapshots({
     } catch (error, stack) {
       if (active && requestGeneration == generation) {
         // A network/permission error is not a deleted room. Keep the last
-        // screen intact; the next heartbeat notification can retry the read.
+        // screen intact. Bounded backoff below also recovers when no further
+        // heartbeat arrives; only authenticated snapshot reads are retried.
         controller.addError(error, stack);
       }
     } finally {
@@ -92,17 +108,33 @@ Stream<MatchState?> watchCommandSnapshots({
       // Coalesce notifications during a request, without spinning when a
       // read fails or a lagging response hasn't reached the notified version.
       if (active &&
+          haveRoom &&
+          !released &&
           wantedVersion >= 0 &&
           (wantedVersion > requestedVersion ||
               requestGeneration != generation)) {
+        recoveryRetries = 0;
+        recovery?.cancel();
         unawaited(refresh());
+      } else if (active &&
+          haveRoom &&
+          !released &&
+          requestGeneration == generation &&
+          wantedVersion > deliveredVersion &&
+          recoveryRetries < retryDelays.length) {
+        recovery?.cancel();
+        recovery = Timer(
+          retryDelays[recoveryRetries++],
+          () => unawaited(refresh()),
+        );
       }
     }
   }
 
   void scheduleRecovery() {
-    if (!active || !haveRoom || released || wantedVersion <= deliveredVersion)
+    if (!active || !haveRoom || released || wantedVersion <= deliveredVersion) {
       return;
+    }
     if (privateSnapshots == null) {
       unawaited(refresh());
     } else if (recovery?.isActive != true) {
@@ -133,6 +165,7 @@ Stream<MatchState?> watchCommandSnapshots({
           recovery?.cancel();
           wantedVersion = -1;
           deliveredVersion = -1;
+          recoveryRetries = 0;
           controller.add(null);
           return;
         }
@@ -162,16 +195,20 @@ Stream<MatchState?> watchCommandSnapshots({
           return;
         }
         released = false;
-        if (version > wantedVersion) wantedVersion = version;
+        if (version > wantedVersion) {
+          wantedVersion = version;
+          recoveryRetries = 0;
+        }
         if (candidate != null) accept(candidate!);
         scheduleRecovery();
       }, onError: controller.addError);
       privateSubscription = privateSnapshots?.listen(
         (snapshot) {
-          if (snapshot != null)
+          if (snapshot != null) {
             offer(snapshot);
-          else
+          } else {
             scheduleRecovery(); // Missing private view is not a deleted room.
+          }
         },
         onError: (Object error, StackTrace stack) {
           // The authenticated fallback also works during a compatible rollout

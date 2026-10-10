@@ -14,7 +14,7 @@ import { beginDeletion } from './account_deletion.ts';
 import { createDeletionJobStore, deletionReceiptHash, recoverDeletion } from './deletion_job_store.ts';
 import { createFirebaseIdentityStore, assertActiveIdentity } from './firebase_identity.ts';
 import { runDeletionWorker } from './deletion_worker.ts';
-import { createDatabaseRunner, databaseConnectionString } from "./database.ts";
+import { createDatabaseRunner, databaseConnectionString, withDatabaseGuard } from "./database.ts";
 import { createRequestTiming } from './request_timing.ts';
 import { commitAndDeliver, matchMirrorUpdates, participantSnapshot, publicMatchState } from "./match_delivery.ts";
 import { commitAndQueue, earlyAckEnabled, publicationLease, publishRoom, retryPublicationLater } from './room_publication.ts';
@@ -432,7 +432,8 @@ Deno.serve(async (request) => {
         return reply({id:job.id,status:job.status},202,origin);
       });
     }
-    await timing.measure('deletion_guard', () => assertNotDeletionBlocked(user.uid, path => firebaseRequest(path)));
+    const checkDeletionGuard = () => timing.measure('deletion_guard',
+      () => assertNotDeletionBlocked(user.uid, path => firebaseRequest(path)));
     const body = input as {
       action?: string;
       toUid?: unknown;
@@ -466,6 +467,7 @@ Deno.serve(async (request) => {
     };
     // Firestore-only discovery must not hold a scarce Postgres connection.
     if (body.action === 'getPublicProfile' || body.action === 'queryPublicProfiles') {
+        await checkDeletionGuard();
         const store = createPublicProfileStore(firebaseProject, firebaseAccessToken);
         try {
           return body.action === 'getPublicProfile'
@@ -476,7 +478,7 @@ Deno.serve(async (request) => {
           throw error;
         }
     }
-    return await runDatabase(async (connection) => {
+    return await withDatabaseGuard<Client, Response>(runDatabase, checkDeletionGuard, async (connection) => {
       // Defense in depth: once durable deletion is accepted, no ordinary API
       // request can bootstrap the deleted profile again. Receipt/worker actions
       // will use a separate authorized path rather than this normal upsert.

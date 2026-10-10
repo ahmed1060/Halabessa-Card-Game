@@ -61,7 +61,7 @@ void main() {
   });
 
   Future<(StreamController<MatchState?>, StreamController<MatchState>)>
-  usePrivateFeed({MatchState? seed}) async {
+  usePrivateFeed({MatchState? seed, List<Duration>? retryDelays}) async {
     await subscription.cancel();
     await events.close();
     events = StreamController<Map<String, dynamic>?>();
@@ -75,6 +75,13 @@ void main() {
       acceptedSnapshots: accepted.stream,
       initialSnapshot: seed,
       recoveryDelay: const Duration(milliseconds: 20),
+      recoveryRetryDelays:
+          retryDelays ??
+          const [
+            Duration(seconds: 1),
+            Duration(seconds: 2),
+            Duration(seconds: 4),
+          ],
       fetchSnapshot: () {
         final request = Completer<MatchState>();
         requests.add(request);
@@ -313,6 +320,100 @@ void main() {
     await flush();
     expect(received, isEmpty);
   });
+
+  test(
+    'failed recovery retries without another public event, then stops on success',
+    () async {
+      await usePrivateFeed(retryDelays: const [Duration(milliseconds: 25)]);
+      events.add({'serverVersion': 3});
+      await Future<void>.delayed(const Duration(milliseconds: 35));
+      requests.single.completeError(StateError('offline'));
+      await Future<void>.delayed(const Duration(milliseconds: 35));
+      expect(requests, hasLength(2));
+      requests.last.complete(snapshot(3));
+      await Future<void>.delayed(const Duration(milliseconds: 35));
+      expect(received.single!.serverVersion, 3);
+      expect(requests, hasLength(2));
+    },
+  );
+
+  test(
+    'persistent outage exhausts a bounded retry budget without a busy loop',
+    () async {
+      await usePrivateFeed(retryDelays: const [Duration(milliseconds: 25)]);
+      events.add({'serverVersion': 3});
+      await Future<void>.delayed(const Duration(milliseconds: 35));
+      requests.single.completeError(StateError('offline'));
+      await Future<void>.delayed(const Duration(milliseconds: 35));
+      requests.last.completeError(StateError('offline'));
+      await Future<void>.delayed(const Duration(milliseconds: 80));
+      expect(requests, hasLength(2));
+      expect(received, isEmpty);
+      expect(errors, hasLength(2));
+    },
+  );
+
+  test('accepted private revision cancels a scheduled network retry', () async {
+    final (own, _) = await usePrivateFeed(
+      retryDelays: const [Duration(milliseconds: 25)],
+    );
+    events.add({'serverVersion': 3});
+    await Future<void>.delayed(const Duration(milliseconds: 35));
+    requests.single.completeError(StateError('offline'));
+    await flush();
+    own.add(snapshot(3));
+    await Future<void>.delayed(const Duration(milliseconds: 40));
+    expect(received.single!.serverVersion, 3);
+    expect(requests, hasLength(1));
+  });
+
+  test('deletion, kick and cancellation cancel a scheduled retry', () async {
+    for (final action in ['delete', 'kick', 'cancel']) {
+      await usePrivateFeed(retryDelays: const [Duration(milliseconds: 25)]);
+      requests.clear();
+      received.clear();
+      errors.clear();
+      events.add({'serverVersion': 3});
+      await Future<void>.delayed(const Duration(milliseconds: 35));
+      requests.single.completeError(StateError('offline'));
+      await flush();
+      if (action == 'delete') {
+        events.add(null);
+      } else if (action == 'kick') {
+        events.add({
+          ...snapshot(4).toJson(),
+          'playerIds': ['bot_0'],
+        });
+      } else {
+        await subscription.cancel();
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 40));
+      expect(requests, hasLength(1));
+      if (action == 'delete') {
+        expect(received, [null]);
+      } else if (action == 'kick') {
+        expect(received.single!.playerIds, ['bot_0']);
+      } else {
+        expect(received, isEmpty);
+      }
+    }
+  });
+
+  test(
+    'lagging fallback response retries until it reaches the notified revision',
+    () async {
+      await usePrivateFeed(retryDelays: const [Duration(milliseconds: 25)]);
+      events.add({'serverVersion': 4});
+      await Future<void>.delayed(const Duration(milliseconds: 35));
+      requests.single.complete(snapshot(3));
+      await Future<void>.delayed(const Duration(milliseconds: 35));
+      expect(received, isEmpty);
+      expect(requests, hasLength(2));
+      requests.last.complete(snapshot(4));
+      await flush();
+      expect(received.single!.serverVersion, 4);
+    },
+  );
 
   test('wrong-room response never reaches the controller', () async {
     events.add({'serverVersion': 3});

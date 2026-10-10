@@ -431,3 +431,44 @@ Rollback: keep global async_ack_enabled false, clear canary_room_id, and pause
 only the publication cron job if needed. Compatible delivery and authenticated
 snapshot recovery remain. Preserve private tables/deletion tombstones rather
 than dropping safety data or replaying queued game commands.
+
+## Implementation update — guarded connection overlap and recovery
+
+The log service recovered. A narrow read of 21:25–21:34 UTC on 10 October
+returned two getSocialGraph and two getAdminStatus timing events. Totals were
+798–900 ms; deletion_guard was 354–377 ms and db_connect 245–280 ms, with
+db_queue zero. These are four recent server executions, not a controlled
+before/after sample or client end-to-end measurements.
+
+- After Firebase JWT verification, normal SQL-backed calls now start the
+  independent deletion-block read and bounded connection setup together.
+  The application callback cannot query, bootstrap, read data or mutate until
+  the block read succeeds. The durable SQL deletion-job check and profile
+  recreation trigger remain. Both promises are observed; guard denial takes
+  precedence even if connection setup fails first, and the runner closes the
+  socket without replay. Firestore-only discovery still awaits its guard and
+  never opens a SQL connection. Receipt/deletion-worker authorization is
+  unchanged. Connection admission, no-idle policy and transaction ownership
+  are unchanged. No guard result is cached. Overlapping timing stages must
+  not be summed as independent serial durations.
+- A failed or lagging authenticated snapshot recovery no longer relies solely
+  on another heartbeat. It gets at most three automatic retries with 1/2/4-second
+  backoff for an unchanged revision. Success, kick, room deletion and disposal
+  cancel scheduled retries. New revisions retain coalescing and stale/private
+  view validation. This retries reads only, not play, purchase or reward commands.
+  Persistent outages exhaust the budget rather than spinning indefinitely.
+
+Verification: 399 Flutter tests, 174 server/build tests and complete Edge Deno
+type-checking passed. Analysis has zero errors and 263 warning/info items;
+modified stream/test flow-control lint was cleaned up. Edge version 43 is ACTIVE
+with the guarded-connection implementation. Prior commit dbc90694 Hosting and
+Android workflows passed; its iOS workflow was still compiling at this check.
+The next client release must pass its own CI/deployment gates.
+
+No additional live guest, room, purchase, reward or account-deletion fixture
+was created. The consumed one-fixture approval is not reused. Global early ack
+stays off; actual latency improvements from connection overlap, region/pooler
+A/B, transport-failure rollout and physical-device profiling remain unverified.
+Rollback for this batch: redeploy the version-42 backend source and revert
+only the guarded-connection/recovery commit; preserve the publication queue,
+private views and deletion guards.

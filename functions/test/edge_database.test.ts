@@ -1,6 +1,62 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createDatabaseRunner, databaseConnectionString } from "../../supabase/functions/halabessa-api/database.ts";
+import { createDatabaseRunner, databaseConnectionString, withDatabaseGuard } from "../../supabase/functions/halabessa-api/database.ts";
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (error: Error) => void;
+  const promise = new Promise<T>((yes, no) => { resolve = yes; reject = no; });
+  return { promise, resolve, reject };
+}
+
+test('guard and connection overlap, but no application work precedes guard success', async () => {
+  const guard = deferred<void>(), connect = deferred<void>();
+  const events: string[] = [];
+  const run = createDatabaseRunner(() => ({
+    async connect() { events.push('connect'); await connect.promise; },
+    async end() { events.push('close'); },
+  }));
+  const task = withDatabaseGuard(run, async () => {
+    events.push('guard'); await guard.promise;
+  }, async () => { events.push('work'); return 'allowed'; });
+  await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+  assert.ok(events.includes('connect')); assert.ok(events.includes('guard'));
+  connect.resolve();
+  await Promise.resolve(); await Promise.resolve();
+  assert.equal(events.includes('work'), false);
+  guard.resolve();
+  assert.equal(await task, 'allowed');
+  assert.deepEqual(events.slice(-2), ['work', 'close']);
+});
+
+test('blocked or unavailable guard closes the socket without query, mutation or replay', async () => {
+  for (const code of ['unauthenticated', 'account_guard_unavailable']) {
+    const guard = deferred<void>();
+    let work = 0, closed = 0;
+    const run = createDatabaseRunner(() => ({async connect() {}, async end() { closed++; }}));
+    const task = withDatabaseGuard(run, () => guard.promise, async () => { work++; });
+    const rejected = assert.rejects(task, new RegExp(code));
+    guard.reject(new Error(code)); await rejected;
+    assert.equal(work, 0); assert.equal(closed, 1);
+    assert.equal(await withDatabaseGuard(run, async () => {}, async () => 'next'), 'next');
+    assert.equal(closed, 2);
+  }
+});
+
+test('connection failure still waits for guard verdict and preserves guard-error precedence', async () => {
+  for (const allowed of [false, true]) {
+    const guard = deferred<void>();
+    let closed = 0, work = 0;
+    const run = createDatabaseRunner(() => ({
+      async connect() { throw Error('connect_failed'); }, async end() { closed++; },
+    }));
+    const task = withDatabaseGuard(run, () => guard.promise, async () => { work++; });
+    const rejected = assert.rejects(task, allowed ? /connect_failed/ : /unauthenticated/);
+    if (allowed) guard.resolve(); else guard.reject(Error('unauthenticated'));
+    await rejected;
+    assert.equal(closed, 1); assert.equal(work, 0);
+  }
+});
 
 test("idle isolates create no clients; completed requests retain no connections", async () => {
   let created = 0;

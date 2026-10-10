@@ -3,6 +3,33 @@ interface DatabaseClient {
   end(): Promise<void>;
 }
 
+/** Overlap an authenticated caller's independent guard and connection setup.
+ * No application query or mutation may execute before the guard succeeds.
+ * Observe both failures immediately and retain guard-error precedence even if
+ * connecting fails first. The supplied runner still owns admission and close.
+ */
+export async function withDatabaseGuard<Client, Result>(
+  run: (work: (client: Client) => Promise<Result>) => Promise<Result>,
+  guard: () => Promise<void>,
+  work: (client: Client) => Promise<Result>,
+): Promise<Result> {
+  const checked = Promise.resolve().then(guard).then(
+    () => ({ allowed: true as const }),
+    (error: unknown) => ({ allowed: false as const, error }),
+  );
+  try {
+    return await run(async client => {
+      const result = await checked;
+      if (!result.allowed) throw result.error;
+      return work(client);
+    });
+  } catch (error) {
+    const result = await checked;
+    if (!result.allowed) throw result.error;
+    throw error;
+  }
+}
+
 /** Keep one request at a time per isolate, but no idle database sockets.
  * A pool per Edge isolate is not a project-wide pool: cold starts multiply it,
  * including for OPTIONS/health checks. Create the client only after admission,
