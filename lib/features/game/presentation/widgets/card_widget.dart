@@ -39,17 +39,15 @@ class CardWidget extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final store = ref.watch(storeProvider);
-    final notifier = ref.watch(storeProvider.notifier);
+    // Buying an item or changing a table must not rebuild every playing card.
+    final String selectedId = skinId ?? ref.watch(storeProvider.select((s) => s.activeCardBackId));
+    final extraItems = ref.watch(storeProvider.select((s) => s.extraItems));
     
-    final targetSkinId = skinId ?? store.activeCardBackId;
+    final targetSkinId = selectedId;
     if (targetSkinId == 'default_card' && customBackPath == null && customFrontPath == null && customAceSkinPath == null && customSevenDiamondSkinPath == null && faceIllustrations == null && customSuitIcons == null) {
       return GestureDetector(onTap: onTap, child: LanternCardArt(card: card, faceUp: isFaceUp, width: width, height: height));
     }
-    final activeCard = notifier.allItems.firstWhere(
-      (i) => i.id == targetSkinId, 
-      orElse: () => notifier.allItems[0]
-    );
+    final activeCard = resolveCardBack([...StoreNotifier.builtinItems, ...extraItems], targetSkinId);
 
     final effectiveBackPath = customBackPath ?? activeCard.assetPath;
     

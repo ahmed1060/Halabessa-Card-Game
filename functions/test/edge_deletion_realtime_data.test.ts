@@ -69,6 +69,7 @@ test('message cleanup deletes only authored messages across all four channels, n
     'matchChat/ABC12345/public/message-1':null,'matchChat/ABC12345/teamA/message-1':null,
     'matchChat/ABC12345/teamB/message-1':null,'matches/ABC12345/chat/message-1':null,
     'matchChat/ABC12345/rate/alice':null,'matches/ABC12345/presence/alice':null,
+    'matchViews/ABC12345/alice':null,
   });
 });
 test('a full message batch remains pending; malformed/other-sender results issue no deletion',async()=>{

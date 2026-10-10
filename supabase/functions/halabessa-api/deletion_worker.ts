@@ -45,7 +45,7 @@ export async function runDeletionWorker(query:DeletionQuery,id:string,deps:Depen
     async removeSocialAndMessages(uid) {
       // Canonical associations persist into SQL before their external removal.
       await firestore.removeSocialEdges(uid,peers=>inventory('peer',peers));
-      for(const root of ['users','matches','matchChat'] as const) {
+      for(const root of ['users','matches','matchChat','matchViews'] as const) {
         const scanned=await query("select 1 from halabessa.account_deletion_inventory where job_id=$1::uuid and kind='scan' and item=$2",[id,root]);
         if(!scanned.length) {
           const keys=await realtime.inventory(root);

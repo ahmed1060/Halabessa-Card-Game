@@ -88,3 +88,24 @@ test("atomic mirror field updates never replace chat, presence, actions or heart
   assert.throws(() => matchMirrorUpdates("bad/path", room(), () => ({})), /invalid_room_id/);
   assert.throws(() => matchMirrorUpdates("ABC12345", { ...room(), state: { "presence/other": true } }, () => ({})), /invalid_state_field/);
 });
+
+test('private realtime views pair one revision with only that human hand', () => {
+  const source = room(7);
+  source.state.playerIds = ['a', 'b', 'bot_1', 'waiting_3'];
+  source.hands.bot_1 = [{suit: 'clubs', rank: 'king'}];
+  source.hands.departed = [{suit: 'diamonds', rank: 'queen'}];
+  const updates = matchMirrorUpdates('ABC12345', source, () => ({}));
+  const views = updates['matchViews/ABC12345'] as Record<string, any>;
+  assert.deepEqual(Object.keys(views), ['a', 'b']);
+  for (const uid of ['a', 'b']) {
+    assert.equal(views[uid].recipientUid, uid);
+    assert.equal(views[uid].version, 7);
+    assert.equal(views[uid].state.serverVersion, 7);
+    assert.deepEqual(views[uid].hand, source.hands[uid]);
+    assert.equal('handCards' in views[uid].state, false);
+    assert.equal('deck' in views[uid].state, false);
+    assert.equal('secretDeck' in views[uid].state, false);
+  }
+  source.state.playerIds = ['bad/path'];
+  assert.throws(() => matchMirrorUpdates('ABC12345', source, () => ({})), /invalid_player_uid/);
+});

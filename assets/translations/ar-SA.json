@@ -73,6 +73,7 @@
     "table_wait_or_queue": "بانتظار اللعب. اضغط على ورقة لاختيارها لدورك.",
     "table_play_card": "العب هذه الورقة",
     "table_queue_card": "اختر هذه الورقة لدورك؛ اضغط مرة أخرى للإلغاء",
+    "table_sending_move": "جاري إرسال الورقة",
     "table_card_name": "{} {}",
     "table_reactions": "التفاعلات",
     "table_captures": "الورق المجموع",

@@ -146,6 +146,14 @@
         }
       }
     },
+    "matchViews": {
+      "$matchId": {
+        "$uid": {
+          ".read": "auth != null && !root.child('accountDeletionBlocked').child(auth.uid).exists() && auth.uid === $uid && root.child('matches').child($matchId).child('protocolVersion').val() === 1 && root.child('matches').child($matchId).child('players').hasChild(auth.uid)",
+          ".write": false
+        }
+      }
+    },
     "matchSecrets": {
       "$matchId": {
         ".read": false,

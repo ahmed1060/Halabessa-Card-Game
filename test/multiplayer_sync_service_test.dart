@@ -3,6 +3,31 @@ import 'package:halabessa/features/game/data/repositories/multiplayer_sync_servi
 import 'package:halabessa/features/game/domain/models/match_state.dart';
 
 void main() {
+  test('private view validates recipient, room, revision and complete own hand', () {
+    Map<String, dynamic> view() => {
+      'recipientUid': 'human', 'version': 8,
+      'state': {'id': 'ABC12345', 'protocolVersion': 1, 'serverVersion': 8,
+        'playerIds': ['human', 'bot_1'], 'handCounts': {'human': 1, 'bot_1': 4}},
+      'hand': [{'suit': 'hearts', 'rank': 'ace'}],
+    };
+    final valid = MultiplayerSyncService.privateRealtimeSnapshot(view(), 'ABC12345', 'human');
+    expect(valid.handCards.keys, ['human']);
+    expect(valid.cardsRemainingFor('bot_1'), 4);
+    for (final change in [
+      {'recipientUid': 'other'}, {'version': 7}, {'version': 8.5}, {'hand': null},
+      {'hand': []}, {'state': {...view()['state'] as Map, 'id': 'OTHER123'}},
+      {'state': {...view()['state'] as Map, 'playerIds': ['bot_1']}},
+      {'state': {...view()['state'] as Map, 'protocolVersion': 2}},
+    ]) {
+      expect(() => MultiplayerSyncService.privateRealtimeSnapshot(
+        {...view(), ...change}, 'ABC12345', 'human'), throwsA(isA<Exception>()));
+    }
+    final empty = view();
+    empty.remove('hand');
+    (empty['state'] as Map)['handCounts'] = {'human': 0, 'bot_1': 4};
+    expect(MultiplayerSyncService.privateRealtimeSnapshot(empty, 'ABC12345', 'human')
+      .handCards['human'], isEmpty);
+  });
   test('spectator snapshot strips all private cards but preserves public counts', () {
     final state = MultiplayerSyncService.publicSnapshot({
       'id': 'ABC12345', 'mode': 'classic', 'protocolVersion': 1,

@@ -14,6 +14,7 @@ import 'package:halabessa/features/game/presentation/widgets/fanned_hand_widget.
 import 'package:halabessa/features/game/domain/models/capture.dart';
 import 'package:halabessa/features/home/presentation/providers/store_provider.dart';
 import 'package:halabessa/core/theme/theme_config.dart';
+import 'package:halabessa/core/widgets/background_decode_size.dart';
 import 'package:halabessa/core/widgets/settings_overlay.dart';
 import 'package:halabessa/core/providers/settings_provider.dart';
 import 'package:halabessa/features/game/presentation/providers/chat_providers.dart';
@@ -404,15 +405,17 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
                             : Duration.zero,
                         opacity: is3DActive ? 0.0 : 1.0,
                         child: activeTable.id == 'default_table'
-                            ? Image.asset(
+                            ? RepaintBoundary(child: Image.asset(
                                 MediaQuery.sizeOf(context).width <
                                         MediaQuery.sizeOf(context).height
                                     ? 'assets/images/tables/lantern_nights_portrait_v2.png'
                                     : 'assets/images/tables/lantern_nights_v1.png',
                                 fit: BoxFit.cover,
+                                cacheWidth: backgroundDecodeWidth(MediaQuery.sizeOf(context).width,
+                                  MediaQuery.devicePixelRatioOf(context)),
                                 errorBuilder: (_, __, ___) =>
                                     const ColoredBox(color: TableStyle.felt),
-                              )
+                              ))
                             : activeTable.assetPath.startsWith('http')
                             ? Image.network(
                                 activeTable.assetPath,
@@ -725,10 +728,11 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
                     ? Offset.zero
                     : box.globalToLocal(globalOrigin) -
                           box.size.center(Offset.zero);
-                ref
+                return ref
                     .read(matchStateProvider.notifier)
                     .playCard(myUid, card, origin: origin);
               },
+              pendingHint: 'table_sending_move'.tr(),
             ),
       controls: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),

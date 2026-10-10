@@ -10,13 +10,14 @@ import 'deal_card_motion.dart';
 /// Bounded, keyboard-accessible hand. Queued cards use identity, not list index.
 class FannedHandWidget extends StatefulWidget {
   final List<game_card.Card> cards;
-  final void Function(game_card.Card, Offset origin) onCardTap;
+  final FutureOr<void> Function(game_card.Card, Offset origin) onCardTap;
   final bool isMyTurn;
   final bool interactionEnabled;
   final Widget Function(game_card.Card, double, double)? cardBuilder;
   final String Function(game_card.Card)? cardLabelBuilder;
   final String playHint;
   final String queueHint;
+  final String pendingHint;
   final GlobalKey? dealerDeckKey;
 
   const FannedHandWidget({
@@ -29,6 +30,7 @@ class FannedHandWidget extends StatefulWidget {
     this.cardLabelBuilder,
     this.playHint = 'Play card',
     this.queueHint = 'Queue card; tap again to cancel',
+    this.pendingHint = 'Sending move',
     this.dealerDeckKey,
   });
 
@@ -43,6 +45,7 @@ class _FannedHandWidgetState extends State<FannedHandWidget> {
   Timer? _autoPlay;
   Timer? _tapGuard;
   bool _submitting = false;
+  game_card.Card? _pendingCard;
   double _dragDistance = 0;
   Offset _dragOrigin = Offset.zero;
 
@@ -75,7 +78,7 @@ class _FannedHandWidgetState extends State<FannedHandWidget> {
     }
   }
 
-  void _activate(game_card.Card card, Offset origin) {
+  Future<void> _activate(game_card.Card card, Offset origin) async {
     if (!widget.interactionEnabled ||
         _submitting ||
         !widget.cards.contains(card)) {
@@ -92,14 +95,30 @@ class _FannedHandWidgetState extends State<FannedHandWidget> {
     setState(() {
       _queued = null;
       _submitting = true;
+      _pendingCard = card;
     });
-    // Suppress double taps but allow retry after a rejected command.
-    // Server revisions remain the authoritative duplicate protection.
+    // Keep the guard for the real request, not just a guessed network delay.
+    // The short minimum also protects synchronous/offline callbacks.
     _tapGuard?.cancel();
     _tapGuard = Timer(const Duration(milliseconds: 600), () {
-      if (mounted) setState(() => _submitting = false);
+      if (mounted && _pendingCard == null) {
+        setState(() => _submitting = false);
+      }
     });
-    widget.onCardTap(card, origin);
+    try {
+      await widget.onCardTap(card, origin);
+    } catch (error, stack) {
+      FlutterError.reportError(
+        FlutterErrorDetails(exception: error, stack: stack),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _pendingCard = null;
+          if (_tapGuard?.isActive != true) _submitting = false;
+        });
+      }
+    }
   }
 
   @override
@@ -149,7 +168,8 @@ class _FannedHandWidgetState extends State<FannedHandWidget> {
                     child: Builder(
                       builder: (cardContext) {
                         final card = widget.cards[index];
-                        final selected = _queued == card;
+                        final pending = _pendingCard == card;
+                        final selected = _queued == card || pending;
                         void activate() {
                           final box =
                               cardContext.findRenderObject() as RenderBox?;
@@ -175,6 +195,7 @@ class _FannedHandWidgetState extends State<FannedHandWidget> {
                                 ? widget.playHint
                                 : widget.queueHint,
                             selected: selected,
+                            value: pending ? widget.pendingHint : null,
                             child: GestureDetector(
                               key: ValueKey('hand-card-${card.firebaseKey}'),
                               onVerticalDragStart: widget.interactionEnabled
@@ -220,83 +241,113 @@ class _FannedHandWidgetState extends State<FannedHandWidget> {
                                       widget.interactionEnabled && !_submitting
                                       ? activate
                                       : null,
-                                  child: widget.dealerDeckKey != null
-                                      ? DealCardMotion(
-                                          key: ValueKey(
-                                            'hand-deal-${card.firebaseKey}',
-                                          ),
-                                          sourceKey: widget.dealerDeckKey!,
-                                          delay: Duration(
-                                            milliseconds: index * 70,
-                                          ),
-                                          child: Transform.rotate(
-                                            angle:
-                                                (index -
-                                                    (widget.cards.length - 1) /
-                                                        2) *
-                                                .035,
-                                            child: ExcludeSemantics(
-                                              child: IgnorePointer(
-                                                child:
-                                                    widget.cardBuilder?.call(
-                                                      card,
-                                                      width,
-                                                      height,
-                                                    ) ??
-                                                    CardWidget(
-                                                      card: card,
-                                                      width: width,
-                                                      height: height,
-                                                    ),
+                                  child: Stack(
+                                    children: [
+                                      widget.dealerDeckKey != null
+                                          ? DealCardMotion(
+                                              key: ValueKey(
+                                                'hand-deal-${card.firebaseKey}',
+                                              ),
+                                              sourceKey: widget.dealerDeckKey!,
+                                              delay: Duration(
+                                                milliseconds: index * 70,
+                                              ),
+                                              child: Transform.rotate(
+                                                angle:
+                                                    (index -
+                                                        (widget.cards.length -
+                                                                1) /
+                                                            2) *
+                                                    .035,
+                                                child: ExcludeSemantics(
+                                                  child: IgnorePointer(
+                                                    child:
+                                                        widget.cardBuilder
+                                                            ?.call(
+                                                              card,
+                                                              width,
+                                                              height,
+                                                            ) ??
+                                                        CardWidget(
+                                                          card: card,
+                                                          width: width,
+                                                          height: height,
+                                                        ),
+                                                  ),
+                                                ),
+                                              ),
+                                            )
+                                          : BoardCardMotion(
+                                              key: ValueKey(
+                                                'hand-visual-${card.firebaseKey}',
+                                              ),
+                                              // New cards leave one point above the hand and
+                                              // fan out; the card's hit target never moves.
+                                              origin: Offset(
+                                                fanWidth / 2 -
+                                                    (firstCardLeft +
+                                                        index * spacing +
+                                                        width / 2),
+                                                compact ? -72 : -108,
+                                              ),
+                                              delay: Duration(
+                                                milliseconds: index * 70,
+                                              ),
+                                              travelDuration: const Duration(
+                                                milliseconds: 380,
+                                              ),
+                                              initialOpacity: 0.65,
+                                              // Keep the hit target fixed while only the
+                                              // dealt card artwork travels into the hand.
+                                              child: Transform.rotate(
+                                                angle:
+                                                    (index -
+                                                        (widget.cards.length -
+                                                                1) /
+                                                            2) *
+                                                    .035,
+                                                child: ExcludeSemantics(
+                                                  child: IgnorePointer(
+                                                    child:
+                                                        widget.cardBuilder
+                                                            ?.call(
+                                                              card,
+                                                              width,
+                                                              height,
+                                                            ) ??
+                                                        CardWidget(
+                                                          card: card,
+                                                          width: width,
+                                                          height: height,
+                                                        ),
+                                                  ),
+                                                ),
                                               ),
                                             ),
-                                          ),
-                                        )
-                                      : BoardCardMotion(
+                                      if (pending)
+                                        Positioned(
                                           key: ValueKey(
-                                            'hand-visual-${card.firebaseKey}',
+                                            'hand-pending-${card.firebaseKey}',
                                           ),
-                                          // New cards leave one point above the hand and
-                                          // fan out; the card's hit target never moves.
-                                          origin: Offset(
-                                            fanWidth / 2 -
-                                                (firstCardLeft +
-                                                    index * spacing +
-                                                    width / 2),
-                                            compact ? -72 : -108,
-                                          ),
-                                          delay: Duration(
-                                            milliseconds: index * 70,
-                                          ),
-                                          travelDuration: const Duration(
-                                            milliseconds: 380,
-                                          ),
-                                          initialOpacity: 0.65,
-                                          // Keep the hit target fixed while only the
-                                          // dealt card artwork travels into the hand.
-                                          child: Transform.rotate(
-                                            angle:
-                                                (index -
-                                                    (widget.cards.length - 1) /
-                                                        2) *
-                                                .035,
-                                            child: ExcludeSemantics(
-                                              child: IgnorePointer(
-                                                child:
-                                                    widget.cardBuilder?.call(
-                                                      card,
-                                                      width,
-                                                      height,
-                                                    ) ??
-                                                    CardWidget(
-                                                      card: card,
-                                                      width: width,
-                                                      height: height,
-                                                    ),
+                                          right: 4,
+                                          bottom: 4,
+                                          child: IgnorePointer(
+                                            child: Container(
+                                              padding: const EdgeInsets.all(5),
+                                              decoration: const BoxDecoration(
+                                                color: TableStyle.ink,
+                                                shape: BoxShape.circle,
+                                              ),
+                                              child: const Icon(
+                                                Icons.hourglass_top,
+                                                size: 16,
+                                                color: TableStyle.brass,
                                               ),
                                             ),
                                           ),
                                         ),
+                                    ],
+                                  ),
                                 ),
                               ),
                             ),

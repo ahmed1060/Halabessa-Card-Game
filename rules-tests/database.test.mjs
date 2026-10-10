@@ -23,6 +23,10 @@ beforeEach(async () => {
         FUTURE: { ...server, protocolVersion: 2 } },
       matchHands: { SERVER: { alice: ['ace'], bob: ['king'] }, LEGACY: { alice: ['ace'], bob: ['king'] } },
       matchSecrets: { SERVER: { deck: ['queen'] } }, rooms: { SERVER: { phase: 'playing' } },
+      matchViews: {SERVER: {
+        alice: {state: server, version: 8, recipientUid: 'alice', hand: ['ace']},
+        bob: {state: server, version: 8, recipientUid: 'bob', hand: ['king']},
+      }, LEGACY: {alice: {hand: ['ace']}}, FUTURE: {alice: {hand: ['ace']}}},
     });
   });
 });
@@ -34,6 +38,7 @@ test('deletion block denies retained-token access without affecting unrelated pl
   });
   await assertFails(get(ref(db('alice'),'matches/SERVER')));
   await assertFails(get(ref(db('alice'),'matchHands/SERVER/alice')));
+  await assertFails(get(ref(db('alice'),'matchViews/SERVER/alice')));
   await assertFails(set(ref(db('alice'),'users/alice'),{displayName:'Recreated'}));
   await assertFails(set(ref(db('alice'),'userPresence/alice/connection'),{lastSeen:serverTimestamp()}));
   await assertFails(remove(ref(db('alice'),'accountDeletionBlocked/alice')));
@@ -106,6 +111,22 @@ test('seated player reads only their own server hand, not parent or opponents', 
   await assertFails(get(ref(alice, 'matchHands/SERVER/bob')));
   await assertFails(get(ref(alice, 'matchHands')));
   await assertFails(get(ref(alice, 'matchSecrets/SERVER')));
+});
+
+test('atomic own views are private, server-only and revoked on seat release', async () => {
+  const alice = db('alice');
+  assert.deepEqual((await assertSucceeds(get(ref(alice, 'matchViews/SERVER/alice')))).val().hand, ['ace']);
+  for (const path of ['matchViews', 'matchViews/SERVER', 'matchViews/SERVER/bob',
+    'matchViews/LEGACY/alice', 'matchViews/FUTURE/alice']) {
+    await assertFails(get(ref(alice, path)));
+  }
+  await assertFails(get(ref(db('stranger'), 'matchViews/SERVER/alice')));
+  await assertFails(get(ref(env.unauthenticatedContext().database(), 'matchViews/SERVER/alice')));
+  await assertFails(get(ref(env.authenticatedContext('stranger', {admin: true}).database(), 'matchViews/SERVER/alice')));
+  await assertFails(set(ref(alice, 'matchViews/SERVER/alice/version'), 99));
+  await assertFails(remove(ref(alice, 'matchViews/SERVER/alice')));
+  await env.withSecurityRulesDisabled(context => remove(ref(context.database(), 'matches/SERVER/players/alice')));
+  await assertFails(get(ref(alice, 'matchViews/SERVER/alice')));
 });
 test('outsider cannot read hands but can browse public match/index', async () => {
   const stranger = db('stranger');

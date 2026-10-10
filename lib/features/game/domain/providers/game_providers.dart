@@ -18,6 +18,7 @@ import '../../domain/logic/bot_brain.dart';
 import '../../domain/models/bot_difficulty.dart';
 import '../../domain/logic/score_config.dart';
 import '../../domain/logic/server_match_progress.dart';
+import '../../domain/logic/server_progress_coordinator.dart';
 import '../../domain/logic/shuffle_bot_votes.dart';
 import 'package:halabessa/core/services/supabase_backend_service.dart';
 import '../../data/repositories/multiplayer_sync_service.dart';
@@ -31,7 +32,9 @@ final multiplayerSyncServiceProvider = Provider<MultiplayerSyncService>((ref) {
   final db = FirebaseDatabase.instance;
   // If a custom URL is strictly needed, it should be set once in main.dart or here with a check.
   // For Halabessa, we use the default RTDB from the google-services/FirebaseOptions.
-  return MultiplayerSyncService(db);
+  final service = MultiplayerSyncService(db);
+  ref.onDispose(service.dispose);
+  return service;
 });
 
 final localPlayOriginsProvider = StateProvider<Map<String, Offset>>((ref) => {});
@@ -161,6 +164,8 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
   bool _serverCommandBusy = false;
   Completer<void>? _serverIdle;
   DateTime? _serverRetryAfter;
+  final _progressCoordinator = ServerProgressCoordinator();
+  Map<String, bool>? _serverPresence;
 
   void _adoptServerSnapshot(MatchState incoming) {
     if (!mounted || lastBoundMatchId != incoming.id ||
@@ -241,8 +246,12 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
         (_serverRetryAfter != null && now.isBefore(_serverRetryAfter!))) {
       return;
     }
-    if (s.settlementPending &&
-        (s.phase == GamePhase.rematchVoting || s.phase == GamePhase.matchOver)) {
+    final settle = s.settlementPending &&
+        (s.phase == GamePhase.rematchVoting || s.phase == GamePhase.matchOver);
+    final advance = serverProgressDue(s, now);
+    if (!_progressCoordinator.shouldRequest(state: s, uid: uid, now: now,
+        due: settle || advance, presence: _serverPresence)) return;
+    if (settle) {
       final generation = _bindingGeneration;
       final idle = Completer<void>();
       _serverIdle = idle;
@@ -259,7 +268,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
         if (generation == _bindingGeneration) _serverCommandBusy = false;
         idle.complete();
       }
-    } else if (serverProgressDue(s, now)) {
+    } else if (advance) {
       await _sendServerIntent('advance');
     }
   }
@@ -586,7 +595,10 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
 
     // Host Presence Watcher
     _presenceListener?.cancel();
+    _serverPresence = null;
     _presenceListener = ref.read(multiplayerSyncServiceProvider).watchPresence(matchId).listen((presence) {
+       if (!mounted || generation != _bindingGeneration) return;
+       _serverPresence = presence;
        final serverState = state;
        if (serverState == null) return;
        if (_isSpectating || serverState.usesServerCommands) return;

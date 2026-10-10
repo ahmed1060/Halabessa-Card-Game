@@ -61,6 +61,10 @@ void main() {
     expect(canAdoptServerSnapshot(s, s.copyWith(id: 'OTHER123', serverVersion: 4)), false);
     expect(canAdoptServerSnapshot(null, s), false);
     expect(canAdoptServerSnapshot(s, s.copyWith(serverVersion: 4)), true);
+    expect(canAdoptServerSnapshot(s, s), false);
+    final own = s.copyWith(handCards: {'human': []});
+    expect(canAdoptServerSnapshot(s, own), true);
+    expect(canAdoptServerSnapshot(own, own), false);
   });
   test('phase timestamp survives model round trips and copies', () {
     final decoded = MatchState.fromJson(s.toJson());

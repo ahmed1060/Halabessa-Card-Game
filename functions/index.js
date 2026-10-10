@@ -533,6 +533,7 @@ exports.deleteRoom = onCall(async (request) => {
   await admin.database().ref().update({
     [`matches/${roomId}`]: null,
     [`matchHands/${roomId}`]: null,
+    [`matchViews/${roomId}`]: null,
     [`rooms/${roomId}`]: null,
   });
   return { ok: true, roomId };
@@ -552,6 +553,7 @@ exports.cleanupExpiredRooms = onSchedule("every 24 hours", async () => {
     if (!roomId || !ROOM_ID_PATTERN.test(roomId)) return;
     updates[`matches/${roomId}`] = null;
     updates[`matchHands/${roomId}`] = null;
+    updates[`matchViews/${roomId}`] = null;
     updates[`rooms/${roomId}`] = null;
   });
   if (Object.keys(updates).length > 0) await db.ref().update(updates);

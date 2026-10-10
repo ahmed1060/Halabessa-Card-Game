@@ -289,3 +289,52 @@ No existing player, match or balance was used as a mutation test or reset.
 No paid plan, region override, schema migration or access-rule relaxation was made.
 Rollback: redeploy the compatible version-36 source from baseline commit
 3f60ff9c and revert this first client batch if measurements show a regression.
+
+## Implementation update — realtime/presentation batch
+
+- Atomic RTDB `matchViews/<room>/<uid>` pairs the public board and only that
+  human's hand with one server revision and recipient tag. Bots/departed seats
+  have no view. Parent, opponent, spectator, admin-bypass and client-write
+  access are denied; deletion tombstones and active membership remain required.
+  Room deletion removes the tree. Account deletion inventories orphaned views
+  and removes the deleted user's child, preserving peers' data.
+- Client validates recipient, room, protocol, version and own hand count
+  (including Firebase's omitted empty arrays). Healthy private feed updates
+  require no per-revision HTTP read. A 500-ms grace handles listener ordering;
+  missing/failed feeds use the existing authenticated snapshot endpoint.
+  Accepted play/settlement responses are reused. Stale/equal revisions are
+  suppressed, with one exception for initial same-version private hydration.
+  Removal/deletion and stream cancellation invalidate pending reads.
+- A selected card lifts immediately and displays a pending indicator until
+  its actual request finishes. Tap/drag/queued actions share that real in-flight
+  guard. It does not invent a capture, score or accepted turn. English and both
+  Arabic locales include accessible pending feedback; hit geometry is unchanged.
+- Timed advance/settlement requests prefer one connected human and stagger
+  others by 1.5 seconds as fallback if no newer accepted revision arrives.
+  Known disconnected primaries are bypassed. This is a client request hint,
+  not authority: server deadlines, version checks and idempotency remain.
+- Playing cards subscribe only to equipped card ID and catalogue changes, not
+  unrelated purchases/table changes. Static Lantern backgrounds are isolated
+  and quantized for bounded native decoding (up to 2048 px). No frame-rate
+  benefit is claimed without a device/browser profile.
+- Web build fingerprints 75 raster image variants by SHA-256 while preserving
+  logical AssetImage keys and dpr metadata in both Flutter manifest formats.
+  Only content-addressed artwork and already-hashed JS entrypoints get immutable
+  cache headers. Originals, manifests, index and private replies still revalidate.
+  The strict manifest codec fails closed if Flutter changes its encoding.
+
+Verification before rollout: 388 Flutter tests passed; 161 server/build tests
+passed; analysis has zero errors and the same 266 warning/info backlog. Complete
+Edge Deno check and release web build passed. The real generated web manifest
+round-tripped and 75 images were fingerprinted. Added tests cover callback
+ordering, fallback, cancellation, stale responses, recipient/hand-count checks,
+long pending requests, leave/dispose, coordination, Unicode/dpr/cache paths and
+private-feed rules. Local RTDB-only emulator startup also hits the Windows Java
+loopback error, before tests; Ubuntu CI must pass the new permission gate.
+First-batch Hosting, Android and iOS CI are all successful.
+
+Remaining: durable ordered publication/retry before early command acknowledgment,
+authenticated region/pooler and before/after measurements, isolated live failure
+and reconnect/concurrency QA (approval pending), and physical-device frame profiling.
+This batch preserves the current serialized publication lock; it is not an
+unverified early-ack change or a claim that every latency target is achieved.

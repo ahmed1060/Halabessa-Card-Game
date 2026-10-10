@@ -933,6 +933,7 @@ Deno.serve(async (request) => {
           const deleted = await firebaseRequest("", "PATCH", {
             [`matches/${id}`]: null,
             [`matchHands/${id}`]: null,
+            [`matchViews/${id}`]: null,
             [`matchSecrets/${id}`]: null,
             [`matchChat/${id}`]: null,
             [`rooms/${id}`]: null,

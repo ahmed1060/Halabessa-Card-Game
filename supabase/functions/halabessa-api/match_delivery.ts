@@ -42,6 +42,14 @@ export function matchMirrorUpdates(id: string, room: CommittedRoom,
   updates[`matches/${id}/handCards`] = null;
   updates[`matches/${id}/deck`] = null;
   updates[`matchHands/${id}`] = room.hands;
+  // Each private child is a complete, single-revision view. Never put these
+  // under the publicly readable match node, or publish bot/departed hands.
+  updates[`matchViews/${id}`] = Object.fromEntries((room.state.playerIds ?? [])
+    .filter(uid => !uid.startsWith('bot_') && !uid.startsWith('waiting_'))
+    .map(uid => {
+      if (!/^[A-Za-z0-9_-]{1,128}$/.test(uid)) throw new Error('invalid_player_uid');
+      return [uid, { ...participantSnapshot(room, uid), recipientUid: uid }];
+    }));
   updates[`matchSecrets/${id}`] = null;
   updates[`rooms/${id}`] = summarize(state);
   return updates;

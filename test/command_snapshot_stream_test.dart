@@ -51,6 +51,94 @@ void main() {
     expect(received.single!.serverVersion, 3);
   });
 
+  Future<(StreamController<MatchState?>, StreamController<MatchState>)> usePrivateFeed() async {
+    await subscription.cancel();
+    await events.close();
+    events = StreamController<Map<String, dynamic>?>();
+    final own = StreamController<MatchState?>();
+    final accepted = StreamController<MatchState>();
+    subscription = watchCommandSnapshots(
+      notifications: events.stream, roomId: 'ROOM1234', callerUid: 'human',
+      privateSnapshots: own.stream, acceptedSnapshots: accepted.stream,
+      recoveryDelay: const Duration(milliseconds: 20),
+      fetchSnapshot: () {
+        final request = Completer<MatchState>();
+        requests.add(request);
+        return request.future;
+      },
+    ).listen(received.add, onError: errors.add);
+    addTearDown(() async {
+      await subscription.cancel();
+      await own.close(); await accepted.close();
+    });
+    return (own, accepted);
+  }
+
+  test('healthy own views arrive without any per-revision HTTP request', () async {
+    final (own, accepted) = await usePrivateFeed();
+    own.add(snapshot(3)); // Private callback can precede public callback.
+    events.add({'serverVersion': 3});
+    await flush();
+    events.add({'serverVersion': 4});
+    own.add(snapshot(4));
+    await flush();
+    accepted.add(snapshot(4));
+    events.add({'serverVersion': 4, 'presence': {'human': true}});
+    await Future<void>.delayed(const Duration(milliseconds: 35));
+    expect(requests, isEmpty);
+    expect(received.map((s) => s?.serverVersion), [3, 4]);
+  });
+
+  test('command response cancels recovery and stale fallback is suppressed', () async {
+    final (_, accepted) = await usePrivateFeed();
+    events.add({'serverVersion': 3});
+    await Future<void>.delayed(const Duration(milliseconds: 35));
+    expect(requests, hasLength(1));
+    accepted.add(snapshot(4));
+    await flush();
+    requests.single.complete(snapshot(3));
+    await flush();
+    expect(received.map((s) => s?.serverVersion), [4]);
+    events.add({'serverVersion': 4});
+    await Future<void>.delayed(const Duration(milliseconds: 35));
+    expect(requests, hasLength(1));
+  });
+
+  test('missing/failed own feed uses bounded recovery, not a deletion', () async {
+    final (own, _) = await usePrivateFeed();
+    events.add({'serverVersion': 2});
+    own.add(null);
+    own.addError(StateError('permission-denied'));
+    await Future<void>.delayed(const Duration(milliseconds: 35));
+    expect(requests, hasLength(1));
+    requests.single.complete(snapshot(2));
+    await flush();
+    expect(received.single!.serverVersion, 2);
+    expect(errors, isEmpty);
+  });
+
+  test('deleted room ignores late private views and cancels scheduled recovery', () async {
+    final (own, accepted) = await usePrivateFeed();
+    events.add({'serverVersion': 2});
+    await flush();
+    events.add(null);
+    await flush();
+    own.add(snapshot(3));
+    accepted.add(snapshot(3));
+    await Future<void>.delayed(const Duration(milliseconds: 35));
+    expect(received, [null]);
+    expect(requests, isEmpty);
+  });
+
+  test('wrong room or opponent hand is never accepted from a view', () async {
+    final (own, _) = await usePrivateFeed();
+    events.add({'serverVersion': 1});
+    own.add(snapshot(1, id: 'OTHER123'));
+    await flush();
+    expect(received, isEmpty);
+    expect(errors, hasLength(1));
+  });
+
   test('coalesces concurrent notifications and suppresses stale hand/board', () async {
     events.add({'serverVersion': 3});
     await flush();

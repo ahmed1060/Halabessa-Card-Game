@@ -27,6 +27,18 @@
         ]
       },
       {
+        "source": "/assets/_immutable/**",
+        "headers": [{"key": "Cache-Control", "value": "public, max-age=31536000, immutable"}]
+      },
+      {
+        "source": "/main.*.dart.js",
+        "headers": [{"key": "Cache-Control", "value": "public, max-age=31536000, immutable"}]
+      },
+      {
+        "source": "/flutter_bootstrap.*.js",
+        "headers": [{"key": "Cache-Control", "value": "public, max-age=31536000, immutable"}]
+      },
+      {
         "source": "**/*.br",
         "headers": [
           {

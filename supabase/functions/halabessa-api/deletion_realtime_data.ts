@@ -35,7 +35,7 @@ export function createRealtimeDeletionDataStore(url: string,token: ()=>Promise<s
     return {data,etag:response.headers.get('etag')};
   }
   return {
-    async inventory(root:'users'|'matches'|'matchChat') {
+    async inventory(root:'users'|'matches'|'matchChat'|'matchViews') {
       const found=await request(root,'GET',undefined,undefined,{shallow:'true'});
       if(found.data===null)return [];
       if(!found.data || typeof found.data!=='object' || Array.isArray(found.data))throw new Error('invalid_deletion_realtime_data');
@@ -114,6 +114,7 @@ export function createRealtimeDeletionDataStore(url: string,token: ()=>Promise<s
       }
       updates[`matchChat/${id}/rate/${uid}`]=null;
       updates[`matches/${id}/presence/${uid}`]=null;
+      updates[`matchViews/${id}/${uid}`]=null;
       await request('','PATCH',updates);
       return !more;
     },

@@ -40,4 +40,7 @@ bool serverProgressDue(MatchState s, DateTime now) {
 /// Never let delayed intent responses roll back a newer room revision.
 bool canAdoptServerSnapshot(MatchState? current, MatchState incoming) =>
     current != null && current.usesServerCommands && incoming.usesServerCommands &&
-    current.id == incoming.id && incoming.serverVersion >= current.serverVersion;
+    current.id == incoming.id && (incoming.serverVersion > current.serverVersion ||
+      // An initial public create/reconnect snapshot may still need its own hand.
+      (incoming.serverVersion == current.serverVersion &&
+        current.handCards.isEmpty && incoming.handCards.isNotEmpty));

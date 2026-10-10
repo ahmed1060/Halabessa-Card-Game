@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/theme_config.dart';
+import 'background_decode_size.dart';
 import '../../features/game/presentation/widgets/match_table_layout.dart';
 
 /// One cafe frame for every screen family. All controls remain real widgets;
@@ -11,13 +12,15 @@ class LanternPageFrame extends StatelessWidget {
   Widget build(BuildContext context) => Stack(
     fit: StackFit.expand,
     children: [
-      Image.asset(
+      RepaintBoundary(child: Image.asset(
         MediaQuery.sizeOf(context).width > MediaQuery.sizeOf(context).height
             ? 'assets/images/tables/lantern_nights_v1.png'
             : 'assets/images/tables/lantern_nights_portrait_v2.png',
         fit: BoxFit.cover,
         excludeFromSemantics: true,
-      ),
+        cacheWidth: backgroundDecodeWidth(MediaQuery.sizeOf(context).width,
+          MediaQuery.devicePixelRatioOf(context)),
+      )),
       const DecoratedBox(
         decoration: BoxDecoration(
           gradient: LinearGradient(

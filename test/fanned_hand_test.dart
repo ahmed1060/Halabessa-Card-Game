@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -11,7 +12,7 @@ void main() {
     game.Card(game.Suit.spades, game.Rank.eight),
     game.Card(game.Suit.diamonds, game.Rank.king),
   ];
-  Widget hand(bool myTurn, void Function(game.Card, Offset) onTap, {
+  Widget hand(bool myTurn, FutureOr<void> Function(game.Card, Offset) onTap, {
     List<game.Card> values = cards, double width = 390, bool enabled = true,
     TextDirection direction = TextDirection.ltr,
   }) => MaterialApp(home: Scaffold(body: Directionality(textDirection: direction,
@@ -34,6 +35,37 @@ void main() {
     await tester.tap(card(1));
     expect(played, [cards[1]]);
     await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('pending feedback and tap guard last for the actual request', (tester) async {
+    final request = Completer<void>();
+    final played = <game.Card>[];
+    await tester.pumpWidget(hand(true, (value, _) {
+      played.add(value);
+      return request.future;
+    }));
+    await tester.tap(card(1));
+    await tester.pump(const Duration(seconds: 2));
+    expect(find.byKey(ValueKey('hand-pending-${cards[1].firebaseKey}')), findsOneWidget);
+    await tester.tap(card(2));
+    await tester.drag(card(3), const Offset(0, -70));
+    expect(played, [cards[1]]);
+    request.complete();
+    await tester.pump();
+    expect(find.byKey(ValueKey('hand-pending-${cards[1].firebaseKey}')), findsNothing);
+    await tester.tap(card(2));
+    expect(played, [cards[1], cards[2]]);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('completing a move after leaving the screen is safe', (tester) async {
+    final request = Completer<void>();
+    await tester.pumpWidget(hand(true, (_, __) => request.future));
+    await tester.tap(card(0));
+    await tester.pumpWidget(const SizedBox.shrink());
+    request.complete();
+    await tester.pump();
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('horizontal swipes do not play, deliberate upward swipes do', (tester) async {

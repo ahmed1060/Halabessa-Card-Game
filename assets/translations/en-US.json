@@ -73,6 +73,7 @@
     "table_wait_or_queue": "Waiting for the next play. Tap a card to queue it.",
     "table_play_card": "Play this card",
     "table_queue_card": "Queue this card; tap again to cancel",
+    "table_sending_move": "Sending move",
     "table_card_name": "{} of {}",
     "table_reactions": "Reactions",
     "table_captures": "Captured cards",

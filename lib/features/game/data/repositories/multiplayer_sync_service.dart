@@ -13,8 +13,17 @@ import '../../../auth/domain/models/app_user.dart';
 
 class MultiplayerSyncService {
   final FirebaseDatabase _db;
+  final _accepted = StreamController<(String, MatchState)>.broadcast();
 
   MultiplayerSyncService(this._db);
+
+  void dispose() => unawaited(_accepted.close());
+
+  MatchState _acceptedSnapshot(Map<String, dynamic> data, String uid) {
+    final snapshot = commandSnapshot(data, uid);
+    if (!_accepted.isClosed) _accepted.add((uid, snapshot));
+    return snapshot;
+  }
 
   DatabaseReference get matchRef => _db.ref('matches');
 
@@ -127,7 +136,7 @@ class MultiplayerSyncService {
         timeout: const Duration(seconds: 20),
       ),
     );
-    return commandSnapshot(data, callerUid);
+    return _acceptedSnapshot(data, callerUid);
   }
 
   /// Private/public state in a command response belongs to one SQL revision.
@@ -145,6 +154,26 @@ class MultiplayerSyncService {
       callerUid: ownHand is List || ownHand is Map ? ownHand : [],
     };
     return MatchState.fromJson(merged);
+  }
+
+  /// RTDB omits empty arrays. Validate revision, recipient and own-hand count
+  /// before interpreting an absent hand as empty; never mix two publications.
+  static MatchState privateRealtimeSnapshot(
+    Map<String, dynamic> data, String roomId, String callerUid,
+  ) {
+    final state = data['state'];
+    final version = data['version'];
+    final hand = data['hand'];
+    final counts = state is Map ? state['handCounts'] : null;
+    if (state is! Map || state['id'] != roomId ||
+        state['protocolVersion'] != 1 || data['recipientUid'] != callerUid ||
+        version is! num || version < 0 || version != version.toInt() ||
+        state['serverVersion'] != version || state['playerIds'] is! List ||
+        !(state['playerIds'] as List).contains(callerUid) ||
+        counts is! Map || counts[callerUid] != _privateHandLength(hand)) {
+      throw const SupabaseBackendException('invalid_match_response');
+    }
+    return commandSnapshot(data, callerUid);
   }
 
   Future<MatchState> getCommandSnapshot(
@@ -201,7 +230,7 @@ class MultiplayerSyncService {
         timeout: const Duration(seconds: 40),
       ),
     );
-    return commandSnapshot(data, callerUid);
+    return _acceptedSnapshot(data, callerUid);
   }
 
   String _newCommandId() {
@@ -323,6 +352,15 @@ class MultiplayerSyncService {
           return value is Map ? Map<String, dynamic>.from(value) : null;
         }),
         fetchSnapshot: () => getCommandSnapshot(matchId, callerUid),
+        privateSnapshots: _db.ref('matchViews/$matchId/$callerUid').onValue.map((event) {
+          final value = event.snapshot.value;
+          return value is Map
+              ? privateRealtimeSnapshot(Map<String, dynamic>.from(value), matchId, callerUid)
+              : null;
+        }),
+        acceptedSnapshots: _accepted.stream
+            .where((event) => event.$1 == callerUid && event.$2.id == matchId)
+            .map((event) => event.$2),
       );
       return;
     }

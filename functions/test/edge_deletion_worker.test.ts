@@ -67,7 +67,7 @@ test('late-upload drain cannot be bypassed before avatar removal and final ident
 
 test('room inventory is drained in bounded batches without prematurely completing its stage',async()=>{
   const f=fixture();f.job.completed_stages.push(...deletionStages.slice(0,2));
-  for(const root of ['users','matches','matchChat'])f.items.set(`scan:${root}`,{kind:'scan',item:root,processed:true});
+  for(const root of ['users','matches','matchChat','matchViews'])f.items.set(`scan:${root}`,{kind:'scan',item:root,processed:true});
   for(let i=0;i<12;i++)f.items.set(`room:ABC${10000+i}`,{kind:'room',item:`ABC${10000+i}`,processed:false});
   const processed=()=>[...f.items.values()].filter(row=>row.kind==='room' && row.processed).length;
   for(const expected of [5,10,12]) {
