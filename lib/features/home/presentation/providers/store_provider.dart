@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:easy_localization/easy_localization.dart';
@@ -112,6 +113,7 @@ class StoreState {
 class StoreNotifier extends StateNotifier<StoreState> {
   final SharedPreferences _prefs;
   final Ref _ref;
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _catalogSubscription;
 
   static const _kOwnedIds = 'store_owned_ids';
   static const _kActiveCardBack = 'store_active_card_back';
@@ -127,7 +129,8 @@ class StoreNotifier extends StateNotifier<StoreState> {
 
   void _initFirestoreSync() {
     // Sync Store Items from Settings
-    FirebaseFirestore.instance.collection('settings').doc('store').snapshots().listen((doc) {
+    _catalogSubscription = FirebaseFirestore.instance.collection('settings').doc('store').snapshots().listen((doc) {
+      if (!mounted) return;
       if (doc.exists) {
         final data = doc.data();
         if (data != null && data['items'] is List) {
@@ -135,6 +138,8 @@ class StoreNotifier extends StateNotifier<StoreState> {
           state = state.copyWith(extraItems: items);
         }
       }
+    }, onError: (Object _) {
+      // Retain the built-in/last catalogue if the network goes away.
     });
 
     // Sync Owned IDs from User Profile (Persistent Cloud Storage)
@@ -152,6 +157,12 @@ class StoreNotifier extends StateNotifier<StoreState> {
         }
       }
     });
+  }
+
+  @override
+  void dispose() {
+    unawaited(_catalogSubscription?.cancel());
+    super.dispose();
   }
 
   List<ShopItem> get allItems => [...builtinItems, ...state.extraItems];

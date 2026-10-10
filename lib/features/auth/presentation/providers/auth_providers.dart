@@ -22,9 +22,64 @@ final authStateChangesProvider = StreamProvider<AppUser?>((ref) {
   return ref.watch(authRepositoryProvider).authStateChanges;
 });
 
-// 4. Provides the current logged in user directly if available
+// Social/privilege requests depend only on the session UID, not balances or
+// inventory. Auto-dispose prevents another account inheriting cached state.
+final sessionUidProvider = Provider<String?>(
+  (ref) =>
+      ref.watch(authStateChangesProvider.select((value) => value.value?.uid)),
+);
+
+final backendCallProvider = Provider((ref) => SupabaseBackendService.call);
+
+class SessionSocialGraph {
+  final String uid;
+  final Map<String, dynamic> data;
+  const SessionSocialGraph(this.uid, this.data);
+}
+
+final socialGraphProvider = FutureProvider.autoDispose<SessionSocialGraph?>((
+  ref,
+) async {
+  final uid = ref.watch(sessionUidProvider);
+  if (uid == null) return null;
+  return SessionSocialGraph(
+    uid,
+    await ref.read(backendCallProvider)('getSocialGraph'),
+  );
+});
+
+final verifiedAdminProvider = FutureProvider.autoDispose<bool>((ref) async {
+  final uid = ref.watch(sessionUidProvider);
+  if (uid == null) return false;
+  final result = await ref.read(backendCallProvider)('getAdminStatus');
+  return result['admin'] == true;
+});
+
+// 4. Publish profile values without waiting for enrichment. Admin is false
+// until verified; backend authorization is still checked on every operation.
 final currentUserProvider = Provider<AppUser?>((ref) {
-  return ref.watch(authStateChangesProvider).value;
+  final user = ref.watch(authStateChangesProvider).value;
+  if (user == null) return null;
+  final admin = ref.watch(verifiedAdminProvider).asData?.value ?? false;
+  // Retain the visible graph during a same-account refresh, but never use a
+  // previous account's relationships while its successor is loading.
+  final graph = ref.watch(socialGraphProvider).value;
+  final social = graph?.uid == user.uid
+      ? graph!.data
+      : const <String, dynamic>{};
+  return user.copyWith(
+    isAdmin: admin,
+    friends: List<String>.from(social['friends'] as List? ?? const []),
+    pendingFriendRequests: List<String>.from(
+      social['pendingFriendRequests'] as List? ?? const [],
+    ),
+    sentFriendRequests: List<String>.from(
+      social['sentFriendRequests'] as List? ?? const [],
+    ),
+    friendInvites: Map<String, String>.from(
+      social['friendInvites'] as Map? ?? const {},
+    ),
+  );
 });
 
 // 5. Discovery receives the server's allowlisted public view, never email/wallets.

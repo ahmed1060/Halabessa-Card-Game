@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:halabessa/features/game/presentation/widgets/match_table_layout.dart';
 import 'package:flutter/material.dart';
 import 'package:halabessa/features/game/presentation/widgets/table_style.dart';
@@ -17,6 +18,27 @@ class SocialOverlay extends ConsumerStatefulWidget {
 }
 
 class _SocialOverlayState extends ConsumerState<SocialOverlay> {
+  Timer? _refreshTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    // Fresh on demand, then bounded polling only while this panel is open.
+    Future.microtask(() {
+      if (mounted) ref.invalidate(socialGraphProvider);
+    });
+    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (mounted) ref.invalidate(socialGraphProvider);
+    });
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    _searchController.dispose();
+    super.dispose();
+  }
+
   final TextEditingController _searchController = TextEditingController();
   List<AppUser> _searchResults = [];
   bool _isSearching = false;
@@ -56,6 +78,7 @@ class _SocialOverlayState extends ConsumerState<SocialOverlay> {
   Widget build(BuildContext context) {
     final currentUser = ref.watch(currentUserProvider);
     if (currentUser == null) return const SizedBox.shrink();
+    final social = ref.watch(socialGraphProvider);
 
     return DefaultTabController(
       length: 3,
@@ -97,6 +120,13 @@ class _SocialOverlayState extends ConsumerState<SocialOverlay> {
                 ),
               ),
               const SizedBox(height: 8),
+              if (social.isLoading) const LinearProgressIndicator(),
+              if (social.hasError)
+                TextButton.icon(
+                  onPressed: () => ref.invalidate(socialGraphProvider),
+                  icon: const Icon(Icons.refresh),
+                  label: Text('retry_action'.tr()),
+                ),
               // Header
               Padding(
                 padding: const EdgeInsets.symmetric(
@@ -620,7 +650,7 @@ class _SocialOverlayState extends ConsumerState<SocialOverlay> {
                 await ref
                     .read(multiplayerSyncServiceProvider)
                     .acceptFriendRequest(myUid, user.uid);
-                ref.invalidate(authStateChangesProvider);
+                ref.invalidate(socialGraphProvider);
                 if (mounted)
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text('friend_request_accepted'.tr())),
@@ -639,7 +669,7 @@ class _SocialOverlayState extends ConsumerState<SocialOverlay> {
                 await ref
                     .read(multiplayerSyncServiceProvider)
                     .rejectFriendRequest(myUid, user.uid);
-                ref.invalidate(authStateChangesProvider);
+                ref.invalidate(socialGraphProvider);
                 if (mounted)
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text('friend_request_rejected'.tr())),
@@ -672,7 +702,7 @@ class _SocialOverlayState extends ConsumerState<SocialOverlay> {
             await ref
                 .read(multiplayerSyncServiceProvider)
                 .sendFriendRequest(myUid, user.uid);
-            ref.invalidate(authStateChangesProvider);
+            ref.invalidate(socialGraphProvider);
             if (mounted)
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(content: Text('friend_request_sent'.tr())),

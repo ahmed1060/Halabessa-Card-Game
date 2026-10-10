@@ -135,6 +135,7 @@ class PlayerProfilePreview extends ConsumerWidget {
                             ? null 
                             : () async {
                               await ref.read(multiplayerSyncServiceProvider).sendFriendRequest(currentUser.uid, displayUser.uid);
+                              if (context.mounted) ref.invalidate(socialGraphProvider);
                               if (context.mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(content: Text('friend_request_sent'.tr())),

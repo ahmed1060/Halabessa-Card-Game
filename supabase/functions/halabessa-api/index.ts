@@ -15,6 +15,7 @@ import { createDeletionJobStore, deletionReceiptHash, recoverDeletion } from './
 import { createFirebaseIdentityStore, assertActiveIdentity } from './firebase_identity.ts';
 import { runDeletionWorker } from './deletion_worker.ts';
 import { createDatabaseRunner, databaseConnectionString } from "./database.ts";
+import { createRequestTiming } from './request_timing.ts';
 import { commitAndDeliver, deliverLatestRoom, matchMirrorUpdates, participantSnapshot, publicMatchState } from "./match_delivery.ts";
 
 const firebaseProject = "halabessa-card-game1";
@@ -49,6 +50,8 @@ function headers(origin: string | null) {
     "Access-Control-Allow-Origin": origin && allowedOrigins.has(origin) ? origin : "null",
     "Access-Control-Allow-Headers": "authorization, content-type",
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Max-Age": "600",
+    "Cache-Control": "no-store",
     "Content-Type": "application/json",
     Vary: "Origin",
   };
@@ -292,14 +295,17 @@ Deno.serve(async (request) => {
   if (request.method === "GET") return reply({ ok: true, service: "halabessa-api" }, 200, origin);
   if (request.method !== "POST") return reply({ error: "method_not_allowed" }, 405, origin);
 
+  const timing = createRequestTiming(record => console.log(JSON.stringify(record)));
+  const runDatabase = <T>(work: (client: Client) => Promise<T>) => withDatabase(work, timing.observe);
   try {
     // Worker/receipt recovery must precede Firebase auth and normal profile
     // upserts: a disabled/deleted identity cannot be required to finish cleanup.
     const input = await request.json();
+    timing.operation(input?.action);
     if (!input || typeof input !== 'object' || Array.isArray(input)) return reply({error:'invalid_request'},400,origin);
     if (input.action === 'accountDeletionStatus') {
       await deletionReceiptHash(input.receipt); // Reject malformed guesses before connecting.
-      return await withDatabase(async connection => reply(await recoverDeletion(
+      return await runDatabase(async connection => reply(await recoverDeletion(
         async (sql,args)=>(await connection.queryObject<Record<string,unknown>>(sql,args)).rows,
         input.receipt),200,origin));
     }
@@ -307,7 +313,7 @@ Deno.serve(async (request) => {
       const workerKey=request.headers.get('x-deletion-worker');
       if(!workerKey || !/^[a-f0-9]{64}$/.test(workerKey))return reply({error:'unauthenticated'},401,origin);
       const keyHash=await deletionReceiptHash(workerKey);
-      return await withDatabase(async connection=>{
+      return await runDatabase(async connection=>{
         const query=async (sql:string,args:unknown[])=>(await connection.queryObject<Record<string,unknown>>(sql,args)).rows;
         const permitted=await query('select 1 from halabessa.deletion_worker_config where key_hash=$1',[keyHash]);
         if(!permitted.length)return reply({error:'unauthenticated'},401,origin);
@@ -340,13 +346,13 @@ Deno.serve(async (request) => {
         return reply({ok:true,...status},200,origin);
       });
     }
-    const user = await firebaseUser(request);
+    const user = await timing.measure('jwt', () => firebaseUser(request));
     if(input.action === 'requestAccountDeletion') {
       const receiptHash=await deletionReceiptHash(input.receipt);
       const identity=createFirebaseIdentityStore(firebaseProject,firebaseAccessToken);
       const account=await identity.lookup(user.uid);
       assertActiveIdentity(account,user.authTime);
-      return await withDatabase(async connection=>{
+      return await runDatabase(async connection=>{
         const query=async (sql:string,args:unknown[])=>(await connection.queryObject<Record<string,unknown>>(sql,args)).rows;
         const actor={...user,email:account!.email,admin:user.admin || account!.admin || await isAdmin(connection,user),verifiedGuest:account!.verifiedGuest};
         // Serialize acceptance with any existing profile mutation; no account
@@ -379,7 +385,7 @@ Deno.serve(async (request) => {
         return reply({id:job.id,status:job.status},202,origin);
       });
     }
-    await assertNotDeletionBlocked(user.uid, path => firebaseRequest(path));
+    await timing.measure('deletion_guard', () => assertNotDeletionBlocked(user.uid, path => firebaseRequest(path)));
     const body = input as {
       action?: string;
       toUid?: unknown;
@@ -423,7 +429,7 @@ Deno.serve(async (request) => {
           throw error;
         }
     }
-    return await withDatabase(async (connection) => {
+    return await runDatabase(async (connection) => {
       // Defense in depth: once durable deletion is accepted, no ordinary API
       // request can bootstrap the deleted profile again. Receipt/worker actions
       // will use a separate authorized path rather than this normal upsert.
@@ -431,14 +437,16 @@ Deno.serve(async (request) => {
         select 1 from halabessa.account_deletion_jobs where firebase_uid = ${user.uid}
       `;
       if (blocked.rows.length) return reply({error:'unauthenticated'},401,origin);
-      await connection.queryObject`
+      await timing.measure('profile_sync', () => connection.queryObject`
         insert into halabessa.user_profiles (firebase_uid, email, display_name)
         values (${user.uid}, ${user.email}, ${user.name})
         on conflict (firebase_uid) do update set
           email = excluded.email,
           display_name = excluded.display_name,
           updated_at = now()
-      `;
+        where halabessa.user_profiles.email is distinct from excluded.email
+           or halabessa.user_profiles.display_name is distinct from excluded.display_name
+      `);
       if (body.action === "uploadAsset") {
         if (body.kind !== "avatar" && !await isAdmin(connection, user)) {
           return reply({ error: "admin_required" }, 403, origin);
@@ -556,10 +564,10 @@ Deno.serve(async (request) => {
               transactionOpen = false;
               return reply({ error: "command_id_conflict" }, 409, origin);
             }
-            const delivery = await commitAndDeliver(async () => {
+            const delivery = await commitAndDeliver(() => timing.measure('commit', async () => {
               await connection.queryObject`commit`;
               transactionOpen = false;
-            }, () => mirrorDurableRoom(connection, id));
+            }), () => timing.measure('mirror', () => mirrorDurableRoom(connection, id)));
             return reply({ ...duplicate.rows[0].result,
               appliedVersion: duplicate.rows[0].result.version,
               ...participantSnapshot(delivery.snapshot ?? {
@@ -623,10 +631,10 @@ Deno.serve(async (request) => {
               (${id}, ${commandId}::uuid, ${user.uid}, ${commandType}, ${expectedVersion}, ${appliedVersion},
                ${JSON.stringify(ledgerPayload)}::jsonb, ${JSON.stringify(response)}::jsonb)
           `;
-          const delivery = await commitAndDeliver(async () => {
+          const delivery = await commitAndDeliver(() => timing.measure('commit', async () => {
             await connection.queryObject`commit`;
             transactionOpen = false;
-          }, () => mirrorDurableRoom(connection, id));
+          }), () => timing.measure('mirror', () => mirrorDurableRoom(connection, id)));
           if (delivery.mirrorPending) console.warn("halabessa-match: committed command awaits mirror repair");
           return reply({ ...response,
             ...participantSnapshot(delivery.snapshot ?? {
@@ -686,9 +694,9 @@ Deno.serve(async (request) => {
               set state = ${JSON.stringify(publicMatchState({ ...state, handCards: room.hands ?? {} }, version))}::jsonb,
                   version = ${version}, updated_at = now() where room_id = ${id}`;
           }
-          const delivery = await commitAndDeliver(async () => {
+          const delivery = await commitAndDeliver(() => timing.measure('commit', async () => {
             await connection.queryObject`commit`; transactionOpen = false;
-          }, () => mirrorDurableRoom(connection, id));
+          }), () => timing.measure('mirror', () => mirrorDurableRoom(connection, id)));
           return reply({ ok: true, settled: true, duplicate,
             ...participantSnapshot(delivery.snapshot ?? { state, version, hands: room.hands ?? {} }, user.uid),
             mirrorPending: delivery.mirrorPending }, 200, origin);
@@ -809,9 +817,9 @@ Deno.serve(async (request) => {
                 set hands = ${JSON.stringify(hands)}::jsonb where room_id = ${id}`;
             }
             await connection.queryObject`delete from halabessa.room_invites where room_id = ${id} and recipient_uid = ${user.uid}`;
-            const delivery = await commitAndDeliver(async () => {
+            const delivery = await commitAndDeliver(() => timing.measure('commit', async () => {
               await connection.queryObject`commit`; joinTransactionOpen = false;
-            }, () => mirrorDurableRoom(connection, id));
+            }), () => timing.measure('mirror', () => mirrorDurableRoom(connection, id)));
             const snapshot = participantSnapshot(delivery.snapshot ?? { state: publicState, version, hands }, user.uid);
             return reply({ roomId: id, match: snapshot.state, ...snapshot,
               seatIndex: joined.seatIndex, alreadyJoined: joined.alreadyJoined,
@@ -964,19 +972,23 @@ Deno.serve(async (request) => {
         return reply({ ok: true, roomId: id }, 200, origin);
       }
       if (body.action === "getSocialGraph") {
-        const friends = await connection.queryObject<{ uid: string }>`select friend_uid as uid from halabessa.friendships where owner_uid = ${user.uid}`;
-        const incoming = await connection.queryObject<{ uid: string }>`select sender_uid as uid from halabessa.friend_requests where recipient_uid = ${user.uid}`;
-        const outgoing = await connection.queryObject<{ uid: string }>`select recipient_uid as uid from halabessa.friend_requests where sender_uid = ${user.uid}`;
-        const invites = await connection.queryObject<{ room_id: string; display_name: string }>`
-          select i.room_id, p.display_name from halabessa.room_invites i
-          join halabessa.user_profiles p on p.firebase_uid = i.sender_uid
-          where i.recipient_uid = ${user.uid}
-        `;
+        // One network round trip and one MVCC snapshot, with the same indexed
+        // predicates and response schema as the previous four queries.
+        const graph = await timing.measure('social_query', () => connection.queryObject<{
+          friends: string[]; incoming: string[]; outgoing: string[]; invites: Record<string, string>;
+        }>`select
+          coalesce((select jsonb_agg(friend_uid) from halabessa.friendships where owner_uid=${user.uid}), '[]'::jsonb) as friends,
+          coalesce((select jsonb_agg(sender_uid) from halabessa.friend_requests where recipient_uid=${user.uid}), '[]'::jsonb) as incoming,
+          coalesce((select jsonb_agg(recipient_uid) from halabessa.friend_requests where sender_uid=${user.uid}), '[]'::jsonb) as outgoing,
+          coalesce((select jsonb_object_agg(i.room_id, p.display_name) from halabessa.room_invites i
+            join halabessa.user_profiles p on p.firebase_uid=i.sender_uid
+            where i.recipient_uid=${user.uid}), '{}'::jsonb) as invites`);
+        const social = graph.rows[0];
         return reply({
-          friends: friends.rows.map((row) => row.uid),
-          pendingFriendRequests: incoming.rows.map((row) => row.uid),
-          sentFriendRequests: outgoing.rows.map((row) => row.uid),
-          friendInvites: Object.fromEntries(invites.rows.map((row) => [row.room_id, row.display_name])),
+          friends: social.friends,
+          pendingFriendRequests: social.incoming,
+          sentFriendRequests: social.outgoing,
+          friendInvites: social.invites,
         }, 200, origin);
       }
       if (body.action === "sendFriendRequest") {
@@ -1027,5 +1039,7 @@ Deno.serve(async (request) => {
       return reply({error:'account_unavailable'},409,origin);
     }
     return reply({ error: message === "unauthenticated" ? message : "internal_error" }, message === "unauthenticated" ? 401 : 500, origin);
+  } finally {
+    timing.finish();
   }
 });

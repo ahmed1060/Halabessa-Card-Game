@@ -4,7 +4,6 @@ import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/foundation.dart';
-import 'package:halabessa/core/services/supabase_backend_service.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 import 'dart:math';
@@ -51,27 +50,6 @@ class FirebaseAuthRepository implements AuthRepository {
     return current?.isAnonymous == true
         ? current!.linkWithProvider(provider)
         : _firebaseAuth.signInWithProvider(provider);
-  }
-
-  // Cache the server-owned admin status per user so authStateChanges does not
-  // repeatedly invoke the Edge Function on Firebase token refreshes.
-  String? _adminSyncedForUid;
-  bool _cachedIsAdmin = false;
-
-  /// The real source of admin authorization is the Supabase Edge Function,
-  /// never the client-writable Firebase profile field.
-  Future<bool> _syncAdminClaim(String uid) async {
-    if (_adminSyncedForUid == uid) return _cachedIsAdmin;
-    try {
-      final data = await SupabaseBackendService.call('getAdminStatus');
-      final isAdmin = data['admin'] == true;
-      _adminSyncedForUid = uid;
-      _cachedIsAdmin = isAdmin;
-      return isAdmin;
-    } catch (e) {
-      debugPrint("Admin claim sync failed: $e");
-      return false;
-    }
   }
 
   Future<void> _syncUserToDatabase(
@@ -128,8 +106,8 @@ class FirebaseAuthRepository implements AuthRepository {
     // isAdmin is never set true here, even for the admin's own email: this
     // object gets persisted by _syncUserToDatabase, and firestore.rules now
     // rejects any client write that sets isAdmin to anything but false (see
-    // HAL-08). The real value comes from _syncAdminClaim in
-    // authStateChanges, which asks the server-side custom claim instead.
+    // HAL-08). The presentation provider verifies admin with the server
+    // independently, without blocking profile publication.
     return AppUser(
       uid: user.uid,
       email: user.email ?? '',
@@ -152,7 +130,7 @@ class FirebaseAuthRepository implements AuthRepository {
           .collection('users')
           .doc(firebaseUser.uid)
           .snapshots()
-          .asyncMap((doc) async {
+          .map((doc) {
             AppUser? user;
             if (doc.exists && doc.data() != null) {
               user = AppUser.fromJson(doc.data()!, firebaseUser.uid);
@@ -160,37 +138,16 @@ class FirebaseAuthRepository implements AuthRepository {
             user ??= _userFromFirebase(firebaseUser);
             if (user == null) return null;
 
-            // Authorization comes from the live custom claim, not whatever
-            // Firestore's isAdmin mirror currently says -- overriding it here
-            // means a stale or (pre-fix) tampered mirror can never grant more
-            // than the claim actually allows. See HAL-08.
-            final isAdmin = await _syncAdminClaim(firebaseUser.uid);
-            // Friend state is server-owned in Supabase. Firebase Auth and
-            // Firestore remain the identity/profile layer during the migration.
-            try {
-              final social = await SupabaseBackendService.call(
-                'getSocialGraph',
-              );
-              return user.copyWith(
-                isAdmin: isAdmin,
-                friends: List<String>.from(
-                  social['friends'] as List? ?? const [],
-                ),
-                pendingFriendRequests: List<String>.from(
-                  social['pendingFriendRequests'] as List? ?? const [],
-                ),
-                sentFriendRequests: List<String>.from(
-                  social['sentFriendRequests'] as List? ?? const [],
-                ),
-                friendInvites: Map<String, String>.from(
-                  social['friendInvites'] as Map? ?? const {},
-                ),
-              );
-            } catch (_) {
-              // Keep the existing Firestore-backed values available offline or
-              // while the Edge Function is temporarily unavailable.
-              return user.copyWith(isAdmin: isAdmin);
-            }
+            // Publish the own profile immediately. Client-writable mirrors
+            // must never grant admin access or manufacture server-owned social
+            // relationships. Those domains are loaded separately per session.
+            return user.copyWith(
+              isAdmin: false,
+              friends: const [],
+              pendingFriendRequests: const [],
+              sentFriendRequests: const [],
+              friendInvites: const {},
+            );
           });
     });
   }

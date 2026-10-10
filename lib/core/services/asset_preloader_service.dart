@@ -1,106 +1,95 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:audioplayers/audioplayers.dart';
-import '../providers/global_settings_provider.dart';
 import '../../features/home/presentation/providers/store_provider.dart';
+
+/// Startup warms only the visible theme, not the entire shop or remote music.
+/// Other assets load normally when their screen/skin is selected.
+Set<String> startupImagePaths({
+  required bool landscape,
+  required ShopItem table,
+  required ShopItem cardBack,
+}) => {
+  landscape
+      ? 'assets/images/tables/lantern_nights_v1.png'
+      : 'assets/images/tables/lantern_nights_portrait_v2.png',
+  table.assetPath,
+  // Lantern cards are painted, so their old raster alternatives need no decode.
+  if (cardBack.id != 'default_card') ...{
+    cardBack.assetPath,
+    if (cardBack.frontSkinPath != null) cardBack.frontSkinPath!,
+    if (cardBack.aceSkinPath != null) cardBack.aceSkinPath!,
+    if (cardBack.sevenDiamondSkinPath != null) cardBack.sevenDiamondSkinPath!,
+    ...?cardBack.faceIllustrations?.values,
+    ...?cardBack.suitIcons?.values,
+  },
+}..removeWhere((path) => path.isEmpty);
+
+ImageProvider<Object> startupImageProvider(String path) =>
+    path.startsWith('https://') || path.startsWith('http://')
+    ? NetworkImage(path)
+    : AssetImage(path);
 
 class AssetPreloaderService {
   final Ref _ref;
-  final _audioCache = AudioPlayer();
-
+  bool _disposed = false;
   AssetPreloaderService(this._ref);
-
   final _loadProgressController = StreamController<double>.broadcast();
   Stream<double> get loadProgress => _loadProgressController.stream;
 
+  void _progress(double value) {
+    if (!_disposed) _loadProgressController.add(value);
+  }
+
   Future<void> preloadAll(BuildContext context) async {
-    debugPrint('PRELOADER: Starting asset preloading...');
-    final startTime = DateTime.now();
-    _loadProgressController.add(0.0);
-
-    final List<String> imageAssets = [
-      // Essential
-      'assets/images/gaming/game_logo.png',
-      'assets/images/gaming/login_bg.png',
-      'assets/images/items/ticket.png',
-      
-      // Avatars
-      'assets/images/avatars/avatar1.png',
-      'assets/images/avatars/avatar2.png',
-      'assets/images/avatars/avatar3.png',
-      'assets/images/avatars/avatar4.png',
-      'assets/images/avatars/avatar5.png',
-      'assets/images/avatars/avatar6.png',
-
-      // Tables
-      'assets/images/tables/table_skin_ancient_marble.png',
-      'assets/images/tables/table_skin_golden_oasis.png',
-      'assets/images/tables/table_skin_midnight_cyber.png',
-      'assets/images/tables/table_skin_oceanic_depths.png',
-      'assets/images/tables/table_skin_royal_velvet.png',
-
-      // Cards (Royal is default)
-      'assets/images/cards/royal/card_back_royal.png',
-      'assets/images/cards/royal/card_front_royal_bg.png',
-      'assets/images/cards/royal/card_seven_royal.png',
-    ];
-
-    // Collect Store Items
-    try {
-      final storeNotifier = _ref.read(storeProvider.notifier);
-      final allItems = storeNotifier.allItems;
-      for (var item in allItems) {
-        if (!imageAssets.contains(item.assetPath)) imageAssets.add(item.assetPath);
-        if (item.frontSkinPath != null && !imageAssets.contains(item.frontSkinPath!)) {
-          imageAssets.add(item.frontSkinPath!);
+    _progress(0);
+    final paths = startupImagePaths(
+      landscape:
+          MediaQuery.sizeOf(context).width > MediaQuery.sizeOf(context).height,
+      table: _ref.read(activeTableSkinProvider),
+      cardBack: _ref.read(activeCardBackProvider),
+    ).toList();
+    var next = 0;
+    var loaded = 0;
+    var finished = false;
+    Future<void> warm() async {
+      while (!finished &&
+          !_disposed &&
+          context.mounted &&
+          next < paths.length) {
+        final path = paths[next++];
+        try {
+          await precacheImage(
+            startupImageProvider(path),
+            context,
+            onError: (_, __) {},
+          ).timeout(const Duration(seconds: 3));
+        } catch (_) {
+          // Loading UI must never require a catalogue/network asset to succeed.
         }
-        if (item.faceIllustrations != null) {
-          for (var path in item.faceIllustrations!.values) {
-             if (!imageAssets.contains(path)) imageAssets.add(path);
-          }
-        }
+        if (!finished) _progress(++loaded / paths.length);
       }
-    } catch (e) {
-      debugPrint('PRELOADER: Store items collection failed: $e');
     }
 
-    int loadedCount = 0;
-    final int total = imageAssets.length;
-
-    await Future.wait(imageAssets.map((path) async {
-      try {
-        if (context.mounted) {
-          await precacheImage(AssetImage(path), context).catchError((_) => null);
-        }
-      } catch (_) {}
-      loadedCount++;
-      _loadProgressController.add(loadedCount / total);
-    }));
-
-    // Audio Pre-caching (Simplified)
+    // Limit simultaneous decodes. A slow custom skin cannot hold startup.
     try {
-      final globalSettings = _ref.read(globalSettingsProvider);
-      if (globalSettings.musicOverrideUrl != null) {
-        await _audioCache
-            .setSourceUrl(globalSettings.musicOverrideUrl!)
-            .timeout(const Duration(seconds: 5));
-      }
-    } catch (_) {}
-
-    final duration = DateTime.now().difference(startTime);
-    debugPrint('PRELOADER: Preloading finished in ${duration.inMilliseconds}ms');
-    _loadProgressController.add(1.0);
+      await Future.wait([warm(), warm()]).timeout(const Duration(seconds: 4));
+    } on TimeoutException {
+      // Remaining artwork is loaded by its normal visible widget.
+    } finally {
+      finished = true;
+      _progress(1);
+    }
   }
 
   void dispose() {
-    _audioCache.dispose();
-    _loadProgressController.close();
+    _disposed = true;
+    unawaited(_loadProgressController.close());
   }
 }
 
 final assetPreloaderServiceProvider = Provider<AssetPreloaderService>((ref) {
   final service = AssetPreloaderService(ref);
-  ref.onDispose(() => service.dispose());
+  ref.onDispose(service.dispose);
   return service;
 });

@@ -40,6 +40,7 @@ jobs:
           functions/test/edge_room_seating.test.ts functions/test/edge_room_summary.test.ts
           functions/test/edge_match_rewards.test.ts functions/test/edge_turn_policy.test.ts
           functions/test/edge_match_delivery.test.ts functions/test/edge_database.test.ts
+          functions/test/edge_request_timing.test.ts
           functions/test/edge_public_profiles.test.ts functions/test/edge_account_deletion.test.ts
           functions/test/edge_firebase_identity.test.ts
           functions/test/edge_deletion_job_store.test.ts

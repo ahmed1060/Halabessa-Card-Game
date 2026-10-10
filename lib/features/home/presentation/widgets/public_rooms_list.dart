@@ -8,6 +8,16 @@ import 'package:halabessa/features/auth/presentation/providers/auth_providers.da
 import 'package:halabessa/core/theme/theme_config.dart';
 import 'package:halabessa/core/utils/error_handler.dart';
 
+// Subscription identity survives widget/profile rebuilds. Cancel when the
+// lobby is unmounted or the authenticated session changes.
+final publicRoomsProvider = StreamProvider.autoDispose<List<RoomSummary>>((
+  ref,
+) {
+  final uid = ref.watch(currentUserProvider.select((user) => user?.uid));
+  if (uid == null) return Stream.value(const []);
+  return ref.watch(multiplayerSyncServiceProvider).watchPublicMatches();
+});
+
 class PublicRoomsList extends ConsumerWidget {
   const PublicRoomsList({super.key});
 
@@ -15,21 +25,31 @@ class PublicRoomsList extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final syncService = ref.watch(multiplayerSyncServiceProvider);
     final currentUser = ref.watch(currentUserProvider);
-    return StreamBuilder<List<RoomSummary>>(
-      stream: syncService.watchPublicMatches(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
+    final rooms = ref.watch(publicRoomsProvider);
+    return Builder(
+      builder: (context) {
+        if (rooms.isLoading && !rooms.hasValue) {
           return const Center(child: CircularProgressIndicator());
         }
-        
-        final matches = snapshot.data ?? [];
+        if (rooms.hasError && !rooms.hasValue) {
+          return TextButton.icon(
+            onPressed: () => ref.invalidate(publicRoomsProvider),
+            icon: const Icon(Icons.refresh),
+            label: Text('retry_action'.tr()),
+          );
+        }
+
+        final matches = rooms.value ?? [];
         if (matches.isEmpty) {
           return Padding(
             padding: const EdgeInsets.all(24.0),
             child: Text(
               'no_public_matches'.tr(),
               textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.white70, fontStyle: FontStyle.italic),
+              style: const TextStyle(
+                color: Colors.white70,
+                fontStyle: FontStyle.italic,
+              ),
             ),
           );
         }
@@ -43,30 +63,44 @@ class PublicRoomsList extends ConsumerWidget {
             return Card(
               color: Colors.white.withOpacity(0.05),
               margin: const EdgeInsets.symmetric(vertical: 8),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
               child: ListTile(
                 leading: const CircleAvatar(
                   backgroundColor: Colors.teal,
                   child: Icon(Icons.videogame_asset, color: Colors.white),
                 ),
                 title: Text(
-                  'join_matching_mode'.tr(args: [match.mode.name.toUpperCase()]),
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                  'join_matching_mode'.tr(
+                    args: [match.mode.name.toUpperCase()],
+                  ),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 subtitle: Text(
-                  'room_players_info'.tr(args: [
-                    '${match.playerIds.length - match.openSeatCount}/4',
-                    match.id
-                  ]),
+                  'room_players_info'.tr(
+                    args: [
+                      '${match.playerIds.length - match.openSeatCount}/4',
+                      match.id,
+                    ],
+                  ),
                   style: const TextStyle(color: Colors.white70),
                 ),
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     IconButton(
-                      icon: Icon(Icons.visibility_outlined, color: ThemeConfig.goldAccent),
+                      icon: Icon(
+                        Icons.visibility_outlined,
+                        color: ThemeConfig.goldAccent,
+                      ),
                       onPressed: () {
-                        ref.read(matchStateProvider.notifier).spectateMatch(match.id);
+                        ref
+                            .read(matchStateProvider.notifier)
+                            .spectateMatch(match.id);
                         Navigator.pushNamed(context, '/game');
                       },
                       tooltip: 'spectate'.tr(),
@@ -80,46 +114,74 @@ class PublicRoomsList extends ConsumerWidget {
                           children: [
                             if (currentUser?.isAdmin == true)
                               IconButton(
-                                icon: const Icon(Icons.delete_forever, color: Colors.redAccent),
-                                onPressed: () => _confirmDelete(context, syncService, match.id),
+                                icon: const Icon(
+                                  Icons.delete_forever,
+                                  color: Colors.redAccent,
+                                ),
+                                onPressed: () => _confirmDelete(
+                                  context,
+                                  syncService,
+                                  match.id,
+                                ),
                                 tooltip: 'delete_room'.tr(),
                               ),
-                            if (currentUser?.isAdmin == true) const SizedBox(width: 8),
+                            if (currentUser?.isAdmin == true)
+                              const SizedBox(width: 8),
                             ElevatedButton(
-                              onPressed: isFull ? null : () async {
-                                if (currentUser != null) {
-                                  // A successful join removes this room from the
-                                  // availability stream before the request returns.
-                                  // Keep route-level handles, not the removed tile's
-                                  // BuildContext, across that asynchronous boundary.
-                                  final navigator = Navigator.of(context);
-                                  final messenger = ScaffoldMessenger.of(context);
-                                  try {
-                                    await ref.read(matchStateProvider.notifier).joinMatch(
-                                      match.id, 
-                                      currentUser.uid, 
-                                      currentUser.displayName
-                                    );
-                                    if (navigator.mounted) {
-                                      navigator.pushNamed('/game');
-                                    }
-                                  } catch (e) {
-                                    if (messenger.mounted) {
-                                      messenger.showSnackBar(
-                                        SnackBar(content: Text(ErrorHandler.getAuthErrorMessage(e))),
-                                      );
-                                    }
-                                  }
-                                }
-                              },
+                              onPressed: isFull
+                                  ? null
+                                  : () async {
+                                      if (currentUser != null) {
+                                        // A successful join removes this room from the
+                                        // availability stream before the request returns.
+                                        // Keep route-level handles, not the removed tile's
+                                        // BuildContext, across that asynchronous boundary.
+                                        final navigator = Navigator.of(context);
+                                        final messenger = ScaffoldMessenger.of(
+                                          context,
+                                        );
+                                        try {
+                                          await ref
+                                              .read(matchStateProvider.notifier)
+                                              .joinMatch(
+                                                match.id,
+                                                currentUser.uid,
+                                                currentUser.displayName,
+                                              );
+                                          if (navigator.mounted) {
+                                            navigator.pushNamed('/game');
+                                          }
+                                        } catch (e) {
+                                          if (messenger.mounted) {
+                                            messenger.showSnackBar(
+                                              SnackBar(
+                                                content: Text(
+                                                  ErrorHandler.getAuthErrorMessage(
+                                                    e,
+                                                  ),
+                                                ),
+                                              ),
+                                            );
+                                          }
+                                        }
+                                      }
+                                    },
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: isFull ? Colors.grey.withOpacity(0.3) : Colors.teal,
+                                backgroundColor: isFull
+                                    ? Colors.grey.withOpacity(0.3)
+                                    : Colors.teal,
                               ),
-                              child: Text(isFull ? (match.isActiveReplacementRoom ? 'table_playing'.tr() : 'full'.tr()) : 'join'.tr()),
+                              child: Text(
+                                isFull
+                                    ? (match.isActiveReplacementRoom
+                                          ? 'table_playing'.tr()
+                                          : 'full'.tr())
+                                    : 'join'.tr(),
+                              ),
                             ),
                           ],
                         );
-                      }
+                      },
                     ),
                   ],
                 ),
@@ -131,17 +193,30 @@ class PublicRoomsList extends ConsumerWidget {
     );
   }
 
-  void _confirmDelete(BuildContext context, MultiplayerSyncService syncService, String matchId) {
+  void _confirmDelete(
+    BuildContext context,
+    MultiplayerSyncService syncService,
+    String matchId,
+  ) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: const Color(0xFF1B263B),
-        title: Text('delete_room'.tr(), style: const TextStyle(color: Colors.white)),
-        content: Text('delete_room_confirm'.tr(args: [matchId]), style: const TextStyle(color: Colors.white70)),
+        title: Text(
+          'delete_room'.tr(),
+          style: const TextStyle(color: Colors.white),
+        ),
+        content: Text(
+          'delete_room_confirm'.tr(args: [matchId]),
+          style: const TextStyle(color: Colors.white70),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('cancel'.tr(), style: const TextStyle(color: Colors.white60)),
+            child: Text(
+              'cancel'.tr(),
+              style: const TextStyle(color: Colors.white60),
+            ),
           ),
           ElevatedButton(
             onPressed: () {

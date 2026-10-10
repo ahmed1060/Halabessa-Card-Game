@@ -79,3 +79,26 @@ test("observability preserves the supplied credentials and TLS/pooler settings",
   assert.equal(actual.searchParams.get("application_name"), "halabessa-api");
   assert.throws(() => databaseConnectionString(undefined), /server_not_configured/);
 });
+
+test('an expired queued request never runs or opens a second active socket', async () => {
+  let unblock!: () => void;
+  let created = 0;
+  let open = 0;
+  const blocker = new Promise<void>(resolve => { unblock = resolve; });
+  const run = createDatabaseRunner(() => {
+    created++;
+    return {async connect() { open++; assert.equal(open, 1); }, async end() { open--; }};
+  }, 8, () => {}, 15);
+  const first = run(async () => { await blocker; return 'committed'; });
+  let expiredWork = 0;
+  await assert.rejects(run(async () => { expiredWork++; }), /database_busy/);
+  assert.equal(created, 1);
+  assert.equal(expiredWork, 0);
+  const third = run(async () => 'after');
+  assert.equal(created, 1);
+  unblock();
+  assert.equal(await first, 'committed');
+  assert.equal(await third, 'after');
+  assert.equal(created, 2);
+  assert.equal(open, 0);
+});
