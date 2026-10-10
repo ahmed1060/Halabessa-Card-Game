@@ -64,6 +64,18 @@ export async function publishFencedMirror(request: MirrorRequest, id: string, ro
   if (cleared.status < 200 || cleared.status >= 300) throw Error('match_mirror_failed');
 }
 
+/** Legacy/create/index refresh adapters must not bypass a room's fence.
+ * A delayed version-zero summary cannot replace a newer authoritative index
+ * or recreate a deleted room, even when its SQL lease was rolled back.
+ */
+export async function publishFencedSummary(request: MirrorRequest, id: string, state: Row,
+  summarize: (state: Row) => Row) {
+  if (!/^[A-Z]{3}[0-9]{5}$/.test(id)) throw Error('invalid_room_id');
+  const version = state.serverVersion ?? 0;
+  if (!Number.isSafeInteger(version) || Number(version) < 0) throw Error('invalid_mirror_version');
+  await fencedPut(request, `rooms/${id}`, Number(version), summarize(state));
+}
+
 /** Do not remove these four tiny non-personal markers: removing them would
  * permit a delayed publisher to resurrect a deleted room. New room creation
  * already uses null_etag and retries a different ID on collision.

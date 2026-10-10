@@ -14,10 +14,10 @@ import { beginDeletion } from './account_deletion.ts';
 import { createDeletionJobStore, deletionReceiptHash, recoverDeletion } from './deletion_job_store.ts';
 import { createFirebaseIdentityStore, assertActiveIdentity } from './firebase_identity.ts';
 import { runDeletionWorker } from './deletion_worker.ts';
-import { createDatabaseRunner, configuredConnectionMode, databaseConnectionString, withDatabaseGuard } from "./database.ts";
+import { createDatabaseRunner, configuredConnectionMode, databaseConnectionString, transactionPoolerConnectionString, probeReadOnlyConnection, withDatabaseGuard } from "./database.ts";
 import { createRequestTiming } from './request_timing.ts';
 import { commitAndDeliver, participantSnapshot, publicMatchState } from "./match_delivery.ts";
-import { deleteFencedMirror, publishFencedMirror } from './mirror_fencing.ts';
+import { deleteFencedMirror, publishFencedMirror, publishFencedSummary } from './mirror_fencing.ts';
 import { commitAndQueue, earlyAckEnabled, publicationLease, publishDetachedRoom, publishRoom, retryPublicationLater } from './room_publication.ts';
 
 const firebaseProject = "halabessa-card-game1";
@@ -181,8 +181,16 @@ async function isAdmin(connection: Client, user: { uid: string; email: string | 
 // open a connection only for authenticated work and close it before replying.
 // DATABASE_POOLER_URL can select the shared transaction pooler (port 6543).
 // The platform URL also remains safe from retained per-isolate idle sockets.
-const withDatabase = createDatabaseRunner(() => new Client(databaseConnectionString(
-  Deno.env.get("DATABASE_POOLER_URL") ?? Deno.env.get("SUPABASE_DB_URL"),
+// Activate only after the worker-authorized read-only probe succeeds.
+const preferSharedPooler = true;
+function primaryDatabaseUrl() {
+  return Deno.env.get('DATABASE_POOLER_URL') ?? (preferSharedPooler
+    ? transactionPoolerConnectionString(Deno.env.get('SUPABASE_DB_URL'))
+    : Deno.env.get('SUPABASE_DB_URL'));
+}
+const withDatabase = createDatabaseRunner(purpose => new Client(databaseConnectionString(
+  purpose === 'pooler_probe' ? transactionPoolerConnectionString(Deno.env.get('SUPABASE_DB_URL')) :
+    purpose === 'direct_probe' ? Deno.env.get('SUPABASE_DB_URL') : primaryDatabaseUrl(),
 )));
 
 // Provided by the Supabase Edge runtime (not ordinary standalone Deno).
@@ -323,7 +331,7 @@ Deno.serve(async (request) => {
 
   const timing = createRequestTiming(record => console.log(JSON.stringify(record)), undefined,
     {region: Deno.env.get('SB_REGION'), configuredConnection: configuredConnectionMode(
-      Deno.env.get('DATABASE_POOLER_URL') ?? Deno.env.get('SUPABASE_DB_URL'))});
+      primaryDatabaseUrl())});
   const runDatabase = <T>(work: (client: Client) => Promise<T>) => withDatabase(work, timing.observe);
   const runBackgroundDatabase = <T>(work: (client: Client) => Promise<T>) =>
     withDatabase(work, timing.observe, 'background');
@@ -347,9 +355,20 @@ Deno.serve(async (request) => {
       const workerKey=request.headers.get('x-publication-worker');
       if(!workerKey || !/^[a-f0-9]{64}$/.test(workerKey))return reply({error:'unauthenticated'},401,origin);
       const hash=await deletionReceiptHash(workerKey);
-      const authorized=await runBackgroundDatabase(async connection =>
-        (await connection.queryObject`select 1 from halabessa.publication_worker_config where key_hash=${hash}`).rows.length>0);
+      const authorized=await withDatabase(async connection =>
+        (await connection.queryObject`select 1 from halabessa.publication_worker_config where key_hash=${hash}`).rows.length>0,
+        timing.observe, 'background', input.probeConnection ? 'direct_probe' : 'primary');
       if(!authorized)return reply({error:'unauthenticated'},401,origin);
+      if (input.probeConnection !== undefined) {
+        if (!['direct','shared_transaction'].includes(input.probeConnection)) return reply({error:'invalid_request'},400,origin);
+        const mode = input.probeConnection as 'direct' | 'shared_transaction';
+        const started = performance.now();
+        try {
+          await withDatabase(connection => probeReadOnlyConnection(sql => connection.queryObject(sql)),
+            timing.observe, 'background', mode === 'direct' ? 'direct_probe' : 'pooler_probe');
+          return reply({ok:true,connection:mode,probe_ms:Math.round(performance.now()-started)},200,origin);
+        } catch { return reply({error:'connection_probe_failed',connection:mode},503,origin); }
+      }
       const started=performance.now();
       let published=0,pending=0;
       // Release admission/socket after EVERY room. Retry workers cannot keep
@@ -831,21 +850,15 @@ Deno.serve(async (request) => {
             }
             if (created.status < 200 || created.status >= 300) throw new Error("room_create_failed");
             firebaseCreated = true;
-            const indexed = await firebaseRequest(`rooms/${id}`, "PUT", roomSummary(match));
-            if (indexed.status < 200 || indexed.status >= 300) throw new Error("room_index_failed");
+            await publishFencedSummary(firebaseRequest,id,match,roomSummary);
             await connection.queryObject`commit`;
             transactionOpen = false;
             return reply({ roomId: id, match, version: 0 }, 200, origin);
           } catch (error) {
             if (transactionOpen) await connection.queryObject`rollback`;
             if (firebaseCreated) {
-              const cleanup = await firebaseRequest("", "PATCH", {
-                [`matches/${id}`]: null,
-                [`rooms/${id}`]: null,
-              });
-              if (cleanup.status < 200 || cleanup.status >= 300) {
-                console.error("room create compensation failed", { roomId: id, status: cleanup.status });
-              }
+              try { await deleteFencedMirror(firebaseRequest,id); }
+              catch { console.error('room create compensation remains pending'); }
             }
             throw error;
           }
@@ -954,8 +967,7 @@ Deno.serve(async (request) => {
                 continue;
               }
               if (written.status < 200 || written.status >= 300) throw new Error("room_join_failed");
-              const indexed = await firebaseRequest(`rooms/${id}`, "PUT", roomSummary(match));
-              if (indexed.status < 200 || indexed.status >= 300) throw new Error("room_index_failed");
+              await publishFencedSummary(firebaseRequest,id,match,roomSummary);
               await connection.queryObject`delete from halabessa.room_invites where room_id = ${id} and recipient_uid = ${user.uid}`;
               await connection.queryObject`commit`;
               transactionOpen = false;
@@ -971,8 +983,7 @@ Deno.serve(async (request) => {
               throw error;
             }
           }
-          const indexed = await firebaseRequest(`rooms/${id}`, "PUT", roomSummary(match));
-          if (indexed.status < 200 || indexed.status >= 300) throw new Error("room_index_failed");
+          await publishFencedSummary(firebaseRequest,id,match,roomSummary);
           await connection.queryObject`delete from halabessa.room_invites where room_id = ${id} and recipient_uid = ${user.uid}`;
           const authoritative = await connection.queryObject<{ version: string }>`
             select version::text as version from halabessa.rooms where room_id = ${id}
@@ -994,8 +1005,7 @@ Deno.serve(async (request) => {
           await timing.measure('mirror', () => mirrorDurableRoom(connection,id));
           return reply({ ok: true, roomId: id }, 200, origin);
         }
-        const indexed = await firebaseRequest(`rooms/${id}`, "PUT", roomSummary(match));
-        if (indexed.status < 200 || indexed.status >= 300) throw new Error("room_index_failed");
+        await publishFencedSummary(firebaseRequest,id,match,roomSummary);
         return reply({ ok: true, roomId: id }, 200, origin);
       }
       if (body.action === "deleteRoom") {

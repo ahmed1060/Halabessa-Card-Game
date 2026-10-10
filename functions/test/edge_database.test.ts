@@ -1,6 +1,39 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createDatabaseRunner, configuredConnectionMode, databaseConnectionString, withDatabaseGuard } from "../../supabase/functions/halabessa-api/database.ts";
+import { createDatabaseRunner, configuredConnectionMode, databaseConnectionString, transactionPoolerConnectionString, probeReadOnlyConnection, withDatabaseGuard } from "../../supabase/functions/halabessa-api/database.ts";
+
+test('verified pooler preserves encoded credentials and TLS without accepting another project', () => {
+  const url = new URL(transactionPoolerConnectionString('postgresql://postgres:p%40ss%3A%2F%25@db.jmlipglfgmuyegoroepu.supabase.co:5432/postgres?sslmode=require'));
+  assert.equal(url.hostname, 'aws-0-eu-west-2.pooler.supabase.com');
+  assert.equal(url.username, 'postgres.jmlipglfgmuyegoroepu');
+  assert.equal(url.password, 'p%40ss%3A%2F%25');
+  assert.equal(url.port, '6543'); assert.equal(url.searchParams.get('sslmode'), 'require');
+  assert.equal(url.searchParams.get('application_name'), 'halabessa-api');
+  for (const value of [undefined, 'secret', 'postgres://postgres:secret@db.other.supabase.co/postgres',
+    'postgres://admin:secret@db.jmlipglfgmuyegoroepu.supabase.co/postgres',
+    'postgres://postgres:secret@db.jmlipglfgmuyegoroepu.supabase.co/postgres?host=other']) {
+    assert.throws(() => transactionPoolerConnectionString(value), /^Error: pooler_not_configured$/);
+  }
+  const enforced = new URL(transactionPoolerConnectionString('postgres://postgres:secret@db.jmlipglfgmuyegoroepu.supabase.co/postgres?sslmode=disable'));
+  assert.equal(enforced.searchParams.get('sslmode'), 'require');
+});
+
+test('read-only probe rolls back on success and error without replay or commit', async () => {
+  for (const fail of [false,true]) {
+    const calls: string[] = [];
+    const task = probeReadOnlyConnection(async sql => {calls.push(sql); if(fail && sql === 'select 1')throw Error('failure');});
+    if(fail) await assert.rejects(task,/failure/); else await task;
+    assert.deepEqual(calls, ['begin read only', "set local statement_timeout = '3000ms'", 'select 1', 'rollback']);
+  }
+});
+
+test('diagnostic clients share the same admission and socket budget as primary work', async () => {
+  const purposes: string[] = [];
+  const run = createDatabaseRunner(purpose => {purposes.push(purpose); return {async connect(){},async end(){}};});
+  await run(async()=>{}); await run(async()=>{},undefined,'background','pooler_probe');
+  await run(async()=>{},undefined,'background','direct_probe');
+  assert.deepEqual(purposes,['primary','pooler_probe','direct_probe']);
+});
 
 function deferred<T>() {
   let resolve!: (value: T) => void;

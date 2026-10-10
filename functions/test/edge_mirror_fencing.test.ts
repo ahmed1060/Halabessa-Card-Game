@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { publishFencedMirror, deleteFencedMirror, type MirrorRequest } from '../../supabase/functions/halabessa-api/mirror_fencing.ts';
+import { publishFencedMirror, publishFencedSummary, deleteFencedMirror, type MirrorRequest } from '../../supabase/functions/halabessa-api/mirror_fencing.ts';
 import type { CommittedRoom } from '../../supabase/functions/halabessa-api/match_delivery.ts';
 
 const marker = '__halabessaDelivery', id = 'ABC12345';
@@ -129,4 +129,15 @@ test('missing ETags, invalid versions and metadata UID collisions fail closed', 
   await assert.rejects(publishFencedMirror(db.request, id, collision, summarize), /reserved_player_uid/);
   db.put(`matches/${id}`, {[marker]: {version: 'not-a-version'}});
   await assert.rejects(publishFencedMirror(db.request, id, room(1), summarize), /invalid_mirror_version/);
+});
+
+test('legacy index refresh cannot rewind authoritative versions or resurrect deleted entries', async () => {
+  const db = database();
+  await publishFencedMirror(db.request, id, room(8), summarize);
+  await publishFencedSummary(db.request, id, {phase: 'waitingForPlayers', protocolVersion: 0}, summarize);
+  assert.equal(db.values.get(`rooms/${id}`).phase, 'playing');
+  assert.equal(db.values.get(`rooms/${id}`)[marker].version, 8);
+  await deleteFencedMirror(db.request, id);
+  await assert.rejects(publishFencedSummary(db.request, id, {phase: 'waitingForPlayers'}, summarize), /room_deleted/);
+  assert.equal(db.values.get(`rooms/${id}`)[marker].deleted, true);
 });

@@ -548,3 +548,34 @@ private publication intents, deletion guards or the non-personal room fences.
 After fencing is introduced, do not redeploy an older unfenced PATCH writer:
 that would bypass the monotonic/deletion boundary. Revert optional presentation
 or admission changes separately while keeping the fenced publication adapter.
+
+## Verified London transaction-pooler switch — 11 October
+
+The owner supplied the exact project transaction-pooler host, port and username
+(not a password). The backend reuses its existing stored database credential in
+memory. The URI builder accepts only this project's direct postgres endpoint,
+rejects query parameters that could override the destination or identity, and
+requires TLS. No connection string or credential is returned or logged.
+
+A diagnostic restricted to the existing private publication-worker key verifies
+the candidate with BEGIN READ ONLY, a three-second local statement timeout,
+SELECT 1 and ROLLBACK. It uses the same single-socket admission budget, closes
+the authorization connection before probing, and reports only a fixed mode and
+duration. It neither publishes rooms nor reads/modifies application records.
+
+The initial pooled probe succeeded (125 ms). Three alternating direct/pooler
+checks in London all succeeded: direct 115/101/102 ms; pooled 68/62/55 ms.
+These measure connection plus a trivial read-only transaction, NOT authenticated
+menu/game commands or user-visible latency. The verified shared transaction
+pooler is now the default; an explicit DATABASE_POOLER_URL remains an operator
+override. There is no automatic direct fallback or command replay on failure.
+Rollback can select the original direct URL using that override while preserving
+the publication fences, queue, private views and account-deletion guards.
+
+The final audit also fenced all four legacy/create/index-summary writes and
+room-creation compensation, eliminating paths that could bypass a newer index
+revision or resurrect a deleted room. Backend/build tests: 190 passed, full
+Edge entrypoint typecheck passed. Current client tests/builds are unchanged:
+400 Flutter tests, zero analysis errors (263 warning/info backlog), release web
+build passed. The adc04393 Hosting and Android CI jobs passed; iOS was still
+building at this checkpoint. No additional QA guest/room has yet been created.

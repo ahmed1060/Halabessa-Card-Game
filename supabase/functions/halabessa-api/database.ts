@@ -1,3 +1,4 @@
+export type DatabasePurpose = 'primary' | 'direct_probe' | 'pooler_probe';
 interface DatabaseClient {
   connect(): Promise<void>;
   end(): Promise<void>;
@@ -37,7 +38,7 @@ export async function withDatabaseGuard<Client, Result>(
  * the same client for the entire callback. Never replay a callback on failure.
  */
 export function createDatabaseRunner<Client extends DatabaseClient>(
-  createClient: () => Client,
+  createClient: (purpose: DatabasePurpose) => Client,
   maxPending = 8,
   onCloseError: () => void = () => console.error("halabessa-db: close failed"),
   maxQueueWaitMs = 5_000,
@@ -57,6 +58,7 @@ export function createDatabaseRunner<Client extends DatabaseClient>(
     work: (client: Client) => Promise<Result>,
     observe: (stage: string, ms: number) => void = () => {},
     priority: 'interactive' | 'background' = 'interactive',
+    purpose: DatabasePurpose = 'primary',
   ): Promise<Result> {
     // Background delivery is durable and can wait for cron. Reserve one
     // admission slot for an interactive request instead of filling the queue.
@@ -79,7 +81,7 @@ export function createDatabaseRunner<Client extends DatabaseClient>(
       async function execute() {
         let client: Client | undefined;
         try {
-          client = createClient();
+          client = createClient(purpose);
           const connectAt = performance.now();
           try { await client.connect(); }
           finally { observe('db_connect', performance.now() - connectAt); }
@@ -107,6 +109,39 @@ export function databaseConnectionString(value: string | undefined): string {
   const url = new URL(value);
   url.searchParams.set("application_name", "halabessa-api");
   return url.toString();
+}
+
+/** Reuse the stored credential only for this project's verified pooler.
+ * Never accept a caller-supplied host or return/log this URI in a response.
+ */
+export function transactionPoolerConnectionString(value: string | undefined): string {
+  try {
+    if (!value) throw Error();
+    const url = new URL(value);
+    if (!['postgres:', 'postgresql:'].includes(url.protocol) ||
+        url.hostname !== 'db.jmlipglfgmuyegoroepu.supabase.co' ||
+        url.username !== 'postgres' || !url.password || url.pathname !== '/postgres' ||
+        ['host','port','user','password','dbname'].some(key => url.searchParams.has(key))) throw Error();
+    url.hostname = 'aws-0-eu-west-2.pooler.supabase.com';
+    url.port = '6543';
+    url.username = 'postgres.jmlipglfgmuyegoroepu';
+    // Do not permit a driver fallback to plaintext after a TLS negotiation error.
+    if (!['require','verify-ca','verify-full'].includes(url.searchParams.get('sslmode') ?? '')) {
+      url.searchParams.set('sslmode', 'require');
+    }
+    return databaseConnectionString(url.toString());
+  } catch { throw Error('pooler_not_configured'); }
+}
+
+/** The diagnostic has no application reads/writes, commits or session state.
+ * Roll back on either outcome so transaction pooling can safely release it.
+ */
+export async function probeReadOnlyConnection(query: (sql: string) => Promise<unknown>): Promise<void> {
+  await query('begin read only');
+  try {
+    await query("set local statement_timeout = '3000ms'");
+    await query('select 1');
+  } finally { await query('rollback'); }
 }
 
 /** Classification only; never log the URL, hostname, database or credentials.
