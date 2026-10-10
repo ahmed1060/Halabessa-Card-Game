@@ -50,6 +50,9 @@ test('room change and pending outbox precede publication; retry publishes curren
   f.state.teamBScore=9;
   assert.equal(await f.store.advance(jobId,'alice'),false);
   assert.equal(f.publications[0].room.state.teamBScore,9);
+  const lease=f.calls.findIndex(c=>c.includes('pg_advisory_xact_lock'));
+  const roomLock=f.calls.findIndex(c=>c.startsWith('select room_id,state'));
+  assert.ok(lease>=0 && lease<roomLock,'publication lease must precede the room lock');
   assert.equal(f.outbox,true);assert.equal(await f.store.advance(jobId,'alice'),true);
   assert.equal(f.calls.filter(c=>c.startsWith('update halabessa.rooms')).length,1);
 });

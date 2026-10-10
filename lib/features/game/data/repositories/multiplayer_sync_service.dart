@@ -159,18 +159,26 @@ class MultiplayerSyncService {
   /// RTDB omits empty arrays. Validate revision, recipient and own-hand count
   /// before interpreting an absent hand as empty; never mix two publications.
   static MatchState privateRealtimeSnapshot(
-    Map<String, dynamic> data, String roomId, String callerUid,
+    Map<String, dynamic> data,
+    String roomId,
+    String callerUid,
   ) {
     final state = data['state'];
     final version = data['version'];
     final hand = data['hand'];
     final counts = state is Map ? state['handCounts'] : null;
-    if (state is! Map || state['id'] != roomId ||
-        state['protocolVersion'] != 1 || data['recipientUid'] != callerUid ||
-        version is! num || version < 0 || version != version.toInt() ||
-        state['serverVersion'] != version || state['playerIds'] is! List ||
+    if (state is! Map ||
+        state['id'] != roomId ||
+        state['protocolVersion'] != 1 ||
+        data['recipientUid'] != callerUid ||
+        version is! num ||
+        version < 0 ||
+        version != version.toInt() ||
+        state['serverVersion'] != version ||
+        state['playerIds'] is! List ||
         !(state['playerIds'] as List).contains(callerUid) ||
-        counts is! Map || counts[callerUid] != _privateHandLength(hand)) {
+        counts is! Map ||
+        counts[callerUid] != _privateHandLength(hand)) {
       throw const SupabaseBackendException('invalid_match_response');
     }
     return commandSnapshot(data, callerUid);
@@ -321,6 +329,7 @@ class MultiplayerSyncService {
     String matchId, {
     String? callerUid,
     bool spectator = false,
+    MatchState? initialSnapshot,
   }) async* {
     if (spectator) {
       yield* matchRef.child(matchId).onValue.map((event) {
@@ -333,8 +342,11 @@ class MultiplayerSyncService {
     }
     // Inspect the protocol before subscribing to the private tree. Server
     // rooms never read matchHands/$id (which would reveal opponents' cards).
-    final initial = await matchRef.child(matchId).get();
-    final value = initial.value;
+    final seed =
+        initialSnapshot?.id == matchId && initialSnapshot!.usesServerCommands
+        ? initialSnapshot
+        : null;
+    final value = seed?.toJson() ?? (await matchRef.child(matchId).get()).value;
     final publicState = value is Map ? Map<String, dynamic>.from(value) : null;
     if (publicState == null) {
       yield null;
@@ -347,17 +359,24 @@ class MultiplayerSyncService {
       yield* watchCommandSnapshots(
         roomId: matchId,
         callerUid: callerUid,
+        initialSnapshot: seed,
         notifications: matchRef.child(matchId).onValue.map((event) {
           final value = event.snapshot.value;
           return value is Map ? Map<String, dynamic>.from(value) : null;
         }),
         fetchSnapshot: () => getCommandSnapshot(matchId, callerUid),
-        privateSnapshots: _db.ref('matchViews/$matchId/$callerUid').onValue.map((event) {
-          final value = event.snapshot.value;
-          return value is Map
-              ? privateRealtimeSnapshot(Map<String, dynamic>.from(value), matchId, callerUid)
-              : null;
-        }),
+        privateSnapshots: _db.ref('matchViews/$matchId/$callerUid').onValue.map(
+          (event) {
+            final value = event.snapshot.value;
+            return value is Map
+                ? privateRealtimeSnapshot(
+                    Map<String, dynamic>.from(value),
+                    matchId,
+                    callerUid,
+                  )
+                : null;
+          },
+        ),
         acceptedSnapshots: _accepted.stream
             .where((event) => event.$1 == callerUid && event.$2.id == matchId)
             .map((event) => event.$2),

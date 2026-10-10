@@ -536,6 +536,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
 
     _matchListener = ref.read(multiplayerSyncServiceProvider).watchMatch(
       matchId, callerUid: ref.read(currentUserProvider)?.uid, spectator: spectating,
+      initialSnapshot: state,
     ).listen(
       (serverState) {
         if (!mounted || generation != _bindingGeneration) return;

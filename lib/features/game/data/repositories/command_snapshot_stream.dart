@@ -12,6 +12,7 @@ Stream<MatchState?> watchCommandSnapshots({
   String? callerUid,
   Stream<MatchState?>? privateSnapshots,
   Stream<MatchState>? acceptedSnapshots,
+  MatchState? initialSnapshot,
   Duration recoveryDelay = const Duration(milliseconds: 500),
 }) {
   late StreamController<MatchState?> controller;
@@ -29,12 +30,18 @@ Stream<MatchState?> watchCommandSnapshots({
   var fetching = false;
   var active = true;
 
+  bool validSnapshot(MatchState snapshot) =>
+      snapshot.id == roomId &&
+      snapshot.usesServerCommands &&
+      snapshot.serverVersion >= 0 &&
+      (callerUid == null ||
+          (!snapshot.handCards.keys.any((uid) => uid != callerUid) &&
+              (snapshot.handCards[callerUid]?.length ?? 0) ==
+                  (snapshot.handCounts[callerUid] ?? 0)));
+
   void accept(MatchState snapshot) {
     if (!active || !haveRoom || released) return;
-    if (snapshot.id != roomId ||
-        !snapshot.usesServerCommands ||
-        (callerUid != null &&
-            snapshot.handCards.keys.any((uid) => uid != callerUid))) {
+    if (!validSnapshot(snapshot)) {
       controller.addError(StateError('Unexpected command snapshot'));
       return;
     }
@@ -48,10 +55,7 @@ Stream<MatchState?> watchCommandSnapshots({
 
   void offer(MatchState snapshot) {
     if (!active || released || (seenPublic && !haveRoom)) return;
-    if (snapshot.id != roomId ||
-        !snapshot.usesServerCommands ||
-        (callerUid != null &&
-            snapshot.handCards.keys.any((uid) => uid != callerUid))) {
+    if (!validSnapshot(snapshot)) {
       controller.addError(StateError('Unexpected command snapshot'));
       return;
     }
@@ -110,6 +114,15 @@ Stream<MatchState?> watchCommandSnapshots({
 
   controller = StreamController<MatchState?>(
     onListen: () {
+      // Reuse the authenticated create/join/reconnect response, but never seed
+      // a public board whose positive own-hand count has not been hydrated.
+      final seed = initialSnapshot;
+      if (seed != null &&
+          validSnapshot(seed) &&
+          (callerUid == null || seed.playerIds.contains(callerUid))) {
+        haveRoom = true;
+        offer(seed);
+      }
       subscription = notifications.listen((publicState) {
         seenPublic = true;
         if (publicState == null) {
@@ -125,6 +138,13 @@ Stream<MatchState?> watchCommandSnapshots({
         }
         final version = (publicState['serverVersion'] as num?)?.toInt() ?? 0;
         haveRoom = true;
+        // Public membership can lag behind a committed join response/private
+        // view. Only a same-or-newer revision can remove the current seat.
+        if (version < deliveredVersion ||
+            version < (candidate?.serverVersion ?? -1)) {
+          if (candidate != null) accept(candidate!);
+          return;
+        }
         if (callerUid != null &&
             publicState['playerIds'] is List &&
             !(publicState['playerIds'] as List).contains(callerUid)) {
@@ -133,6 +153,7 @@ Stream<MatchState?> watchCommandSnapshots({
           candidate = null;
           recovery?.cancel();
           wantedVersion = -1;
+          deliveredVersion = version;
           // A released seat can no longer fetch its old private hand. Deliver
           // the public removal immediately so the controller clears recovery.
           controller.add(

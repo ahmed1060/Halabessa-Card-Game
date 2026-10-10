@@ -8,6 +8,7 @@ const operations = new Set([
   'sendFriendRequest', 'respondToFriendRequest', 'sendRoomInvite',
   'uploadAsset', 'setUserAdmin', 'requestAccountDeletion',
   'accountDeletionStatus', 'continueAccountDeletion',
+  'repairMatchDelivery',
 ]);
 const stages = new Set([
   'jwt', 'deletion_guard', 'db_queue', 'db_connect', 'db_work', 'db_close',

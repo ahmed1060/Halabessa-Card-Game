@@ -2,6 +2,7 @@ import type {DeletionQuery} from './deletion_job_store.ts';
 import type {MatchState, Card} from './match_engine.ts';
 import {anonymizeDeletedPlayer, roomReferencesDeletedPlayer} from './deletion_room_state.ts';
 import {publicMatchState, type CommittedRoom} from './match_delivery.ts';
+import {publicationLease} from './room_publication.ts';
 
 /** Runs on the SAME connection as the active deletion-job transaction. Changes
  * and an outbox entry commit together; only a later pass publishes the latest
@@ -38,6 +39,8 @@ export function createDeletionRoomStore(query: DeletionQuery, assertLease: (id: 
       const pending=await query('select room_id from halabessa.account_deletion_rooms where job_id=$1::uuid and not published order by room_id limit 1',[jobId]);
       if (pending[0]) {
         const id=pending[0].room_id;
+        // Same lease/order as ordinary publishers and admin room deletion.
+        await publicationLease(query,String(id),true);
         const rows=await query('select room_id,state,version::text from halabessa.rooms where room_id=$1 for update',[id]);
         if (rows[0]) {
           const latest=room(rows[0]),hands=await secrets(latest.id);

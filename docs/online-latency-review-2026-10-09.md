@@ -2,8 +2,9 @@
 
 Date: 9 October 2026. Reviewed source: main commit `3f60ff9c`.
 Scope: the user reports lag throughout the online game, not just the table;
-offline Training is unaffected. This is an investigation and proposal, not an
-implemented fix or a claim of measured mobile frame rates.
+offline Training is unaffected. The original investigation is retained below;
+implementation and verification updates are recorded at the end. No measured
+mobile frame-rate claim is made.
 
 ## Outcome
 
@@ -13,8 +14,9 @@ reducing all animation durations would not address those paths. Optimize the
 existing free-service architecture first; do not buy hosting or replace the
 engine merely to conceal the waits.
 
-No runtime source, production configuration, database records or player accounts
-were changed during this investigation. Only this report was added locally.
+At the original investigation stage, no runtime source, production configuration,
+database records or player accounts were changed. The later approved implementation
+and isolated QA changes are documented below.
 
 ## Measured evidence
 
@@ -338,3 +340,94 @@ authenticated region/pooler and before/after measurements, isolated live failure
 and reconnect/concurrency QA (approval pending), and physical-device frame profiling.
 This batch preserves the current serialized publication lock; it is not an
 unverified early-ack change or a claim that every latency target is achieved.
+
+## Implementation update — durable delivery and isolated QA (10 October UTC)
+
+- Gameplay revisions and private SQL publication intents commit in one
+  transaction. Queue records contain only a room ID/revision, never cards or
+  credentials. A transaction-scoped advisory lease serializes publishers,
+  deletion publication and admin room deletion. Each publisher reads the latest
+  committed board and hands together, then removes only intents at or below
+  that snapshot's revision. Normal compatible delivery still locks game rows.
+- Early-ack mode commits before scheduling background delivery and returns the
+  authenticated caller's own snapshot. Background tasks are not assumed durable:
+  an independently authenticated, Vault-key retry worker drains eligible pending
+  intents in bounded batches, with backoff. Idle queue means no HTTP invocation.
+  No paid service or access-rule relaxation was introduced. RLS is intentionally
+  deny-all for both private publication tables; the advisor's two no-policy INFO
+  notices are expected. Client roles have no table/function grants.
+- The migration initially pauses the scheduler using `cron.alter_job`, not a
+  forbidden direct update of `cron.job`. Both migrations were applied, their
+  local filenames aligned with verified production history, and Edge v42 is
+  ACTIVE with the temporary cleanup adapter removed. Retry scheduling is active;
+  global early acknowledgment remains OFF, and the QA canary is cleared.
+- Joining/reconnecting reuses a complete own-hand accepted response. An older
+  public membership revision cannot kick a newly joined player or replace a
+  newer accepted revision. Actual same/newer removal and room deletion still
+  invalidate reads immediately. Incomplete/foreign-hand seeds cannot bypass
+  authenticated recovery. There is no optimistic score/turn/capture update.
+
+Live QA was explicitly approved for exactly one new guest/private bot room:
+`EJE77344`, guest `qbjS8MTi6Yd1YzDIob7PbZhuWjE3`. Global early ack stayed false;
+only that room was temporarily selected by the private SQL canary configuration.
+Six serial updateProfile commands per mode measured client round trips:
+
+| Mode | Samples | Reported median | Sample p95 |
+| --- | ---: | ---: | ---: |
+| Compatible synchronous delivery | 6 | 1,868 ms | 1,949 ms |
+| Isolated early-ack canary | 6 | 1,447 ms | 1,962 ms |
+
+The sample uses sorted upper-middle/nearest-rank percentiles. Median decreased
+about 23%, but this tiny sample does NOT establish a p95 benefit, tap-to-animation
+timing, region/pooler improvement, or resolution of the whole-app lag.
+
+- One real human turn accepted exactly one of two concurrent different-card
+  commands; the other returned version_conflict. The hand lost one card only.
+  Retrying the accepted command preserved appliedVersion and did not replay it.
+- The authorized own-hand SSE feed delivered revision 21, only that guest's
+  three-card hand, and the matching board. Closing/reopening the stream returned
+  revision 21 again; reconnect took 474 ms. Bot preparation/capture phases used
+  actual server deadlines, not rewritten clocks. No match was completed or paid.
+- Teardown used a temporary authenticated adapter restricted to that exact UID,
+  exact canary room, private visibility, sole human seat and one-hour creation
+  window. It held the publication lease while removing only the six fixture
+  RTDB roots and SQL room. The guest deleted its own Firebase identity, and a
+  guarded SQL statement removed only its null-email QA profile. The adapter was
+  immediately removed and clean source redeployed as v42. QA room/profile/intent
+  counts are all zero; totals returned to the pre-QA 23 profiles and 27 rooms.
+  No existing player, match, wallet or balance was deliberately mutated.
+
+Verification: 394 Flutter tests and 171 server/build tests passed; Deno check and
+release web compilation passed; analysis has zero errors (267 warning/info
+items remain). The real Flutter AssetImage/AssetManifest SDK test resolves the
+fingerprinted retina image with preserved scale. Previous batch Hosting, Android
+and iOS CI all passed, including Ubuntu private-feed permission tests. Latest
+delivery-batch CI/deployment must also pass before any broader early-ack rollout.
+
+Still outstanding, not marked complete:
+
+- Broader early-ack activation and tail/failure testing: ambiguous transport
+  completion, worker termination, dropped packets and reconnect while commands
+  compete need a larger controlled run; the current live test is not that test.
+- Authenticated routing/shared-transaction-pooler A/B measurement. No region
+  override or database credential/connection change was made without evidence.
+  The unified-log service returned a backend error during the stage-timing read;
+  it was not repeatedly polled or treated as an empty-success result.
+- Browser/physical-device rendering profile and end-to-end latency targets for
+  lobby, store, social screens and online play. Desktop inspection is not proof
+  of smooth iPhone/Android rendering, and an offline widget test is not online QA.
+
+Desktop observation: an authenticated production homepage reload captured in
+Edge's Performance panel spans 7,518 ms, with 2,670 ms scripting, 831 ms system,
+27 ms rendering and 8 ms painting. Bottom-up lists 466.7 ms profiling overhead
+and 336.0 ms script compilation. LCP/INP are unavailable in this load-only trace;
+CLS is zero. Existing extensions and docked DevTools make this a diagnostic
+sample, not an extension-free benchmark or a mobile frame-rate measurement.
+No match, purchase, account setting or balance was changed during this trace;
+DevTools was closed afterward. Startup scripting remains a profiling lead, not
+proof of the cause of ongoing online latency.
+
+Rollback: keep global async_ack_enabled false, clear canary_room_id, and pause
+only the publication cron job if needed. Compatible delivery and authenticated
+snapshot recovery remain. Preserve private tables/deletion tombstones rather
+than dropping safety data or replaying queued game commands.

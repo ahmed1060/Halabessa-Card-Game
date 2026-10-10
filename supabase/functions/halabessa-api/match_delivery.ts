@@ -47,7 +47,7 @@ export function matchMirrorUpdates(id: string, room: CommittedRoom,
   updates[`matchViews/${id}`] = Object.fromEntries((room.state.playerIds ?? [])
     .filter(uid => !uid.startsWith('bot_') && !uid.startsWith('waiting_'))
     .map(uid => {
-      if (!/^[A-Za-z0-9_-]{1,128}$/.test(uid)) throw new Error('invalid_player_uid');
+      if (!/^[A-Za-z0-9:_-]{1,128}$/.test(uid)) throw new Error('invalid_player_uid');
       return [uid, { ...participantSnapshot(room, uid), recipientUid: uid }];
     }));
   updates[`matchSecrets/${id}`] = null;

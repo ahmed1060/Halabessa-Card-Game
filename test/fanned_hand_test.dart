@@ -68,6 +68,25 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('rejected request clears pending feedback and allows retry', (tester) async {
+    final request = Completer<void>();
+    var calls = 0;
+    await tester.pumpWidget(hand(true, (_, __) {
+      calls++;
+      return calls == 1 ? request.future : Future<void>.value();
+    }));
+    await tester.tap(card(0));
+    await tester.pump(const Duration(seconds: 1));
+    request.completeError(StateError('request rejected'));
+    await tester.pump();
+    expect(tester.takeException(), isA<StateError>());
+    expect(find.byKey(ValueKey('hand-pending-${cards[0].firebaseKey}')), findsNothing);
+    await tester.tap(card(0));
+    await tester.pump();
+    expect(calls, 2);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets('horizontal swipes do not play, deliberate upward swipes do', (tester) async {
     final played = <game.Card>[];
     await tester.pumpWidget(hand(true, (value, _) => played.add(value)));
