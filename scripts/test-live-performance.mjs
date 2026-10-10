@@ -13,15 +13,17 @@ const edge='https://jmlipglfgmuyegoroepu.supabase.co/functions/v1/halabessa-api'
 const database='https://halabessa-card-game1-default-rtdb.firebaseio.com';
 const input=createInterface({input:process.stdin,output:process.stdout});
 let account,roomId,current,stage='create guest';
-const metrics={baseline:[],canary:[]};
+const metrics={baseline:[],canary:[],routing:{}};
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
-async function json(url,body,token){
+async function json(url,body,token,region){
   try {
     const started=performance.now();
     const response=await fetch(url,{method:'POST',signal:AbortSignal.timeout(25000),
-      headers:{'Content-Type':'application/json',...(token?{Authorization:`Bearer ${token}`}:{})},
+      headers:{'Content-Type':'application/json',...(token?{Authorization:`Bearer ${token}`}:{ }),
+        ...(region?{'x-region':region}:{})},
       body:JSON.stringify(body)});
-    return {status:response.status,data:await response.json(),ms:Math.round(performance.now()-started)};
+    return {status:response.status,data:await response.json(),ms:Math.round(performance.now()-started),
+      region:response.headers.get('x-sb-edge-region')};
   }catch{throw Error(`transport_failed_at_${stage}`);}
 }
 async function api(action,data={},allowRejected=false){
@@ -40,10 +42,26 @@ function summary(samples){
   return {n:sorted.length,median_ms:sorted[Math.floor(sorted.length/2)],p95_ms:sorted[Math.ceil(sorted.length*.95)-1]};
 }
 async function sample(bucket){
-  for(let i=0;i<6;i++){
+  for(let i=0;i<20;i++){
     const result=await command('updateProfile',{displayName:'CodexPerformanceQA',cardBackId:'default_card',avatarUrl:''});
     metrics[bucket].push(result.ms);
     assert.equal(result.data.mirrorPending,bucket==='canary');
+  }
+}
+async function routingSamples() {
+  // Alternate order to reduce warmup/time-of-day bias. Read-only calls touch
+  // only this new guest. No region override is applied to the application.
+  for (const action of ['getAdminStatus','getSocialGraph','getDailyRewardStatus','getMatchSnapshot']) {
+    const samples={automatic:[],london:[]}, regions={automatic:new Set(),london:new Set()};
+    for (let i=0;i<10;i++) for (const mode of (i%2?['london','automatic']:['automatic','london'])) {
+      const result=await json(edge,{action,...(action==='getMatchSnapshot'?{roomId}:{})},account.idToken,
+        mode==='london'?'eu-west-2':undefined);
+      assert.equal(result.status,200,`${action}/${mode} HTTP status`);
+      samples[mode].push(result.ms); if(result.region)regions[mode].add(result.region);
+    }
+    metrics.routing[action]={automatic:summary(samples.automatic),london:summary(samples.london),
+      observedRegions:Object.fromEntries(Object.entries(regions).map(([mode,values])=>[mode,[...values]]))};
+    console.log(JSON.stringify({routingRead:action,...metrics.routing[action]}));
   }
 }
 async function ownView(minVersion){
@@ -88,6 +106,8 @@ try{
   roomId=created.data.roomId;assert.match(roomId,/^[A-Z]{3}\d{5}$/);
   current=(await api('getMatchSnapshot',{roomId})).data;
   console.log(JSON.stringify({fixture:{roomId,uid:account.uid},created:true}));
+  assert.equal((await input.question('Implementation/local checks must be complete; type VERIFIED to begin live checks: ')).trim(),'VERIFIED');
+  stage='authenticated routing read samples';await routingSamples();
   stage='baseline profile commands';await sample('baseline');
   console.log(JSON.stringify({baseline:summary(metrics.baseline)}));
   assert.equal((await input.question('Enable only this room canary, then type CANARY: ')).trim(),'CANARY');
@@ -102,6 +122,26 @@ try{
   }
   assert.equal(current.state.phase,'playing');
   assert.equal(current.state.playerIds[current.state.currentTurnIndex],account.uid);
+  assert.equal(current.hand.length,4);
+  // Simulate a lost response to a safe profile command. It is still identified
+  // by the SAME id on retry; never submit a second mutation ID after ambiguity.
+  stage='lost command response';const lost=intent('updateProfile',{
+    displayName:'CodexPerformanceQA',cardBackId:'default_card',avatarUrl:''});
+  const disconnected=new AbortController(), disconnectedTimer=setTimeout(()=>disconnected.abort(),500);
+  try {
+    await fetch(edge,{method:'POST',signal:disconnected.signal,
+      headers:{'Content-Type':'application/json',Authorization:`Bearer ${account.idToken}`},
+      body:JSON.stringify({action:'submitMatchCommand',...lost})});
+  }catch{ /* Completion unknown; exactly-once retry below is the test. */ }
+  finally{clearTimeout(disconnectedTimer);}
+  await sleep(1800);
+  const recovered=await api('submitMatchCommand',lost,true);
+  assert.equal(recovered.status,200);current=recovered.data;
+  assert.equal(current.version,lost.expectedVersion+1);
+  const recoveredAgain=await api('submitMatchCommand',lost);
+  assert.equal(recoveredAgain.data.duplicate,true);
+  assert.equal(recoveredAgain.data.appliedVersion,current.version);
+  assert.equal(recoveredAgain.data.version,current.version);
   assert.equal(current.hand.length,4);
   stage='competing real card plays';const version=current.version;
   const competing=current.hand.slice(0,2).map(card=>intent('playCard',{card}));
@@ -119,6 +159,20 @@ try{
   console.log(JSON.stringify({passed:true,concurrentAccepted:1,concurrentRejected:1,retryDidNotReplay:true,
     deliveredVersion:delivered.view.version,reconnectedVersion:reconnected.view.version,
     reconnect_ms:reconnected.ms,baseline:summary(metrics.baseline),canary:summary(metrics.canary)}));
+  stage='private room rejoin';
+  const joined=await api('joinRoom',{roomId,displayName:'CodexPerformanceQA',cardBackId:'default_card',avatarUrl:''});
+  assert.equal(joined.data.alreadyJoined,true);
+  assert.equal(joined.data.version,current.version);
+  assert.equal(joined.data.hand.length,3);
+  stage='leave with bot takeover';await command('leave');
+  assert.equal(current.state.playerIds.includes(account.uid),false);
+  assert.equal(current.state.playerIds.length,4);
+  assert.ok(current.state.playerIds.every(uid=>uid.startsWith('bot_')));
+  const departed=await api('getMatchSnapshot',{roomId},true);
+  assert.equal(departed.status,403);
+  // Exactly one fixture means no fourth human identity is created. True
+  // four-human replacement/race behavior is covered by isolated unit tests.
+  console.log(JSON.stringify({leaveTakeover:true,formerSnapshotDenied:true,routing:metrics.routing}));
 }catch(error){
   console.error(JSON.stringify({passed:false,stage,message:error instanceof assert.AssertionError?'assertion_failed':error.message}));
   process.exitCode=1;

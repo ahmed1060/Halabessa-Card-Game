@@ -167,6 +167,7 @@
       }
     },
     "rooms": {
+      ".indexOn": ["isPublic"],
       ".read": "auth != null && !root.child('accountDeletionBlocked').child(auth.uid).exists()",
       "$roomId": {
         ".write": false

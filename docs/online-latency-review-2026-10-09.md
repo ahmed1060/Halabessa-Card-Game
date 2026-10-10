@@ -472,3 +472,79 @@ A/B, transport-failure rollout and physical-device profiling remain unverified.
 Rollback for this batch: redeploy the version-42 backend source and revert
 only the guarded-connection/recovery commit; preserve the publication queue,
 private views and deletion guards.
+
+## Implementation update — externally fenced delivery and final QA preparation
+
+The final additional guest/private-room approval is conditional: finish the
+implementation and local checks first. No second fixture has been created at
+this implementation checkpoint.
+
+- Firebase delivery now uses conditional PUTs with ETags and revision checks
+  on each of the four per-room roots. SQL advisory locks cannot prevent a
+  timed-out HTTP PATCH from completing after its transaction releases the lock.
+  The new external fence rejects that late write. A 412 refetches both ETag and
+  version, with at most three publication-only attempts. Transport ambiguity
+  leaves the durable intent pending; it never replays a game command.
+- Each participant view still contains one coherent board/own-hand revision.
+  Different roots can arrive separately, using the existing revision-aware
+  reconciliation and authenticated recovery. This deliberately replaces the
+  earlier unfenced cross-root PATCH; it is not a claim of cross-root atomicity.
+  All sibling writes settle before publication returns. Public board writes
+  preserve concurrently updated chat/presence/heartbeats/actions via CAS.
+  Private cards and decks are never copied onto the public board. Successful
+  writes suppress unnecessary echoed JSON with print=silent.
+- Deleted rooms retain four tiny, non-personal __halabessaDelivery markers.
+  They contain no users, cards, chat, scores or balances. Without these fences,
+  a publisher starting after deletion could recreate the room. The existing
+  null_etag room creation guard reserves these short IDs rather than reusing
+  them. Clients treat the board marker as deletion, including legacy/spectator
+  streams; the public-room query excludes the markers.
+- Asynchronous and scheduled publication read board+hands in one committed
+  MVCC statement, close the SQL socket, publish using the external fence, and
+  then acknowledge only intents at or below that published revision. No socket
+  or room lock is held during that network wait. Failure/termination before
+  acknowledgment retains the queue. Early acknowledgment remains OFF globally.
+- The single-socket per-isolate admission queue prioritizes interactive work
+  over waiting background work and reserves an admission slot. It still closes
+  every client, bounds admission/expiry, never replays callbacks and adds no
+  extra connection pool. Background drains yield between revisions/rooms;
+  same-isolate scheduling coalesces a room's work and closes the final-drain
+  scheduling race. Transaction-scoped deletion leases remain compatible with
+  a transaction pooler. An already running callback is not unsafely preempted.
+- Lobby subscriptions now use the indexed isPublic=true query, instead of
+  downloading private/retired rooms and filtering all of them on the device.
+- Timing events classify configured connection mode and execution region using
+  fixed allowlists only. URLs, passwords, hosts, tokens, user/room IDs and payloads
+  are not logged. Classification of a configured endpoint is NOT proof of its
+  live pooling behavior or of a faster route.
+
+Local verification at this checkpoint: 400 Flutter tests and 186 server/build
+tests pass; full Edge Deno type-checking passes. New tests cover late timed-out
+writes, partial mirrors, sibling settlement, deletion/no-resurrection, private
+views, bounded conflicts, no database admission during delivery, queue priority
+and expiry, privacy-safe diagnostics, and client deletion/recovery cancellation.
+The added indexed-query/private-fence permission tests still need the isolated
+Ubuntu CI emulator gate; the Windows emulator limitation remains. The previous
+601df6ea Hosting, Android and iOS workflows all passed.
+
+The manual one-fixture harness is ready for final verification: alternating
+authenticated automatic/London reads across four menu/match actions, 20 serial
+commands per delivery mode, lost-response same-ID retry, competing card plays,
+own-hand SSE delivery/reconnect, same-room rejoin and leave/bot takeover. It
+does not complete a rewarded match or create additional human accounts.
+Failure injection/true four-human cases are local isolated tests, not permission
+to kill the production worker, disrupt other rooms or use existing identities.
+
+Remaining verification gates, not additional unfinished UI promises: release
+web compilation, current-commit CI/emulator/deployment, then the newly approved
+isolated live fixture and cleanup. Region/pooler or global early-ack activation
+requires measured benefit and reliability; do not switch merely because a
+setting exists. Physical iPhone/Android frame/tap-to-feedback profiling cannot
+be certified from this Windows host without a connected device. Prior desktop
+traces and unit tests are not substitutes for those release-device measurements.
+
+Rollback: keep global early ack off and clear the room canary. Do not remove
+private publication intents, deletion guards or the non-personal room fences.
+After fencing is introduced, do not redeploy an older unfenced PATCH writer:
+that would bypass the monotonic/deletion boundary. Revert optional presentation
+or admission changes separately while keeping the fenced publication adapter.

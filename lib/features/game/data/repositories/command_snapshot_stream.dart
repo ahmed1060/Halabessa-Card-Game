@@ -157,7 +157,10 @@ Stream<MatchState?> watchCommandSnapshots({
       }
       subscription = notifications.listen((publicState) {
         seenPublic = true;
-        if (publicState == null) {
+        if (publicState == null ||
+            (publicState['__halabessaDelivery'] is Map &&
+                (publicState['__halabessaDelivery'] as Map)['deleted'] ==
+                    true)) {
           generation++;
           haveRoom = false;
           released = false;

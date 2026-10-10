@@ -2,6 +2,18 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createRequestTiming } from '../../supabase/functions/halabessa-api/request_timing.ts';
 
+test('routing diagnostics allow only infrastructure enums, never arbitrary strings', () => {
+  const records: any[] = [];
+  createRequestTiming(record => records.push(record), () => 0,
+    {region: 'eu-west-2', configuredConnection: 'shared_transaction'}).finish();
+  createRequestTiming(record => records.push(record), () => 0,
+    {region: 'private@example.com', configuredConnection: 'postgres://password@secret'}).finish();
+  assert.deepEqual(records.map(record => record.routing), [
+    {region: 'eu-west-2', configuredConnection: 'shared_transaction'},
+    {region: 'other', configuredConnection: 'other'},
+  ]);
+});
+
 test('timing labels cannot expose caller payloads or credentials', async () => {
   let now = 0;
   const records: unknown[] = [];

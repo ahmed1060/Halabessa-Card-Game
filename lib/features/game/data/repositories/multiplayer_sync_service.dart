@@ -334,7 +334,9 @@ class MultiplayerSyncService {
     if (spectator) {
       yield* matchRef.child(matchId).onValue.map((event) {
         final value = event.snapshot.value;
-        return value is Map
+        return value is Map &&
+                !(value['__halabessaDelivery'] is Map &&
+                    (value['__halabessaDelivery'] as Map)['deleted'] == true)
             ? publicSnapshot(Map<String, dynamic>.from(value))
             : null;
       });
@@ -348,7 +350,9 @@ class MultiplayerSyncService {
         : null;
     final value = seed?.toJson() ?? (await matchRef.child(matchId).get()).value;
     final publicState = value is Map ? Map<String, dynamic>.from(value) : null;
-    if (publicState == null) {
+    if (publicState == null ||
+        (publicState['__halabessaDelivery'] is Map &&
+            (publicState['__halabessaDelivery'] as Map)['deleted'] == true)) {
       yield null;
       return;
     }
@@ -394,7 +398,11 @@ class MultiplayerSyncService {
     var haveHandsSnapshot = false;
 
     void emit() {
-      if (!havePublic || latestPublic == null) {
+      if (!havePublic ||
+          latestPublic == null ||
+          (latestPublic!['__halabessaDelivery'] is Map &&
+              (latestPublic!['__halabessaDelivery'] as Map)['deleted'] ==
+                  true)) {
         controller.add(null);
         return;
       }
@@ -508,7 +516,9 @@ class MultiplayerSyncService {
   /// to any match, active games included; the index carries only what
   /// PublicRoomsList actually needs (see room_summary.dart).
   Stream<List<RoomSummary>> watchPublicMatches() {
-    return _roomsRef.onValue.map((event) {
+    return _roomsRef.orderByChild('isPublic').equalTo(true).onValue.map((
+      event,
+    ) {
       final value = event.snapshot.value;
       if (value == null || value is! Map) return <RoomSummary>[];
       try {
@@ -517,7 +527,11 @@ class MultiplayerSyncService {
 
         value.forEach((id, data) {
           try {
-            if (data is! Map) return;
+            if (data is! Map ||
+                (data['__halabessaDelivery'] is Map &&
+                    (data['__halabessaDelivery'] as Map)['deleted'] == true)) {
+              return;
+            }
             final room = RoomSummary.fromJson(id.toString(), data);
 
             // Expired rooms are not joinable. Deletion is server-owned; a

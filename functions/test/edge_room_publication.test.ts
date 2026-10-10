@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { commitAndQueue, earlyAckEnabled, publicationLease, publishRoom, retryPublicationLater,
+import { commitAndQueue, earlyAckEnabled, publicationLease, publishDetachedRoom, publishRoom, retryPublicationLater,
   type PublicationQuery } from '../../supabase/functions/halabessa-api/room_publication.ts';
 
 function fixture({busy=false, version='4', invalid=false}={}) {
@@ -17,6 +17,30 @@ function fixture({busy=false, version='4', invalid=false}={}) {
   };
   return {query,calls};
 }
+
+test('detached publication releases database admission during network I/O and keeps newer intents',async()=>{
+  const {query,calls}=fixture();
+  let sockets=0, admitted=0;
+  const run=async<T>(work:(q:PublicationQuery)=>Promise<T>)=>{
+    assert.equal(++sockets,1); admitted++;
+    try{return await work(query);}finally{sockets--;}
+  };
+  const room=await publishDetachedRoom(run,'ABC12345',async room=>{
+    assert.equal(sockets,0);assert.equal(room.version,4);
+    assert.equal(calls.some(call=>call.sql.includes('for update')||call.sql.includes('advisory')),false);
+    assert.equal(await run(async()=> 'interactive admission available'),'interactive admission available');
+  });
+  assert.equal(room?.version,4);assert.equal(sockets,0);assert.equal(admitted,3);
+  assert.deepEqual(calls.at(-1)?.args,['ABC12345',4]);
+});
+
+test('detached transport/runtime failure cannot erase the durable publication intent',async()=>{
+  const {query,calls}=fixture();
+  const run=async<T>(work:(q:PublicationQuery)=>Promise<T>)=>work(query);
+  await assert.rejects(publishDetachedRoom(run,'ABC12345',async()=>{throw Error('runtime terminated');}),/runtime terminated/);
+  assert.equal(calls.some(call=>call.sql.startsWith('delete from')),false);
+  await assert.rejects(publishDetachedRoom(run,'../other',async()=>assert.fail()),/invalid_room_id/);
+});
 
 test('early acknowledgment canary is scoped to one room and fails closed',()=>{
   const config={async_ack_enabled:false,canary_room_id:'ABC12345'};

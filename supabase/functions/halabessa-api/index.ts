@@ -14,10 +14,11 @@ import { beginDeletion } from './account_deletion.ts';
 import { createDeletionJobStore, deletionReceiptHash, recoverDeletion } from './deletion_job_store.ts';
 import { createFirebaseIdentityStore, assertActiveIdentity } from './firebase_identity.ts';
 import { runDeletionWorker } from './deletion_worker.ts';
-import { createDatabaseRunner, databaseConnectionString, withDatabaseGuard } from "./database.ts";
+import { createDatabaseRunner, configuredConnectionMode, databaseConnectionString, withDatabaseGuard } from "./database.ts";
 import { createRequestTiming } from './request_timing.ts';
-import { commitAndDeliver, matchMirrorUpdates, participantSnapshot, publicMatchState } from "./match_delivery.ts";
-import { commitAndQueue, earlyAckEnabled, publicationLease, publishRoom, retryPublicationLater } from './room_publication.ts';
+import { commitAndDeliver, participantSnapshot, publicMatchState } from "./match_delivery.ts";
+import { deleteFencedMirror, publishFencedMirror } from './mirror_fencing.ts';
+import { commitAndQueue, earlyAckEnabled, publicationLease, publishDetachedRoom, publishRoom, retryPublicationLater } from './room_publication.ts';
 
 const firebaseProject = "halabessa-card-game1";
 const firebaseKeys = createRemoteJWKSet(new URL(
@@ -116,7 +117,7 @@ async function firebaseAccessToken() {
 
 async function firebaseRequest(path: string, method = "GET", body?: unknown, etag?: string) {
   const token = await firebaseAccessToken();
-  const response = await fetch(`${firebaseDatabaseUrl}/${path}.json`, {
+  const response = await fetch(`${firebaseDatabaseUrl}/${path}.json${method === 'GET' ? '' : '?print=silent'}`, {
     method,
     signal: AbortSignal.timeout(12_000),
     headers: {
@@ -162,8 +163,7 @@ function objectPayload(value: unknown) {
 async function mirrorDurableRoom(connection: Client, id: string, lockGameRows = true) {
   const room = await publishRoom(async(sql,args) =>
     (await connection.queryObject<Record<string,unknown>>(sql,args)).rows, id, async room => {
-    const mirrored = await firebaseRequest("", "PATCH", matchMirrorUpdates(id, room, roomSummary));
-    if (mirrored.status < 200 || mirrored.status >= 300) throw new Error("match_mirror_failed");
+    await publishFencedMirror(firebaseRequest, id, room, roomSummary);
   }, lockGameRows);
   if (!room) throw new Error('publication_busy');
   return room;
@@ -187,25 +187,41 @@ const withDatabase = createDatabaseRunner(() => new Client(databaseConnectionStr
 
 // Provided by the Supabase Edge runtime (not ordinary standalone Deno).
 declare const EdgeRuntime: { waitUntil(task: Promise<unknown>): void };
+const publicationTasks = new Map<string, {task: Promise<void>; requested: number}>();
 function scheduleRoomPublication(id: string) {
-  EdgeRuntime.waitUntil(withDatabase(async connection => {
-    const query = async(sql:string,args:unknown[]) =>
-      (await connection.queryObject<Record<string,unknown>>(sql,args)).rows;
-    // Drain versions committed during publication, but bound each isolate's
-    // work. Runtime termination is safe because the SQL queue persists.
+  const existing = publicationTasks.get(id);
+  if (existing) {
+    existing.requested++;
+    EdgeRuntime.waitUntil(existing.task);
+    return;
+  }
+  const state = {task: Promise.resolve(), requested: 1};
+  let seen = 0, drained = false;
+  state.task = (async () => {
+    // Release the only socket between revisions. Interactive requests queued
+    // during delivery run before the next background pass; no second pool.
     const started = performance.now();
     for (let pass=0;pass<8 && performance.now()-started<20000;pass++) {
-      const pending = await query('select 1 from halabessa.room_publications where room_id=$1 limit 1',[id]);
-      if (!pending.length) return;
-      try { await mirrorDurableRoom(connection,id,false); }
-      catch (error) {
-        if (!(error instanceof Error && error.message==='publication_busy')) {
-          await retryPublicationLater(query,id);
-        }
-        return;
+      seen = state.requested;
+      const run = <T>(work: (query: (sql:string,args:unknown[]) => Promise<Record<string,unknown>[]>) => Promise<T>) =>
+        withDatabase(connection => work(async(sql,args) =>
+          (await connection.queryObject<Record<string,unknown>>(sql,args)).rows), undefined, 'background');
+      let more = false;
+      try {
+        more = !!await publishDetachedRoom(run, id, room => publishFencedMirror(firebaseRequest,id,room,roomSummary));
+      } catch {
+        await run(query => retryPublicationLater(query,id));
       }
+      if (!more && seen === state.requested) {drained = true; return;}
     }
-  }).catch(() => console.warn('halabessa-publication: durable retry pending')));
+  })().catch(() => console.warn('halabessa-publication: durable retry pending')).finally(() => {
+    publicationTasks.delete(id);
+    // A commit can schedule between the final empty read and promise cleanup.
+    // Wake that intent rather than leaving it until the minute retry worker.
+    if (drained && seen !== state.requested) scheduleRoomPublication(id);
+  });
+  publicationTasks.set(id,state);
+  EdgeRuntime.waitUntil(state.task);
 }
 
 function cairoDate() {
@@ -305,8 +321,12 @@ Deno.serve(async (request) => {
   if (request.method === "GET") return reply({ ok: true, service: "halabessa-api" }, 200, origin);
   if (request.method !== "POST") return reply({ error: "method_not_allowed" }, 405, origin);
 
-  const timing = createRequestTiming(record => console.log(JSON.stringify(record)));
+  const timing = createRequestTiming(record => console.log(JSON.stringify(record)), undefined,
+    {region: Deno.env.get('SB_REGION'), configuredConnection: configuredConnectionMode(
+      Deno.env.get('DATABASE_POOLER_URL') ?? Deno.env.get('SUPABASE_DB_URL'))});
   const runDatabase = <T>(work: (client: Client) => Promise<T>) => withDatabase(work, timing.observe);
+  const runBackgroundDatabase = <T>(work: (client: Client) => Promise<T>) =>
+    withDatabase(work, timing.observe, 'background');
   const deliverCommitted = async(connection:Client,id:string,commit:()=>Promise<void>) => {
     const config = await connection.queryObject<Record<string,unknown>>`
       select async_ack_enabled,canary_room_id from halabessa.publication_worker_config where singleton=true
@@ -327,28 +347,33 @@ Deno.serve(async (request) => {
       const workerKey=request.headers.get('x-publication-worker');
       if(!workerKey || !/^[a-f0-9]{64}$/.test(workerKey))return reply({error:'unauthenticated'},401,origin);
       const hash=await deletionReceiptHash(workerKey);
-      return await runDatabase(async connection=>{
-        const query = async(sql:string,args:unknown[]) =>
-          (await connection.queryObject<Record<string,unknown>>(sql,args)).rows;
-        const permitted=await query('select async_ack_enabled,canary_room_id from halabessa.publication_worker_config where key_hash=$1',[hash]);
-        if(!permitted.length)return reply({error:'unauthenticated'},401,origin);
-        const started=performance.now();
-        let published=0,pending=0;
-        // Bounded batches prevent one unavailable/busy room starving others.
-        for(let pass=0;pass<8 && performance.now()-started<20000;pass++) {
+      const authorized=await runBackgroundDatabase(async connection =>
+        (await connection.queryObject`select 1 from halabessa.publication_worker_config where key_hash=${hash}`).rows.length>0);
+      if(!authorized)return reply({error:'unauthenticated'},401,origin);
+      const started=performance.now();
+      let published=0,pending=0;
+      // Release admission/socket after EVERY room. Retry workers cannot keep
+      // eight deliveries ahead of an interactive caller on the same isolate.
+      for(let pass=0;pass<8 && performance.now()-started<20000;pass++) {
+        const id = await runBackgroundDatabase(async connection=>{
+          const query = async(sql:string,args:unknown[]) =>
+            (await connection.queryObject<Record<string,unknown>>(sql,args)).rows;
           const queued=await query('select room_id from halabessa.room_publications where next_attempt_at<=now() order by next_attempt_at,created_at limit 1',[]);
-          if(!queued[0])break;
-          const id=String(queued[0].room_id);
-          try {
-            await timing.measure('mirror',()=>mirrorDurableRoom(connection,id,!earlyAckEnabled(permitted[0],id)));
-            published++;
-          } catch {
-            await retryPublicationLater(query,id);
-            pending++;
-          }
+          return queued[0] ? String(queued[0].room_id) : null;
+        });
+        if(!id)break;
+        const run = <T>(work: (query: (sql:string,args:unknown[]) => Promise<Record<string,unknown>[]>) => Promise<T>) =>
+          runBackgroundDatabase(connection => work(async(sql,args) =>
+            (await connection.queryObject<Record<string,unknown>>(sql,args)).rows));
+        try {
+          const room = await timing.measure('mirror',()=>publishDetachedRoom(run,id,
+            room=>publishFencedMirror(firebaseRequest,id,room,roomSummary)));
+          if(room)published++; else break;
+        } catch {
+          await run(query=>retryPublicationLater(query,id));pending++;
         }
-        return reply({ok:true,idle:published+pending===0,published,pending},200,origin);
-      });
+      }
+      return reply({ok:true,idle:published+pending===0,published,pending},200,origin);
     }
     if (input.action === 'accountDeletionStatus') {
       await deletionReceiptHash(input.receipt); // Reject malformed guesses before connecting.
@@ -360,7 +385,7 @@ Deno.serve(async (request) => {
       const workerKey=request.headers.get('x-deletion-worker');
       if(!workerKey || !/^[a-f0-9]{64}$/.test(workerKey))return reply({error:'unauthenticated'},401,origin);
       const keyHash=await deletionReceiptHash(workerKey);
-      return await runDatabase(async connection=>{
+      return await runBackgroundDatabase(async connection=>{
         const query=async (sql:string,args:unknown[])=>(await connection.queryObject<Record<string,unknown>>(sql,args)).rows;
         const permitted=await query('select 1 from halabessa.deletion_worker_config where key_hash=$1',[keyHash]);
         if(!permitted.length)return reply({error:'unauthenticated'},401,origin);
@@ -378,8 +403,7 @@ Deno.serve(async (request) => {
             return plan.receiptId;
           },
           publish:async(id,room)=>{
-            const result=await firebaseRequest('','PATCH',matchMirrorUpdates(id,room,roomSummary));
-            if(result.status<200 || result.status>=300)throw new Error('match_mirror_failed');
+            await publishFencedMirror(firebaseRequest,id,room,roomSummary);
           },
         }); } catch(error) {
           // A SQL failure rolls back the lease, including its failure marker.
@@ -966,6 +990,10 @@ Deno.serve(async (request) => {
         if (!match) return reply({ error: "room_not_found" }, 404, origin);
         const players = match.players as Record<string, boolean> | undefined;
         if (!players?.[user.uid]) return reply({ error: "not_room_participant" }, 403, origin);
+        if (match.protocolVersion === 1) {
+          await timing.measure('mirror', () => mirrorDurableRoom(connection,id));
+          return reply({ ok: true, roomId: id }, 200, origin);
+        }
         const indexed = await firebaseRequest(`rooms/${id}`, "PUT", roomSummary(match));
         if (indexed.status < 200 || indexed.status >= 300) throw new Error("room_index_failed");
         return reply({ ok: true, roomId: id }, 200, origin);
@@ -981,15 +1009,7 @@ Deno.serve(async (request) => {
           await publicationLease(async(sql,args) =>
             (await connection.queryObject<Record<string,unknown>>(sql,args)).rows,id,true);
           await connection.queryObject`delete from halabessa.rooms where room_id = ${id}`;
-          const deleted = await firebaseRequest("", "PATCH", {
-            [`matches/${id}`]: null,
-            [`matchHands/${id}`]: null,
-            [`matchViews/${id}`]: null,
-            [`matchSecrets/${id}`]: null,
-            [`matchChat/${id}`]: null,
-            [`rooms/${id}`]: null,
-          });
-          if (deleted.status < 200 || deleted.status >= 300) throw new Error("room_delete_failed");
+          await deleteFencedMirror(firebaseRequest,id);
           await connection.queryObject`commit`;
           transactionOpen = false;
           return reply({ ok: true, roomId: id }, 200, origin);

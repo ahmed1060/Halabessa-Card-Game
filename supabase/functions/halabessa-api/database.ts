@@ -42,54 +42,63 @@ export function createDatabaseRunner<Client extends DatabaseClient>(
   onCloseError: () => void = () => console.error("halabessa-db: close failed"),
   maxQueueWaitMs = 5_000,
 ) {
-  let tail = Promise.resolve();
-  let pending = 0;
+  type Job = {priority: 'interactive' | 'background'; start: () => void; expire: () => void};
+  const waiting: Job[] = [];
+  let active = false;
+  const drain = () => {
+    if (active || !waiting.length) return;
+    const foreground = waiting.findIndex(job => job.priority === 'interactive');
+    const job = waiting.splice(foreground < 0 ? 0 : foreground, 1)[0];
+    active = true;
+    job.start();
+  };
 
   return async function withDatabase<Result>(
     work: (client: Client) => Promise<Result>,
     observe: (stage: string, ms: number) => void = () => {},
+    priority: 'interactive' | 'background' = 'interactive',
   ): Promise<Result> {
-    if (pending >= maxPending) throw new Error("database_busy");
-    pending += 1;
-    const previous = tail;
-    let release!: () => void;
-    const slot = new Promise<void>((resolve) => { release = resolve; });
-    // If a queued caller expires, later slots must still wait for the active
-    // transaction. Releasing just `slot` as the tail would permit overlap.
-    tail = previous.then(() => slot);
+    // Background delivery is durable and can wait for cron. Reserve one
+    // admission slot for an interactive request instead of filling the queue.
+    const limit = priority === 'background' ? Math.max(1, maxPending - 1) : maxPending;
+    if (waiting.length + Number(active) >= limit) throw new Error("database_busy");
     const queuedAt = performance.now();
-    let client: Client | undefined;
-    let queueTimer: ReturnType<typeof setTimeout> | undefined;
-    try {
-      try {
-        await Promise.race([previous, new Promise<never>((_, reject) => {
-          queueTimer = setTimeout(() => reject(new Error('database_busy')), maxQueueWaitMs);
-        })]);
-      } finally {
+    return new Promise<Result>((resolve, reject) => {
+      let queueTimer: ReturnType<typeof setTimeout>;
+      const job: Job = {priority, start() {
         clearTimeout(queueTimer);
         observe('db_queue', performance.now() - queuedAt);
+        void execute().then(resolve, reject);
+      }, expire() {
+        const index = waiting.indexOf(job);
+        if (index < 0) return;
+        waiting.splice(index, 1);
+        observe('db_queue', performance.now() - queuedAt);
+        reject(Error('database_busy'));
+      }};
+      async function execute() {
+        let client: Client | undefined;
+        try {
+          client = createClient();
+          const connectAt = performance.now();
+          try { await client.connect(); }
+          finally { observe('db_connect', performance.now() - connectAt); }
+          const workAt = performance.now();
+          try { return await work(client); }
+          finally { observe('db_work', performance.now() - workAt); }
+        } finally {
+          try {
+            const closeAt = performance.now();
+            try { if (client) await client.end(); }
+            finally { observe('db_close', performance.now() - closeAt); }
+          } catch { onCloseError(); }
+          finally { active = false; drain(); }
+        }
       }
-      client = createClient();
-      const connectAt = performance.now();
-      try { await client.connect(); }
-      finally { observe('db_connect', performance.now() - connectAt); }
-      const workAt = performance.now();
-      try { return await work(client); }
-      finally { observe('db_work', performance.now() - workAt); }
-    } finally {
-      try {
-        // Also clean up when connect or the transaction fails. A close error
-        // must not turn an already committed operation into a retryable error.
-        const closeAt = performance.now();
-        try { if (client) await client.end(); }
-        finally { observe('db_close', performance.now() - closeAt); }
-      } catch {
-        onCloseError();
-      } finally {
-        pending -= 1;
-        release();
-      }
-    }
+      queueTimer = setTimeout(job.expire, maxQueueWaitMs);
+      waiting.push(job);
+      drain();
+    });
   };
 }
 
@@ -98,4 +107,19 @@ export function databaseConnectionString(value: string | undefined): string {
   const url = new URL(value);
   url.searchParams.set("application_name", "halabessa-api");
   return url.toString();
+}
+
+/** Classification only; never log the URL, hostname, database or credentials.
+ * A configured endpoint is not proof of the pooler's live backend behavior.
+ */
+export function configuredConnectionMode(value: string | undefined) {
+  if (!value) return 'unconfigured';
+  try {
+    const url = new URL(value);
+    if (url.hostname.endsWith('.pooler.supabase.com')) {
+      return url.port === '6543' ? 'shared_transaction' : 'shared_session';
+    }
+    if (url.hostname.endsWith('.supabase.co')) return 'direct';
+    return 'other';
+  } catch { return 'invalid'; }
 }

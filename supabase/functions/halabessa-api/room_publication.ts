@@ -2,6 +2,38 @@ import type { Card, MatchState } from './match_engine.ts';
 import type { CommittedRoom } from './match_delivery.ts';
 
 export type PublicationQuery = (sql: string, args: unknown[]) => Promise<Record<string, unknown>[]>;
+export type PublicationRunner = <T>(work: (query: PublicationQuery) => Promise<T>) => Promise<T>;
+
+function committedRoom(row: Record<string, unknown>) {
+  const version = Number(row.version);
+  if (!row.state || typeof row.state !== 'object' || Array.isArray(row.state) ||
+      (row.state as MatchState).protocolVersion !== 1 || !Number.isSafeInteger(version) || version < 0 ||
+      !row.hands || typeof row.hands !== 'object' || Array.isArray(row.hands)) {
+    throw Error('invalid_publication_snapshot');
+  }
+  return {state: row.state as MatchState, version, hands: row.hands as Record<string, Card[]>};
+}
+
+/** With external CAS fencing, asynchronous delivery no longer needs to hold
+ * a database socket or row/advisory lock during Firebase network I/O. The
+ * board and hands are read by ONE MVCC statement. A failed/terminated publish
+ * cannot acknowledge its durable intent, and a newer queued version survives.
+ */
+export async function publishDetachedRoom(run: PublicationRunner, id: string,
+  publish: (room: CommittedRoom) => Promise<void>) {
+  if (!/^[A-Z]{3}[0-9]{5}$/.test(id)) throw Error('invalid_room_id');
+  const room = await run(async query => {
+    const rows = await query(`select r.state,r.version::text as version,s.hands
+      from halabessa.rooms r join halabessa.room_secrets s on s.room_id=r.room_id
+      where r.room_id=$1 and exists(select 1 from halabessa.room_publications p
+        where p.room_id=r.room_id and p.next_attempt_at<=now())`, [id]);
+    return rows[0] ? committedRoom(rows[0]) : null;
+  });
+  if (!room) return null;
+  await publish(room); // MUST use external version-checked publication.
+  await run(query => query('delete from halabessa.room_publications where room_id=$1 and version<=$2', [id, room.version]));
+  return room;
+}
 export function earlyAckEnabled(config: Record<string, unknown> | undefined, id: string) {
   return /^[A-Z]{3}[0-9]{5}$/.test(id) &&
     (config?.async_ack_enabled === true || config?.canary_room_id === id);
@@ -33,14 +65,7 @@ export async function publishRoom(query: PublicationQuery, id: string,
       where r.room_id=$1${lockGameRows ? ' for update of r,s' : ''}`, [id]);
     const row = rows[0];
     if (!row) throw new Error('room_not_found');
-    const version = Number(row.version);
-    if (!row.state || typeof row.state !== 'object' || Array.isArray(row.state) ||
-        (row.state as MatchState).protocolVersion !== 1 ||
-        !Number.isSafeInteger(version) || version < 0 ||
-        !row.hands || typeof row.hands !== 'object' || Array.isArray(row.hands)) {
-      throw new Error('invalid_publication_snapshot');
-    }
-    const room = {state: row.state as MatchState, version, hands: row.hands as Record<string, Card[]>};
+    const room = committedRoom(row), version = room.version;
     await publish(room);
     // Commits after our SELECT have higher versions and retain their intents.
     await query('delete from halabessa.room_publications where room_id=$1 and version<=$2', [id, version]);

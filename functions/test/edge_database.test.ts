@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createDatabaseRunner, databaseConnectionString, withDatabaseGuard } from "../../supabase/functions/halabessa-api/database.ts";
+import { createDatabaseRunner, configuredConnectionMode, databaseConnectionString, withDatabaseGuard } from "../../supabase/functions/halabessa-api/database.ts";
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -8,6 +8,47 @@ function deferred<T>() {
   const promise = new Promise<T>((yes, no) => { resolve = yes; reject = no; });
   return { promise, resolve, reject };
 }
+
+test('interactive work overtakes queued background work without opening another socket', async () => {
+  const gate = deferred<void>(), started = deferred<void>();
+  let sockets = 0;
+  const order: string[] = [];
+  const run = createDatabaseRunner(() => ({
+    async connect() {assert.equal(++sockets, 1);}, async end() {sockets--;},
+  }));
+  const first = run(async () => {started.resolve(); await gate.promise;});
+  await started.promise;
+  const background = run(async () => {order.push('background');}, undefined, 'background');
+  const interactive = run(async () => {order.push('interactive');});
+  gate.resolve(); await Promise.all([first, background, interactive]);
+  assert.deepEqual(order, ['interactive', 'background']); assert.equal(sockets, 0);
+});
+
+test('background admission reserves room for interaction and expires safely', async () => {
+  const gate = deferred<void>(), started = deferred<void>();
+  let clients = 0;
+  const run = createDatabaseRunner(() => {
+    clients++; return {async connect() {}, async end() {}};
+  }, 3, () => {}, 20);
+  const first = run(async () => {started.resolve(); await gate.promise;}); await started.promise;
+  const background = run(async () => assert.fail('expired background'), undefined, 'background');
+  const expired = assert.rejects(background, /database_busy/);
+  await assert.rejects(run(async () => assert.fail(), undefined, 'background'), /database_busy/);
+  const foreground = run(async () => assert.fail('expired foreground'));
+  const foregroundExpired = assert.rejects(foreground, /database_busy/);
+  await expired; await foregroundExpired;
+  assert.equal(clients, 1);
+  gate.resolve(); await first;
+  assert.equal(await run(async () => 'recovered'), 'recovered');
+  assert.equal(clients, 2);
+});
+
+test('configured pooler classification cannot reveal connection credentials', () => {
+  assert.equal(configuredConnectionMode('postgres://private:p%40ss@aws-0-eu-west-2.pooler.supabase.com:6543/postgres'), 'shared_transaction');
+  assert.equal(configuredConnectionMode('postgres://private:secret@aws-0-eu-west-2.pooler.supabase.com:5432/postgres'), 'shared_session');
+  assert.equal(configuredConnectionMode('postgres://private:secret@db.project.supabase.co:5432/postgres'), 'direct');
+  assert.equal(configuredConnectionMode('not-a-url'), 'invalid');
+});
 
 test('guard and connection overlap, but no application work precedes guard success', async () => {
   const guard = deferred<void>(), connect = deferred<void>();

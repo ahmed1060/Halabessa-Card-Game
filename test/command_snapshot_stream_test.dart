@@ -60,6 +60,23 @@ void main() {
     expect(received.single!.serverVersion, 3);
   });
 
+  test(
+    'a data-free deletion fence closes the match and cancels recovery',
+    () async {
+      events.add({'serverVersion': 3});
+      await flush();
+      events.add({
+        'protocolVersion': 1,
+        '__halabessaDelivery': {'version': 0, 'deleted': true},
+      });
+      await flush();
+      requests.single.complete(snapshot(3));
+      await flush();
+      expect(received, [null]);
+      expect(errors, isEmpty);
+    },
+  );
+
   Future<(StreamController<MatchState?>, StreamController<MatchState>)>
   usePrivateFeed({MatchState? seed, List<Duration>? retryDelays}) async {
     await subscription.cancel();

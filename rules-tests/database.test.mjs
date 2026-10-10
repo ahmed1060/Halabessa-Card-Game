@@ -32,6 +32,32 @@ beforeEach(async () => {
 });
 after(async () => { await env?.cleanup(); });
 const db = uid => env.authenticatedContext(uid).database();
+
+test('indexed public-room query excludes private rooms and deletion fences', async () => {
+  await env.withSecurityRulesDisabled(context => update(ref(context.database(), 'rooms'), {
+    PUBLIC: {isPublic: true, phase: 'waitingForPlayers'},
+    PRIVATE: {isPublic: false, phase: 'waitingForPlayers'},
+    DELETED: {__halabessaDelivery: {version: 0, deleted: true}},
+  }));
+  const result = await assertSucceeds(get(query(ref(db('alice'), 'rooms'), orderByChild('isPublic'), equalTo(true))));
+  assert.deepEqual(Object.keys(result.val()), ['PUBLIC']);
+});
+
+test('deletion fences cannot grant own-hand or metadata access or permit resurrection', async () => {
+  await env.withSecurityRulesDisabled(context => update(ref(context.database()), {
+    'matches/SERVER': {protocolVersion: 1, __halabessaDelivery: {version: 0, deleted: true}},
+    'matchViews/SERVER': {__halabessaDelivery: {version: 0, deleted: true}},
+    'matchHands/SERVER': {__halabessaDelivery: {version: 0, deleted: true}},
+  }));
+  for (const path of ['matchViews/SERVER/alice', 'matchHands/SERVER/alice',
+    'matchViews/SERVER/__halabessaDelivery', 'matchHands/SERVER/__halabessaDelivery']) {
+    await assertFails(get(ref(db('alice'), path)));
+  }
+  await assertFails(set(ref(db('alice'), 'matches/SERVER'), {protocolVersion: 0, players: {alice: true}}));
+  await assertFails(remove(ref(db('alice'), 'matches/SERVER')));
+  const board = (await assertSucceeds(get(ref(db('alice'), 'matches/SERVER')))).val();
+  assert.deepEqual(Object.keys(board).sort(), ['__halabessaDelivery', 'protocolVersion']);
+});
 test('deletion block denies retained-token access without affecting unrelated players', async () => {
   await env.withSecurityRulesDisabled(async context => {
     await set(ref(context.database(),'accountDeletionBlocked/alice'),true);
