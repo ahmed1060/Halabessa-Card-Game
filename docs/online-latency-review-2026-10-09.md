@@ -669,3 +669,91 @@ backlog), and release web build (87.1 seconds) all passed. The deployed backend
 preflight returned 204 with the exact allowed origin, x-region in allowed
 headers and max-age 600. Edge v56 has only the stable release source; temporary
 rescue/cleanup helpers and the local recovery launcher were removed.
+
+## Final implementation and additional approved QA — 11 October
+
+The user approved exactly one further guest/private room, explicitly requiring
+implementation/local checks to finish first. No fixture was created until the
+command-route implementation, continuous-feed harness, teardown adapter and
+local verification were ready. This approval is now consumed, not reusable.
+
+Command routing is restricted to submitMatchCommand. Gateway/transport failure
+does not resend an ambiguous mutation: it cools down that preferred route for
+one minute, so a subsequent caller-controlled same-ID recovery can use automatic
+routing. Authorization/version refusals do not activate route failover. Purchases,
+rewards, joins and deletion keep their existing route and no generic write retry.
+HALABESSA_COMMAND_REGION='' restores automatic command routing at build time.
+
+The QA harness registers a revision waiter BEFORE each command and keeps a
+second connection to the guest's private Firebase SSE view throughout each
+sample batch. It checks recipient, room, monotonic version and absence of public
+handCards, then measures acknowledgement and remote-feed visibility separately.
+This is continuous own-view delivery, NOT a second human/opponent simulation.
+
+The fixture was EGK02480 / guest DMhoUiCLLFfWSNkzASQxNISmSy53. It did not finish
+a rewarded match. Twenty samples per route/delivery mode alternated automatic
+and London order on the same Windows host/network:
+
+| Command path | Acknowledgement median / p95 | Private feed median / p95 |
+| --- | --- | --- |
+| Synchronous automatic | 2,016 / 2,120 ms | 1,749 / 1,871 ms |
+| Synchronous London | 1,476 / 1,588 ms | 1,279 / 1,321 ms |
+| QA fast-ack automatic | 1,231 / 1,334 ms | 1,844 / 2,089 ms |
+| QA fast-ack London | 871 / 927 ms | 1,330 / 1,335 ms |
+
+The combined route + fast-ack path reduces acknowledgement p95 by 56.3% versus
+the current synchronous automatic baseline (median by 56.8%). This meets the
+plan's alternative >=50% improvement gate, NOT its absolute <800 ms target.
+Fast ack alone in London improves p95 by 41.6%; do not attribute the combined
+56.3% solely to publication changes. London private-feed p95 is approximately
+unchanged (+14 ms) versus synchronous London. Automatic fast-ack feed p95 was
+218 ms slower than synchronous automatic; routing matters, and broad guarantees
+or worldwide latency claims cannot be inferred from these small QA samples.
+
+Authenticated reads (ten samples each, including warmup) again showed lower
+London medians, but not uniformly lower tails:
+
+| Read | Automatic median / p95 | London median / p95 |
+| --- | --- | --- |
+| Admin | 923 / 2,268 ms | 717 / 1,748 ms |
+| Social | 906 / 1,008 ms | 717 / 820 ms |
+| Daily status | 908 / 928 ms | 716 / 820 ms |
+| Snapshot | 813 / 845 ms | 681 / 955 ms |
+
+All sampled command revisions reached the uninterrupted private feed. Live
+lost-response same-ID recovery, duplicate refusal, two competing card plays
+(one acceptance/one conflict, hand 4 -> 3), reconnect at revision 90 (597 ms),
+same-room rejoin, leave/bot takeover and former-player snapshot 403 passed.
+The actual card race used automatic routing; regional command timings used
+synthetic profile commands, not a claim of measured regional card-play p95.
+Multi-human races, failed publication, runtime termination and deletion guards
+remain isolated regression tests, not injected production outages.
+
+Cleanup used a one-hour, exact-UID/room authenticated adapter that refused other
+owners, public/shared-human rooms, changed balances, old profiles and completed
+matches. It removed only the fixture SQL rows and personal Firebase mirror data,
+then deleted and verified absence of the guest identity server-side. No expired
+client-token deletion was needed. All four non-personal deletion fences remain
+to reject late publishers. The adapter is removed: stable Edge v58 bundle hash
+32792a0191af2f9c9f65d815fcd0da40b5ab866c7f81f19ae2192612738681b2 matches v56.
+Counts returned to 23 profiles / 27 rooms, zero publication intents, null canary,
+and zero idle halabessa-api database sessions before the final switch.
+
+Local verification: 408 Flutter tests and 196 backend/build tests passed, full
+Edge and scoped teardown typechecks passed, modified Dart files analyze cleanly,
+and the release web build passed (86.4 seconds). The pre-existing whole-project
+warning/info backlog is not represented as clean analysis. Hosting CI now also
+runs the revision-tracker timeout/privacy/regression tests. The 75180453 Hosting
+and Android workflows passed; final release CI is tracked separately.
+
+Rollout: prefer London commands with bounded outage cooldown; activate the
+existing private global fast-ack switch only after release Hosting succeeds.
+The scheduler and transactional queue remain in place for failed/terminated
+publishers. Rollback is async_ack_enabled=false, canary_room_id=null; retain
+fences/queue/deletion guards and never restore an older unfenced writer.
+
+Implementation and permitted live tests are complete. Physical iPhone/Android
+frame/tap-to-feedback traces remain an external release gate: no connected
+device was available, and neither unit tests nor this network harness certify
+native smoothness. Cold starts, peak concurrency and worldwide latency are also
+not guaranteed by this fixture. No paid-tier upgrade or user-data reset occurred.

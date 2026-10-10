@@ -11,14 +11,81 @@ void main() {
     Future<http.Response> Function(http.Request) send, {
     Future<String?> Function()? token,
     String? region,
+    String? commandRegion,
   }) => BackendTransport(
     endpoint: Uri.parse('https://backend.invalid/api'),
     client: MockClient(send),
     sessionKey: () => session,
     token: token ?? () async => 'test-token',
     preferredReadRegion: region,
+    preferredCommandRegion: commandRegion,
   );
   setUp(() => session = 'A:1');
+
+  test(
+    'command route outage cools down subsequent calls, not auth refusals',
+    () async {
+      for (final status in [503, 403]) {
+        final routes = <String?>[];
+        final backend = transport((request) async {
+          routes.add(request.headers['x-region']);
+          expect(jsonDecode(request.body)['commandId'], 'same-id');
+          return routes.length == 1
+              ? http.Response('{"error":"denied"}', status)
+              : http.Response('{}', 200);
+        }, commandRegion: 'eu-west-2');
+        await expectLater(
+          backend.call('submitMatchCommand', data: {'commandId': 'same-id'}),
+          throwsA(isA<SupabaseBackendException>()),
+        );
+        expect(routes.length, 1);
+        await backend.call(
+          'submitMatchCommand',
+          data: {'commandId': 'same-id'},
+        );
+        expect(routes, ['eu-west-2', status == 503 ? null : 'eu-west-2']);
+      }
+    },
+  );
+
+  test(
+    'command routing is scoped and never fails over after ambiguity',
+    () async {
+      for (final transportFailure in [false, true]) {
+        var calls = 0;
+        final backend = transport((request) async {
+          calls++;
+          expect(request.headers['x-region'], 'eu-west-2');
+          expect(jsonDecode(request.body)['commandId'], 'same-id');
+          if (transportFailure) throw http.ClientException('lost reply');
+          return http.Response('{"error":"backend_busy"}', 503);
+        }, commandRegion: 'eu-west-2');
+        await expectLater(
+          backend.call('submitMatchCommand', data: {'commandId': 'same-id'}),
+          throwsA(isA<Exception>()),
+        );
+        expect(calls, 1);
+      }
+    },
+  );
+
+  test(
+    'command preference does not force other writes into a region',
+    () async {
+      final backend = transport((request) async {
+        expect(request.headers['x-region'], isNull);
+        return http.Response('{}', 200);
+      }, commandRegion: 'eu-west-2');
+      for (final action in [
+        'createRoom',
+        'joinRoom',
+        'claimDailyReward',
+        'requestAccountDeletion',
+      ]) {
+        await backend.call(action);
+      }
+    },
+  );
 
   test(
     'ordinary reads prefer London and fail over once on a gateway failure',

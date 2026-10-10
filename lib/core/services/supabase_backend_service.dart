@@ -51,6 +51,13 @@ class SupabaseBackendService {
       'HALABESSA_READ_REGION',
       defaultValue: 'eu-west-2',
     ),
+    // Authenticated command + continuous-delivery QA passed in London.
+    // Empty HALABESSA_COMMAND_REGION restores automatic routing at build time.
+    // Commands retain same-ID recovery in the match service, not blind retries.
+    preferredCommandRegion: const String.fromEnvironment(
+      'HALABESSA_COMMAND_REGION',
+      defaultValue: 'eu-west-2',
+    ),
     onTiming: (operation, durations) {
       if (!kReleaseMode) debugPrint('backend timing $operation $durations');
     },

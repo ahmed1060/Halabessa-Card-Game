@@ -21,6 +21,7 @@ class BackendTransport {
     required this.token,
     this.onTiming,
     this.preferredReadRegion,
+    this.preferredCommandRegion,
     this.regionalReadTimeout = const Duration(seconds: 4),
   });
 
@@ -30,8 +31,12 @@ class BackendTransport {
   final Future<String?> Function() token;
   final void Function(String operation, Map<String, int> durations)? onTiming;
   final String? preferredReadRegion;
+
+  /// Optional command route. Never fails over or repeats an ambiguous write.
+  final String? preferredCommandRegion;
   final Duration regionalReadTimeout;
   final _reads = <String, Future<Map<String, dynamic>>>{};
+  DateTime? _commandRegionUnavailableUntil;
 
   static const readActions = {
     'getAdminStatus',
@@ -121,10 +126,43 @@ class BackendTransport {
 
       // Only these ordinary reads may fail over. Purchases, deletion,
       // rewards, joins and commands are never retried by this transport.
-      final region = readActions.contains(action) ? preferredReadRegion : null;
+      final isRead = readActions.contains(action);
+      final commandRouteAvailable =
+          _commandRegionUnavailableUntil == null ||
+          DateTime.now().isAfter(_commandRegionUnavailableUntil!);
+      final region = isRead
+          ? preferredReadRegion
+          : action == 'submitMatchCommand' && commandRouteAvailable
+          ? preferredCommandRegion
+          : null;
       http.Response response;
-      if (region == null || region.isEmpty) {
-        response = await send();
+      if (!isRead || region == null || region.isEmpty) {
+        final routedCommand = !isRead && region?.isNotEmpty == true;
+        void coolDownCommandRoute() {
+          if (routedCommand) {
+            _commandRegionUnavailableUntil = DateTime.now().add(
+              const Duration(minutes: 1),
+            );
+          }
+        }
+
+        try {
+          response = await send(
+            region: region?.isNotEmpty == true ? region : null,
+          );
+          if ([502, 503, 504].contains(response.statusCode)) {
+            coolDownCommandRoute();
+          }
+        } on http.ClientException {
+          coolDownCommandRoute();
+          rethrow;
+        } on TimeoutException {
+          coolDownCommandRoute();
+          rethrow;
+        }
+        // Do NOT repeat this request. A later same-ID recovery/new call may
+        // use automatic routing during cooldown, under the caller's existing
+        // authorization, version and command-ID checks.
       } else {
         http.Response? regional;
         try {

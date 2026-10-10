@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { createInterface } from 'node:readline/promises';
+import { openRevisionFeed } from './performance-feed.mjs';
 if (!process.argv.includes('--live')) throw Error('Explicit --live approval required');
 const options=readFileSync('lib/firebase_options.dart','utf8');
 const apiKey=/FirebaseOptions web = FirebaseOptions\(\s*apiKey: '([^']+)'/.exec(options)?.[1];
@@ -13,7 +14,7 @@ const edge='https://jmlipglfgmuyegoroepu.supabase.co/functions/v1/halabessa-api'
 const database='https://halabessa-card-game1-default-rtdb.firebaseio.com';
 const input=createInterface({input:process.stdin,output:process.stdout});
 let account,roomId,current,stage='create guest';
-const metrics={baseline:[],canary:[],routing:{}};
+const metrics={baseline:{},canary:{},routing:{}};
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 async function json(url,body,token,region){
   try {
@@ -33,8 +34,9 @@ async function api(action,data={},allowRejected=false){
 }
 function intent(commandType,payload={}){return {roomId,commandType,expectedVersion:current.version,
   commandId:randomUUID(),commandPayload:payload};}
-async function command(type,payload={}){
-  const result=await api('submitMatchCommand',intent(type,payload));
+async function command(type,payload={},region){
+  const result=await json(edge,{action:'submitMatchCommand',...intent(type,payload)},account.idToken,region);
+  assert.equal(result.status,200,`${stage}: command HTTP ${result.status}`);
   current=result.data;return result;
 }
 function summary(samples){
@@ -42,11 +44,25 @@ function summary(samples){
   return {n:sorted.length,median_ms:sorted[Math.floor(sorted.length/2)],p95_ms:sorted[Math.ceil(sorted.length*.95)-1]};
 }
 async function sample(bucket){
-  for(let i=0;i<20;i++){
-    const result=await command('updateProfile',{displayName:'CodexPerformanceQA',cardBackId:'default_card',avatarUrl:''});
-    metrics[bucket].push(result.ms);
-    assert.equal(result.data.mirrorPending,bucket==='canary');
-  }
+  const feed=await openRevisionFeed(`${database}/matchViews/${roomId}/${account.uid}.json?auth=${encodeURIComponent(account.idToken)}`,account.uid,roomId);
+  const samples={automatic:{ack:[],visible:[],regions:new Set()},london:{ack:[],visible:[],regions:new Set()}};
+  try {
+    await feed.tracker.wait(current.version);
+    for(let i=0;i<20;i++) for(const mode of (i%2?['london','automatic']:['automatic','london'])){
+      const visible=feed.tracker.wait(current.version+1);
+      // Attach immediately so a feed failure cannot produce an unhandled rejection.
+      const delivery=visible.then(value=>({value}),()=>({failed:true}));
+      const result=await command('updateProfile',{displayName:'CodexPerformanceQA',cardBackId:'default_card',avatarUrl:''},
+        mode==='london'?'eu-west-2':undefined);
+      const delivered=await delivery; assert.equal(delivered.failed,undefined);
+      samples[mode].ack.push(result.ms); samples[mode].visible.push(delivered.value.ms);
+      if(result.region)samples[mode].regions.add(result.region);
+      assert.equal(result.data.mirrorPending,bucket==='canary');
+      if(i%5===4)console.log(JSON.stringify({progress:bucket,completedPerRoute:i+1}));
+    }
+    metrics[bucket]=Object.fromEntries(Object.entries(samples).map(([mode,values])=>[mode,
+      {ack:summary(values.ack),visible:summary(values.visible),observedRegions:[...values.regions]}]));
+  }finally{await feed.close();}
 }
 async function routingSamples() {
   // Alternate order to reduce warmup/time-of-day bias. Read-only calls touch
@@ -116,10 +132,10 @@ try{
   assert.equal((await input.question('Implementation/local checks must be complete; type VERIFIED to begin live checks: ')).trim(),'VERIFIED');
   stage='authenticated routing read samples';await routingSamples();
   stage='baseline profile commands';await sample('baseline');
-  console.log(JSON.stringify({baseline:summary(metrics.baseline)}));
+  console.log(JSON.stringify({baseline:metrics.baseline}));
   assert.equal((await input.question('Enable only this room canary, then type CANARY: ')).trim(),'CANARY');
   stage='canary profile commands';await sample('canary');
-  console.log(JSON.stringify({canary:summary(metrics.canary)}));
+  console.log(JSON.stringify({canary:metrics.canary}));
   stage='bot preparation';await command('voteForBots');await command('startRound');
   await sleep(1100);await command('advance');
   await sleep(2100);await command('advance');
@@ -165,7 +181,7 @@ try{
   assert.ok(reconnected.view.version>=delivered.view.version);
   console.log(JSON.stringify({passed:true,concurrentAccepted:1,concurrentRejected:1,retryDidNotReplay:true,
     deliveredVersion:delivered.view.version,reconnectedVersion:reconnected.view.version,
-    reconnect_ms:reconnected.ms,baseline:summary(metrics.baseline),canary:summary(metrics.canary)}));
+    reconnect_ms:reconnected.ms,baseline:metrics.baseline,canary:metrics.canary}));
   stage='private room rejoin';
   const joined=await api('joinRoom',{roomId,displayName:'CodexPerformanceQA',cardBackId:'default_card',avatarUrl:''});
   assert.equal(joined.data.alreadyJoined,true);
@@ -192,9 +208,11 @@ try{
       try{
         stage='room cleanup';const cleaned=await api('cleanupPerformanceFixture',{roomId});
         assert.equal(cleaned.data.ok,true);
-        const deleted=await json(`https://identitytoolkit.googleapis.com/v1/accounts:delete?key=${apiKey}`,{idToken:account.idToken});
-        assert.equal(deleted.status,200);
-        console.log(JSON.stringify({roomCleaned:true,accountDeleted:true,sqlProfileCleanupRequired:account.uid}));
+        // The one-hour exact-fixture server adapter verifies guest identity,
+        // removes the profile after room cleanup, deletes identity and verifies
+        // absence. Do not depend on an aged client token for identity deletion.
+        assert.equal(cleaned.data.guestDeleted,true);
+        console.log(JSON.stringify({roomCleaned:true,accountDeleted:true}));
       }catch{console.error(JSON.stringify({cleanupFailed:true,roomId,uid:account.uid}));process.exitCode=1;}
     }
   }else if(account){
