@@ -604,3 +604,68 @@ The manual harness now prints its non-secret fixture UID before creation and
 cleans the account even if room creation fails, preventing an orphan on that
 path. Credentials remain memory-only. The edbed442 Hosting workflow passed
 including emulators, client tests, typechecks and deployment.
+
+## Final approved-fixture results and regional-read follow-up
+
+Exactly one additional guest and one private room were used. No existing player,
+match or balance was a mutation target; no rewarded match was completed.
+
+| Authenticated ordinary read | Automatic median / p95 (10) | London median / p95 (10) |
+| --- | --- | --- |
+| Admin status | 874 / 1,853 ms | 757 / 1,512 ms |
+| Social graph | 830 / 933 ms | 694 / 819 ms |
+| Daily reward status | 844 / 942 ms | 667 / 751 ms |
+| Match snapshot | 837 / 889 ms | 693 / 736 ms |
+
+Calls alternated route order. Actual response regions were Zurich eu-central-2
+and London eu-west-2. This is one network, small samples, including warmup—not
+evidence for every device, country, cold-start percentile or provider outage.
+
+Twenty synchronous QA-room profile commands measured median 2,002 ms / p95
+2,043 ms. Twenty isolated early-ack commands measured 1,170 ms / 1,270 ms:
+about 42% median and 38% p95 improvement. The proposed <800 ms / >=50% target
+was NOT reached. Global early acknowledgment remains disabled; its implementation
+is ready, but broad rollout is held rather than claiming the lag is solved.
+
+Live correctness checks passed: aborted-reply same-ID recovery and duplicate
+replay refusal, two competing cards yielding one acceptance/one version conflict
+and exactly one removed card, own-hand coherent SSE view at revision 51,
+reconnect at the same revision (403 ms), same-room rejoin without an extra seat,
+immediate leave/bot takeover and former-player snapshot refusal (403).
+The final fixture publication queue drained to zero. This did not simulate
+production runtime termination, multiple real humans, continuous remote-feed
+percentiles or mobile rendering frames; those must not be claimed as live proof.
+
+The temporary cleanup removed the QA room/ledger/secrets/publication intents.
+The client identity-deletion step failed after the longer test, so a second
+temporary server-authorized exact-UID helper completed and verified identity
+absence; no assumption was made from the client failure. It refused cleanup
+unless the SQL fixture/profile were absent and all four Firebase room roots
+contained only deletion fences. Both temporary helpers were removed. Final
+counts returned to 23 profiles / 27 rooms, zero publication intents, null canary
+and zero idle halabessa-api database sessions. The four data-free room fences
+are intentional; they contain no player/card data and prevent delayed resurrection.
+
+Based on the authenticated route measurements, ordinary application reads now
+prefer London, allow its x-region CORS header and fall back once to automatic
+routing on transport timeout/failure or gateway 502/503/504. The total request
+deadline and account/session checks remain enforced before each attempt. A late
+regional response cannot replace the chosen fallback result. Authorization and
+version refusals are not retried. Mutations (including commands, purchases,
+rewards, joins and deletion) retain automatic routing and are never automatically
+retried by this transport. HALABESSA_READ_REGION='' restores automatic reads at
+build time. The deletion guard is still a fresh read, not a positive-access cache.
+
+Remaining gates: authenticated London command comparison plus sustained remote
+delivery/rollout verification before enabling the global fast-ack switch, and
+physical iPhone/Android frame/tap profiling. The consumed fixture approval is
+not reused to create another account/room. No paid upgrade is required by these
+changes. The 9577fd73 Hosting workflow passed; Android/iOS build status is tracked
+separately and unsigned iOS artifacts are not App Store signing approval.
+
+Regional-read batch local verification: 405 Flutter tests, 193 backend/build
+tests, full Edge typecheck, zero analysis errors (existing 263 warning/info
+backlog), and release web build (87.1 seconds) all passed. The deployed backend
+preflight returned 204 with the exact allowed origin, x-region in allowed
+headers and max-age 600. Edge v56 has only the stable release source; temporary
+rescue/cleanup helpers and the local recovery launcher were removed.

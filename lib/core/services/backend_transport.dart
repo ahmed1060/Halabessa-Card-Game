@@ -20,6 +20,8 @@ class BackendTransport {
     required this.sessionKey,
     required this.token,
     this.onTiming,
+    this.preferredReadRegion,
+    this.regionalReadTimeout = const Duration(seconds: 4),
   });
 
   final Uri endpoint;
@@ -27,6 +29,8 @@ class BackendTransport {
   final Object? Function() sessionKey;
   final Future<String?> Function() token;
   final void Function(String operation, Map<String, int> durations)? onTiming;
+  final String? preferredReadRegion;
+  final Duration regionalReadTimeout;
   final _reads = <String, Future<Map<String, dynamic>>>{};
 
   static const readActions = {
@@ -89,14 +93,57 @@ class BackendTransport {
       // A token completing after the deadline must not start a late mutation.
       if (total.elapsed >= limit) throw TimeoutException('backend deadline');
       final network = Stopwatch()..start();
-      final response = await client.post(
-        endpoint,
-        headers: {
-          'Authorization': 'Bearer $bearer',
-          'Content-Type': 'application/json',
-        },
-        body: body,
-      );
+      Future<http.Response> send({String? region, Duration? attemptLimit}) {
+        // Recheck before every attempt: a late token/failed route must not
+        // launch requests after logout or after the original call deadline.
+        if (sessionKey() != session) {
+          throw const SupabaseBackendException('unauthenticated');
+        }
+        final remaining = limit - total.elapsed;
+        if (remaining <= Duration.zero) {
+          throw TimeoutException('backend deadline');
+        }
+        final budget = attemptLimit != null && attemptLimit < remaining
+            ? attemptLimit
+            : remaining;
+        return client
+            .post(
+              endpoint,
+              headers: {
+                'Authorization': 'Bearer $bearer',
+                'Content-Type': 'application/json',
+                if (region != null) 'x-region': region,
+              },
+              body: body,
+            )
+            .timeout(budget);
+      }
+
+      // Only these ordinary reads may fail over. Purchases, deletion,
+      // rewards, joins and commands are never retried by this transport.
+      final region = readActions.contains(action) ? preferredReadRegion : null;
+      http.Response response;
+      if (region == null || region.isEmpty) {
+        response = await send();
+      } else {
+        http.Response? regional;
+        try {
+          regional = await send(
+            region: region,
+            attemptLimit: regionalReadTimeout,
+          );
+        } on http.ClientException {
+          /* Safe read-only fallback below. */
+        } on TimeoutException {
+          /* Original total deadline still applies. */
+        }
+        if (regional == null || [502, 503, 504].contains(regional.statusCode)) {
+          durations['route_fallback'] = 1;
+          response = await send();
+        } else {
+          response = regional;
+        }
+      }
       durations['http_ms'] = network.elapsedMilliseconds;
       if (sessionKey() != session) {
         throw const SupabaseBackendException('unauthenticated');

@@ -45,6 +45,12 @@ class SupabaseBackendService {
     client: _client,
     sessionKey: _sessionKey,
     token: () async => FirebaseAuth.instance.currentUser?.getIdToken(),
+    // Measured authenticated London reads were faster than automatic routing.
+    // Empty HALABESSA_READ_REGION restores automatic routing at build time.
+    preferredReadRegion: const String.fromEnvironment(
+      'HALABESSA_READ_REGION',
+      defaultValue: 'eu-west-2',
+    ),
     onTiming: (operation, durations) {
       if (!kReleaseMode) debugPrint('backend timing $operation $durations');
     },

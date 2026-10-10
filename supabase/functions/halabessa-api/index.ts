@@ -51,7 +51,7 @@ let firebaseToken: { value: string; expiresAt: number } | null = null;
 function headers(origin: string | null) {
   return {
     "Access-Control-Allow-Origin": origin && allowedOrigins.has(origin) ? origin : "null",
-    "Access-Control-Allow-Headers": "authorization, content-type",
+    "Access-Control-Allow-Headers": "authorization, content-type, x-region",
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Access-Control-Max-Age": "600",
     "Cache-Control": "no-store",

@@ -10,13 +10,116 @@ void main() {
   BackendTransport transport(
     Future<http.Response> Function(http.Request) send, {
     Future<String?> Function()? token,
+    String? region,
   }) => BackendTransport(
     endpoint: Uri.parse('https://backend.invalid/api'),
     client: MockClient(send),
     sessionKey: () => session,
     token: token ?? () async => 'test-token',
+    preferredReadRegion: region,
   );
   setUp(() => session = 'A:1');
+
+  test(
+    'ordinary reads prefer London and fail over once on a gateway failure',
+    () async {
+      final routes = <String?>[];
+      final backend = transport((request) async {
+        routes.add(request.headers['x-region']);
+        expect(jsonDecode(request.body)['action'], 'getMatchSnapshot');
+        return routes.length == 1
+            ? http.Response('unavailable', 503)
+            : http.Response('{"version":7}', 200);
+      }, region: 'eu-west-2');
+      expect((await backend.call('getMatchSnapshot'))['version'], 7);
+      expect(routes, ['eu-west-2', null]);
+    },
+  );
+
+  test(
+    'read transport failure falls back but authorization refusals do not',
+    () async {
+      var calls = 0;
+      final backend = transport((request) async {
+        calls++;
+        if (calls == 1) throw http.ClientException('connection failed');
+        expect(request.headers['x-region'], isNull);
+        return http.Response('{}', 200);
+      }, region: 'eu-west-2');
+      await backend.call('getSocialGraph');
+      expect(calls, 2);
+      for (final status in [401, 403, 409]) {
+        calls = 0;
+        final denied = transport((_) async {
+          calls++;
+          return http.Response('{"error":"denied"}', status);
+        }, region: 'eu-west-2');
+        await expectLater(
+          denied.call('getSocialGraph'),
+          throwsA(isA<SupabaseBackendException>()),
+        );
+        expect(calls, 1);
+      }
+    },
+  );
+
+  test('preferred read region never reroutes or retries a mutation', () async {
+    var calls = 0;
+    final backend = transport((request) async {
+      calls++;
+      expect(request.headers['x-region'], isNull);
+      return http.Response('{"error":"backend_busy"}', 503);
+    }, region: 'eu-west-2');
+    await expectLater(
+      backend.call('submitMatchCommand'),
+      throwsA(isA<SupabaseBackendException>()),
+    );
+    expect(calls, 1);
+  });
+
+  test(
+    'logout during a failed regional read prevents automatic-route fallback',
+    () async {
+      var calls = 0;
+      final backend = transport((_) async {
+        calls++;
+        session = null;
+        return http.Response('unavailable', 503);
+      }, region: 'eu-west-2');
+      await expectLater(
+        backend.call('getAdminStatus'),
+        throwsA(isA<SupabaseBackendException>()),
+      );
+      expect(calls, 1);
+    },
+  );
+
+  test(
+    'a late regional response cannot overwrite the fallback result',
+    () async {
+      final late = Completer<http.Response>();
+      var calls = 0;
+      final backend = BackendTransport(
+        endpoint: Uri.parse('https://backend.invalid/api'),
+        client: MockClient((request) async {
+          calls++;
+          return request.headers['x-region'] != null
+              ? late.future
+              : http.Response('{"version":9}', 200);
+        }),
+        sessionKey: () => session,
+        token: () async => 'test-token',
+        preferredReadRegion: 'eu-west-2',
+        regionalReadTimeout: const Duration(milliseconds: 5),
+      );
+      final response = await backend.call('getMatchSnapshot');
+      expect(response['version'], 9);
+      expect(calls, 2);
+      late.complete(http.Response('{"version":2}', 200));
+      await Future<void>.delayed(Duration.zero);
+      expect(response['version'], 9);
+    },
+  );
 
   test('identical concurrent reads coalesce but never cache results', () async {
     var calls = 0;
