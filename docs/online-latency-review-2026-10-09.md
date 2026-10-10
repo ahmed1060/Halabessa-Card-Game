@@ -579,3 +579,28 @@ Edge entrypoint typecheck passed. Current client tests/builds are unchanged:
 400 Flutter tests, zero analysis errors (263 warning/info backlog), release web
 build passed. The adc04393 Hosting and Android CI jobs passed; iOS was still
 building at this checkpoint. No additional QA guest/room has yet been created.
+
+### Live integration correction before latency sampling
+
+The approved guest's first private-room creation exposed a concrete HTTP adapter
+bug: Firebase returned 400 for a conditional request combined with print=silent.
+An authenticated worker diagnostic used deliberately mismatched ETags (no writes)
+to compare the two forms: silent+if-match returned 400 with the explicit
+unsupported-combination error; plain if-match correctly returned 412. This was
+not a pooler or gameplay-engine failure.
+
+The adapter now suppresses echoed JSON only on unconditional PUT/POST/PATCH.
+Conditional creation and fenced publication keep if-match and omit print=silent;
+GET still requests ETags, 412 retains conflict data, empty 204s are accepted,
+and DELETE uses no unsupported silent parameter. Three regression tests and the
+Hosting CI gate cover these request shapes; all 193 server/build tests pass and
+the full Edge entrypoint typecheck passes.
+
+The original failed process did not retain its guest credential. The same
+approved guest was recovered via a temporary exact-UID, time-limited,
+random-nonce-hash-gated helper after live guest/profile checks; it was immediately
+removed. No second guest was created. Room creation then succeeded for XZZ56629.
+The manual harness now prints its non-secret fixture UID before creation and
+cleans the account even if room creation fails, preventing an orphan on that
+path. Credentials remain memory-only. The edbed442 Hosting workflow passed
+including emulators, client tests, typechecks and deployment.

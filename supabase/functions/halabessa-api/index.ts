@@ -18,6 +18,7 @@ import { createDatabaseRunner, configuredConnectionMode, databaseConnectionStrin
 import { createRequestTiming } from './request_timing.ts';
 import { commitAndDeliver, participantSnapshot, publicMatchState } from "./match_delivery.ts";
 import { deleteFencedMirror, publishFencedMirror, publishFencedSummary } from './mirror_fencing.ts';
+import { createFirebaseDatabaseRequest } from './firebase_transport.ts';
 import { commitAndQueue, earlyAckEnabled, publicationLease, publishDetachedRoom, publishRoom, retryPublicationLater } from './room_publication.ts';
 
 const firebaseProject = "halabessa-card-game1";
@@ -115,23 +116,7 @@ async function firebaseAccessToken() {
   return firebaseToken.value;
 }
 
-async function firebaseRequest(path: string, method = "GET", body?: unknown, etag?: string) {
-  const token = await firebaseAccessToken();
-  const response = await fetch(`${firebaseDatabaseUrl}/${path}.json${method === 'GET' ? '' : '?print=silent'}`, {
-    method,
-    signal: AbortSignal.timeout(12_000),
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-      ...(method === "GET" ? { "X-Firebase-ETag": "true" } : {}),
-      ...(etag ? { "if-match": etag } : {}),
-    },
-    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-  });
-  const text = await response.text();
-  const json = text ? JSON.parse(text) : null;
-  return { status: response.status, data: json, etag: response.headers.get("etag") };
-}
+const firebaseRequest = createFirebaseDatabaseRequest(firebaseDatabaseUrl, firebaseAccessToken);
 
 function roomId() {
   const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";

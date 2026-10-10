@@ -42,6 +42,7 @@ jobs:
           functions/test/edge_match_delivery.test.ts functions/test/edge_database.test.ts
           functions/test/edge_room_publication.test.ts
           functions/test/edge_mirror_fencing.test.ts
+          functions/test/edge_firebase_transport.test.ts
           functions/test/edge_request_timing.test.ts
           functions/test/edge_public_profiles.test.ts functions/test/edge_account_deletion.test.ts
           functions/test/edge_firebase_identity.test.ts

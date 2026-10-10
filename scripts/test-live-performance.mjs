@@ -98,8 +98,15 @@ async function ownView(minVersion){
   }finally{clearTimeout(timer);abort.abort();await reader?.cancel().catch(()=>{});}
 }
 try{
-  const signed=await json(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${apiKey}`,{returnSecureToken:true});
-  assert.equal(signed.status,200);account={uid:signed.data.localId,idToken:signed.data.idToken};
+  // A separately authorized recovery launcher can resume the SAME fixture
+  // after its original process exits. Never persist or print its credentials.
+  const resumed=globalThis[Symbol.for('halabessa.approved.performance.fixture')];
+  if(resumed){assert.ok(resumed.uid && resumed.idToken);account=resumed;}
+  else {
+    const signed=await json(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${apiKey}`,{returnSecureToken:true});
+    assert.equal(signed.status,200);account={uid:signed.data.localId,idToken:signed.data.idToken};
+  }
+  console.log(JSON.stringify({testGuestUid:account.uid}));
   stage='private room';
   const created=await api('createRoom',{protocolVersion:1,mode:'classic',maxPoints:41,timerDurationSeconds:0,
     isPublic:false,displayName:'CodexPerformanceQA',cardBackId:'default_card',avatarUrl:''});
@@ -190,6 +197,14 @@ try{
         console.log(JSON.stringify({roomCleaned:true,accountDeleted:true,sqlProfileCleanupRequired:account.uid}));
       }catch{console.error(JSON.stringify({cleanupFailed:true,roomId,uid:account.uid}));process.exitCode=1;}
     }
+  }else if(account){
+    // Creation failure must not orphan the account merely because no room ID
+    // was assigned. The operator still removes only its exact SQL QA profile.
+    try {
+      const deleted=await json(`https://identitytoolkit.googleapis.com/v1/accounts:delete?key=${apiKey}`,{idToken:account.idToken});
+      console.log(JSON.stringify({accountDeleted:deleted.status===200,sqlProfileCleanupRequired:account.uid}));
+      if(deleted.status!==200)process.exitCode=1;
+    }catch{console.error(JSON.stringify({accountCleanupRequired:account.uid}));process.exitCode=1;}
   }
   input.close();
 }
