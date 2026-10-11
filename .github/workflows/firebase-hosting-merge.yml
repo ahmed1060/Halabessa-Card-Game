@@ -58,6 +58,7 @@ jobs:
           functions/test/edge_deletion_worker.test.ts
           functions/test/unity_web_startup.test.js functions/test/web_build_versioning.test.mjs
           functions/test/release_pages.test.mjs
+          functions/test/hosting_archives.test.mjs
       - name: Typecheck complete Edge entrypoint
         run: npm exec --yes --package=deno@2.5.4 -- deno check supabase/functions/halabessa-api/index.ts
       - uses: actions/setup-java@v4
@@ -91,6 +92,15 @@ jobs:
       - run: flutter build web --release --base-href / --pwa-strategy=none
       - name: Fingerprint Flutter entrypoints
         run: node scripts/version-web-build.mjs
+      # One-time user-approved cleanup, not a recurring retention policy.
+      # Future commits skip this step; successful reruns are idempotent.
+      - name: Cleanup approved archived Hosting builds
+        if: github.event.head_commit.message == 'Cleanup approved archived Firebase Hosting builds'
+        env:
+          FIREBASE_HOSTING_CLEANUP_SA_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_HALABESSA_CARD_GAME1 }}
+        run: |
+          node --test functions/test/hosting_archives.test.mjs
+          node scripts/cleanup-hosting-archives.mjs --apply-approved-halabessa-archives
       - uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
