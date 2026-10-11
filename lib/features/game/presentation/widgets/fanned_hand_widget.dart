@@ -6,11 +6,15 @@ import 'package:halabessa/features/game/presentation/widgets/card_widget.dart';
 import 'table_style.dart';
 import 'board_card_motion.dart';
 import 'deal_card_motion.dart';
+import 'local_card_play_layer.dart';
+export 'local_card_play_layer.dart' show CardPlayOrigin;
 
 /// Bounded, keyboard-accessible hand. Queued cards use identity, not list index.
 class FannedHandWidget extends StatefulWidget {
   final List<game_card.Card> cards;
-  final FutureOr<void> Function(game_card.Card, Offset origin) onCardTap;
+  final FutureOr<void> Function(game_card.Card, CardPlayOrigin origin)
+  onCardTap;
+  final game_card.Card? hiddenCard;
   final bool isMyTurn;
   final bool interactionEnabled;
   final Widget Function(game_card.Card, double, double)? cardBuilder;
@@ -32,6 +36,7 @@ class FannedHandWidget extends StatefulWidget {
     this.queueHint = 'Queue card; tap again to cancel',
     this.pendingHint = 'Sending move',
     this.dealerDeckKey,
+    this.hiddenCard,
   });
 
   @override
@@ -41,13 +46,14 @@ class FannedHandWidget extends StatefulWidget {
 class _FannedHandWidgetState extends State<FannedHandWidget> {
   game_card.Card? _queued;
   game_card.Card? _hovered;
-  Offset _queuedOrigin = Offset.zero;
+  CardPlayOrigin _queuedOrigin = const CardPlayOrigin(Rect.zero, 0);
+  game_card.Card? _focused;
+  final _geometry = <game_card.Card, CardPlayOrigin Function()>{};
   Timer? _autoPlay;
   Timer? _tapGuard;
   bool _submitting = false;
   game_card.Card? _pendingCard;
   double _dragDistance = 0;
-  Offset _dragOrigin = Offset.zero;
 
   @override
   void dispose() {
@@ -78,13 +84,14 @@ class _FannedHandWidgetState extends State<FannedHandWidget> {
     }
   }
 
-  Future<void> _activate(game_card.Card card, Offset origin) async {
+  Future<void> _activate(game_card.Card card, CardPlayOrigin origin) async {
     if (!widget.interactionEnabled ||
         _submitting ||
         !widget.cards.contains(card)) {
       return;
     }
     _autoPlay?.cancel();
+    origin = _geometry[card]?.call() ?? origin;
     if (!widget.isMyTurn) {
       setState(() {
         _queued = _queued == card ? null : card;
@@ -170,15 +177,93 @@ class _FannedHandWidgetState extends State<FannedHandWidget> {
                         final card = widget.cards[index];
                         final pending = _pendingCard == card;
                         final selected = _queued == card || pending;
+                        final angle =
+                            (index - (widget.cards.length - 1) / 2) * .035;
                         void activate() {
+                          _activate(card, _geometry[card]!());
+                        }
+
+                        _geometry[card] = () {
                           final box =
                               cardContext.findRenderObject() as RenderBox?;
-                          _activate(
-                            card,
-                            box?.localToGlobal(Offset(width / 2, height / 2)) ??
-                                Offset.zero,
+                          return CardPlayOrigin(
+                            Rect.fromPoints(
+                              box?.localToGlobal(Offset.zero) ?? Offset.zero,
+                              box?.localToGlobal(Offset(width, height)) ??
+                                  Offset.zero,
+                            ),
+                            angle,
                           );
-                        }
+                        };
+
+                        // Artwork, selection and keyboard focus share one
+                        // transform; the tap target remains fixed during deals.
+                        final artwork = Transform.rotate(
+                          key: ValueKey('hand-art-angle-${card.firebaseKey}'),
+                          angle: angle,
+                          child: ExcludeSemantics(
+                            child: IgnorePointer(
+                              child: SizedBox(
+                                width: width,
+                                height: height,
+                                child: Stack(
+                                  children: [
+                                    widget.cardBuilder?.call(
+                                          card,
+                                          width,
+                                          height,
+                                        ) ??
+                                        CardWidget(
+                                          card: card,
+                                          width: width,
+                                          height: height,
+                                        ),
+                                    if (selected || _focused == card)
+                                      Positioned.fill(
+                                        child: DecoratedBox(
+                                          key: ValueKey(
+                                            'hand-outline-${card.firebaseKey}',
+                                          ),
+                                          decoration: BoxDecoration(
+                                            borderRadius: BorderRadius.all(
+                                              Radius.elliptical(
+                                                width * .1,
+                                                height * .07,
+                                              ),
+                                            ),
+                                            border: Border.all(
+                                              color: TableStyle.brass,
+                                              width: 2,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    if (pending)
+                                      Positioned(
+                                        key: ValueKey(
+                                          'hand-pending-${card.firebaseKey}',
+                                        ),
+                                        right: 4,
+                                        bottom: 4,
+                                        child: Container(
+                                          padding: const EdgeInsets.all(5),
+                                          decoration: const BoxDecoration(
+                                            color: TableStyle.ink,
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: const Icon(
+                                            Icons.hourglass_top,
+                                            size: 16,
+                                            color: TableStyle.brass,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
 
                         return AnimatedPadding(
                           duration: reducedMotion
@@ -201,7 +286,6 @@ class _FannedHandWidgetState extends State<FannedHandWidget> {
                               onVerticalDragStart: widget.interactionEnabled
                                   ? (details) {
                                       _dragDistance = 0;
-                                      _dragOrigin = details.globalPosition;
                                     }
                                   : null,
                               onVerticalDragUpdate: widget.interactionEnabled
@@ -212,7 +296,7 @@ class _FannedHandWidgetState extends State<FannedHandWidget> {
                               onVerticalDragEnd: widget.interactionEnabled
                                   ? (_) {
                                       if (_dragDistance < -36) {
-                                        _activate(card, _dragOrigin);
+                                        activate();
                                       }
                                       _dragDistance = 0;
                                     }
@@ -220,19 +304,13 @@ class _FannedHandWidgetState extends State<FannedHandWidget> {
                               onVerticalDragCancel: () => _dragDistance = 0,
                               child: Material(
                                 color: Colors.transparent,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                  side: BorderSide(
-                                    color: selected
-                                        ? TableStyle.brass
-                                        : Colors.transparent,
-                                    width: 2,
-                                  ),
-                                ),
                                 child: InkWell(
                                   borderRadius: BorderRadius.circular(8),
-                                  focusColor: TableStyle.brass.withValues(
-                                    alpha: 0.5,
+                                  focusColor: Colors.transparent,
+                                  splashColor: Colors.transparent,
+                                  highlightColor: Colors.transparent,
+                                  onFocusChange: (value) => setState(
+                                    () => _focused = value ? card : null,
                                   ),
                                   onHover: (value) => setState(
                                     () => _hovered = value ? card : null,
@@ -241,112 +319,43 @@ class _FannedHandWidgetState extends State<FannedHandWidget> {
                                       widget.interactionEnabled && !_submitting
                                       ? activate
                                       : null,
-                                  child: Stack(
-                                    children: [
-                                      widget.dealerDeckKey != null
-                                          ? DealCardMotion(
-                                              key: ValueKey(
-                                                'hand-deal-${card.firebaseKey}',
-                                              ),
-                                              sourceKey: widget.dealerDeckKey!,
-                                              delay: Duration(
-                                                milliseconds: index * 70,
-                                              ),
-                                              child: Transform.rotate(
-                                                angle:
-                                                    (index -
-                                                        (widget.cards.length -
-                                                                1) /
-                                                            2) *
-                                                    .035,
-                                                child: ExcludeSemantics(
-                                                  child: IgnorePointer(
-                                                    child:
-                                                        widget.cardBuilder
-                                                            ?.call(
-                                                              card,
-                                                              width,
-                                                              height,
-                                                            ) ??
-                                                        CardWidget(
-                                                          card: card,
-                                                          width: width,
-                                                          height: height,
-                                                        ),
-                                                  ),
-                                                ),
-                                              ),
-                                            )
-                                          : BoardCardMotion(
-                                              key: ValueKey(
-                                                'hand-visual-${card.firebaseKey}',
-                                              ),
-                                              // New cards leave one point above the hand and
-                                              // fan out; the card's hit target never moves.
-                                              origin: Offset(
-                                                fanWidth / 2 -
-                                                    (firstCardLeft +
-                                                        index * spacing +
-                                                        width / 2),
-                                                compact ? -72 : -108,
-                                              ),
-                                              delay: Duration(
-                                                milliseconds: index * 70,
-                                              ),
-                                              travelDuration: const Duration(
-                                                milliseconds: 380,
-                                              ),
-                                              initialOpacity: 0.65,
-                                              // Keep the hit target fixed while only the
-                                              // dealt card artwork travels into the hand.
-                                              child: Transform.rotate(
-                                                angle:
-                                                    (index -
-                                                        (widget.cards.length -
-                                                                1) /
-                                                            2) *
-                                                    .035,
-                                                child: ExcludeSemantics(
-                                                  child: IgnorePointer(
-                                                    child:
-                                                        widget.cardBuilder
-                                                            ?.call(
-                                                              card,
-                                                              width,
-                                                              height,
-                                                            ) ??
-                                                        CardWidget(
-                                                          card: card,
-                                                          width: width,
-                                                          height: height,
-                                                        ),
-                                                  ),
-                                                ),
-                                              ),
+                                  child: Opacity(
+                                    opacity: widget.hiddenCard == card ? 0 : 1,
+                                    child: widget.dealerDeckKey != null
+                                        ? DealCardMotion(
+                                            key: ValueKey(
+                                              'hand-deal-${card.firebaseKey}',
                                             ),
-                                      if (pending)
-                                        Positioned(
-                                          key: ValueKey(
-                                            'hand-pending-${card.firebaseKey}',
-                                          ),
-                                          right: 4,
-                                          bottom: 4,
-                                          child: IgnorePointer(
-                                            child: Container(
-                                              padding: const EdgeInsets.all(5),
-                                              decoration: const BoxDecoration(
-                                                color: TableStyle.ink,
-                                                shape: BoxShape.circle,
-                                              ),
-                                              child: const Icon(
-                                                Icons.hourglass_top,
-                                                size: 16,
-                                                color: TableStyle.brass,
-                                              ),
+                                            sourceKey: widget.dealerDeckKey!,
+                                            delay: Duration(
+                                              milliseconds: index * 70,
                                             ),
+                                            child: artwork,
+                                          )
+                                        : BoardCardMotion(
+                                            key: ValueKey(
+                                              'hand-visual-${card.firebaseKey}',
+                                            ),
+                                            // New cards leave one point above the hand and
+                                            // fan out; the card's hit target never moves.
+                                            origin: Offset(
+                                              fanWidth / 2 -
+                                                  (firstCardLeft +
+                                                      index * spacing +
+                                                      width / 2),
+                                              compact ? -72 : -108,
+                                            ),
+                                            delay: Duration(
+                                              milliseconds: index * 70,
+                                            ),
+                                            travelDuration: const Duration(
+                                              milliseconds: 380,
+                                            ),
+                                            initialOpacity: 0.65,
+                                            // Keep the hit target fixed while only the
+                                            // dealt card artwork travels into the hand.
+                                            child: artwork,
                                           ),
-                                        ),
-                                    ],
                                   ),
                                 ),
                               ),

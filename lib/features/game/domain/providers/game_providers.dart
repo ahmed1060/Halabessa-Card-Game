@@ -1288,26 +1288,27 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     await _publishState(currentState.copyWith(playerEmojis: emojis));
   }
 
-  Future<void> playCard(String playerId, game_card.Card card, {Offset? origin}) async {
-    if (_playInFlight) return;
+  Future<bool> playCard(String playerId, game_card.Card card, {Offset? origin}) async {
+    if (_playInFlight) return false;
     _playInFlight = true;
     try {
       MatchState? currentState = state;
-      if (currentState == null || currentState.phase != GamePhase.playing) return;
+      if (currentState == null || currentState.phase != GamePhase.playing ||
+          currentState.playerIds.indexOf(playerId) != currentState.currentTurnIndex ||
+          !(currentState.handCards[playerId]?.contains(card) ?? false)) return false;
 
       if (origin != null) {
         ref.read(localPlayOriginsProvider.notifier).update((m) => {...m, card.firebaseKey: origin});
       }
 
       if (currentState.usesServerCommands) {
-        if (playerId != ref.read(currentUserProvider)?.uid) return;
-        await _sendServerIntent('playCard', payload: {'card': card.toJson()});
-        return;
+        if (playerId != ref.read(currentUserProvider)?.uid) return false;
+        return await _sendServerIntent('playCard', payload: {'card': card.toJson()});
       }
 
       final result = GameEngine.apply(currentState, PlayCardAction(playerId, card));
       final newState = result.newState;
-      if (identical(newState, currentState)) return;
+      if (identical(newState, currentState)) return false;
 
       if (result.capturedCards.isNotEmpty) {
         final intermediateBoard = List<game_card.Card>.from(currentState.board)..add(card);
@@ -1334,13 +1335,13 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
 
         if (!mounted || state?.id != currentState.id ||
             state?.roundCount != currentState.roundCount ||
-            state?.phase != GamePhase.capturing) return;
+            state?.phase != GamePhase.capturing) return true;
         await _publishState(state!.copyWith(capturingStage: 1));
         await Future.delayed(const Duration(milliseconds: 600));
 
         if (!mounted || state?.id != currentState.id ||
             state?.roundCount != currentState.roundCount ||
-            state?.phase != GamePhase.capturing) return;
+            state?.phase != GamePhase.capturing) return true;
         await _publishState(newState);
       } else {
         await _publishState(newState);
@@ -1355,8 +1356,10 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
           await _handleRoundEnd();
         }
       }
+      return true;
     } catch (e) {
       debugPrint('ERROR in playCard: $e');
+      return false;
     } finally {
       _playInFlight = false;
     }

@@ -6,6 +6,7 @@ import 'card_widget.dart';
 import 'board_card_motion.dart';
 import 'table_style.dart';
 import 'card_face_flip.dart';
+import 'local_card_play_layer.dart';
 
 class BoardCardsWidget extends StatelessWidget {
   final List<game_card.Card> cards;
@@ -14,6 +15,7 @@ class BoardCardsWidget extends StatelessWidget {
   final String? capturingTeam;
   final int capturingStage;
   final Map<String, Offset> arrivalOffsets;
+  final Set<String> alreadyPresented;
   final bool captureToBottom;
   final String? captureLabel;
   final Offset? captureOffset;
@@ -28,6 +30,7 @@ class BoardCardsWidget extends StatelessWidget {
     this.capturingTeam,
     this.capturingStage = 0,
     this.arrivalOffsets = const {},
+    this.alreadyPresented = const {},
     this.captureToBottom = false,
     this.captureLabel,
     this.cardBuilder,
@@ -239,6 +242,7 @@ class BoardCardsWidget extends StatelessWidget {
   Widget _arrivingCard(game_card.Card card, Widget child) => BoardCardMotion(
     key: ValueKey('board-${card.firebaseKey}'),
     origin: arrivalOffsets[card.firebaseKey] ?? const Offset(0, -95),
+    alreadyArrived: alreadyPresented.contains(card.firebaseKey),
     child: child,
   );
 
@@ -284,9 +288,13 @@ class BoardCardsWidget extends StatelessWidget {
       for (int i = 0; i < count; i++) {
         final card = cards[i];
         final isTop = i == count - 1;
-        final xOffset = startOffset + (i * width * 0.45);
+        final xOffset = isTop
+            ? boardTopCardOffset(count, width).dx
+            : startOffset + (i * width * 0.45);
         // Pre-defined subtle angles for natural Egyptian card table feel
-        final angle = (i - (count - 1) / 2) * 0.08;
+        final angle = isTop
+            ? boardTopCardAngle(count)
+            : (i - (count - 1) / 2) * 0.08;
 
         cardWidgets.add(
           _positionedCard(

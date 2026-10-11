@@ -8,12 +8,17 @@ class BoardCardMotion extends StatefulWidget {
   final Duration delay;
   final Duration travelDuration;
   final double initialOpacity;
+  final bool alreadyArrived;
 
-  const BoardCardMotion({super.key, required this.origin,
+  const BoardCardMotion({
+    super.key,
+    required this.origin,
     this.delay = Duration.zero,
     this.travelDuration = const Duration(milliseconds: 320),
     this.initialOpacity = 0.75,
-    required this.child});
+    this.alreadyArrived = false,
+    required this.child,
+  });
 
   @override
   State<BoardCardMotion> createState() => _BoardCardMotionState();
@@ -29,7 +34,7 @@ class _BoardCardMotionState extends State<BoardCardMotion>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (MediaQuery.disableAnimationsOf(context)) {
+    if (widget.alreadyArrived || MediaQuery.disableAnimationsOf(context)) {
       _controller.value = 1;
     } else if (_controller.value == 0) {
       _controller.forward();
@@ -48,18 +53,19 @@ class _BoardCardMotionState extends State<BoardCardMotion>
     child: widget.child,
     builder: (context, child) {
       final travelMs = widget.travelDuration.inMilliseconds;
-      final elapsed = _controller.value *
-          (travelMs + widget.delay.inMilliseconds);
+      final elapsed =
+          _controller.value * (travelMs + widget.delay.inMilliseconds);
       final travel = ((elapsed - widget.delay.inMilliseconds) / travelMs)
-          .clamp(0.0, 1.0).toDouble();
+          .clamp(0.0, 1.0)
+          .toDouble();
       final progress = Curves.easeOutCubic.transform(travel);
       return Transform.translate(
         offset: widget.origin * (1 - progress),
         child: Transform.scale(
           scale: 0.84 + 0.16 * progress,
           child: Opacity(
-            opacity: widget.initialOpacity +
-                (1 - widget.initialOpacity) * progress,
+            opacity:
+                widget.initialOpacity + (1 - widget.initialOpacity) * progress,
             child: child,
           ),
         ),

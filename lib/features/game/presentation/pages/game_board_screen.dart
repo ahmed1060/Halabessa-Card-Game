@@ -27,6 +27,7 @@ import '../widgets/table_seat.dart';
 import '../widgets/table_style.dart';
 import '../widgets/lantern_controls.dart';
 import '../widgets/table_motion_geometry.dart';
+import '../widgets/local_card_play_layer.dart';
 import '../widgets/dealer_seat.dart';
 import '../widgets/team_capture_stack.dart';
 import '../widgets/match_phase_panel.dart';
@@ -405,17 +406,21 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
                             : Duration.zero,
                         opacity: is3DActive ? 0.0 : 1.0,
                         child: activeTable.id == 'default_table'
-                            ? RepaintBoundary(child: Image.asset(
-                                MediaQuery.sizeOf(context).width <
-                                        MediaQuery.sizeOf(context).height
-                                    ? 'assets/images/tables/lantern_nights_portrait_v2.png'
-                                    : 'assets/images/tables/lantern_nights_v1.png',
-                                fit: BoxFit.cover,
-                                cacheWidth: backgroundDecodeWidth(MediaQuery.sizeOf(context).width,
-                                  MediaQuery.devicePixelRatioOf(context)),
-                                errorBuilder: (_, __, ___) =>
-                                    const ColoredBox(color: TableStyle.felt),
-                              ))
+                            ? RepaintBoundary(
+                                child: Image.asset(
+                                  MediaQuery.sizeOf(context).width <
+                                          MediaQuery.sizeOf(context).height
+                                      ? 'assets/images/tables/lantern_nights_portrait_v2.png'
+                                      : 'assets/images/tables/lantern_nights_v1.png',
+                                  fit: BoxFit.cover,
+                                  cacheWidth: backgroundDecodeWidth(
+                                    MediaQuery.sizeOf(context).width,
+                                    MediaQuery.devicePixelRatioOf(context),
+                                  ),
+                                  errorBuilder: (_, __, ___) =>
+                                      const ColoredBox(color: TableStyle.felt),
+                                ),
+                              )
                             : activeTable.assetPath.startsWith('http')
                             ? Image.network(
                                 activeTable.assetPath,
@@ -591,215 +596,245 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
       );
     }
 
-    return MatchTableLayout(
-      header: MatchScoreBar(
-        firstLabel: firstLabel,
-        secondLabel: secondLabel,
-        firstScore: firstIsA ? state.teamAScore : state.teamBScore,
-        secondScore: firstIsA ? state.teamBScore : state.teamAScore,
-        details: 'table_round_target'.tr(
-          args: [state.roundCount.toString(), state.maxPoints.toString()],
+    return LocalCardPlayLayer(
+      identity:
+          '${state.id}:${state.matchSequence}:${state.roundCount}:${state.handInRound}:$myUid',
+      hand: state.handCards[myUid] ?? const [],
+      boardCount: state.board.length,
+      boardKey: _boardKey,
+      enabled: state.usesServerCommands,
+      isLandscape: isLandscape,
+      pendingLabel: 'table_sending_move'.tr(),
+      cardBuilder: _cardFace,
+      submit: (card, geometry) {
+        final box = _boardKey.currentContext?.findRenderObject() as RenderBox?;
+        final origin = box == null
+            ? Offset.zero
+            : box.globalToLocal(geometry.center) - box.size.center(Offset.zero);
+        return ref
+            .read(matchStateProvider.notifier)
+            .playCard(myUid, card, origin: origin);
+      },
+      builder: (hiddenCard, presented, play) => MatchTableLayout(
+        header: MatchScoreBar(
+          firstLabel: firstLabel,
+          secondLabel: secondLabel,
+          firstScore: firstIsA ? state.teamAScore : state.teamBScore,
+          secondScore: firstIsA ? state.teamBScore : state.teamAScore,
+          details: 'table_round_target'.tr(
+            args: [state.roundCount.toString(), state.maxPoints.toString()],
+          ),
+          roomLabel: state.id.startsWith('OFFLINE_')
+              ? 'practice_bots'.tr()
+              : state.id,
+          onCopyRoom: state.id.startsWith('OFFLINE_')
+              ? null
+              : () {
+                  Clipboard.setData(ClipboardData(text: state.id));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('room_id_copied'.tr())),
+                  );
+                },
         ),
-        roomLabel: state.id.startsWith('OFFLINE_')
-            ? 'practice_bots'.tr()
-            : state.id,
-        onCopyRoom: state.id.startsWith('OFFLINE_')
-            ? null
-            : () {
-                Clipboard.setData(ClipboardData(text: state.id));
-                ScaffoldMessenger.of(
-                  context,
-                ).showSnackBar(SnackBar(content: Text('room_id_copied'.tr())));
-              },
-      ),
-      partner: seat(2),
-      leftOpponent: seat(3),
-      rightOpponent: seat(1),
-      localSeat: state.dealerIndex == _getAbsoluteIndex(state, myUid, 0)
-          ? Semantics(
-              key: _seatKeys[0],
-              label: 'table_deal_deck'.tr(),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  FaceDownStack(
-                    key: _dealerDeckKey,
-                    count: state.deckCount,
-                    backBuilder: _cardBack,
-                    width: 38,
-                    height: 54,
-                  ),
-                  Text(
-                    '${state.deckCount}',
-                    style: TableStyle.detail.copyWith(color: TableStyle.brass),
-                  ),
-                  Text(
-                    'table_dealer'.tr(),
-                    textAlign: TextAlign.center,
-                    style: TableStyle.detail.copyWith(
-                      color: TableStyle.brass,
-                      fontWeight: FontWeight.w700,
+        partner: seat(2),
+        leftOpponent: seat(3),
+        rightOpponent: seat(1),
+        localSeat: state.dealerIndex == _getAbsoluteIndex(state, myUid, 0)
+            ? Semantics(
+                key: _seatKeys[0],
+                label: 'table_deal_deck'.tr(),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    FaceDownStack(
+                      key: _dealerDeckKey,
+                      count: state.deckCount,
+                      backBuilder: _cardBack,
+                      width: 38,
+                      height: 54,
                     ),
-                  ),
-                ],
-              ),
-            )
-          : const SizedBox(height: 84),
-      collections: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            flex: 2,
-            child: TeamCaptureStack(
-              captures:
-                  state.harvestStacks[firstIsA ? 'teamA' : 'teamB'] ?? const [],
-              label: firstLabel,
-              countLabel: 'cards_count'.tr(
-                args: [
-                  _captureCount(state, firstIsA ? 'teamA' : 'teamB').toString(),
-                ],
-              ),
-              latestLabel: 'table_last_capture'.tr(),
-              historyLabel: 'table_view_history'.tr(),
-              showLatest: !isSpectator,
-              pileKey: _ourPileKey,
-              faceBuilder: _cardFace,
-              backBuilder: _cardBack,
-              onHistory: isSpectator ? null : () => _showCaptures(context),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: TeamCaptureStack(
-              captures:
-                  state.harvestStacks[firstIsA ? 'teamB' : 'teamA'] ?? const [],
-              label: secondLabel,
-              countLabel: 'cards_count'.tr(
-                args: [
-                  _captureCount(state, firstIsA ? 'teamB' : 'teamA').toString(),
-                ],
-              ),
-              latestLabel: '',
-              historyLabel: '',
-              showLatest: false,
-              pileKey: _rivalPileKey,
-              accent: TableStyle.red,
-              faceBuilder: _cardFace,
-              backBuilder: _cardBack,
-            ),
-          ),
-        ],
-      ),
-      board: SizedBox(
-        key: _boardKey,
-        child: _buildBoardCenter(
-          context,
-          ref,
-          state,
-          myUid,
-          isLandscape,
-          is3DActive: show3DHand,
-        ),
-      ),
-      status: _buildTableStatus(state, myUid, isSpectator, myTurn),
-      hand:
-          isSpectator || show3DHand || (state.handCards[myUid]?.isEmpty ?? true)
-          ? const SizedBox(height: 24)
-          : FannedHandWidget(
-              key: ValueKey(
-                'hand-${state.id}-${state.roundCount}-${state.handInRound}',
-              ),
-              dealerDeckKey: _dealerDeckKey,
-              cards: state.handCards[myUid] ?? [],
-              isMyTurn: myTurn,
-              interactionEnabled: playing,
-              playHint: 'table_play_card'.tr(),
-              queueHint: 'table_queue_card'.tr(),
-              cardLabelBuilder: (card) => 'table_card_name'.tr(
-                args: [
-                  'table_rank_${card.rank.name}'.tr(),
-                  'table_suit_${card.suit.name}'.tr(),
-                ],
-              ),
-              onCardTap: (card, globalOrigin) {
-                final box =
-                    _boardKey.currentContext?.findRenderObject() as RenderBox?;
-                final origin = box == null || globalOrigin == Offset.zero
-                    ? Offset.zero
-                    : box.globalToLocal(globalOrigin) -
-                          box.size.center(Offset.zero);
-                return ref
-                    .read(matchStateProvider.notifier)
-                    .playCard(myUid, card, origin: origin);
-              },
-              pendingHint: 'table_sending_move'.tr(),
-            ),
-      controls: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-        child: Wrap(
-          alignment: WrapAlignment.center,
-          spacing: 8,
+                    Text(
+                      '${state.deckCount}',
+                      style: TableStyle.detail.copyWith(
+                        color: TableStyle.brass,
+                      ),
+                    ),
+                    Text(
+                      'table_dealer'.tr(),
+                      textAlign: TextAlign.center,
+                      style: TableStyle.detail.copyWith(
+                        color: TableStyle.brass,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            : const SizedBox(height: 84),
+        collections: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            LanternControlButton(
-              label: 'chat'.tr(),
-              icon: Icons.chat_bubble_rounded,
-              onPressed: () =>
-                  ref.read(chatStateProvider.notifier).toggleOverlay(),
+            Expanded(
+              flex: 2,
+              child: TeamCaptureStack(
+                captures:
+                    state.harvestStacks[firstIsA ? 'teamA' : 'teamB'] ??
+                    const [],
+                label: firstLabel,
+                countLabel: 'cards_count'.tr(
+                  args: [
+                    _captureCount(
+                      state,
+                      firstIsA ? 'teamA' : 'teamB',
+                    ).toString(),
+                  ],
+                ),
+                latestLabel: 'table_last_capture'.tr(),
+                historyLabel: 'table_view_history'.tr(),
+                showLatest: !isSpectator,
+                pileKey: _ourPileKey,
+                faceBuilder: _cardFace,
+                backBuilder: _cardBack,
+                onHistory: isSpectator ? null : () => _showCaptures(context),
+              ),
             ),
-            LanternControlButton(
-              label:
-                  (ref.watch(settingsProvider).isSoundEnabled
-                          ? 'table_sound_on'
-                          : 'table_sound_off')
-                      .tr(),
-              icon: ref.watch(settingsProvider).isSoundEnabled
-                  ? Icons.volume_up_rounded
-                  : Icons.volume_off_rounded,
-              onPressed: () => ref
-                  .read(settingsProvider.notifier)
-                  .toggleSound(!ref.read(settingsProvider).isSoundEnabled),
+            const SizedBox(width: 8),
+            Expanded(
+              child: TeamCaptureStack(
+                captures:
+                    state.harvestStacks[firstIsA ? 'teamB' : 'teamA'] ??
+                    const [],
+                label: secondLabel,
+                countLabel: 'cards_count'.tr(
+                  args: [
+                    _captureCount(
+                      state,
+                      firstIsA ? 'teamB' : 'teamA',
+                    ).toString(),
+                  ],
+                ),
+                latestLabel: '',
+                historyLabel: '',
+                showLatest: false,
+                pileKey: _rivalPileKey,
+                accent: TableStyle.red,
+                faceBuilder: _cardFace,
+                backBuilder: _cardBack,
+              ),
             ),
-            LanternControlButton(
-              label: 'settings'.tr(),
-              icon: Icons.settings_rounded,
-              onPressed: () => _showSettings(context),
-            ),
-            PopupMenuButton<String>(
-              tooltip: 'table_more'.tr(),
-              color: TableStyle.ink,
-              icon: const Icon(Icons.more_horiz, color: TableStyle.ivory),
-              constraints: const BoxConstraints(minWidth: 160),
-              onSelected: (action) {
-                switch (action) {
-                  case 'reactions':
-                    setState(() => _isEmoteWheelOpen = !_isEmoteWheelOpen);
-                  case 'captures':
-                    _showCaptures(context);
-                  case 'leave':
-                    _confirmLeave(context, ref);
-                }
-              },
-              itemBuilder: (_) => [
-                if (!isSpectator)
+          ],
+        ),
+        board: SizedBox(
+          key: _boardKey,
+          child: _buildBoardCenter(
+            context,
+            ref,
+            state,
+            myUid,
+            isLandscape,
+            is3DActive: show3DHand,
+            alreadyPresented: presented,
+          ),
+        ),
+        status: _buildTableStatus(state, myUid, isSpectator, myTurn),
+        hand:
+            isSpectator ||
+                show3DHand ||
+                (state.handCards[myUid]?.isEmpty ?? true)
+            ? const SizedBox(height: 24)
+            : FannedHandWidget(
+                key: ValueKey(
+                  'hand-${state.id}-${state.roundCount}-${state.handInRound}',
+                ),
+                dealerDeckKey: _dealerDeckKey,
+                cards: state.handCards[myUid] ?? [],
+                isMyTurn: myTurn,
+                interactionEnabled: playing && hiddenCard == null,
+                hiddenCard: hiddenCard,
+                playHint: 'table_play_card'.tr(),
+                queueHint: 'table_queue_card'.tr(),
+                cardLabelBuilder: (card) => 'table_card_name'.tr(
+                  args: [
+                    'table_rank_${card.rank.name}'.tr(),
+                    'table_suit_${card.suit.name}'.tr(),
+                  ],
+                ),
+                onCardTap: play,
+                pendingHint: 'table_sending_move'.tr(),
+              ),
+        controls: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          child: Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 8,
+            children: [
+              LanternControlButton(
+                label: 'chat'.tr(),
+                icon: Icons.chat_bubble_rounded,
+                onPressed: () =>
+                    ref.read(chatStateProvider.notifier).toggleOverlay(),
+              ),
+              LanternControlButton(
+                label:
+                    (ref.watch(settingsProvider).isSoundEnabled
+                            ? 'table_sound_on'
+                            : 'table_sound_off')
+                        .tr(),
+                icon: ref.watch(settingsProvider).isSoundEnabled
+                    ? Icons.volume_up_rounded
+                    : Icons.volume_off_rounded,
+                onPressed: () => ref
+                    .read(settingsProvider.notifier)
+                    .toggleSound(!ref.read(settingsProvider).isSoundEnabled),
+              ),
+              LanternControlButton(
+                label: 'settings'.tr(),
+                icon: Icons.settings_rounded,
+                onPressed: () => _showSettings(context),
+              ),
+              PopupMenuButton<String>(
+                tooltip: 'table_more'.tr(),
+                color: TableStyle.ink,
+                icon: const Icon(Icons.more_horiz, color: TableStyle.ivory),
+                constraints: const BoxConstraints(minWidth: 160),
+                onSelected: (action) {
+                  switch (action) {
+                    case 'reactions':
+                      setState(() => _isEmoteWheelOpen = !_isEmoteWheelOpen);
+                    case 'captures':
+                      _showCaptures(context);
+                    case 'leave':
+                      _confirmLeave(context, ref);
+                  }
+                },
+                itemBuilder: (_) => [
+                  if (!isSpectator)
+                    PopupMenuItem(
+                      value: 'reactions',
+                      child: Text(
+                        'table_reactions'.tr(),
+                        style: TableStyle.label,
+                      ),
+                    ),
+                  if (!isSpectator)
+                    PopupMenuItem(
+                      value: 'captures',
+                      child: Text(
+                        'table_captures'.tr(),
+                        style: TableStyle.label,
+                      ),
+                    ),
                   PopupMenuItem(
-                    value: 'reactions',
+                    value: 'leave',
                     child: Text(
-                      'table_reactions'.tr(),
+                      'leave_game_title'.tr(),
                       style: TableStyle.label,
                     ),
                   ),
-                if (!isSpectator)
-                  PopupMenuItem(
-                    value: 'captures',
-                    child: Text('table_captures'.tr(), style: TableStyle.label),
-                  ),
-                PopupMenuItem(
-                  value: 'leave',
-                  child: Text('leave_game_title'.tr(), style: TableStyle.label),
-                ),
-              ],
-            ),
-          ],
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1127,6 +1162,7 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
     String myUid,
     bool isLandscape, {
     bool is3DActive = false,
+    Set<String> alreadyPresented = const {},
   }) {
     if (is3DActive) {
       return const SizedBox.shrink();
@@ -1184,6 +1220,7 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
     return BoardCardsWidget(
       key: ValueKey('board-${matchState.id}'),
       cards: matchState.board,
+      alreadyPresented: alreadyPresented,
       isLandscape: isLandscape,
       isCapturing: isCapturing,
       capturingTeam: matchState.capturingTeam,

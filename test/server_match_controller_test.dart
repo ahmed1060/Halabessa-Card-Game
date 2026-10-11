@@ -66,11 +66,11 @@ void main() {
   test('play submits intent only, with no optimistic hand removal or duplicate', () async {
     final card = match.handCards['human']!.single;
     final play = notifier.playCard('human', card);
-    await notifier.playCard('human', card);
+    expect(await notifier.playCard('human', card), isFalse);
     expect(sync.types, ['playCard']);
     expect(container.read(matchStateProvider), same(match));
     sync.pending.single.complete(match.copyWith(serverVersion: 4, handCards: {'human': []}));
-    await play;
+    expect(await play, isTrue);
     expect(container.read(matchStateProvider)!.serverVersion, 4);
     expect(container.read(matchStateProvider)!.handCards['human'], isEmpty);
   });
@@ -110,7 +110,7 @@ void main() {
   test('rejected human intent surfaces safe feedback without changing cards', () async {
     final play = notifier.playCard('human', match.handCards['human']!.single);
     sync.pending.single.completeError(const SupabaseBackendException('phase_not_ready'));
-    await play;
+    expect(await play, isFalse);
     expect(container.read(matchStateProvider), same(match));
     expect(container.read(matchFeedbackProvider)?.translationKey, 'match_action_rejected');
   });
