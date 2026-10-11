@@ -95,13 +95,12 @@ test("capture animation has one harvest record and grants the next turn a fresh 
   assert.equal(captured.state.phase, "capturing");
   assert.deepEqual(captured.state.playHistory, [state.handCards!.a[0]]);
   assert.throws(() => lifecycleCommand("playCard", captured.state, [], "b", { card: state.handCards!.a[0] }, now + 1), /play_not_ready/);
-  const flying = advanceMatch(captured.state, [], now + 600);
-  assert.equal(flying.state.capturingStage, 1);
-  const finished = advanceMatch(flying.state, [], now + 1200);
+  assert.throws(() => advanceMatch(captured.state, [], now + 599), /no_transition_due/);
+  const finished = advanceMatch(captured.state, [], now + 600);
   assert.equal(finished.state.phase, "playing");
   assert.deepEqual(finished.state.board, []);
   assert.equal(JSON.stringify(finished.state.harvestStacks), harvest);
-  assert.equal(finished.state.turnStartTime, new Date(now + 1200).toISOString());
+  assert.equal(finished.state.turnStartTime, new Date(now + 600).toISOString());
 });
 
 test("unanimous rematch cannot discard pending rewards; settled rematch resets scores", () => {
@@ -116,4 +115,97 @@ test("unanimous rematch cannot discard pending rewards; settled rematch resets s
   assert.equal(restarted.state.matchSequence, 1);
   assert.equal(restarted.deck.length, 52);
   assert.deepEqual(restarted.state.earnedCoins, {});
+});
+
+function oneCardRoom(): MatchState {
+  return { ...room(), phase: 'playing', currentTurnIndex: 0,
+    turnStartTime: new Date(now).toISOString(), consecutiveTimeouts: {a: 2},
+    handCards: {a: [{suit: 'hearts', rank: 'ace'}],
+      b: [{suit: 'clubs', rank: 'two'}, {suit: 'clubs', rank: 'three'}],
+      c: [{suit: 'spades', rank: 'four'}], d: [{suit: 'diamonds', rank: 'five'}]},
+    board: [], harvestStacks: {teamA: [], teamB: []} };
+}
+
+test('a forced last card uses server time, preserves inactivity and plays exactly once', () => {
+  const initial = oneCardRoom();
+  assert.throws(() => lifecycleCommand('advance', initial, [], 'b', {}, now + 599), /turn_deadline_not_reached/);
+  const next = lifecycleCommand('advance', initial, [], 'b', {}, now + 600).state;
+  assert.equal(next.currentTurnIndex, 1);
+  assert.deepEqual(next.handCards!.a, []);
+  assert.deepEqual(next.board, initial.handCards!.a);
+  assert.equal((next.playHistory as Card[]).length, 1);
+  assert.deepEqual(next.consecutiveTimeouts, {a: 2});
+  assert.equal(next.playerIds![0], 'a');
+  assert.equal(next.turnStartTime, new Date(now + 600).toISOString());
+  assert.throws(() => lifecycleCommand('advance', next, [], 'b', {}, now + 601), /turn_deadline_not_reached/);
+  assert.throws(() => lifecycleCommand('playCard', next, [], 'a', {card: initial.handCards!.a[0]}, now + 601), /not_your_turn/);
+});
+
+test('forced last-card play works without a turn timer and cannot affect a non-active hand', () => {
+  const initial = {...oneCardRoom(), timerDurationSeconds: 0};
+  assert.equal(advanceMatch(initial, [], now + 600).state.handCards!.a.length, 0);
+  assert.throws(() => advanceMatch({...initial, currentTurnIndex: 1}, [], now + 600), /turn_deadline_not_reached/);
+  assert.throws(() => advanceMatch({...initial, turnStartTime: new Date(now + 1000).toISOString()}, [], now + 600), /turn_deadline_not_reached/);
+  assert.throws(() => lifecycleCommand('advance', initial, [], 'stranger', {}, now + 600), /human_participant_required/);
+});
+
+test('last-card capture has a single harvest entry and one completion transition', () => {
+  const initial = {...oneCardRoom(), mode: 'tafweet', board: [{suit: 'diamonds', rank: 'ace'} as Card]};
+  const captured = advanceMatch(initial, [], now + 600).state;
+  assert.equal(captured.phase, 'capturing');
+  assert.equal(captured.capturingStage, 0);
+  assert.equal(captured.handCards!.a.length, 0);
+  const harvest = JSON.stringify(captured.harvestStacks);
+  assert.throws(() => advanceMatch(captured, [], now + 1199), /no_transition_due/);
+  const finished = advanceMatch(captured, [], now + 1200).state;
+  assert.equal(finished.phase, 'playing');
+  assert.deepEqual(finished.board, []);
+  assert.equal(JSON.stringify(finished.harvestStacks), harvest);
+  assert.equal((finished.playHistory as Card[]).length, 1);
+});
+
+test('manual play winning the race cancels the forced move; bots use the same single-card policy', () => {
+  const initial = oneCardRoom();
+  const manual = lifecycleCommand('playCard', initial, [], 'a', {card: initial.handCards!.a[0]}, now + 599).state;
+  assert.throws(() => advanceMatch(manual, [], now + 600), /turn_deadline_not_reached/);
+  const bot = {...initial, playerIds: ['bot_1', 'b', 'c', 'd'], handCards: {...initial.handCards, bot_1: initial.handCards!.a}};
+  assert.throws(() => advanceMatch(bot, [], now + 599), /no_transition_due/);
+  assert.equal(advanceMatch(bot, [], now + 600).state.handCards!.bot_1.length, 0);
+});
+
+test('a complete round with twelve forced last cards neither skips a deal nor loses cards', () => {
+  let clock = Date.parse('2026-10-11T12:00:00Z');
+  let {state, deck} = advanceMatch(room(), [], clock);
+  ({state, deck} = lifecycleCommand('cut', state, deck, 'd', {position: 20}, clock));
+  let forced = 0, manual = 0;
+  for (let step = 0; step < 160 && state.phase !== 'rematchVoting'; step++) {
+    if (state.phase === 'playing' && state.playerIds!.some(uid => state.handCards?.[uid]?.length)) {
+      const uid = state.playerIds![Number(state.currentTurnIndex)];
+      const hand = state.handCards![uid];
+      if (hand.length === 1) {
+        clock += 600;
+        ({state, deck} = advanceMatch(state, deck, clock));
+        forced++;
+      } else {
+        const card = hand.find(c => c.rank === state.board?.at(-1)?.rank) ?? hand[0];
+        ({state, deck} = lifecycleCommand('playCard', state, deck, uid, {card}, clock));
+        manual++;
+      }
+    } else {
+      clock += state.phase === 'capturing' ? 600 : 5000;
+      ({state, deck} = advanceMatch(state, deck, clock));
+    }
+    if (state.phase !== 'capturing') {
+      const harvest = Object.values(state.harvestStacks as Record<string, {leadingCard: Card; capturedCards: Card[]}[]> ?? {})
+        .flatMap(captures => captures.flatMap(capture => [...capture.capturedCards, capture.leadingCard]));
+      const cards = [...deck, ...(state.board ?? []), ...Object.values(state.handCards ?? {}).flat(), ...harvest];
+      assert.equal(cards.length, 52);
+      assert.equal(new Set(cards.map(c => c.suit + '_' + c.rank)).size, 52);
+    }
+  }
+  assert.equal(forced, 12);
+  assert.equal(manual, 36);
+  assert.equal((state.playHistory as Card[]).length, 48);
+  assert.equal(state.handInRound, 3);
+  assert.equal(state.phase, 'rematchVoting');
 });

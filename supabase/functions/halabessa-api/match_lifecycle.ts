@@ -4,6 +4,8 @@ import { assignBotDifficulties, chooseBotCard } from './bot_strategy.ts';
 
 type Capture = { leadingCard: Card; capturedCards: Card[]; isRoundAward?: boolean };
 type Transition = { state: MatchState; deck: Card[] };
+export const CAPTURE_DURATION_MS = 600;
+export const LAST_CARD_AUTO_PLAY_MS = 600;
 function map<T>(value: unknown): Record<string, T> {
   return value && typeof value === "object" && !Array.isArray(value) ? { ...value as Record<string, T> } : {};
 }
@@ -67,7 +69,7 @@ function animateCapture(before: MatchState, after: MatchState, deck: Card[], now
   const leading = captures.at(-1)!.leadingCard;
   return stamp({ state: { ...after, phase: "capturing", capturingStage: 0,
     board: [...(before.board ?? []), leading], capturingCards: [...(before.board ?? []), leading],
-    capturingTeam: team, turnStartTime: new Date(now + 1200).toISOString() }, deck }, now);
+    capturingTeam: team, turnStartTime: new Date(now + CAPTURE_DURATION_MS).toISOString() }, deck }, now);
 }
 
 /** All timed transitions use a supplied server clock, never a client clock. */
@@ -93,12 +95,11 @@ export function advanceMatch(state: MatchState, deck: Card[], now = Date.now()):
       if (elapsed(state, now) < 5000) throw new Error("no_transition_due");
       return stamp({ state: { ...state, phase: "playing", turnStartTime: new Date(now).toISOString() }, deck }, now);
     case "capturing":
-      if (elapsed(state, now) >= 1200) return stamp({ state: { ...state, phase: "playing",
+      if (elapsed(state, now) >= CAPTURE_DURATION_MS) return stamp({ state: { ...state, phase: "playing",
         board: [], capturingCards: [], capturingTeam: null, capturingStage: 0,
         turnStartTime: new Date(now).toISOString() }, deck }, now);
-      if (elapsed(state, now) >= 600 && state.capturingStage !== 1) {
-        return { state: { ...state, capturingStage: 1 }, deck };
-      }
+      // The client owns merge/flight staging. Do not add a database mutation and
+      // publication round trip just to advance decorative animation frames.
       throw new Error("no_transition_due");
     case "playing": {
       if (ids.every(uid => !(state.handCards?.[uid] ?? []).length)) {
@@ -108,9 +109,16 @@ export function advanceMatch(state: MatchState, deck: Card[], now = Date.now()):
       }
       const uid = ids[integer(state.currentTurnIndex)];
       const started = Date.parse(String(state.turnStartTime ?? ""));
+      const hand = state.handCards?.[uid] ?? [];
+      if (hand.length === 1 && Number.isFinite(started) && now - started >= LAST_CARD_AUTO_PLAY_MS) {
+        // A forced move is neither a timeout nor evidence of manual activity.
+        // Preserve inactivity counters and use the same locked/versioned path
+        // as every other command. Any human may request this, never pick a card
+        // for another human while they still have a choice.
+        return animateCapture(state, playCard(state, uid, hand[0]), deck, now);
+      }
       if (uid.startsWith("bot_")) {
         if (!Number.isFinite(started) || now - started < 1000) throw new Error("no_transition_due");
-        const hand = state.handCards?.[uid] ?? [];
         if (!hand.length) throw new Error("empty_hand");
         const card = chooseBotCard(state, uid);
         return animateCapture(state, playCard(state, uid, card), deck, now);

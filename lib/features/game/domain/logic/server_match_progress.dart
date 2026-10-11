@@ -1,4 +1,5 @@
 import '../models/match_state.dart';
+import 'match_presentation_timing.dart';
 
 /// Scheduling is only a request hint: the server independently checks its clock.
 bool serverProgressDue(MatchState s, DateTime now) {
@@ -19,10 +20,14 @@ bool serverProgressDue(MatchState s, DateTime now) {
     case GamePhase.roundScoring:
       return elapsed(5000);
     case GamePhase.capturing:
-      return elapsed(s.capturingStage == 0 ? 600 : 1200);
+      return elapsed(captureTotalDuration.inMilliseconds);
     case GamePhase.playing:
       if (s.areAllHandsEmpty) return true;
       if (s.turnStartTime == null) return false;
+      final active = s.playerIds[s.currentTurnIndex];
+      if (s.handCounts[active] == 1 || s.handCards[active]?.length == 1) {
+        return now.difference(s.turnStartTime!) >= lastCardAutoPlayDuration;
+      }
       final bot = s.playerIds[s.currentTurnIndex].startsWith('bot_');
       if (!bot && s.timerDurationSeconds <= 0) return false;
       return now.difference(s.turnStartTime!).inMilliseconds >=

@@ -18,6 +18,7 @@ import '../../domain/logic/bot_brain.dart';
 import '../../domain/models/bot_difficulty.dart';
 import '../../domain/logic/score_config.dart';
 import '../../domain/logic/server_match_progress.dart';
+import '../../domain/logic/match_presentation_timing.dart';
 import '../../domain/logic/server_progress_coordinator.dart';
 import '../../domain/logic/shuffle_bot_votes.dart';
 import 'package:halabessa/core/services/supabase_backend_service.dart';
@@ -794,6 +795,21 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
           final activeId = currentState.playerIds[currentState.currentTurnIndex];
           bool isBot = activeId.startsWith('bot_');
 
+          // Offline Training uses the same forced last-card policy as online
+          // authority. Never auto-play merely because a non-active hand has one
+          // card, and recheck the full turn identity after the short pause.
+          final activeHand = currentState.handCards[activeId] ?? [];
+          if (activeHand.length == 1) {
+            await Future.delayed(lastCardAutoPlayDuration);
+            final finalState = state;
+            if (generation == _bindingGeneration && finalState != null &&
+                sameMatchTurn(finalState, currentState) &&
+                finalState.handCards[activeId]?.length == 1) {
+              await playCard(activeId, finalState.handCards[activeId]!.single);
+            }
+            break;
+          }
+
           // Watchdog: If player's turn exceeded timerDurationSeconds + 2s grace period,
           // it means their local client crashed, disconnected, or froze without autoplaying.
           bool isTurnStuck = false;
@@ -1331,13 +1347,13 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
         ));
 
         _multimedia.playSfx('sfx/capture.mp3');
-        await Future.delayed(const Duration(milliseconds: 600));
+        await Future.delayed(captureMergeDuration);
 
         if (!mounted || state?.id != currentState.id ||
             state?.roundCount != currentState.roundCount ||
             state?.phase != GamePhase.capturing) return true;
         await _publishState(state!.copyWith(capturingStage: 1));
-        await Future.delayed(const Duration(milliseconds: 600));
+        await Future.delayed(captureTotalDuration - captureMergeDuration);
 
         if (!mounted || state?.id != currentState.id ||
             state?.roundCount != currentState.roundCount ||

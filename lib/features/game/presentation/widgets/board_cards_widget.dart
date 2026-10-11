@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import '../../domain/models/card.dart' as game_card;
@@ -7,6 +8,63 @@ import 'board_card_motion.dart';
 import 'table_style.dart';
 import 'card_face_flip.dart';
 import 'local_card_play_layer.dart';
+import '../../domain/logic/match_presentation_timing.dart';
+
+/// Decorative capture staging never waits for another server publication.
+class _CaptureTimeline extends StatefulWidget {
+  final String? identity;
+  final bool immediate;
+  final Widget Function(bool flying) builder;
+  const _CaptureTimeline({
+    required this.identity,
+    required this.immediate,
+    required this.builder,
+  });
+
+  @override
+  State<_CaptureTimeline> createState() => _CaptureTimelineState();
+}
+
+class _CaptureTimelineState extends State<_CaptureTimeline> {
+  Timer? _timer;
+  bool _flying = false;
+
+  void _start() {
+    _timer?.cancel();
+    _flying = widget.identity != null && widget.immediate;
+    if (widget.identity != null && !_flying) {
+      _timer = Timer(captureMergeDuration, () {
+        if (mounted) setState(() => _flying = true);
+      });
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _start();
+  }
+
+  @override
+  void didUpdateWidget(_CaptureTimeline oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.identity != oldWidget.identity) {
+      _start();
+    } else if (widget.immediate && widget.identity != null) {
+      _timer?.cancel();
+      _flying = true;
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.builder(_flying);
+}
 
 class BoardCardsWidget extends StatelessWidget {
   final List<game_card.Card> cards;
@@ -73,7 +131,6 @@ class BoardCardsWidget extends StatelessWidget {
     final cardHeight = isLandscape ? 104.0 : 92.0;
 
     final reducedMotion = MediaQuery.disableAnimationsOf(context);
-    final captureFlight = isCapturing && capturingStage > 0;
     final motionDuration = reducedMotion
         ? Duration.zero
         : const Duration(milliseconds: 300);
@@ -81,107 +138,67 @@ class BoardCardsWidget extends StatelessWidget {
         ? Duration.zero
         : const Duration(milliseconds: 240);
 
-    return Center(
-      child: Stack(
-        alignment: Alignment.center,
-        clipBehavior: Clip.none,
-        children: [
-          // Ambient table glow under the cards
-          Container(
-            width: (cardWidth * 2.2),
-            height: (cardHeight * 1.6),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: isCapturing
-                      ? (capturingTeam == 'teamA'
-                            ? ThemeConfig.primaryTeal.withValues(alpha: 0.45)
-                            : ThemeConfig.goldAccent.withValues(alpha: 0.45))
-                      : ThemeConfig.goldAccent.withValues(alpha: 0.15),
-                  blurRadius: 35,
-                  spreadRadius: 8,
-                ),
-              ],
+    return _CaptureTimeline(
+      identity: isCapturing
+          ? '$capturingTeam:${cards.map((card) => card.firebaseKey).join(',')}'
+          : null,
+      immediate: reducedMotion || capturingStage > 0,
+      builder: (captureFlight) => Center(
+        child: Stack(
+          alignment: Alignment.center,
+          clipBehavior: Clip.none,
+          children: [
+            // Ambient table glow under the cards
+            Container(
+              width: (cardWidth * 2.2),
+              height: (cardHeight * 1.6),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: isCapturing
+                        ? (capturingTeam == 'teamA'
+                              ? ThemeConfig.primaryTeal.withValues(alpha: 0.45)
+                              : ThemeConfig.goldAccent.withValues(alpha: 0.45))
+                        : ThemeConfig.goldAccent.withValues(alpha: 0.15),
+                    blurRadius: 35,
+                    spreadRadius: 8,
+                  ),
+                ],
+              ),
             ),
-          ),
 
-          // The pile compresses on capture, then travels toward the winning
-          // team. New cards independently arrive from their player's seat.
-          AnimatedSlide(
-            key: const ValueKey('capture-flight'),
-            duration: motionDuration,
-            curve: Curves.easeInOutCubic,
-            offset: captureFlight
-                ? (captureOffset == null
-                      ? Offset(0, captureToBottom ? 1.3 : -1.3)
-                      : Offset(
-                          captureOffset!.dx / (cardWidth * 2.2),
-                          captureOffset!.dy / (cardHeight * 1.6),
-                        ))
-                : Offset.zero,
-            child: AnimatedScale(
+            // The pile compresses on capture, then travels toward the winning
+            // team. New cards independently arrive from their player's seat.
+            AnimatedSlide(
+              key: const ValueKey('capture-flight'),
               duration: motionDuration,
-              curve: Curves.easeOutCubic,
-              scale: isCapturing ? 0.84 : 1,
-              child: AnimatedOpacity(
+              curve: Curves.easeInOutCubic,
+              offset: captureFlight
+                  ? (captureOffset == null
+                        ? Offset(0, captureToBottom ? 1.3 : -1.3)
+                        : Offset(
+                            captureOffset!.dx / (cardWidth * 2.2),
+                            captureOffset!.dy / (cardHeight * 1.6),
+                          ))
+                  : Offset.zero,
+              child: AnimatedScale(
                 duration: motionDuration,
-                opacity: captureFlight ? 0.12 : 1,
-                child: SizedBox(
-                  width: cardWidth * 2.2,
-                  height: cardHeight * 1.6,
-                  child: Stack(
-                    alignment: Alignment.center,
-                    clipBehavior: Clip.none,
-                    children: _buildCardStack(
-                      cardWidth,
-                      cardHeight,
-                      reflowDuration,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-
-          if (isCapturing && captureLabel != null && captureLabel!.isNotEmpty)
-            Positioned(
-              top: -48,
-              child: TweenAnimationBuilder<double>(
-                key: ValueKey('capture-cue-$captureLabel'),
-                tween: Tween(begin: 0, end: 1),
-                duration: reducedMotion
-                    ? Duration.zero
-                    : const Duration(milliseconds: 180),
-                builder: (context, progress, child) => Transform.translate(
-                  offset: Offset(0, 8 * (1 - progress)),
-                  child: Opacity(opacity: progress, child: child),
-                ),
-                child: Semantics(
-                  liveRegion: true,
-                  label: captureLabel,
-                  excludeSemantics: true,
-                  child: Container(
-                    constraints: const BoxConstraints(maxWidth: 220),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 7,
-                    ),
-                    decoration: BoxDecoration(
-                      color: TableStyle.ink,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: TableStyle.brass.withValues(alpha: 0.7),
-                      ),
-                    ),
-                    child: Text(
-                      captureLabel!,
-                      textAlign: TextAlign.center,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TableStyle.detail.copyWith(
-                        color: TableStyle.ivory,
-                        fontWeight: FontWeight.w600,
+                curve: Curves.easeOutCubic,
+                scale: isCapturing ? 0.84 : 1,
+                child: AnimatedOpacity(
+                  duration: motionDuration,
+                  opacity: captureFlight ? 0.12 : 1,
+                  child: SizedBox(
+                    width: cardWidth * 2.2,
+                    height: cardHeight * 1.6,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      clipBehavior: Clip.none,
+                      children: _buildCardStack(
+                        cardWidth,
+                        cardHeight,
+                        reflowDuration,
                       ),
                     ),
                   ),
@@ -189,52 +206,98 @@ class BoardCardsWidget extends StatelessWidget {
               ),
             ),
 
-          // Card Count Badge (if more than 3 cards on table)
-          if (cards.length > 3)
-            Positioned(
-              bottom: -22,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 3,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.75),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: ThemeConfig.goldAccent.withValues(alpha: 0.4),
-                    width: 1,
+            if (isCapturing && captureLabel != null && captureLabel!.isNotEmpty)
+              Positioned(
+                top: -48,
+                child: TweenAnimationBuilder<double>(
+                  key: ValueKey('capture-cue-$captureLabel'),
+                  tween: Tween(begin: 0, end: 1),
+                  duration: reducedMotion
+                      ? Duration.zero
+                      : const Duration(milliseconds: 180),
+                  builder: (context, progress, child) => Transform.translate(
+                    offset: Offset(0, 8 * (1 - progress)),
+                    child: Opacity(opacity: progress, child: child),
                   ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.4),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.style,
-                      size: 12,
-                      color: ThemeConfig.goldAccent,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      '${cards.length}',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
+                  child: Semantics(
+                    liveRegion: true,
+                    label: captureLabel,
+                    excludeSemantics: true,
+                    child: Container(
+                      constraints: const BoxConstraints(maxWidth: 220),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 7,
+                      ),
+                      decoration: BoxDecoration(
+                        color: TableStyle.ink,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: TableStyle.brass.withValues(alpha: 0.7),
+                        ),
+                      ),
+                      child: Text(
+                        captureLabel!,
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TableStyle.detail.copyWith(
+                          color: TableStyle.ivory,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
-                  ],
+                  ),
                 ),
               ),
-            ),
-        ],
+
+            // Card Count Badge (if more than 3 cards on table)
+            if (cards.length > 3)
+              Positioned(
+                bottom: -22,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 3,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.75),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: ThemeConfig.goldAccent.withValues(alpha: 0.4),
+                      width: 1,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.4),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.style,
+                        size: 12,
+                        color: ThemeConfig.goldAccent,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${cards.length}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:halabessa/features/game/domain/logic/server_match_progress.dart';
 import 'package:halabessa/features/game/domain/models/match_state.dart';
+import 'package:halabessa/features/game/domain/models/card.dart' as game;
 
 void main() {
   final start = DateTime.utc(2026, 10, 4);
@@ -25,14 +26,31 @@ void main() {
     expect(serverProgressDue(s.copyWith(playerOnlineStatus: {'human': false}),
       start.add(Duration(seconds: 1))), false);
   });
-  test('capture phases honor the distinct stage deadlines', () {
+  test('capture requests one completion, never a decorative stage mutation', () {
     final capture = s.copyWith(phase: GamePhase.capturing);
     expect(serverProgressDue(capture, start.add(Duration(milliseconds: 599))), false);
     expect(serverProgressDue(capture, start.add(Duration(milliseconds: 600))), true);
     expect(serverProgressDue(capture.copyWith(capturingStage: 1),
-      start.add(Duration(milliseconds: 1199))), false);
+      start.add(Duration(milliseconds: 599))), false);
     expect(serverProgressDue(capture.copyWith(capturingStage: 1),
-      start.add(Duration(milliseconds: 1200))), true);
+      start.add(Duration(milliseconds: 600))), true);
+  });
+  test('one public hand count auto-plays only the active turn, even without a timer', () {
+    final single = s.copyWith(timerDurationSeconds: 0,
+      handCounts: {'human': 1, 'bot_1': 4, 'bot_2': 4, 'bot_3': 4});
+    expect(serverProgressDue(single, start.add(const Duration(milliseconds: 599))), false);
+    expect(serverProgressDue(single, start.add(const Duration(milliseconds: 600))), true);
+    expect(serverProgressDue(single.copyWith(currentTurnIndex: 1),
+      start.add(const Duration(milliseconds: 600))), false);
+    expect(serverProgressDue(single.copyWith(phase: GamePhase.dealingCards),
+      start.add(const Duration(milliseconds: 600))), false);
+  });
+  test('private own single-card hand can hint forced play without public counts', () {
+    final single = s.copyWith(handCounts: {}, handCards: {
+      'human': [const game.Card(game.Suit.hearts, game.Rank.ace)]});
+    expect(serverProgressDue(single, start.add(const Duration(milliseconds: 600))), true);
+    expect(serverProgressDue(single.copyWith(turnStartTime: start.add(const Duration(seconds: 1))),
+      start.add(const Duration(milliseconds: 600))), false);
   });
   test('memory and scoring phases use phase clock instead of turn clock', () {
     for (final phase in [GamePhase.dealingCards, GamePhase.roundScoring]) {
