@@ -1,23 +1,61 @@
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:halabessa/core/services/supabase_backend_service.dart';
 import 'package:halabessa/core/services/idempotent_match_request.dart';
 import 'command_snapshot_stream.dart';
 import '../../domain/models/match_state.dart';
 import '../../domain/logic/online_room_protocol.dart';
+import '../../domain/logic/online_match_clock.dart';
 import '../../domain/models/room_summary.dart';
 import '../../domain/models/chat_message.dart';
 import '../../../auth/domain/models/app_user.dart';
 
-class MultiplayerSyncService {
+class MultiplayerSyncService with WidgetsBindingObserver {
   final FirebaseDatabase _db;
   final _accepted = StreamController<(String, MatchState)>.broadcast();
 
   MultiplayerSyncService(this._db);
 
-  void dispose() => unawaited(_accepted.close());
+  StreamSubscription<DatabaseEvent>? _clockSubscription;
+  StreamSubscription<DatabaseEvent>? _clockConnection;
+  bool _clockStarted = false;
+  bool _disposed = false;
+
+  void startClockSync() {
+    if (_clockStarted || _disposed) return;
+    _clockStarted = true;
+    WidgetsBinding.instance.addObserver(this);
+    _clockSubscription = _db.ref('.info/serverTimeOffset').onValue.listen(
+      (event) => OnlineMatchClock.instance.calibrate(event.snapshot.value),
+      onError: (Object _) {},
+    );
+    _clockConnection = _db.ref('.info/connected').onValue.listen((event) {
+      if (event.snapshot.value == true) unawaited(_refreshClock());
+    }, onError: (Object _) {});
+  }
+
+  Future<void> _refreshClock() async {
+    try {
+      final value = await _db.ref('.info/serverTimeOffset').get();
+      if (!_disposed) OnlineMatchClock.instance.calibrate(value.value);
+    } catch (_) { /* Keep the last monotonic sample; never extend a turn. */ }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) unawaited(_refreshClock());
+  }
+
+  void dispose() {
+    _disposed = true;
+    if (_clockStarted) WidgetsBinding.instance.removeObserver(this);
+    unawaited(_clockSubscription?.cancel());
+    unawaited(_clockConnection?.cancel());
+    unawaited(_accepted.close());
+  }
 
   MatchState _acceptedSnapshot(Map<String, dynamic> data, String uid) {
     final snapshot = commandSnapshot(data, uid);
@@ -99,6 +137,7 @@ class MultiplayerSyncService {
             : matchState.playerNames.values.first,
         // Creation policy never rewrites an existing room's saved protocol.
         'protocolVersion': newOnlineRoomProtocol,
+        'capturePresentationVersion': 2,
         'cardBackId': matchState.playerSkins.isEmpty
             ? ''
             : matchState.playerSkins.values.first,
@@ -124,8 +163,9 @@ class MultiplayerSyncService {
     final data = await sendIdempotentMatchRequest(
       {
         'roomId': matchState.id,
-        'commandId': commandId ?? _newCommandId(),
+        'commandId': commandId ?? newCommandId(),
         'commandType': commandType,
+        'capturePresentationVersion': 2,
         'expectedVersion': matchState.serverVersion,
         'commandPayload': payload,
         if (actorUid != null) 'actorUid': actorUid,
@@ -241,7 +281,7 @@ class MultiplayerSyncService {
     return _acceptedSnapshot(data, callerUid);
   }
 
-  String _newCommandId() {
+  static String newCommandId() {
     final random = Random.secure();
     final bytes = List<int>.generate(16, (_) => random.nextInt(256));
     bytes[6] = (bytes[6] & 0x0f) | 0x40;
@@ -306,6 +346,7 @@ class MultiplayerSyncService {
       'joinRoom',
       data: {
         'roomId': roomId,
+        'capturePresentationVersion': 2,
         'displayName': displayName,
         'cardBackId': cardBackId,
         'avatarUrl': avatarUrl,

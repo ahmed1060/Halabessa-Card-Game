@@ -30,6 +30,16 @@ test('pending settlement and unsupported legacy rooms fail closed instead of los
   assert.throws(()=>anonymizeDeletedPlayer({...state(),settlementPending:true},'alice',anonymous),/settlement_required/);
   assert.throws(()=>anonymizeDeletedPlayer({...state(),protocolVersion:0},'alice',anonymous),/unsupported_deletion_room/);
 });
+
+test('new capture history and capabilities are anonymized without erasing cards',()=>{
+  const input={...state(),capturePresentationByPlayer:{alice:2,bob:2},
+    captureEvents:[{id:'2:3:11',playerUid:'alice',team:'teamA',createdAt:'2026-10-12T00:00:00Z',
+      cards:[{suit:'hearts',rank:'ace'}]}]};
+  const result=anonymizeDeletedPlayer(input,'alice',anonymous);
+  assert.equal(JSON.stringify(result).includes('alice'),false);
+  assert.deepEqual((result.capturePresentationByPlayer as any),{bob:2});
+  assert.deepEqual((result.captureEvents as any)[0].cards,input.captureEvents[0].cards);
+});
 test('departed players are anonymized without evicting their replacements',()=>{
   const input=state();input.playerIds[0]='bot_1';delete (input.players as any).alice;
   const result=anonymizeDeletedPlayer(input,'alice',anonymous);

@@ -20,6 +20,8 @@ import '../../domain/logic/score_config.dart';
 import '../../domain/logic/server_match_progress.dart';
 import '../../domain/logic/match_presentation_timing.dart';
 import '../../domain/logic/server_progress_coordinator.dart';
+import '../../domain/logic/pending_server_intent.dart';
+import '../../domain/logic/online_match_clock.dart';
 import '../../domain/logic/shuffle_bot_votes.dart';
 import 'package:halabessa/core/services/supabase_backend_service.dart';
 import '../../data/repositories/multiplayer_sync_service.dart';
@@ -34,6 +36,7 @@ final multiplayerSyncServiceProvider = Provider<MultiplayerSyncService>((ref) {
   // If a custom URL is strictly needed, it should be set once in main.dart or here with a check.
   // For Halabessa, we use the default RTDB from the google-services/FirebaseOptions.
   final service = MultiplayerSyncService(db);
+  service.startClockSync();
   ref.onDispose(service.dispose);
   return service;
 });
@@ -164,26 +167,41 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
   Timer? _serverProgressTimer;
   bool _serverCommandBusy = false;
   Completer<void>? _serverIdle;
+  PendingServerIntent? _serverIntent;
+  bool _cosmeticBusy = false;
+  final Map<String, Map<String, dynamic>> _queuedCosmetics = {};
   DateTime? _serverRetryAfter;
   final _progressCoordinator = ServerProgressCoordinator();
   Map<String, bool>? _serverPresence;
 
+  @visibleForTesting
+  void acceptServerSnapshotForTesting(MatchState snapshot) => _adoptServerSnapshot(snapshot);
+
   void _adoptServerSnapshot(MatchState incoming) {
-    if (!mounted || lastBoundMatchId != incoming.id ||
-        !canAdoptServerSnapshot(state, incoming)) {
+    if (!mounted || lastBoundMatchId != incoming.id) {
       return;
     }
+    final adopt = canAdoptServerSnapshot(state, incoming);
+    if (!adopt && state?.id != incoming.id) return;
     final ownUid = ref.read(currentUserProvider)?.uid;
-    if (ownUid != null && !incoming.playerIds.contains(ownUid)) {
+    if (adopt && ownUid != null && !incoming.playerIds.contains(ownUid)) {
       // Removal is already committed. Do not send another leave or penalty.
       leaveMatch(notifyServer: false);
       return;
     }
-    state = incoming;
+    if (adopt) state = incoming;
+    if (_serverIntent?.confirm(incoming) == true) {
+      _serverCommandBusy = false;
+      _serverRetryAfter = null;
+      if (_serverIdle?.isCompleted == false) _serverIdle!.complete();
+    }
   }
 
   Future<bool> _sendServerIntent(String type, {Map<String, dynamic> payload = const {}}) async {
     if (_isSpectating || _leavePending) return false;
+    if (type == 'sendEmoji' || type == 'updateProfile') {
+      return _sendCosmeticIntent(type, payload);
+    }
     final generation = _bindingGeneration;
     // Human votes/cuts must not disappear while a timed transition or reward
     // request is pending. Wait, then use the freshly accepted revision.
@@ -201,29 +219,120 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
       return false;
     }
     final idle = Completer<void>();
+    final intent = PendingServerIntent(current.id,
+        MultiplayerSyncService.newCommandId(), current.serverVersion);
+    _serverIntent = intent;
     _serverIdle = idle;
     _serverCommandBusy = true;
+    final response = _performServerIntent(current, uid, type, payload, generation, idle, intent);
+    // Keep transport recovery alive with the original ID, but do not hold up
+    // presentation or the next intent once the trusted feed proves acceptance.
+    return Future.any([response, intent.confirmation]);
+  }
+
+  Future<bool> _sendCosmeticIntent(String type, Map<String, dynamic> payload) async {
+    // A slow emote/profile reply never occupies the gameplay intent slot.
+    // Coalesce to the latest of each kind, then defer behind queued gameplay.
+    if (_cosmeticBusy || _serverCommandBusy) {
+      _queuedCosmetics[type] = payload;
+      return false;
+    }
+    final generation = _bindingGeneration, current = state;
+    final uid = ref.read(currentUserProvider)?.uid;
+    if (current == null || uid == null || !current.playerIds.contains(uid)) return false;
+    _cosmeticBusy = true;
+    try {
+      final accepted = await ref.read(multiplayerSyncServiceProvider).submitMatchCommand(
+        matchState: current, commandType: type, callerUid: uid, payload: payload,
+        commandId: MultiplayerSyncService.newCommandId());
+      if (mounted && generation == _bindingGeneration) _adoptServerSnapshot(accepted);
+      return true;
+    } on SupabaseBackendException catch (error) {
+      if (mounted && generation == _bindingGeneration &&
+          error.code == 'version_conflict' && error.details['state'] is Map) {
+        _adoptServerSnapshot(MultiplayerSyncService.commandSnapshot(error.details, uid));
+      }
+      // Cosmetic failure is not a gameplay outage or permission to replay an
+      // uncertain command with a fresh ID. The transport retains its own ID.
+      return false;
+    } catch (_) { return false; }
+    finally {
+      if (mounted && generation == _bindingGeneration) {
+        _cosmeticBusy = false;
+        _drainCosmetics();
+      }
+    }
+  }
+
+  void _drainCosmetics() {
+    if (_queuedCosmetics.isEmpty) return;
+    scheduleMicrotask(() {
+      if (!mounted || _isSpectating || _leavePending || _serverCommandBusy || _cosmeticBusy) return;
+      final type = _queuedCosmetics.keys.first;
+      final payload = _queuedCosmetics.remove(type)!;
+      unawaited(_sendCosmeticIntent(type, payload));
+    });
+  }
+
+  Future<bool> _performServerIntent(MatchState current, String uid, String type,
+      Map<String, dynamic> payload, int generation, Completer<void> idle,
+      PendingServerIntent intent) async {
     try {
       final result = await ref.read(multiplayerSyncServiceProvider).submitMatchCommand(
-        matchState: current, commandType: type, callerUid: uid, payload: payload);
+        matchState: current, commandType: type, callerUid: uid, payload: payload,
+        commandId: intent.commandId);
       if (generation == _bindingGeneration) _adoptServerSnapshot(result);
       return generation == _bindingGeneration;
     } on SupabaseBackendException catch (error) {
       if (generation != _bindingGeneration) return false;
+      if (intent.confirmed) return true;
       if (error.code == 'version_conflict' && error.details['state'] is Map) {
         _adoptServerSnapshot(MultiplayerSyncService.commandSnapshot(error.details, uid));
+        final fresh = state;
+        // The server explicitly rejected this revision, so a fresh-ID retry is
+        // safe only for the same still-owned card on the same human turn.
+        if (type == 'playCard' && fresh != null && fresh.id == current.id &&
+            fresh.phase == GamePhase.playing && fresh.currentTurnIndex == current.currentTurnIndex &&
+            fresh.roundCount == current.roundCount && fresh.matchSequence == current.matchSequence &&
+            fresh.playerIds[fresh.currentTurnIndex] == uid &&
+            (fresh.handCards[uid] ?? []).any((card) => mapEquals(card.toJson(), payload['card'] as Map?)) &&
+            (fresh.timerDurationSeconds <= 0 || (fresh.turnStartTime != null &&
+              OnlineMatchClock.instance.now().isBefore(fresh.turnStartTime!.add(Duration(seconds: fresh.timerDurationSeconds)))))) {
+          try {
+            // One reconciliation attempt, never loop or retry ambiguous errors.
+            final retry = PendingServerIntent(fresh.id, MultiplayerSyncService.newCommandId(), fresh.serverVersion);
+            _serverIntent = retry;
+            final response = ref.read(multiplayerSyncServiceProvider).submitMatchCommand(
+              matchState: fresh, commandType: type, callerUid: uid,
+              payload: payload, commandId: retry.commandId);
+            final accepted = response.then((snapshot) {
+              if (mounted && generation == _bindingGeneration) _adoptServerSnapshot(snapshot);
+              return generation == _bindingGeneration;
+            }).catchError((Object error) => retry.confirmed);
+            final success = await Future.any([accepted, retry.confirmation]);
+            if (identical(_serverIntent, retry)) _serverIntent = intent;
+            if (success) return true;
+          } catch (_) { /* Normal rejection feedback below. */ }
+        }
       } else if (kDebugMode) {
         debugPrint('Server intent $type rejected: ${error.code}');
       }
+      if (intent.confirmed) return true;
       if (type != 'advance' && mounted) {
         ref.read(matchFeedbackProvider.notifier).state = MatchFeedback(
           error.code == 'version_conflict' ? 'match_action_changed' :
           const {'backend_busy', 'backend_unavailable', 'internal_error', 'invalid_match_response'}
               .contains(error.code) ? 'match_action_unavailable' : 'match_action_rejected');
       }
-      _serverRetryAfter = DateTime.now().add(const Duration(seconds: 2));
+      if (identical(_serverIntent, intent)) {
+        final reconciled = error.code == 'version_conflict' ||
+            (error.code == 'command_rejected' && error.details['reason'] == 'no_transition_due');
+        _serverRetryAfter = reconciled ? null :
+            DateTime.now().add(const Duration(seconds: 2));
+      }
     } catch (error) {
-      if (generation == _bindingGeneration) {
+      if (intent.confirmed && generation == _bindingGeneration) return true;
+      if (generation == _bindingGeneration && identical(_serverIntent, intent)) {
         _serverRetryAfter = DateTime.now().add(const Duration(seconds: 2));
         if (kDebugMode) debugPrint('Server intent $type unavailable: $error');
         if (type != 'advance' && mounted) {
@@ -231,8 +340,12 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
         }
       }
     } finally {
-      if (generation == _bindingGeneration) _serverCommandBusy = false;
-      idle.complete();
+      if (generation == _bindingGeneration && identical(_serverIntent, intent)) {
+        _serverCommandBusy = false;
+        _serverIntent = null;
+      }
+      if (!idle.isCompleted) idle.complete();
+      _drainCosmetics();
     }
     return false;
   }
@@ -241,10 +354,10 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     if (_isSpectating) return;
     final s = state;
     final uid = ref.read(currentUserProvider)?.uid;
-    final now = DateTime.now();
+    final now = OnlineMatchClock.instance.now();
     if (s == null || !s.usesServerCommands || uid == null ||
         !s.playerIds.contains(uid) || _serverCommandBusy || _leavePending ||
-        (_serverRetryAfter != null && now.isBefore(_serverRetryAfter!))) {
+        (_serverRetryAfter != null && DateTime.now().isBefore(_serverRetryAfter!))) {
       return;
     }
     final settle = s.settlementPending &&
@@ -256,6 +369,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
       final generation = _bindingGeneration;
       final idle = Completer<void>();
       _serverIdle = idle;
+      _serverIntent = null;
       _serverCommandBusy = true;
       try {
         final settled = await ref.read(multiplayerSyncServiceProvider).settleMatchRewards(s, uid);
@@ -266,8 +380,10 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
           if (kDebugMode) debugPrint('Settlement pending: $error');
         }
       } finally {
-        if (generation == _bindingGeneration) _serverCommandBusy = false;
-        idle.complete();
+        if (generation == _bindingGeneration && identical(_serverIdle, idle)) {
+          _serverCommandBusy = false;
+        }
+        if (!idle.isCompleted) idle.complete();
       }
     } else if (advance) {
       await _sendServerIntent('advance');
@@ -453,6 +569,9 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     _serverProgressTimer?.cancel();
     _serverProgressTimer = null;
     _serverCommandBusy = false;
+    _serverIntent = null;
+    _cosmeticBusy = false;
+    _queuedCosmetics.clear();
     _presenceListener?.cancel();
     _heartbeatTimer?.cancel();
     _heartbeatTimer = null;
@@ -497,6 +616,9 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     _isSpectating = spectating;
     final generation = ++_bindingGeneration;
     _serverCommandBusy = false;
+    _serverIntent = null;
+    _cosmeticBusy = false;
+    _queuedCosmetics.clear();
     _serverRetryAfter = null;
     _serverProgressTimer?.cancel();
     _serverProgressTimer = null;
@@ -732,8 +854,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
       return;
     }
     final generation = _bindingGeneration;
-    // Safety delay to allow state to settle
-    await Future.delayed(const Duration(milliseconds: 100));
+    // The generation/turn guards provide safety without artificial settling.
     
     try {
       final currentState = serverState;
@@ -745,7 +866,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
         final humanCount = currentState.playerIds.where((id) => !id.startsWith('waiting_')).length;
         if (humanCount == 4) {
           await Future.delayed(const Duration(milliseconds: 1000));
-          if (state?.phase == GamePhase.waitingForPlayers) {
+          if (generation == _bindingGeneration && _samePhase(currentState)) {
             startNewRound(isFirstRound: true);
           }
         }
@@ -779,12 +900,12 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
           if (allHandsEmpty) {
             if (currentState.deckCount >= 16 && currentState.handInRound < 3) {
               await Future.delayed(const Duration(milliseconds: 1000));
-              if (state?.phase == GamePhase.playing && state?.deckCount == currentState.deckCount) {
+              if (generation == _bindingGeneration && _samePhase(currentState) && state?.deckCount == currentState.deckCount) {
                 await dealSubsequentCards();
               }
             } else {
               await Future.delayed(const Duration(milliseconds: 1000));
-              if (state?.phase == GamePhase.playing && state?.deckCount == 0) {
+              if (generation == _bindingGeneration && _samePhase(currentState) && state?.deckCount == 0) {
                 await _handleRoundEnd();
               }
             }
@@ -801,6 +922,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
           final activeHand = currentState.handCards[activeId] ?? [];
           if (activeHand.length == 1) {
             await Future.delayed(lastCardAutoPlayDuration);
+            if (!mounted || generation != _bindingGeneration) return;
             final finalState = state;
             if (generation == _bindingGeneration && finalState != null &&
                 sameMatchTurn(finalState, currentState) &&
@@ -829,8 +951,9 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
                }
              }
              
-             final delayMs = (isBot && !isTurnStuck) ? (800 + Random().nextInt(1500)) : 200;
+             final delayMs = (isBot && !isTurnStuck) ? botThinkDuration.inMilliseconds : 200;
              await Future.delayed(Duration(milliseconds: delayMs));
+             if (!mounted || generation != _bindingGeneration) return;
              final finalState = state;
              if (finalState != null && sameMatchTurn(finalState, currentState)) {
                 

@@ -9,6 +9,7 @@ const operations = new Set([
   'uploadAsset', 'setUserAdmin', 'requestAccountDeletion',
   'accountDeletionStatus', 'continueAccountDeletion',
   'repairMatchDelivery',
+  'advanceScheduledMatches',
 ]);
 const stages = new Set([
   'jwt', 'deletion_guard', 'db_queue', 'db_connect', 'db_work', 'db_close',
@@ -17,12 +18,13 @@ const stages = new Set([
 
 export function createRequestTiming(
   emit: (record: { event: string; operation: string; total_ms: number; stages: Record<string, number>;
-    routing?: Record<string, string> }) => void,
+    routing?: Record<string, string>; command?: string }) => void,
   now: () => number = () => performance.now(),
   routing?: {region: unknown; configuredConnection: unknown},
 ) {
   const started = now();
   let operation = 'unknown';
+  let command: string | undefined;
   const durations: Record<string, number> = {};
   // Only fixed infrastructure classifications. Even caller-supplied arbitrary
   // labels cannot smuggle an email, token or connection string into logs.
@@ -40,6 +42,16 @@ export function createRequestTiming(
     operation(value: unknown) {
       operation = typeof value === 'string' && operations.has(value) ? value : 'unknown';
     },
+    command(value: unknown) {
+      const categories: Record<string, string> = {
+        playCard: 'manual_play', advance: 'timed_progress', cut: 'cut',
+        sendEmoji: 'cosmetic', updateProfile: 'cosmetic', leave: 'leave',
+        voteShuffle: 'voting', voteRematch: 'voting', voteForBots: 'voting',
+        startRound: 'timed_progress', dealInitial: 'timed_progress',
+        beginPlay: 'timed_progress', dealSubsequent: 'timed_progress',
+      };
+      command = typeof value === 'string' && Object.hasOwn(categories, value) ? categories[value] : 'other';
+    },
     observe,
     async measure<T>(stage: string, work: () => Promise<T>): Promise<T> {
       const start = now();
@@ -49,6 +61,7 @@ export function createRequestTiming(
     finish() {
       emit({event: 'halabessa_timing_v1', operation,
         total_ms: Math.round(now() - started), stages: {...durations},
+        ...(command ? {command} : {}),
         ...(routing ? {routing: {region, configuredConnection}} : {})});
     },
   };

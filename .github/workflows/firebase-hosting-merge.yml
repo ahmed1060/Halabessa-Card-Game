@@ -37,6 +37,9 @@ jobs:
           node --test functions/test/match_engine.test.js
           functions/test/edge_bot_strategy.test.ts functions/test/edge_match_engine.test.ts
           functions/test/edge_match_lifecycle.test.ts functions/test/edge_match_commands.test.ts
+          functions/test/edge_match_progress.test.ts
+          functions/test/edge_capture_presentation.test.ts
+          functions/test/edge_progress_migration.test.mjs
           functions/test/edge_room_seating.test.ts functions/test/edge_room_summary.test.ts
           functions/test/edge_match_rewards.test.ts functions/test/edge_turn_policy.test.ts
           functions/test/edge_match_delivery.test.ts functions/test/edge_database.test.ts

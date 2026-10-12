@@ -16,10 +16,13 @@ import { createFirebaseIdentityStore, assertActiveIdentity } from './firebase_id
 import { runDeletionWorker } from './deletion_worker.ts';
 import { createDatabaseRunner, configuredConnectionMode, databaseConnectionString, transactionPoolerConnectionString, probeReadOnlyConnection, withDatabaseGuard } from "./database.ts";
 import { createRequestTiming } from './request_timing.ts';
-import { commitAndDeliver, participantSnapshot, publicMatchState } from "./match_delivery.ts";
+import { commitAndDeliver, participantSnapshot, publicMatchState, withCommandReceipt } from "./match_delivery.ts";
 import { deleteFencedMirror, publishFencedMirror, publishFencedSummary } from './mirror_fencing.ts';
 import { createFirebaseDatabaseRequest } from './firebase_transport.ts';
 import { commitAndQueue, earlyAckEnabled, publicationLease, publishDetachedRoom, publishRoom, retryPublicationLater } from './room_publication.ts';
+import { progressEnabled } from './match_progress.ts';
+import { runRoomProgress, ProgressRevisionFailure } from './match_progress_worker.ts';
+import { declareCapturePresentation } from './capture_presentation.ts';
 
 const firebaseProject = "halabessa-card-game1";
 const firebaseKeys = createRemoteJWKSet(new URL(
@@ -217,6 +220,45 @@ function scheduleRoomPublication(id: string) {
   EdgeRuntime.waitUntil(state.task);
 }
 
+const progressTasks = new Map<string, { task: Promise<void>; requested: number; wake?: () => void }>();
+function scheduleRoomProgress(id: string) {
+  const existing = progressTasks.get(id);
+  if (existing) {
+    existing.requested++;
+    existing.wake?.();
+    EdgeRuntime.waitUntil(existing.task);
+    return;
+  }
+  const state: { task: Promise<void>; requested: number; wake?: () => void } = { task: Promise.resolve(), requested: 1 };
+  let seen = 1;
+  const run = <T>(work: (query: (sql: string, args: unknown[]) => Promise<Record<string, unknown>[]>) => Promise<T>) =>
+    withDatabase(connection => work(async (sql, args) =>
+      (await connection.queryObject<Record<string, unknown>>(sql, args)).rows), undefined, 'background');
+  state.task = runRoomProgress(run, id, async () => {
+    // Mirror I/O must not postpone the next automatic deadline. The existing
+    // bounded publisher coalesces revisions and the durable outbox repairs loss.
+    scheduleRoomPublication(id);
+    seen = state.requested;
+  }, { observe: record => console.log(JSON.stringify(record)), sleep: ms => new Promise(resolve => {
+    const wake = () => { clearTimeout(timer); if (state.wake === wake) state.wake = undefined; resolve(); };
+    const timer = setTimeout(wake, ms);
+    state.wake = wake;
+  }) }).then(() => {}).catch(async (error) => {
+    // Bounded retry, not an endless function loop. Preserve the current job.
+    if (error instanceof ProgressRevisionFailure) {
+      await run(query => query(`update halabessa.room_progress_jobs set attempts=attempts+1,
+        next_attempt_at=now()+least(30,power(2,least(attempts,4))) * interval '1 second'
+        where room_id=$1 and version=$2`, [id, error.version])).catch(() => {});
+    }
+    console.warn('halabessa-progress: durable retry pending');
+  }).finally(() => {
+    progressTasks.delete(id);
+    if (seen !== state.requested) scheduleRoomProgress(id);
+  });
+  progressTasks.set(id, state);
+  EdgeRuntime.waitUntil(state.task);
+}
+
 function cairoDate() {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Africa/Cairo", year: "numeric", month: "2-digit", day: "2-digit",
@@ -322,13 +364,19 @@ Deno.serve(async (request) => {
     withDatabase(work, timing.observe, 'background');
   const deliverCommitted = async(connection:Client,id:string,commit:()=>Promise<void>) => {
     const config = await connection.queryObject<Record<string,unknown>>`
-      select async_ack_enabled,canary_room_id from halabessa.publication_worker_config where singleton=true
+      select async_ack_enabled,canary_room_id,progress_enabled,progress_canary_room_id
+      from halabessa.publication_worker_config where singleton=true
     `;
     if (earlyAckEnabled(config.rows[0],id)) {
-      return commitAndQueue(() => timing.measure('commit',commit), () => scheduleRoomPublication(id));
+      return commitAndQueue(() => timing.measure('commit',commit), () => {
+        scheduleRoomPublication(id);
+        if (progressEnabled(config.rows[0], id)) scheduleRoomProgress(id);
+      });
     }
-    return commitAndDeliver(() => timing.measure('commit',commit),
+    const delivery = await commitAndDeliver(() => timing.measure('commit',commit),
       () => timing.measure('mirror', () => mirrorDurableRoom(connection,id)));
+    if (progressEnabled(config.rows[0], id)) scheduleRoomProgress(id);
+    return delivery;
   };
   try {
     // Worker/receipt recovery must precede Firebase auth and normal profile
@@ -336,7 +384,7 @@ Deno.serve(async (request) => {
     const input = await request.json();
     timing.operation(input?.action);
     if (!input || typeof input !== 'object' || Array.isArray(input)) return reply({error:'invalid_request'},400,origin);
-    if (input.action === 'repairMatchDelivery') {
+    if (input.action === 'repairMatchDelivery' || input.action === 'advanceScheduledMatches') {
       const workerKey=request.headers.get('x-publication-worker');
       if(!workerKey || !/^[a-f0-9]{64}$/.test(workerKey))return reply({error:'unauthenticated'},401,origin);
       const hash=await deletionReceiptHash(workerKey);
@@ -344,6 +392,17 @@ Deno.serve(async (request) => {
         (await connection.queryObject`select 1 from halabessa.publication_worker_config where key_hash=${hash}`).rows.length>0,
         timing.observe, 'background', input.probeConnection ? 'direct_probe' : 'primary');
       if(!authorized)return reply({error:'unauthenticated'},401,origin);
+      if (input.action === 'advanceScheduledMatches') {
+        const jobs = await runBackgroundDatabase(async connection =>
+          (await connection.queryObject<{room_id: string}>`select p.room_id
+            from halabessa.room_progress_jobs p
+            join halabessa.publication_worker_config c on c.singleton=true
+            where p.next_attempt_at<=now() and p.due_at<=now()
+              and (c.progress_enabled or c.progress_canary_room_id=p.room_id)
+            order by p.due_at limit 8`).rows);
+        for (const job of jobs) scheduleRoomProgress(job.room_id);
+        return reply({ok:true, scheduled:jobs.length},200,origin);
+      }
       if (input.probeConnection !== undefined) {
         if (!['direct','shared_transaction'].includes(input.probeConnection)) return reply({error:'invalid_request'},400,origin);
         const mode = input.probeConnection as 'direct' | 'shared_transaction';
@@ -470,6 +529,7 @@ Deno.serve(async (request) => {
       roomId?: unknown;
       mode?: unknown;
       protocolVersion?: unknown;
+      capturePresentationVersion?: unknown;
       maxPoints?: unknown;
       timerDurationSeconds?: unknown;
       isPublic?: unknown;
@@ -514,7 +574,10 @@ Deno.serve(async (request) => {
         select 1 from halabessa.account_deletion_jobs where firebase_uid = ${user.uid}
       `;
       if (blocked.rows.length) return reply({error:'unauthenticated'},401,origin);
-      await timing.measure('profile_sync', () => connection.queryObject`
+      // Existing participants were provisioned on create/join. Card commands
+      // must not write/sync a profile on every move. The deletion guard above
+      // remains uncached and mandatory; ledger foreign keys remain enforced.
+      if (body.action !== 'submitMatchCommand') await timing.measure('profile_sync', () => connection.queryObject`
         insert into halabessa.user_profiles (firebase_uid, email, display_name)
         values (${user.uid}, ${user.email}, ${user.name})
         on conflict (firebase_uid) do update set
@@ -574,6 +637,7 @@ Deno.serve(async (request) => {
         return reply({ ok: true, ...reward, date: today }, 200, origin);
       }
       if (body.action === "submitMatchCommand") {
+        timing.command(body.commandType);
         const id = validRoomId(body.roomId);
         const commandId = validCommandId(body.commandId);
         const commandType = typeof body.commandType === "string" && matchCommandTypes.has(body.commandType)
@@ -667,7 +731,9 @@ Deno.serve(async (request) => {
           const fullState = { ...room.state, handCards: room.hands ?? {} } as MatchState;
           let transition: { state: MatchState; deck: Card[] };
           try {
-            transition = executeMatchIntent(commandType, fullState, room.deck ?? [], user.uid, requestedActor, payload);
+            transition = executeMatchIntent(commandType,
+              declareCapturePresentation(fullState, user.uid, body.capturePresentationVersion),
+              room.deck ?? [], user.uid, requestedActor, payload);
           } catch (error) {
             await connection.queryObject`rollback`;
             transactionOpen = false;
@@ -676,7 +742,7 @@ Deno.serve(async (request) => {
           }
           const appliedVersion = currentVersion + 1;
           const hands = transition.state.handCards ?? {};
-          const publicState = publicMatchState(transition.state, appliedVersion);
+          const publicState = publicMatchState(withCommandReceipt(transition.state, commandId), appliedVersion);
           const ledgerResult = {
             ok: true,
             roomId: id,
@@ -807,6 +873,7 @@ Deno.serve(async (request) => {
             dealerIndex: 0, currentTurnIndex: 1, phase: "waitingForPlayers",
             timerDurationSeconds: body.timerDurationSeconds, isPublic: body.isPublic, expireAt: expiresAt,
             serverVersion: 0, protocolVersion: body.protocolVersion === 1 ? 1 : 0,
+            capturePresentationByPlayer: { [user.uid]: body.capturePresentationVersion === 2 ? 2 : 1 },
           };
           let transactionOpen = false;
           let firebaseCreated = false;
@@ -877,10 +944,14 @@ Deno.serve(async (request) => {
               await connection.queryObject`rollback`; joinTransactionOpen = false;
               return reply({ error: error instanceof Error ? error.message : "room_not_joinable" }, 409, origin);
             }
-            const version = Number(room.version) + (joined.alreadyJoined ? 0 : 1);
+            const declared = declareCapturePresentation(joined.state, user.uid, body.capturePresentationVersion);
+            const changed = !joined.alreadyJoined || JSON.stringify(declared.capturePresentationByPlayer) !==
+              JSON.stringify(room.state.capturePresentationByPlayer);
+            joined.state = declared;
+            const version = Number(room.version) + (changed ? 1 : 0);
             const publicState = publicMatchState(joined.state, version);
             const hands = joined.state.handCards ?? {};
-            if (!joined.alreadyJoined) {
+            if (changed) {
               await connection.queryObject`update halabessa.rooms
                 set state = ${JSON.stringify(publicState)}::jsonb, version = ${version}, updated_at = now()
                 where room_id = ${id}`;

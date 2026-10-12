@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
+import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'table_style.dart';
+import '../../domain/logic/online_match_clock.dart';
 
 class LanternControlButton extends StatelessWidget {
   final String label;
@@ -45,6 +47,9 @@ class LanternTurnBadge extends StatelessWidget {
   final bool active;
   final DateTime? turnStarted;
   final int turnSeconds;
+  final Duration? turnDuration;
+  final bool serverClock;
+  final bool showCountdown;
   final String Function(int)? countdownLabel;
   final String Function(int)? countdownSemantics;
   const LanternTurnBadge({
@@ -54,6 +59,9 @@ class LanternTurnBadge extends StatelessWidget {
     required this.active,
     this.turnStarted,
     this.turnSeconds = 0,
+    this.turnDuration,
+    this.serverClock = false,
+    this.showCountdown = false,
     this.countdownLabel,
     this.countdownSemantics,
   });
@@ -102,12 +110,17 @@ class LanternTurnBadge extends StatelessWidget {
                         color: active ? TableStyle.ink : TableStyle.ivory,
                       ),
                     ),
-                    if (active && turnStarted != null && turnSeconds > 0)
+                    if ((active || showCountdown) && turnStarted != null &&
+                        (turnDuration ?? Duration(seconds: turnSeconds)) > Duration.zero)
                       TurnCountdown(
                         started: turnStarted!,
                         seconds: turnSeconds,
+                        duration: turnDuration,
+                        now: serverClock ? OnlineMatchClock.instance.now : null,
                         label: countdownLabel,
                         semanticsLabel: countdownSemantics,
+                        waitingLabel: serverClock ? 'ui_waiting_confirmation'.tr() : null,
+                        color: active ? TableStyle.ink : TableStyle.ivory,
                       ),
                   ],
                 ),
@@ -142,14 +155,24 @@ class LanternTurnBadge extends StatelessWidget {
 class TurnCountdown extends StatefulWidget {
   final DateTime started;
   final int seconds;
+  final Duration? duration;
+  final DateTime Function()? now;
   final String Function(int)? label;
   final String Function(int)? semanticsLabel;
+  final String? waitingLabel;
+  final bool onlyWhenExpired;
+  final Color color;
   const TurnCountdown({
     super.key,
     required this.started,
     required this.seconds,
+    this.duration,
+    this.now,
     this.label,
     this.semanticsLabel,
+    this.waitingLabel,
+    this.onlyWhenExpired = false,
+    this.color = TableStyle.ink,
   });
   @override
   State<TurnCountdown> createState() => _TurnCountdownState();
@@ -173,25 +196,28 @@ class _TurnCountdownState extends State<TurnCountdown> {
 
   @override
   Widget build(BuildContext context) {
+    final duration = widget.duration ?? Duration(seconds: widget.seconds);
     final remainingMs = widget.started
-        .add(Duration(seconds: widget.seconds))
-        .difference(DateTime.now())
+        .add(duration)
+        .difference(widget.now?.call() ?? DateTime.now())
         .inMilliseconds;
-    final remaining = (remainingMs / 1000).ceil().clamp(0, widget.seconds);
+    final remaining = (remainingMs / 1000).ceil().clamp(0, (duration.inMilliseconds / 1000).ceil());
+    if (widget.onlyWhenExpired && remaining > 0) return const SizedBox.shrink();
     return Semantics(
       label:
-          widget.semanticsLabel?.call(remaining) ??
-          '$remaining seconds remaining',
+          remaining == 0 && widget.waitingLabel != null ? widget.waitingLabel! :
+          widget.semanticsLabel?.call(remaining) ?? '$remaining seconds remaining',
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.timer_outlined, size: 18, color: TableStyle.ink),
+          Icon(Icons.timer_outlined, size: 18, color: widget.color),
           Text(
+            remaining == 0 && widget.waitingLabel != null ? widget.waitingLabel! :
             widget.label?.call(remaining) ?? '${remaining}s',
             key: const ValueKey('local-turn-countdown'),
             textDirection: TextDirection.ltr,
             style: TableStyle.label.copyWith(
-              color: TableStyle.ink,
+              color: widget.color,
               fontWeight: FontWeight.w700,
             ),
           ),

@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { commitAndDeliver, deliverLatestRoom, matchMirrorUpdates, participantSnapshot,
-  type CommittedRoom } from "../../supabase/functions/halabessa-api/match_delivery.ts";
+  withCommandReceipt, type CommittedRoom } from "../../supabase/functions/halabessa-api/match_delivery.ts";
 
 function room(version = 1): CommittedRoom {
   return { version, state: { id: "ABC12345", playerIds: ["a", "b"], phase: "playing", deckCount: 32,
@@ -9,6 +9,18 @@ function room(version = 1): CommittedRoom {
     secretDeck: [{ suit: "clubs", rank: "king" }] },
     hands: { a: [{ suit: "hearts", rank: "ace" }], b: [{ suit: "spades", rank: "two" }] } };
 }
+
+test('accepted receipts are bounded and persist in public/private snapshots without hands', () => {
+  let state = room().state;
+  for (let i = 0; i < 40; i++) state = withCommandReceipt(state, `command-${i}`);
+  state = withCommandReceipt(state, 'command-39');
+  assert.equal(state.recentCommandIds.length, 32);
+  assert.equal(state.recentCommandIds.filter((id: string) => id === 'command-39').length, 1);
+  const snapshot = participantSnapshot({ ...room(41), state }, 'a');
+  assert.deepEqual(snapshot.state.recentCommandIds, state.recentCommandIds);
+  assert.equal('handCards' in snapshot.state, false);
+  assert.equal('deck' in snapshot.state, false);
+});
 
 test("commit completes before any mirror; commit failure never publishes", async () => {
   const events: string[] = [];

@@ -54,7 +54,6 @@ void main() {
     'Training forces the active last card without a tap, not another hand',
     (tester) async {
       final container = setup(initial);
-      await tester.pump(const Duration(milliseconds: 100));
       await tester.pump(const Duration(milliseconds: 599));
       expect(container.read(matchStateProvider)!.board, isEmpty);
       await tester.pump(const Duration(milliseconds: 1));
@@ -72,7 +71,12 @@ void main() {
   testWidgets('manual last-card play cancels the delayed forced move', (
     tester,
   ) async {
-    final container = setup(initial);
+    final container = setup(initial.copyWith(
+      playerIds: ['human', 'next', 'third', 'fourth'],
+      timerDurationSeconds: 0,
+      handCards: const {'human': [ace], 'next': [two, three],
+        'third': [two, three], 'fourth': [two, three]},
+    ));
     await tester.pump(const Duration(milliseconds: 100));
     await container.read(matchStateProvider.notifier).playCard('human', ace);
     await tester.pump(const Duration(milliseconds: 600));

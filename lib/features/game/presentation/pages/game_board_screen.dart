@@ -1,4 +1,5 @@
 import 'dart:math';
+import '../../domain/logic/match_presentation_timing.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -22,6 +23,7 @@ import 'package:halabessa/features/game/presentation/widgets/chat_overlay.dart';
 import 'package:confetti/confetti.dart';
 import '../widgets/player_profile_preview.dart';
 import '../widgets/board_cards_widget.dart';
+import '../widgets/capture_presentation.dart';
 import '../widgets/match_table_layout.dart';
 import '../widgets/table_seat.dart';
 import '../widgets/table_style.dart';
@@ -567,6 +569,11 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
               ),
         turnStarted: state.turnStartTime,
         turnSeconds: state.timerDurationSeconds,
+        serverClock: state.usesServerCommands,
+        turnDuration: state.cardsRemainingFor(user.uid) == 1
+            ? lastCardAutoPlayDuration
+            : user.uid.startsWith('bot_') ? botThinkDuration
+            : Duration(seconds: state.timerDurationSeconds),
         message: message,
         messageExpiresAt: chat == null
             ? DateTime.tryParse(state.playerEmojiExpiresAt[user.uid] ?? '')
@@ -950,8 +957,14 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
     }
     return LanternTurnBadge(
       active: myTurn,
+      showCountdown: !spectator && state.phase == GamePhase.playing,
       turnStarted: state.turnStartTime,
       turnSeconds: state.timerDurationSeconds,
+      serverClock: state.usesServerCommands,
+      turnDuration: state.cardsRemainingFor(state.playerIds[state.currentTurnIndex]) == 1
+          ? lastCardAutoPlayDuration
+          : state.playerIds[state.currentTurnIndex].startsWith('bot_')
+              ? botThinkDuration : Duration(seconds: state.timerDurationSeconds),
       countdownLabel: (seconds) => 'ui_seconds_short'.tr(args: ['$seconds']),
       countdownSemantics: (seconds) =>
           'ui_seconds_remaining'.tr(args: ['$seconds']),
@@ -1156,6 +1169,22 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
   }
 
   Widget _buildBoardCenter(
+    BuildContext context,
+    WidgetRef ref,
+    MatchState matchState,
+    String myUid,
+    bool isLandscape, {
+    bool is3DActive = false,
+    Set<String> alreadyPresented = const {},
+  }) => CapturePresentation(
+    key: ValueKey('capture-presentation-${matchState.id}'),
+    state: matchState,
+    builder: (visualState) => _buildPresentedBoardCenter(context, ref,
+      visualState, myUid, isLandscape, is3DActive: is3DActive,
+      alreadyPresented: alreadyPresented),
+  );
+
+  Widget _buildPresentedBoardCenter(
     BuildContext context,
     WidgetRef ref,
     MatchState matchState,

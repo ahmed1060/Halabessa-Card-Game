@@ -3,3 +3,4 @@
 const captureMergeDuration = Duration(milliseconds: 300);
 const captureTotalDuration = Duration(milliseconds: 600);
 const lastCardAutoPlayDuration = Duration(milliseconds: 600);
+const botThinkDuration = Duration(milliseconds: 450);

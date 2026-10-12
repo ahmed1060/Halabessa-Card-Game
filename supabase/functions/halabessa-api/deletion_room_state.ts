@@ -4,7 +4,7 @@ import type {MatchState} from './match_engine.ts';
 const referenceFields = ['uid','senderId','playerId','playerUid','playedBy','actorUid','previousUid','ownerUid','hostUid'];
 const identityMaps = ['players','handCards','handCounts','shuffleVotes','rematchVotes','botInjectionVotes',
   'consecutiveTimeouts','earnedStars','earnedCoins','skippedMatches','playerNames','playerAvatars',
-  'playerSkins','playerEmojis','playerEmojiExpiresAt','playerLastActive','playerOnlineStatus'];
+  'playerSkins','playerEmojis','playerEmojiExpiresAt','playerLastActive','playerOnlineStatus','capturePresentationByPlayer'];
 export function roomReferencesDeletedPlayer(state: MatchState, uid: string) {
   if (['playerIds','rewardRoster'].some(field => Array.isArray(state[field]) && state[field].includes(uid))) return true;
   if (identityMaps.some(field => state[field] && typeof state[field] === 'object' && uid in state[field])) return true;
@@ -76,7 +76,7 @@ export function anonymizeDeletedPlayer(state: MatchState, uid: string, anonymous
           ? `${value.slice(0,-uid.length)}${anonymousId}` : value);
     }
   }
-  for (const field of ['playerNames','playerAvatars','playerSkins','playerEmojis','playerEmojiExpiresAt','playerLastActive','playerOnlineStatus']) {
+  for (const field of ['playerNames','playerAvatars','playerSkins','playerEmojis','playerEmojiExpiresAt','playerLastActive','playerOnlineStatus','capturePresentationByPlayer']) {
     const map = result[field];
     if (map && typeof map === 'object' && !Array.isArray(map)) {
       delete (map as Record<string,unknown>)[uid];

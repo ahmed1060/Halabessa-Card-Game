@@ -35,7 +35,7 @@ export function releasePlayer(state: MatchState, uid: string, reason: "left" | "
     consecutiveTimeouts: counts };
   // A vacated controller must never remain an actor in per-player state.
   for (const field of ["playerSkins", "playerAvatars", "playerEmojis", "playerLastActive",
-    "shuffleVotes", "rematchVotes", "botInjectionVotes", "skippedMatches"]) {
+    "shuffleVotes", "rematchVotes", "botInjectionVotes", "skippedMatches", "capturePresentationByPlayer"]) {
     const values = record<unknown>(state[field]);
     if (field === "skippedMatches" && values[uid]) values[bot] = values[uid];
     delete values[uid]; next[field] = values;

@@ -47,6 +47,18 @@ void main() {
       true,
     );
   });
+  test('managed rooms wait for server and coalesce bounded repair requests', () {
+    final coordinator = ServerProgressCoordinator();
+    final managed = state.copyWith(serverProgressManaged: true);
+    bool due(int ms) => coordinator.shouldRequest(state: managed, uid: 'bob',
+      now: now.add(Duration(milliseconds: ms)), due: true);
+    expect(due(0), false);
+    expect(due(1749), false);
+    expect(due(1750), true);
+    expect(due(2000), false);
+    expect(due(2749), false);
+    expect(due(2750), true);
+  });
   test(
     'new revision resets fallback and waiting/nonparticipant seats never request',
     () {

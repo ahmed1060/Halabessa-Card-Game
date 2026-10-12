@@ -1,11 +1,13 @@
 import { cut, deal, playCard, startRound, type Card, type MatchState } from "./match_engine.ts";
 import { manualPlay, releasePlayer, timeoutPlay } from "./turn_policy.ts";
 import { assignBotDifficulties, chooseBotCard } from './bot_strategy.ts';
+import { BOT_THINK_MS, CAPTURE_MS, FORCED_CARD_MS } from './match_progress.ts';
+import { atomicCaptureSupported } from './capture_presentation.ts';
 
 type Capture = { leadingCard: Card; capturedCards: Card[]; isRoundAward?: boolean };
 type Transition = { state: MatchState; deck: Card[] };
-export const CAPTURE_DURATION_MS = 600;
-export const LAST_CARD_AUTO_PLAY_MS = 600;
+export const CAPTURE_DURATION_MS = CAPTURE_MS;
+export const LAST_CARD_AUTO_PLAY_MS = FORCED_CARD_MS;
 function map<T>(value: unknown): Record<string, T> {
   return value && typeof value === "object" && !Array.isArray(value) ? { ...value as Record<string, T> } : {};
 }
@@ -41,7 +43,7 @@ function nextRound(state: MatchState, shuffle: boolean, now: number): Transition
   }
   started.state = { ...started.state, roundsSinceLastShuffle: shuffle ? 0 : integer(state.roundsSinceLastShuffle) + 1,
     turnStartTime: new Date(now).toISOString(), capturingCards: [], capturingTeam: null,
-    capturingStage: 0, playHistory: [], earnedStars: {}, earnedCoins: {}, expireAt: null,
+    capturingStage: 0, captureEvents: [], playHistory: [], earnedStars: {}, earnedCoins: {}, expireAt: null,
     settlementPending: false, rewardRoster: [], rewardScores: null, rewardReceiptId: null, rewardCompletedAt: null };
   return stamp({ ...started, state: assignBotDifficulties(started.state) }, now);
 }
@@ -67,6 +69,23 @@ function animateCapture(before: MatchState, after: MatchState, deck: Card[], now
   const team = String(after.lastCaptureTeam);
   const captures = map<Capture[]>(after.harvestStacks)[team] ?? [];
   const leading = captures.at(-1)!.leadingCard;
+  if (atomicCaptureSupported(before)) {
+    const cards = [...(before.board ?? []), leading];
+    const events = Array.isArray(before.captureEvents) ? before.captureEvents : [];
+    const nextUid = after.playerIds?.[integer(after.currentTurnIndex)];
+    // Only a human choosing among cards gets delivery/animation grace. Bots
+    // and forced cards retain their actual automatic-action deadlines.
+    const grace = nextUid && !nextUid.startsWith('bot_') &&
+      (after.handCards?.[nextUid] ?? []).length > 1 ? CAPTURE_MS : 0;
+    return stamp({ state: { ...after, phase: 'playing', board: [],
+      capturingCards: [], capturingTeam: null, capturingStage: 0,
+      turnStartTime: new Date(now + grace).toISOString(),
+      captureEvents: [...events, {
+        id: `${integer(before.matchSequence)}:${integer(before.roundCount)}:${integer(before.serverVersion) + 1}`,
+        cards, team, playerUid: before.playerIds?.[integer(before.currentTurnIndex)],
+        createdAt: new Date(now).toISOString(),
+      }].slice(-52) }, deck }, now);
+  }
   return stamp({ state: { ...after, phase: "capturing", capturingStage: 0,
     board: [...(before.board ?? []), leading], capturingCards: [...(before.board ?? []), leading],
     capturingTeam: team, turnStartTime: new Date(now + CAPTURE_DURATION_MS).toISOString() }, deck }, now);
@@ -117,8 +136,9 @@ export function advanceMatch(state: MatchState, deck: Card[], now = Date.now()):
         // for another human while they still have a choice.
         return animateCapture(state, playCard(state, uid, hand[0]), deck, now);
       }
+      if (hand.length === 1 && uid.startsWith('bot_')) throw new Error('no_transition_due');
       if (uid.startsWith("bot_")) {
-        if (!Number.isFinite(started) || now - started < 1000) throw new Error("no_transition_due");
+        if (!Number.isFinite(started) || now - started < BOT_THINK_MS) throw new Error("no_transition_due");
         if (!hand.length) throw new Error("empty_hand");
         const card = chooseBotCard(state, uid);
         return animateCapture(state, playCard(state, uid, card), deck, now);

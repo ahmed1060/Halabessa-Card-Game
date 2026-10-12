@@ -3,6 +3,8 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'table_style.dart';
 import 'deal_card_motion.dart';
+import 'turn_deadline_ring.dart';
+import '../../domain/logic/online_match_clock.dart';
 
 /// Public seat information only. Hidden hands receive counts and backs, not faces.
 class TableSeat extends StatefulWidget {
@@ -18,6 +20,8 @@ class TableSeat extends StatefulWidget {
   final Color accent;
   final DateTime? turnStarted;
   final int turnSeconds;
+  final Duration? turnDuration;
+  final bool serverClock;
   final VoidCallback? onPressed;
   final int? hiddenHandCount;
   final String? dealIdentity;
@@ -37,6 +41,8 @@ class TableSeat extends StatefulWidget {
     this.accent = TableStyle.mint,
     this.turnStarted,
     this.turnSeconds = 0,
+    this.turnDuration,
+    this.serverClock = false,
     this.onPressed,
     this.hiddenHandCount,
     this.dealIdentity,
@@ -48,7 +54,6 @@ class TableSeat extends StatefulWidget {
 }
 
 class _TableSeatState extends State<TableSeat> {
-  Timer? _clock;
   Timer? _messageExpiry;
   bool _messageExpired = false;
   @override
@@ -78,18 +83,11 @@ class _TableSeatState extends State<TableSeat> {
         if (mounted) setState(() => _messageExpired = true);
       });
     }
-    _clock?.cancel();
-    if (widget.active && widget.turnStarted != null && widget.turnSeconds > 0) {
-      _clock = Timer.periodic(const Duration(seconds: 1), (_) {
-        if (mounted) setState(() {});
-      });
-    }
   }
 
   @override
   void dispose() {
     _messageExpiry?.cancel();
-    _clock?.cancel();
     super.dispose();
   }
 
@@ -103,14 +101,6 @@ class _TableSeatState extends State<TableSeat> {
     final viewport = MediaQuery.sizeOf(context);
     final compact =
         viewport.width > viewport.height && viewport.height < 500 && line <= 18;
-    final remaining = widget.turnStarted == null || widget.turnSeconds <= 0
-        ? 0.0
-        : (1 -
-                  DateTime.now()
-                          .difference(widget.turnStarted!)
-                          .inMilliseconds /
-                      (widget.turnSeconds * 1000))
-              .clamp(0.0, 1.0);
     return SizedBox(
       width: 110,
       height: compact ? 146 : 110 + 4 * line,
@@ -150,13 +140,14 @@ class _TableSeatState extends State<TableSeat> {
                         SizedBox(
                           width: 72,
                           height: 72,
-                          child: CircularProgressIndicator(
-                            value: widget.active
-                                ? (widget.turnSeconds > 0 ? remaining : 1)
-                                : 0,
-                            backgroundColor: widget.accent,
-                            color: TableStyle.brass,
-                            strokeWidth: 3,
+                          child: TurnDeadlineRing(
+                            active: widget.active,
+                            started: widget.turnStarted,
+                            duration: widget.turnDuration ?? Duration(seconds: widget.turnSeconds),
+                            now: widget.serverClock ? OnlineMatchClock.instance.now : null,
+                            clockChanges: widget.serverClock ? OnlineMatchClock.instance : null,
+                            background: widget.accent,
+                            foreground: TableStyle.brass,
                           ),
                         ),
                         ClipOval(

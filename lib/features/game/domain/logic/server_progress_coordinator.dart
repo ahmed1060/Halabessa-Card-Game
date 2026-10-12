@@ -7,6 +7,7 @@ class ServerProgressCoordinator {
   int? _version;
   String? _room;
   DateTime? _dueSince;
+  DateTime? _lastRequest;
 
   bool shouldRequest({
     required MatchState state,
@@ -17,6 +18,7 @@ class ServerProgressCoordinator {
   }) {
     if (!due) {
       _dueSince = null;
+      _lastRequest = null;
       return false;
     }
     if (_room != state.id ||
@@ -25,6 +27,7 @@ class ServerProgressCoordinator {
       _room = state.id;
       _version = state.serverVersion;
       _dueSince = now;
+      _lastRequest = null;
     }
     final humans = state.playerIds
         .where(
@@ -36,6 +39,12 @@ class ServerProgressCoordinator {
         .toList();
     final rank = humans.indexOf(uid);
     if (rank < 0) return false;
-    return now.difference(_dueSince!).inMilliseconds >= rank * 1500;
+    // Managed rooms normally advance without client commands. Repair only
+    // after a missed deadline, stagger narrowly, and coalesce retries.
+    final delay = state.serverProgressManaged ? 1500 + rank * 250 : rank * 1500;
+    if (now.difference(_dueSince!).inMilliseconds < delay ||
+        (_lastRequest != null && now.difference(_lastRequest!).inMilliseconds < 1000)) return false;
+    _lastRequest = now;
+    return true;
   }
 }

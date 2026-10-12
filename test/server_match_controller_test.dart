@@ -25,6 +25,7 @@ class FakeSync implements MultiplayerSyncService {
   }
   final types = <String>[];
   final versions = <int>[];
+  final commandIds = <String?>[];
   final pending = <Completer<MatchState>>[];
   @override
   Future<MatchState> submitMatchCommand({required MatchState matchState,
@@ -32,6 +33,7 @@ class FakeSync implements MultiplayerSyncService {
     Map<String, dynamic> payload = const {}, String? actorUid, String? commandId}) {
     types.add(commandType);
     versions.add(matchState.serverVersion);
+    commandIds.add(commandId);
     final request = Completer<MatchState>();
     pending.add(request);
     return request.future;
@@ -63,6 +65,31 @@ void main() {
   });
   tearDown(() => container.dispose());
 
+  test('a delayed cosmetic reply cannot occupy the card-play lane', () async {
+    final emoji=notifier.sendEmoji('human','👑');
+    expect(sync.types,['sendEmoji']);
+    final play=notifier.playCard('human',match.handCards['human']!.single);
+    expect(sync.types,['sendEmoji','playCard']);
+    sync.pending[1].complete(match.copyWith(serverVersion:4,handCards:{'human':[]}));
+    expect(await play,true);
+    sync.pending[0].complete(match.copyWith(serverVersion:3));
+    await emoji;
+    expect(container.read(matchStateProvider)!.serverVersion,4);
+  });
+
+  test('a definite cosmetic version race retries still-legal play once with fresh revision', () async {
+    final play=notifier.playCard('human',match.handCards['human']!.single);
+    final fresh=match.copyWith(serverVersion:4,turnStartTime:DateTime.now());
+    sync.pending[0].completeError(SupabaseBackendException('version_conflict',details:{
+      'state':fresh.toJson(),'version':4,'hand':fresh.handCards['human']!.map((c)=>c.toJson()).toList()}));
+    await Future<void>.delayed(Duration.zero);
+    expect(sync.types,['playCard','playCard']);
+    expect(sync.versions,[3,4]);
+    expect(sync.commandIds[0],isNot(sync.commandIds[1]));
+    sync.pending[1].complete(fresh.copyWith(serverVersion:5,handCards:{'human':[]}));
+    expect(await play,true);
+  });
+
   test('play submits intent only, with no optimistic hand removal or duplicate', () async {
     final card = match.handCards['human']!.single;
     final play = notifier.playCard('human', card);
@@ -85,6 +112,41 @@ void main() {
     expect(sync.versions, [3, 4]);
     sync.pending.last.complete(match.copyWith(serverVersion: 5));
     await second;
+  });
+  test('feed acceptance releases play before HTTP and old failure cannot block a new intent', () async {
+    final play = notifier.playCard('human', match.handCards['human']!.single);
+    expect(sync.commandIds.single, isNotNull);
+    final accepted = match.copyWith(serverVersion: 4,
+      handCards: {'human': []}, recentCommandIds: [sync.commandIds.single!]);
+    notifier.acceptServerSnapshotForTesting(accepted);
+    expect(await play, true);
+    final vote = notifier.voteShuffle('human', true);
+    expect(sync.types, ['playCard', 'voteShuffle']);
+    expect(sync.versions, [3, 4]);
+    sync.pending.first.completeError(StateError('late lost HTTP reply'));
+    await Future<void>.delayed(Duration.zero);
+    expect(container.read(matchFeedbackProvider), isNull);
+    final nextVote = notifier.voteRematch('human', true);
+    expect(sync.types, hasLength(2)); // The newer request is still busy.
+    sync.pending[1].complete(accepted.copyWith(serverVersion: 5));
+    await vote;
+    await Future<void>.delayed(Duration.zero);
+    expect(sync.versions.last, 5);
+    sync.pending[2].complete(accepted.copyWith(serverVersion: 6));
+    await nextVote;
+  });
+  test('unrelated feed update does not release pending play', () async {
+    final play = notifier.playCard('human', match.handCards['human']!.single);
+    notifier.acceptServerSnapshotForTesting(match.copyWith(serverVersion: 4,
+      recentCommandIds: ['unrelated-cosmetic']));
+    final vote = notifier.voteShuffle('human', true);
+    expect(sync.types, ['playCard']);
+    sync.pending.first.complete(match.copyWith(serverVersion: 5));
+    await play;
+    await Future<void>.delayed(Duration.zero);
+    expect(sync.versions.last, 5);
+    sync.pending.last.complete(match.copyWith(serverVersion: 6));
+    await vote;
   });
   test('rematch reports rejection so the results button can retry', () async {
     final rejected = notifier.voteRematch('human', true);
@@ -183,6 +245,12 @@ void main() {
     sync.pending.single.complete(match.copyWith(serverVersion: 4));
     await play;
     expect(container.read(matchStateProvider)!.serverVersion, 6);
+  });
+  test('stale removal snapshot cannot evict a player from a newer accepted roster', () {
+    notifier.acceptServerSnapshotForTesting(match.copyWith(serverVersion: 2,
+      playerIds: ['replacement', 'bot_1', 'bot_2', 'bot_3']));
+    expect(container.read(matchStateProvider), same(match));
+    expect(sync.leaves, isEmpty);
   });
   test('another player cannot be used as the command actor', () async {
     await notifier.playCard('bot_1', cards.Card.fromJson({'suit': 'hearts', 'rank': 'ace'}));

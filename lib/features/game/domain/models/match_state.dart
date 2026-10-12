@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'card.dart' as game_card;
 import 'capture.dart';
+import 'capture_event.dart';
 
 enum GamePhase { waitingForPlayers, preRoundCut, dealingFasha, dealingCards, playing, capturing, roundScoring, shuffleVoting, rematchVoting, matchOver }
 enum GameMode { classic, tafweet }
@@ -33,6 +34,9 @@ class MatchState {
   final int serverVersion;
   // Explicit protocol identity; a revision alone does not migrate a legacy room.
   final int protocolVersion;
+  final List<String> recentCommandIds;
+  final List<CaptureEvent> captureEvents;
+  final bool serverProgressManaged;
   final bool settlementPending;
   final int matchSequence;
 
@@ -96,6 +100,9 @@ class MatchState {
       this.handCounts = const {},
       this.serverVersion = 0,
       this.protocolVersion = 0,
+      this.recentCommandIds = const [],
+      this.captureEvents = const [],
+      this.serverProgressManaged = false,
       this.settlementPending = false,
       this.matchSequence = 0,
       this.harvestStacks = const {'teamA': [], 'teamB': []},
@@ -161,6 +168,9 @@ class MatchState {
     Map<String, int>? handCounts,
     int? serverVersion,
     int? protocolVersion,
+    List<String>? recentCommandIds,
+    List<CaptureEvent>? captureEvents,
+    bool? serverProgressManaged,
     bool? settlementPending,
     int? matchSequence,
     Map<String, List<Capture>>? harvestStacks,
@@ -214,6 +224,9 @@ class MatchState {
       handCounts: handCounts ?? this.handCounts,
       serverVersion: serverVersion ?? this.serverVersion,
       protocolVersion: protocolVersion ?? this.protocolVersion,
+      recentCommandIds: recentCommandIds ?? this.recentCommandIds,
+      captureEvents: captureEvents ?? this.captureEvents,
+      serverProgressManaged: serverProgressManaged ?? this.serverProgressManaged,
       settlementPending: settlementPending ?? this.settlementPending,
       matchSequence: matchSequence ?? this.matchSequence,
       harvestStacks: harvestStacks ?? this.harvestStacks,
@@ -277,6 +290,9 @@ class MatchState {
       'handCounts': handCounts,
       'serverVersion': serverVersion,
       'protocolVersion': protocolVersion,
+      'recentCommandIds': recentCommandIds,
+      'captureEvents': captureEvents.map((event) => event.toJson()).toList(),
+      'serverProgressManaged': serverProgressManaged,
       'settlementPending': settlementPending,
       'matchSequence': matchSequence,
       // handCards is deliberately NOT written here -- MultiplayerSyncService
@@ -502,6 +518,13 @@ class MatchState {
         handCounts: handCounts,
         serverVersion: json['serverVersion'] is num ? (json['serverVersion'] as num).toInt() : 0,
         protocolVersion: json['protocolVersion'] is num ? (json['protocolVersion'] as num).toInt() : 0,
+        recentCommandIds: (json['recentCommandIds'] is List
+            ? json['recentCommandIds'] as List
+            : json['recentCommandIds'] is Map
+                ? (json['recentCommandIds'] as Map).values.toList() : const [])
+            .whereType<String>().take(32).toList(),
+        serverProgressManaged: json['serverProgressManaged'] == true,
+        captureEvents: CaptureEvent.parse(json['captureEvents']),
         settlementPending: json['settlementPending'] == true,
         matchSequence: json['matchSequence'] is num ? (json['matchSequence'] as num).toInt() : 0,
         harvestStacks: parseCaptureMap(json['harvestStacks'] ?? {}),

@@ -1,6 +1,14 @@
 import type { Card, MatchState } from "./match_engine.ts";
+import { progressDeadline } from './match_progress.ts';
 
 export type CommittedRoom = { state: MatchState; version: number; hands: Record<string, Card[]> };
+
+/** Bounded metadata, not a capability or a replacement for the private ledger. */
+export function withCommandReceipt(state: MatchState, commandId: string): MatchState {
+  const prior = Array.isArray(state.recentCommandIds) ? state.recentCommandIds : [];
+  return { ...state, recentCommandIds: [...prior.filter(id => typeof id === 'string' &&
+    id !== commandId), commandId].slice(-32) };
+}
 
 /** A committed move is successful even if its realtime mirror needs repair. */
 export async function commitAndDeliver<T>(commit: () => Promise<void>, deliver: () => Promise<T>) {
@@ -18,6 +26,8 @@ export function publicMatchState(state: MatchState, version: number) {
   publicState.handCounts = Object.fromEntries(Object.entries(hands)
     .map(([uid, cards]) => [uid, Array.isArray(cards) ? cards.length : 0]));
   publicState.serverVersion = version;
+  const due = progressDeadline({ ...state, handCounts: publicState.handCounts });
+  publicState.progressDueAt = due === null ? null : new Date(due).toISOString();
   for (const key of ["handCards", "deck", "secretDeck", "presence", "chat", "actions", "playerLastActive"]) {
     delete publicState[key];
   }

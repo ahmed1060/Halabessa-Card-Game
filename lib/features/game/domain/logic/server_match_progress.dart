@@ -31,7 +31,7 @@ bool serverProgressDue(MatchState s, DateTime now) {
       final bot = s.playerIds[s.currentTurnIndex].startsWith('bot_');
       if (!bot && s.timerDurationSeconds <= 0) return false;
       return now.difference(s.turnStartTime!).inMilliseconds >=
-          (bot ? 1000 : s.timerDurationSeconds * 1000);
+          (bot ? botThinkDuration.inMilliseconds : s.timerDurationSeconds * 1000);
     case GamePhase.shuffleVoting:
     case GamePhase.rematchVoting:
       final votes = s.phase == GamePhase.rematchVoting ? s.rematchVotes : s.shuffleVotes;

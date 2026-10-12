@@ -20,9 +20,9 @@ void main() {
   });
   test('only true bot seat can request an early automatic move', () {
     expect(serverProgressDue(s.copyWith(currentTurnIndex: 1),
-      start.add(Duration(milliseconds: 999))), false);
+      start.add(Duration(milliseconds: 449))), false);
     expect(serverProgressDue(s.copyWith(currentTurnIndex: 1),
-      start.add(Duration(seconds: 1))), true);
+      start.add(Duration(milliseconds: 450))), true);
     expect(serverProgressDue(s.copyWith(playerOnlineStatus: {'human': false}),
       start.add(Duration(seconds: 1))), false);
   });
@@ -41,7 +41,9 @@ void main() {
     expect(serverProgressDue(single, start.add(const Duration(milliseconds: 599))), false);
     expect(serverProgressDue(single, start.add(const Duration(milliseconds: 600))), true);
     expect(serverProgressDue(single.copyWith(currentTurnIndex: 1),
-      start.add(const Duration(milliseconds: 600))), false);
+      start.add(const Duration(milliseconds: 449))), false);
+    expect(serverProgressDue(single.copyWith(currentTurnIndex: 1),
+      start.add(const Duration(milliseconds: 450))), true);
     expect(serverProgressDue(single.copyWith(phase: GamePhase.dealingCards),
       start.add(const Duration(milliseconds: 600))), false);
   });

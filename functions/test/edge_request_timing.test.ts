@@ -39,3 +39,12 @@ test('failed operations still record bounded stage timing', async () => {
   timing.finish();
   assert.deepEqual(records, [{event:'halabessa_timing_v1',operation:'getSocialGraph',total_ms:8,stages:{social_query:8}}]);
 });
+
+test('command timing categories cannot contain arbitrary input or inherited keys',()=>{
+  const records:any[]=[];
+  for(const command of ['playCard','advance','sendEmoji','private@example.com','toString']){
+    const timing=createRequestTiming(r=>records.push(r),()=>0);
+    timing.command(command);timing.finish();
+  }
+  assert.deepEqual(records.map(r=>r.command),['manual_play','timed_progress','cosmetic','other','other']);
+});
