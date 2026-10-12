@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { progressDeadline, progressEnabled } from '../../supabase/functions/halabessa-api/match_progress.ts';
+import { readFileSync } from 'node:fs';
+import { BOT_THINK_MS, FORCED_CARD_MS, CAPTURE_MS, progressDeadline, progressEnabled } from '../../supabase/functions/halabessa-api/match_progress.ts';
 import { advanceMatch } from '../../supabase/functions/halabessa-api/match_lifecycle.ts';
 import { publicMatchState } from '../../supabase/functions/halabessa-api/match_delivery.ts';
 import { advanceScheduledRoom, runRoomProgress } from '../../supabase/functions/halabessa-api/match_progress_worker.ts';
@@ -9,6 +10,14 @@ import type { PublicationQuery } from '../../supabase/functions/halabessa-api/ro
 
 const start = Date.parse('2026-10-12T08:00:00Z');
 const card = (rank: string) => ({suit:'hearts',rank});
+test('Training and countdown policy match the server reading beats', () => {
+  const timing = readFileSync(new URL('../../lib/features/game/domain/logic/match_presentation_timing.dart', import.meta.url), 'utf8');
+  assert.match(timing, new RegExp(`botThinkDuration = Duration\\(milliseconds: ${BOT_THINK_MS}\\)`));
+  assert.match(timing, new RegExp(`lastCardAutoPlayDuration = Duration\\(milliseconds: ${FORCED_CARD_MS}\\)`));
+  assert.match(timing, new RegExp(`captureTotalDuration = Duration\\(milliseconds: ${CAPTURE_MS}\\)`));
+  assert.ok(BOT_THINK_MS > CAPTURE_MS);
+  assert.ok(FORCED_CARD_MS > CAPTURE_MS);
+});
 function room(): MatchState {
   return {id:'ABC12345',protocolVersion:1,phase:'playing',playerIds:['a','bot_1','b','bot_2'],
     currentTurnIndex:1,dealerIndex:0,timerDurationSeconds:15,
@@ -17,22 +26,22 @@ function room(): MatchState {
       b:[card('five'),card('six')],bot_2:[card('seven'),card('eight')]},board:[]};
 }
 
-test('bot policy is 450ms, not difficulty-dependent; last card stays 600ms', () => {
+test('bot policy leaves an 800ms reading beat; last card leaves 900ms', () => {
   for (const level of ['easy','medium','hard','expert']) {
     const state = {...room(),botDifficulties:{bot_1:level}};
-    assert.equal(progressDeadline(state),start+450);
-    assert.throws(()=>advanceMatch(state,[],start+449),/no_transition_due/);
-    assert.equal(advanceMatch(state,[],start+450).state.handCards!.bot_1.length,1);
+    assert.equal(progressDeadline(state),start+800);
+    assert.throws(()=>advanceMatch(state,[],start+799),/no_transition_due/);
+    assert.equal(advanceMatch(state,[],start+800).state.handCards!.bot_1.length,1);
     const single = {...state,handCards:{...state.handCards,bot_1:[card('four')]}};
-    assert.equal(progressDeadline(single),start+600);
-    assert.throws(()=>advanceMatch(single,[],start+599),/no_transition_due/);
+    assert.equal(progressDeadline(single),start+900);
+    assert.throws(()=>advanceMatch(single,[],start+899),/no_transition_due/);
   }
 });
 test('public deadlines contain no opponent hands and work with counts alone', () => {
   const snapshot=publicMatchState(room(),3);
-  assert.equal(snapshot.progressDueAt,new Date(start+450).toISOString());
+  assert.equal(snapshot.progressDueAt,new Date(start+800).toISOString());
   assert.equal(snapshot.handCards,undefined);
-  assert.equal(progressDeadline(snapshot),start+450);
+  assert.equal(progressDeadline(snapshot),start+800);
   assert.equal(progressDeadline({...snapshot,currentTurnIndex:0,timerDurationSeconds:0}),null);
   assert.equal(progressDeadline({...snapshot,currentTurnIndex:0}),start+15000);
 });
@@ -69,17 +78,17 @@ function queryFixture(state=room(),version=3) {
 }
 test('worker uses room locks, commits one move and rechecks a duplicate invocation',async()=> {
   const f=queryFixture();
-  assert.equal(await advanceScheduledRoom(f.query,'ABC12345',()=>start+450),true);
+  assert.equal(await advanceScheduledRoom(f.query,'ABC12345',()=>start+800),true);
   assert.equal(f.hands.bot_1.length,1);
   assert.match(f.calls[1],/for update of r,s skip locked/);
   assert.equal(f.calls.at(-1),'commit');
-  assert.equal(await advanceScheduledRoom(f.query,'ABC12345',()=>start+450),false);
+  assert.equal(await advanceScheduledRoom(f.query,'ABC12345',()=>start+800),false);
   assert.equal(f.hands.bot_1.length,1);
   assert.equal(f.calls.at(-1),'rollback');
 });
 test('automatic timing contains fixed categories only; diagnostic failure cannot roll back a move',async()=> {
   const f=queryFixture(); const records: unknown[]=[];
-  assert.equal(await advanceScheduledRoom(f.query,'ABC12345',()=>start+500,record=>{
+  assert.equal(await advanceScheduledRoom(f.query,'ABC12345',()=>start+850,record=>{
     records.push(record);throw Error('logger_unavailable');
   }),true);
   assert.equal(f.calls.at(-1),'commit');
@@ -91,7 +100,7 @@ test('automatic timing contains fixed categories only; diagnostic failure cannot
 });
 test('stale job fails closed; validation failure rolls back without publication',async()=> {
   const f=queryFixture();f.setQueued(2);
-  await assert.rejects(advanceScheduledRoom(f.query,'ABC12345',()=>start+450),/invalid_progress_revision/);
+  await assert.rejects(advanceScheduledRoom(f.query,'ABC12345',()=>start+800),/invalid_progress_revision/);
   assert.equal(f.calls.at(-1),'rollback');
   assert.equal(f.calls.some(s=>s.startsWith('update')),false);
   await assert.rejects(advanceScheduledRoom(f.query,'../../bad'),/invalid_room_id/);
@@ -123,13 +132,13 @@ test('scheduler sleeps outside runner and publishes only after commit',async()=>
   assert.equal(await runRoomProgress(run,'ABC12345',async()=>{
     assert.equal(active,false);assert.equal(f.calls.at(-1),'commit');published++;
   },{maxSteps:1,now:()=>time,elapsed:()=>time-start,sleep:async ms=>{assert.equal(active,false);time+=ms;}}),1);
-  assert.equal(time,start+450);assert.equal(published,1);
+  assert.equal(time,start+800);assert.equal(published,1);
 });
 
 test('consecutive automatic moves reuse only committed deadline hints, with no extra job-read connection',async()=> {
   const f=queryFixture();let time=start,reads=0,published=0;
   const run=async<T>(work:(query:PublicationQuery)=>Promise<T>)=>work(async(sql,args)=>{
-    if(sql.startsWith('select p.due_at')) {reads++;return [{due_at:new Date(start+450)}];}
+    if(sql.startsWith('select p.due_at')) {reads++;return [{due_at:new Date(start+800)}];}
     return f.query(sql,args);
   });
   // The bot moves once, then the next human times out. Both must be locked
@@ -143,7 +152,7 @@ test('consecutive automatic moves reuse only committed deadline hints, with no e
 test('a timer-free human decision stops the chain without another connection',async()=> {
   const f=queryFixture({...room(),timerDurationSeconds:0});let time=start,reads=0;
   const run=async<T>(work:(query:PublicationQuery)=>Promise<T>)=>work(async(sql,args)=>{
-    if(sql.startsWith('select p.due_at')) {reads++;return [{due_at:new Date(start+450)}];}
+    if(sql.startsWith('select p.due_at')) {reads++;return [{due_at:new Date(start+800)}];}
     return f.query(sql,args);
   });
   assert.equal(await runRoomProgress(run,'ABC12345',async()=>{}, {

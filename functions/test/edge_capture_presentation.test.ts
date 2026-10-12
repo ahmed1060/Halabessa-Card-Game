@@ -30,8 +30,8 @@ test('capture commits empty authoritative board and next bot deadline with one m
   assert.equal(event.id,'2:3:11'); assert.equal(event.playerUid,'a');
   assert.deepEqual(event.cards,[before.board![0],before.handCards!.a[0]]);
   assert.equal('handCards' in event,false);
-  assert.throws(()=>advanceMatch(after,[],now+449),/no_transition_due/);
-  assert.equal(advanceMatch(after,[],now+450).state.handCards!.bot_2.length,1);
+  assert.throws(()=>advanceMatch(after,[],now+799),/no_transition_due/);
+  assert.equal(advanceMatch(after,[],now+800).state.handCards!.bot_2.length,1);
   assert.equal(before.handCards!.a.length,2); // input and event are immutable snapshots
 });
 test('legacy capture still needs its compatible phase; human deadline gets visual grace', () => {

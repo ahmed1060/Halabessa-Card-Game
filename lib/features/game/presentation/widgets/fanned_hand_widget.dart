@@ -238,26 +238,6 @@ class _FannedHandWidgetState extends State<FannedHandWidget> {
                                           ),
                                         ),
                                       ),
-                                    if (pending)
-                                      Positioned(
-                                        key: ValueKey(
-                                          'hand-pending-${card.firebaseKey}',
-                                        ),
-                                        right: 4,
-                                        bottom: 4,
-                                        child: Container(
-                                          padding: const EdgeInsets.all(5),
-                                          decoration: const BoxDecoration(
-                                            color: TableStyle.ink,
-                                            shape: BoxShape.circle,
-                                          ),
-                                          child: const Icon(
-                                            Icons.hourglass_top,
-                                            size: 16,
-                                            color: TableStyle.brass,
-                                          ),
-                                        ),
-                                      ),
                                   ],
                                 ),
                               ),

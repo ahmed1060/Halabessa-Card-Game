@@ -20,9 +20,9 @@ void main() {
   });
   test('only true bot seat can request an early automatic move', () {
     expect(serverProgressDue(s.copyWith(currentTurnIndex: 1),
-      start.add(Duration(milliseconds: 449))), false);
+      start.add(Duration(milliseconds: 799))), false);
     expect(serverProgressDue(s.copyWith(currentTurnIndex: 1),
-      start.add(Duration(milliseconds: 450))), true);
+      start.add(Duration(milliseconds: 800))), true);
     expect(serverProgressDue(s.copyWith(playerOnlineStatus: {'human': false}),
       start.add(Duration(seconds: 1))), false);
   });
@@ -38,19 +38,20 @@ void main() {
   test('one public hand count auto-plays only the active turn, even without a timer', () {
     final single = s.copyWith(timerDurationSeconds: 0,
       handCounts: {'human': 1, 'bot_1': 4, 'bot_2': 4, 'bot_3': 4});
-    expect(serverProgressDue(single, start.add(const Duration(milliseconds: 599))), false);
-    expect(serverProgressDue(single, start.add(const Duration(milliseconds: 600))), true);
+    expect(serverProgressDue(single, start.add(const Duration(milliseconds: 899))), false);
+    expect(serverProgressDue(single, start.add(const Duration(milliseconds: 900))), true);
     expect(serverProgressDue(single.copyWith(currentTurnIndex: 1),
-      start.add(const Duration(milliseconds: 449))), false);
+      start.add(const Duration(milliseconds: 799))), false);
     expect(serverProgressDue(single.copyWith(currentTurnIndex: 1),
-      start.add(const Duration(milliseconds: 450))), true);
+      start.add(const Duration(milliseconds: 800))), true);
     expect(serverProgressDue(single.copyWith(phase: GamePhase.dealingCards),
       start.add(const Duration(milliseconds: 600))), false);
   });
   test('private own single-card hand can hint forced play without public counts', () {
     final single = s.copyWith(handCounts: {}, handCards: {
       'human': [const game.Card(game.Suit.hearts, game.Rank.ace)]});
-    expect(serverProgressDue(single, start.add(const Duration(milliseconds: 600))), true);
+    expect(serverProgressDue(single, start.add(const Duration(milliseconds: 899))), false);
+    expect(serverProgressDue(single, start.add(const Duration(milliseconds: 900))), true);
     expect(serverProgressDue(single.copyWith(turnStartTime: start.add(const Duration(seconds: 1))),
       start.add(const Duration(milliseconds: 600))), false);
   });

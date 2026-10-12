@@ -7,7 +7,7 @@
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="viewport"
-    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, height=device-height">
+    content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
   <meta name="theme-color" content="#3B274C">
   <meta name="description" content="halabessa - The ultimate Egyptian card game experience.">
 
@@ -37,6 +37,8 @@
 </head>
 
 <body>
+  <!-- One unscaled host owns both the painted Flutter view and its hit tests. -->
+  <div id="game-host"></div>
   <!-- Unity WebGL Engine Loader (Canvas is dynamically injected by Flutter) -->
   <script src="Build/web.loader.js"></script>
   <script>

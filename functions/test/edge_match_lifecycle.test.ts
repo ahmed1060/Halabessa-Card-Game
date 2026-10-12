@@ -128,36 +128,36 @@ function oneCardRoom(): MatchState {
 
 test('a forced last card uses server time, preserves inactivity and plays exactly once', () => {
   const initial = oneCardRoom();
-  assert.throws(() => lifecycleCommand('advance', initial, [], 'b', {}, now + 599), /turn_deadline_not_reached/);
-  const next = lifecycleCommand('advance', initial, [], 'b', {}, now + 600).state;
+  assert.throws(() => lifecycleCommand('advance', initial, [], 'b', {}, now + 899), /turn_deadline_not_reached/);
+  const next = lifecycleCommand('advance', initial, [], 'b', {}, now + 900).state;
   assert.equal(next.currentTurnIndex, 1);
   assert.deepEqual(next.handCards!.a, []);
   assert.deepEqual(next.board, initial.handCards!.a);
   assert.equal((next.playHistory as Card[]).length, 1);
   assert.deepEqual(next.consecutiveTimeouts, {a: 2});
   assert.equal(next.playerIds![0], 'a');
-  assert.equal(next.turnStartTime, new Date(now + 600).toISOString());
-  assert.throws(() => lifecycleCommand('advance', next, [], 'b', {}, now + 601), /turn_deadline_not_reached/);
-  assert.throws(() => lifecycleCommand('playCard', next, [], 'a', {card: initial.handCards!.a[0]}, now + 601), /not_your_turn/);
+  assert.equal(next.turnStartTime, new Date(now + 900).toISOString());
+  assert.throws(() => lifecycleCommand('advance', next, [], 'b', {}, now + 901), /turn_deadline_not_reached/);
+  assert.throws(() => lifecycleCommand('playCard', next, [], 'a', {card: initial.handCards!.a[0]}, now + 901), /not_your_turn/);
 });
 
 test('forced last-card play works without a turn timer and cannot affect a non-active hand', () => {
   const initial = {...oneCardRoom(), timerDurationSeconds: 0};
-  assert.equal(advanceMatch(initial, [], now + 600).state.handCards!.a.length, 0);
-  assert.throws(() => advanceMatch({...initial, currentTurnIndex: 1}, [], now + 600), /turn_deadline_not_reached/);
-  assert.throws(() => advanceMatch({...initial, turnStartTime: new Date(now + 1000).toISOString()}, [], now + 600), /turn_deadline_not_reached/);
-  assert.throws(() => lifecycleCommand('advance', initial, [], 'stranger', {}, now + 600), /human_participant_required/);
+  assert.equal(advanceMatch(initial, [], now + 900).state.handCards!.a.length, 0);
+  assert.throws(() => advanceMatch({...initial, currentTurnIndex: 1}, [], now + 900), /turn_deadline_not_reached/);
+  assert.throws(() => advanceMatch({...initial, turnStartTime: new Date(now + 1000).toISOString()}, [], now + 900), /turn_deadline_not_reached/);
+  assert.throws(() => lifecycleCommand('advance', initial, [], 'stranger', {}, now + 900), /human_participant_required/);
 });
 
 test('last-card capture has a single harvest entry and one completion transition', () => {
   const initial = {...oneCardRoom(), mode: 'tafweet', board: [{suit: 'diamonds', rank: 'ace'} as Card]};
-  const captured = advanceMatch(initial, [], now + 600).state;
+  const captured = advanceMatch(initial, [], now + 900).state;
   assert.equal(captured.phase, 'capturing');
   assert.equal(captured.capturingStage, 0);
   assert.equal(captured.handCards!.a.length, 0);
   const harvest = JSON.stringify(captured.harvestStacks);
-  assert.throws(() => advanceMatch(captured, [], now + 1199), /no_transition_due/);
-  const finished = advanceMatch(captured, [], now + 1200).state;
+  assert.throws(() => advanceMatch(captured, [], now + 1499), /no_transition_due/);
+  const finished = advanceMatch(captured, [], now + 1500).state;
   assert.equal(finished.phase, 'playing');
   assert.deepEqual(finished.board, []);
   assert.equal(JSON.stringify(finished.harvestStacks), harvest);
@@ -166,11 +166,11 @@ test('last-card capture has a single harvest entry and one completion transition
 
 test('manual play winning the race cancels the forced move; bots use the same single-card policy', () => {
   const initial = oneCardRoom();
-  const manual = lifecycleCommand('playCard', initial, [], 'a', {card: initial.handCards!.a[0]}, now + 599).state;
-  assert.throws(() => advanceMatch(manual, [], now + 600), /turn_deadline_not_reached/);
+  const manual = lifecycleCommand('playCard', initial, [], 'a', {card: initial.handCards!.a[0]}, now + 899).state;
+  assert.throws(() => advanceMatch(manual, [], now + 900), /turn_deadline_not_reached/);
   const bot = {...initial, playerIds: ['bot_1', 'b', 'c', 'd'], handCards: {...initial.handCards, bot_1: initial.handCards!.a}};
-  assert.throws(() => advanceMatch(bot, [], now + 599), /no_transition_due/);
-  assert.equal(advanceMatch(bot, [], now + 600).state.handCards!.bot_1.length, 0);
+  assert.throws(() => advanceMatch(bot, [], now + 899), /no_transition_due/);
+  assert.equal(advanceMatch(bot, [], now + 900).state.handCards!.bot_1.length, 0);
 });
 
 test('a complete round with twelve forced last cards neither skips a deal nor loses cards', () => {
@@ -183,7 +183,7 @@ test('a complete round with twelve forced last cards neither skips a deal nor lo
       const uid = state.playerIds![Number(state.currentTurnIndex)];
       const hand = state.handCards![uid];
       if (hand.length === 1) {
-        clock += 600;
+        clock += 900;
         ({state, deck} = advanceMatch(state, deck, clock));
         forced++;
       } else {

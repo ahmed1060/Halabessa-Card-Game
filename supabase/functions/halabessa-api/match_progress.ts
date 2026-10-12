@@ -1,7 +1,8 @@
 import type { MatchState } from './match_engine.ts';
 
-export const BOT_THINK_MS = 450;
-export const FORCED_CARD_MS = 600;
+// Leave a short reading beat after the previous card/capture, not a network stall.
+export const BOT_THINK_MS = 800;
+export const FORCED_CARD_MS = 900;
 export const CAPTURE_MS = 600;
 
 /** Pure server deadline policy. No credentials, cards or browser presence in jobs. */

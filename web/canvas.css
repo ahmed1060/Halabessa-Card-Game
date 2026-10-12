@@ -1,3 +1,24 @@
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+  background: #3B274C;
+}
+
+/* Do not fix/rotate/scale the body: Safari may pan the document for a keyboard.
+   Bootstrap sizes this absolute host in the visible viewport's CSS pixels. */
+#game-host {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
 #unity-canvas {
   width: 100%;
   height: 100%;

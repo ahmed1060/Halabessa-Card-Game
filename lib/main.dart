@@ -11,6 +11,7 @@ import 'core/services/multimedia_service.dart';
 import 'core/services/player_presence.dart';
 import 'core/providers/age_eligibility_provider.dart';
 import 'core/widgets/age_eligibility_screen.dart';
+import 'core/widgets/app_orientation_scope.dart';
 import 'features/auth/presentation/providers/auth_providers.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/services.dart';
@@ -24,13 +25,12 @@ void main() async {
 
   // Mobile Immersion & Orientation
   await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
-  await SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-    DeviceOrientation.landscapeLeft,
-    DeviceOrientation.landscapeRight,
-  ]);
-
   final sharedPrefs = await SharedPreferences.getInstance();
+  await applyAppOrientation(
+    sharedPrefs.getString('gameOrientation') == 'portrait'
+        ? GameOrientation.portrait
+        : GameOrientation.landscape,
+  );
 
   try {
     await Firebase.initializeApp(
@@ -51,7 +51,7 @@ void main() async {
         ],
         path: 'assets/translations',
         fallbackLocale: const Locale('en', 'US'),
-        child: const HalabessaApp(),
+        child: const AppOrientationScope(child: HalabessaApp()),
       ),
     ),
   );

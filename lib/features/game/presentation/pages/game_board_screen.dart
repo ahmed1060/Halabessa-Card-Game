@@ -1,6 +1,5 @@
 import 'dart:math';
 import '../../domain/logic/match_presentation_timing.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easy_localization/easy_localization.dart';
@@ -79,7 +78,6 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
     _confettiController = ConfettiController(
       duration: const Duration(seconds: 5),
     );
-    _applyGameOrientation(ref.read(settingsProvider).gameOrientation);
 
     final multimedia = ref.read(multimediaServiceProvider);
     final unityVisibility = ref.read(unityLayerVisibilityProvider.notifier);
@@ -109,28 +107,7 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
     // Resume Background Music when leaving room
     // Cache dependencies while mounted: WidgetRef is invalid after disposal.
     Future.microtask(_restoreLobbyPresentation);
-    if (!kIsWeb) {
-      SystemChrome.setPreferredOrientations(const [
-        DeviceOrientation.portraitUp,
-        DeviceOrientation.landscapeLeft,
-        DeviceOrientation.landscapeRight,
-      ]);
-    }
     super.dispose();
-  }
-
-  void _applyGameOrientation(GameOrientation orientation) {
-    // Browsers own device rotation. Never rotate the Flutter canvas with a
-    // transform: that separates painted controls from pointer coordinates.
-    if (kIsWeb) return;
-    SystemChrome.setPreferredOrientations(
-      orientation == GameOrientation.landscape
-          ? const [
-              DeviceOrientation.landscapeLeft,
-              DeviceOrientation.landscapeRight,
-            ]
-          : const [DeviceOrientation.portraitUp],
-    );
   }
 
   AppUser _getAvatarUser(
@@ -231,11 +208,6 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
       final messenger = ScaffoldMessenger.of(context);
       messenger.hideCurrentSnackBar();
       messenger.showSnackBar(SnackBar(content: Text(next.translationKey.tr())));
-    });
-    ref.listen(settingsProvider, (previous, next) {
-      if (previous?.gameOrientation != next.gameOrientation) {
-        _applyGameOrientation(next.gameOrientation);
-      }
     });
     final matchState = ref.watch(matchStateProvider);
     final currentUser = ref.watch(currentUserProvider);

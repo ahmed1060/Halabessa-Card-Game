@@ -72,16 +72,20 @@ void main() {
     await tester.tap(card(1));
     await tester.pump(const Duration(seconds: 2));
     expect(
-      find.byKey(ValueKey('hand-pending-${cards[1].firebaseKey}')),
+      find.byKey(ValueKey('hand-outline-${cards[1].firebaseKey}')),
       findsOneWidget,
     );
+    expect(find.byIcon(Icons.hourglass_top), findsNothing);
+    final pendingSemantics = tester.widget<Semantics>(find.ancestor(
+      of: card(1), matching: find.byType(Semantics)).first);
+    expect(pendingSemantics.properties.value, isNotNull);
     await tester.tap(card(2));
     await tester.drag(card(3), const Offset(0, -70));
     expect(played, [cards[1]]);
     request.complete();
     await tester.pump();
     expect(
-      find.byKey(ValueKey('hand-pending-${cards[1].firebaseKey}')),
+      find.byKey(ValueKey('hand-outline-${cards[1].firebaseKey}')),
       findsNothing,
     );
     await tester.tap(card(2));
@@ -118,7 +122,7 @@ void main() {
     await tester.pump();
     expect(tester.takeException(), isA<StateError>());
     expect(
-      find.byKey(ValueKey('hand-pending-${cards[0].firebaseKey}')),
+      find.byKey(ValueKey('hand-outline-${cards[0].firebaseKey}')),
       findsNothing,
     );
     await tester.tap(card(0));

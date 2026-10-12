@@ -54,7 +54,7 @@ void main() {
     'Training forces the active last card without a tap, not another hand',
     (tester) async {
       final container = setup(initial);
-      await tester.pump(const Duration(milliseconds: 599));
+      await tester.pump(const Duration(milliseconds: 899));
       expect(container.read(matchStateProvider)!.board, isEmpty);
       await tester.pump(const Duration(milliseconds: 1));
       final played = container.read(matchStateProvider)!;
@@ -79,9 +79,25 @@ void main() {
     ));
     await tester.pump(const Duration(milliseconds: 100));
     await container.read(matchStateProvider.notifier).playCard('human', ace);
-    await tester.pump(const Duration(milliseconds: 600));
+    await tester.pump(const Duration(milliseconds: 900));
     expect(container.read(matchStateProvider)!.board, [ace]);
     expect(container.read(matchStateProvider)!.currentTurnIndex, 1);
+    container.dispose();
+    await tester.pump(const Duration(seconds: 4));
+  });
+
+  testWidgets('Training bot waits for the reading beat, then plays one card', (
+    tester,
+  ) async {
+    final container = setup(initial.copyWith(currentTurnIndex: 1,
+      timerDurationSeconds: 0));
+    await tester.pump(const Duration(milliseconds: 799));
+    expect(container.read(matchStateProvider)!.board, isEmpty);
+    await tester.pump(const Duration(milliseconds: 1));
+    final played = container.read(matchStateProvider)!;
+    expect(played.board, hasLength(1));
+    expect(played.handCards['bot_1'], hasLength(1));
+    expect(played.currentTurnIndex, 2);
     container.dispose();
     await tester.pump(const Duration(seconds: 4));
   });
@@ -126,7 +142,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 100));
       final notifier = container.read(matchStateProvider.notifier);
       await notifier.leaveMatch(notifyServer: false);
-      await tester.pump(const Duration(milliseconds: 600));
+      await tester.pump(const Duration(milliseconds: 900));
       expect(container.read(matchStateProvider), isNull);
       container.dispose();
     },
