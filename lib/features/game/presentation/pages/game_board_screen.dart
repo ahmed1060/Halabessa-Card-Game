@@ -875,9 +875,7 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
       final canCut =
           myIndex >= 0 &&
           state.playerIds.isNotEmpty &&
-          myIndex ==
-              (state.dealerIndex + state.playerIds.length - 1) %
-                  state.playerIds.length;
+          myIndex == state.dealerIndex % state.playerIds.length;
       return MatchPhasePanel(
         key: ValueKey('${state.id}-${state.roundCount}-cut'),
         title: 'pre_round_cut'.tr(),

@@ -26,11 +26,12 @@ test("cut preserves every card", () => {
     new Set(deck.map((card) => `${card.suit}_${card.rank}`)));
 });
 
-test("only the designated cutter can transition a pre-round match", () => {
+test("only the dealer can transition a pre-round match by cutting", () => {
   const state = { phase: "preRoundCut", dealerIndex: 1, playerIds: ["a", "b", "c", "d"] };
-  assert.throws(() => cut(state, standardDeck(), "b", 10), /Only the cutter/);
-  const result = cut(state, standardDeck(), "a", 10);
-  // Dealer 1 makes player 0 the cutter under the client rule.
+  for (const player of ["a", "c", "d"]) {
+    assert.throws(() => cut(state, standardDeck(), player, 10), /Only the cutter/);
+  }
+  const result = cut(state, standardDeck(), "b", 10);
   assert.equal(result.state.phase, "dealingFasha");
   assert.equal(result.state.deckCount, 52);
 });

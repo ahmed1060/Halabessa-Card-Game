@@ -12,7 +12,7 @@ bool serverProgressDue(MatchState s, DateTime now) {
     case GamePhase.waitingForPlayers:
       return !s.playerIds.any((id) => id.startsWith('waiting_'));
     case GamePhase.preRoundCut:
-      final cutter = s.playerIds[(s.dealerIndex + 3) % 4];
+      final cutter = s.playerIds[s.dealerIndex % 4];
       return elapsed(cutter.startsWith('bot_') ? 1000 :
           (s.timerDurationSeconds > 0 ? s.timerDurationSeconds : 15) * 1000);
     case GamePhase.dealingFasha:

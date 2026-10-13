@@ -21,6 +21,7 @@ import 'package:halabessa/features/game/presentation/pages/offline_practice_app.
 import 'package:halabessa/features/game/presentation/pages/game_board_screen.dart';
 import 'package:halabessa/features/game/presentation/widgets/option_b_table.dart';
 import 'package:halabessa/features/game/presentation/widgets/table_seat.dart';
+import 'package:halabessa/features/game/presentation/widgets/match_phase_panel.dart';
 import 'package:halabessa/features/game/presentation/widgets/team_capture_stack.dart';
 import 'package:halabessa/features/game/presentation/widgets/lantern_controls.dart';
 import 'package:halabessa/features/game/presentation/widgets/turn_deadline_ring.dart';
@@ -397,6 +398,25 @@ void main() {
           );
         }
       }
+      for (var dealer = 0; dealer < 4; dealer++) {
+        // ignore: invalid_use_of_protected_member, invalid_use_of_visible_for_testing_member
+        n.state = initial.copyWith(
+          phase: GamePhase.preRoundCut,
+          dealerIndex: dealer,
+        );
+        await tester.pump();
+        final cutPanel = tester.widget<MatchPhasePanel>(
+          find.byType(MatchPhasePanel),
+        );
+        expect(cutPanel.onAction != null, dealer == 0);
+        expect(
+          cutPanel.actionLabel,
+          dealer == 0 ? translations['cut_the_deck'] : null,
+        );
+      }
+      // ignore: invalid_use_of_protected_member, invalid_use_of_visible_for_testing_member
+      n.state = initial;
+      await tester.pump();
       await tester.tap(
         find.byKey(ValueKey('hand-card-${hand.first.firebaseKey}')),
       );

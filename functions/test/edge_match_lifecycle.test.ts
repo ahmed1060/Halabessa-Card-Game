@@ -11,7 +11,7 @@ function room(): MatchState {
 test("complete server round conserves all 52 cards and reaches visible results", () => {
   let { state, deck } = advanceMatch(room(), [], now);
   assert.equal(state.phase, "preRoundCut");
-  ({ state, deck } = lifecycleCommand("cut", state, deck, "d", { position: 20 }, now));
+  ({ state, deck } = lifecycleCommand("cut", state, deck, "a", { position: 20 }, now));
   assert.throws(() => advanceMatch(state, deck, now + 3999), /no_transition_due/);
   now += 4000;
   ({ state, deck } = advanceMatch(state, deck, now));
@@ -46,7 +46,7 @@ test("complete server round conserves all 52 cards and reaches visible results",
   assert.equal(Object.keys(state.earnedCoins as Record<string, number>).length, 4);
 });
 test("server phase delays and bot turns can be advanced by any human, not only the host", () => {
-  const initial = { ...room(), playerIds: ["a", "b", "c", "bot_4"] };
+  const initial = { ...room(), playerIds: ["bot_1", "b", "c", "a"] };
   const round = lifecycleCommand("advance", initial, [], "b", {}, now);
   assert.equal(round.state.phase, "preRoundCut");
   assert.throws(() => lifecycleCommand("advance", round.state, round.deck, "b", {}, now + 999), /no_transition_due/);
@@ -176,7 +176,7 @@ test('manual play winning the race cancels the forced move; bots use the same si
 test('a complete round with twelve forced last cards neither skips a deal nor loses cards', () => {
   let clock = Date.parse('2026-10-11T12:00:00Z');
   let {state, deck} = advanceMatch(room(), [], clock);
-  ({state, deck} = lifecycleCommand('cut', state, deck, 'd', {position: 20}, clock));
+  ({state, deck} = lifecycleCommand('cut', state, deck, 'a', {position: 20}, clock));
   let forced = 0, manual = 0;
   for (let step = 0; step < 160 && state.phase !== 'rematchVoting'; step++) {
     if (state.phase === 'playing' && state.playerIds!.some(uid => state.handCards?.[uid]?.length)) {

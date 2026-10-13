@@ -13,6 +13,8 @@ class SilentAudio extends ChangeNotifier implements MultimediaService {
   @override
   Future<void> playSfx(String path) async {}
   @override
+  Future<void> vibrate() async {}
+  @override
   dynamic noSuchMethod(Invocation invocation) => null;
 }
 

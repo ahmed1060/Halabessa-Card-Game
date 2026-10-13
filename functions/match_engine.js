@@ -66,7 +66,7 @@ function cutDeck(deck, position) {
 function cut(state, deck, playerId, position) {
   if (state.phase !== "preRoundCut") throw new Error("Match is not ready to cut.");
   if (!Array.isArray(state.playerIds) || state.playerIds.length !== 4) throw new Error("A match needs four players.");
-  const cutterIndex = (state.dealerIndex + state.playerIds.length - 1) % state.playerIds.length;
+  const cutterIndex = state.dealerIndex % state.playerIds.length;
   if (state.playerIds[cutterIndex] !== playerId) throw new Error("Only the cutter can cut.");
   const nextDeck = cutDeck(deck, position);
   return {

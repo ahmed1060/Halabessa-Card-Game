@@ -19,7 +19,7 @@ export function progressDeadline(state: MatchState): number | null {
   switch (phase) {
     case 'waitingForPlayers': return ids.some(id => id.startsWith('waiting_')) ? null : 0;
     case 'preRoundCut':
-      return clock(phaseStart, ids[(Number(state.dealerIndex) + 3) % 4].startsWith('bot_') ? 1000 : (timer > 0 ? timer : 15) * 1000);
+      return clock(phaseStart, ids[Number(state.dealerIndex) % 4].startsWith('bot_') ? 1000 : (timer > 0 ? timer : 15) * 1000);
     case 'dealingFasha': return clock(phaseStart, DECK_REVEAL_MS);
     case 'dealingCards': return clock(phaseStart, 5000);
     case 'roundScoring': return clock(phaseStart, ROUND_RESULTS_MS);

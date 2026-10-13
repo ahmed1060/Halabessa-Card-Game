@@ -53,6 +53,19 @@ test('phase deadlines preserve memory and ten-second voting policies', () => {
   assert.equal(progressDeadline({...s,phase:'rematchVoting',settlementPending:true,rematchVotes:{a:true,b:true}}),null);
   assert.equal(progressDeadline({...s,phase:'matchOver'}),null);
 });
+test('cut deadlines follow the dealer, never the previous seat', () => {
+  const prepared = advanceMatch({...room(), phase: 'waitingForPlayers'}, [], start);
+  for (let dealerIndex = 0; dealerIndex < 4; dealerIndex++) {
+    const state = {...prepared.state, dealerIndex};
+    const wait = state.playerIds![dealerIndex].startsWith('bot_') ? 1000 : 15000;
+    assert.equal(progressDeadline(state), start + wait);
+    assert.throws(() => advanceMatch(state, prepared.deck, start + wait - 1), /no_transition_due/);
+    const result = advanceMatch(state, prepared.deck, start + wait);
+    assert.equal(result.state.phase, 'dealingFasha');
+    assert.equal(result.deck.length, 52);
+  }
+});
+
 test('disabled, unattended and incomplete rooms do not run', () => {
   assert.equal(progressEnabled(undefined,'ABC12345'),false);
   assert.equal(progressEnabled({progress_enabled:true},'../secret'),false);

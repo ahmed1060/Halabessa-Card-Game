@@ -57,19 +57,24 @@ test("rejects round creation by a non-host participant", () => {
   assert.throws(() => startRound(waitingState(), players[1]), /host_required/);
 });
 
-test("only the player before the dealer can cut", () => {
+test("only the dealer can cut, in every seat; first player stays after the dealer", () => {
   const started = startRound(waitingState(), players[0]);
-
-  assert.throws(() => cut(started.state, started.deck, players[1], 20), /cutter_required/);
-  const result = cut(started.state, started.deck, players[3], 20);
-  assert.equal(result.state.phase, "dealingFasha");
-  assert.equal(result.deck.length, 52);
-  assert.deepEqual(result.deck.slice(0, 32), started.deck.slice(20));
+  for (let dealerIndex = 0; dealerIndex < 4; dealerIndex++) {
+    const state = { ...started.state, dealerIndex, currentTurnIndex: (dealerIndex + 1) % 4 };
+    for (const player of players.filter(p => p !== players[dealerIndex])) {
+      assert.throws(() => cut(state, started.deck, player, 20), /cutter_required/);
+    }
+    const result = cut(state, started.deck, players[dealerIndex], 20);
+    assert.equal(result.state.phase, "dealingFasha");
+    assert.equal(result.state.currentTurnIndex, (dealerIndex + 1) % 4);
+    assert.equal(result.deck.length, 52);
+    assert.deepEqual(result.deck.slice(0, 32), started.deck.slice(20));
+  }
 });
 
 test("initial deal creates four private hands and four board cards", () => {
   const started = startRound(waitingState(), players[0]);
-  const cutResult = cut(started.state, started.deck, players[3], 20);
+  const cutResult = cut(started.state, started.deck, players[0], 20);
   const result = deal(cutResult.state, cutResult.deck, players[0], true);
 
   assert.equal(result.state.phase, "dealingCards");

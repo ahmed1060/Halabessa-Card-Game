@@ -267,6 +267,13 @@ void main() {
           tick < 60 && c.read(matchStateProvider)?.phase != GamePhase.playing;
           tick++
         ) {
+          final preparing = c.read(matchStateProvider);
+          if (preparing?.phase == GamePhase.preRoundCut &&
+              preparing!.playerIds[preparing.dealerIndex] == localUid) {
+            // Practice starts with the human dealer: explicitly perform their
+            // cut, rather than relying on the previous player's bot to cut.
+            await n.performCut(20);
+          }
           await tester.pump(const Duration(milliseconds: 250));
         }
         final s = c.read(matchStateProvider)!;

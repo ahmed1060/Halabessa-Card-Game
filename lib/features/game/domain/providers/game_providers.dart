@@ -881,7 +881,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
       switch (currentState.phase) {
         case GamePhase.preRoundCut:
           if (currentState.playerIds.isEmpty) break;
-          int cutterIdx = (currentState.dealerIndex + (currentState.playerIds.length - 1)) % currentState.playerIds.length;
+          int cutterIdx = currentState.dealerIndex % currentState.playerIds.length;
           String cutterId = currentState.playerIds[cutterIdx];
           bool isBot = cutterId.startsWith('bot_');
           bool isAFK = currentState.playerOnlineStatus[cutterId] == false;
@@ -1323,7 +1323,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
 
     final result = GameEngine.apply(
       currentState,
-      CutAction(currentState.playerIds[(currentState.dealerIndex + 3) % 4], index),
+      CutAction(currentState.playerIds[currentState.dealerIndex % currentState.playerIds.length], index),
       secretDeck: _secretDeck
     );
 

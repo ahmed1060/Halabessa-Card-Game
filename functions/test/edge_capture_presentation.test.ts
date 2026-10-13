@@ -50,7 +50,7 @@ test('atomic full round conserves 52 cards without a decorative completion mutat
     phase:'waitingForPlayers',mode:'classic',playerIds:['a','b','c','d'],
     capturePresentationByPlayer:{a:2,b:2,c:2,d:2},maxPoints:1,timerDurationSeconds:15};
   let clock=now, {state,deck}=advanceMatch(initial,[],clock), plays=0, captures=0;
-  ({state,deck}=lifecycleCommand('cut',state,deck,'d',{position:20},clock));
+  ({state,deck}=lifecycleCommand('cut',state,deck,'a',{position:20},clock));
   for(let step=0;step<100 && state.phase!=='rematchVoting';step++){
     if(state.phase==='playing' && state.playerIds!.some(uid=>state.handCards?.[uid]?.length)){
       const uid=state.playerIds![Number(state.currentTurnIndex)],hand=state.handCards![uid];

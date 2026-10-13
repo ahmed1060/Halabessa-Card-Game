@@ -69,9 +69,17 @@ void main() {
   });
   test('preparation bounded even when human gameplay timer disabled', () {
     final prep = s.copyWith(phase: GamePhase.preRoundCut,
-      playerIds: ['bot_1', 'bot_2', 'bot_3', 'human'], timerDurationSeconds: 0);
+      playerIds: ['bot_1', 'bot_2', 'bot_3', 'human'], dealerIndex: 3, timerDurationSeconds: 0);
     expect(serverProgressDue(prep, start.add(Duration(seconds: 14))), false);
     expect(serverProgressDue(prep, start.add(Duration(seconds: 15))), true);
+  });
+  test('cut deadline follows the dealer rather than the previous player', () {
+    for (var dealer = 0; dealer < 4; dealer++) {
+      final prep = s.copyWith(phase: GamePhase.preRoundCut, dealerIndex: dealer);
+      final wait = dealer == 0 ? 10000 : 1000;
+      expect(serverProgressDue(prep, start.add(Duration(milliseconds: wait - 1))), false);
+      expect(serverProgressDue(prep, start.add(Duration(milliseconds: wait))), true);
+    }
   });
   test('legacy matches and incomplete lobbies stay out of server scheduler', () {
     expect(serverProgressDue(s.copyWith(protocolVersion: 0), start.add(Duration(days: 1))), false);

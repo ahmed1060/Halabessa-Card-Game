@@ -55,7 +55,7 @@ test("nonhost human can advance preparation; outsiders and bot identities cannot
 });
 test("compatibility phase commands cannot skip server animation delays or restart an active match", () => {
   const round = executeMatchIntent("startRound", room(), [], "a", "a", {}, now);
-  const cut = executeMatchIntent("cut", round.state, round.deck, "d", "d", { position: 20 }, now);
+  const cut = executeMatchIntent("cut", round.state, round.deck, "a", "a", { position: 20 }, now);
   assert.throws(() => executeMatchIntent('dealInitial', cut.state, cut.deck, 'b', 'b', {}, now + 3999), /no_transition_due/);
   const dealt = executeMatchIntent("dealInitial", cut.state, cut.deck, "b", "b", {}, now + 4000);
   assert.throws(() => executeMatchIntent("beginPlay", dealt.state, dealt.deck, "a", "a", {}, now + 8999), /no_transition_due/);
@@ -66,10 +66,21 @@ test("compatibility phase commands cannot skip server animation delays or restar
 });
 test("manual cut at its deadline is rejected; server automatic cut advances once", () => {
   const round = executeMatchIntent("advance", room(), [], "b", "b", {}, now);
-  assert.throws(() => executeMatchIntent("cut", round.state, round.deck, "d", "d", { position: 20 }, now + 15000), /cut_deadline_reached/);
+  assert.throws(() => executeMatchIntent("cut", round.state, round.deck, "a", "a", { position: 20 }, now + 15000), /cut_deadline_reached/);
   const cut = executeMatchIntent("advance", round.state, round.deck, "b", "b", {}, now + 15000);
   assert.equal(cut.state.phase, "dealingFasha");
-  assert.throws(() => executeMatchIntent("cut", cut.state, cut.deck, "d", "d", { position: 20 }, now + 15001), /cut_not_ready/);
+  assert.throws(() => executeMatchIntent("cut", cut.state, cut.deck, "a", "a", { position: 20 }, now + 15001), /cut_not_ready/);
+});
+
+test("cut is dealer-only and cannot be proxied by another authenticated player", () => {
+  const round = executeMatchIntent("advance", room(), [], "b", "b", {}, now);
+  for (const uid of ["b", "c", "d"]) {
+    assert.throws(() => executeMatchIntent("cut", round.state, round.deck, uid, uid, {position: 20}, now), /cutter_required/);
+    assert.throws(() => executeMatchIntent("cut", round.state, round.deck, uid, "a", {position: 20}, now), /invalid_command_actor/);
+  }
+  const cut = executeMatchIntent("cut", round.state, round.deck, "a", "a", {position: 20}, now);
+  assert.equal(cut.state.phase, "dealingFasha");
+  assert.equal(cut.state.currentTurnIndex, 1);
 });
 test("advance before deadline cannot play for an offline human or trust a client timeout flag", () => {
   const state = { ...playing(), playerOnlineStatus: { a: false } };

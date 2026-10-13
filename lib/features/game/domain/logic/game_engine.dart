@@ -167,8 +167,8 @@ class GameEngine {
     if (state.phase != GamePhase.preRoundCut) return GameEngineResult(state);
     if (state.playerIds.isEmpty) return GameEngineResult(state);
 
-    // Only cutter can cut
-    int cutterIdx = (state.dealerIndex + state.playerIds.length - 1) % state.playerIds.length;
+    // The dealer owns both cutting and dealing.
+    int cutterIdx = state.dealerIndex % state.playerIds.length;
     if (state.playerIds[cutterIdx] != action.playerId) return GameEngineResult(state);
 
     if (secretDeck != null) {

@@ -106,7 +106,7 @@ export function cut(state: MatchState, deck: Card[], actorUid: string, position:
   const playerIds = state.playerIds;
   if (!Array.isArray(playerIds) || playerIds.length !== 4) throw new Error("four_players_required");
   const dealerIndex = numberValue(state.dealerIndex);
-  const cutterIndex = (dealerIndex + playerIds.length - 1) % playerIds.length;
+  const cutterIndex = dealerIndex % playerIds.length;
   if (playerIds[cutterIndex] !== actorUid) throw new Error("cutter_required");
   const nextDeck = cutDeck(deck, position);
   return {

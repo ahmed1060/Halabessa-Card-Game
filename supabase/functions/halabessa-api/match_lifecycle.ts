@@ -104,7 +104,7 @@ export function advanceMatch(state: MatchState, deck: Card[], now = Date.now()):
       if (ids.some(uid => uid.startsWith("waiting_"))) throw new Error("no_transition_due");
       return nextRound({ ...state, roundCount: 0 }, true, now);
     case "preRoundCut": {
-      const cutter = ids[(integer(state.dealerIndex) + 3) % 4];
+      const cutter = ids[integer(state.dealerIndex) % 4];
       if (elapsed(state, now) < (cutter.startsWith("bot_") ? 1000 : (integer(state.timerDurationSeconds) || 15) * 1000)) {
         throw new Error("no_transition_due");
       }
