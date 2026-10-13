@@ -68,6 +68,7 @@ class _CaptureTimelineState extends State<_CaptureTimeline> {
 class BoardCardsWidget extends StatelessWidget {
   final List<game_card.Card> cards;
   final bool isLandscape;
+  final bool showEmptyPlaceholder;
   final bool isCapturing;
   final String? capturingTeam;
   final int capturingStage;
@@ -83,6 +84,7 @@ class BoardCardsWidget extends StatelessWidget {
     super.key,
     required this.cards,
     this.isLandscape = false,
+    this.showEmptyPlaceholder = true,
     this.isCapturing = false,
     this.capturingTeam,
     this.capturingStage = 0,
@@ -98,6 +100,7 @@ class BoardCardsWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (cards.isEmpty) {
+      if (!showEmptyPlaceholder) return const SizedBox.shrink();
       return Center(
         child: Container(
           width: isLandscape ? 180 : 140,

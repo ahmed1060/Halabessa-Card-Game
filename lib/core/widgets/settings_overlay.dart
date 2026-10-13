@@ -44,239 +44,246 @@ class SettingsOverlay extends ConsumerWidget {
           borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
           child: BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Drag Handle for Swipe-Down (God Move)
-                const SizedBox(height: 12),
-                Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.white24,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                // Header
-                const Padding(
-                  padding: EdgeInsets.only(top: 12),
-                  child: SizedBox(
-                    height: 52,
-                    child: FittedBox(child: LanternWordmark()),
-                  ),
-                ),
-                _buildHeader(context),
-
-                // Scrollable Content
-                Flexible(
-                  child: SingleChildScrollView(
-                    physics: const BouncingScrollPhysics(),
-                    padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildSectionTitle('audio'.tr()),
-                        _buildToggleTile(
-                          'music'.tr(),
-                          settings.isMusicEnabled,
-                          Icons.music_note_rounded,
-                          (val) {
-                            notifier.toggleMusic(val);
-                            multimedia.vibrate();
-                          },
-                        ),
-                        if (settings.isMusicEnabled)
-                          Padding(
-                            padding: const EdgeInsets.only(
-                              left: 48,
-                              right: 16,
-                              bottom: 16,
-                            ),
-                            child: SliderTheme(
-                              data: SliderTheme.of(context).copyWith(
-                                trackHeight: 2,
-                                thumbShape: const RoundSliderThumbShape(
-                                  enabledThumbRadius: 6,
-                                ),
-                                overlayShape: const RoundSliderOverlayShape(
-                                  overlayRadius: 14,
-                                ),
-                              ),
-                              child: Slider(
-                                value: settings.musicVolume,
-                                onChanged: (val) =>
-                                    notifier.setMusicVolume(val),
-                                activeColor: ThemeConfig.goldAccent,
-                                inactiveColor: Colors.white10,
-                              ),
-                            ),
-                          ),
-                        _buildToggleTile(
-                          'sound_effects'.tr(),
-                          settings.isSoundEnabled,
-                          Icons.volume_up_rounded,
-                          (val) {
-                            notifier.toggleSound(val);
-                            multimedia.vibrate();
-                          },
-                        ),
-                        if (settings.isSoundEnabled)
-                          Padding(
-                            padding: const EdgeInsets.only(
-                              left: 48,
-                              right: 16,
-                              bottom: 16,
-                            ),
-                            child: SliderTheme(
-                              data: SliderTheme.of(context).copyWith(
-                                trackHeight: 2,
-                                thumbShape: const RoundSliderThumbShape(
-                                  enabledThumbRadius: 6,
-                                ),
-                                overlayShape: const RoundSliderOverlayShape(
-                                  overlayRadius: 14,
-                                ),
-                              ),
-                              child: Slider(
-                                value: settings.soundVolume,
-                                onChanged: (val) =>
-                                    notifier.setSoundVolume(val),
-                                activeColor: ThemeConfig.goldAccent,
-                                inactiveColor: Colors.white10,
-                              ),
-                            ),
-                          ),
-                        _buildToggleTile(
-                          'haptic_feedback'.tr(),
-                          settings.isHapticsEnabled,
-                          Icons.vibration_rounded,
-                          (val) {
-                            notifier.toggleHaptics(val);
-                            HapticFeedback.mediumImpact();
-                          },
-                        ),
-                        _buildToggleTile(
-                          'reduced_motion'.tr(),
-                          settings.reducedMotion,
-                          Icons.animation_rounded,
-                          notifier.setReducedMotion,
-                        ),
-
-                        const SizedBox(height: 24),
-                        _buildSectionTitle('language'.tr()),
-                        _buildLanguageGrid(context, currentLocale),
-
-                        const SizedBox(height: 24),
-                        _buildSectionTitle('theme'.tr()),
-                        _buildThemeSelector(
-                          settings.themeMode,
-                          notifier,
-                          multimedia,
-                        ),
-
-                        const SizedBox(height: 24),
-                        _buildSectionTitle('graphics'.tr()),
-                        _buildToggleTile(
-                          'game_landscape'.tr(),
-                          settings.gameOrientation == GameOrientation.landscape,
-                          Icons.screen_rotation_rounded,
-                          (value) => notifier.setGameOrientation(
-                            value
-                                ? GameOrientation.landscape
-                                : GameOrientation.portrait,
-                          ),
-                        ),
-                        Text(
-                          'game_orientation_help'.tr(),
-                          style: const TextStyle(color: Colors.white70),
-                        ),
-                        ListTile(
-                          leading: const Icon(
-                            Icons.help_outline,
-                            color: ThemeConfig.goldAccent,
-                          ),
-                          title: Text(
-                            'help_title'.tr(),
-                            style: const TextStyle(color: Colors.white),
-                          ),
-                          onTap: () {
-                            Navigator.pop(context);
-                            Navigator.pushNamed(context, AppRoutes.help);
-                          },
-                        ),
-                        if (!ref.watch(offlineSessionProvider)) _buildToggleTile(
-                          'mode_3d'.tr(),
-                          settings.is3DModeEnabled,
-                          Icons.view_in_ar_rounded,
-                          (val) {
-                            notifier.toggle3DMode(val);
-                            multimedia.vibrate();
-                          },
-                        ),
-
-                        const SizedBox(height: 16),
-                        OutlinedButton.icon(
-                          icon: const Icon(Icons.restore_rounded),
-                          label: Text('ui_reset_settings'.tr()),
-                          onPressed: () async {
-                            final confirmed = await showDialog<bool>(
-                              context: context,
-                              builder: (dialogContext) => AlertDialog(
-                                title: Text('ui_reset_confirm'.tr()),
-                                content: Text('ui_reset_detail'.tr()),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () =>
-                                        Navigator.pop(dialogContext, false),
-                                    child: Text('cancel'.tr()),
-                                  ),
-                                  FilledButton(
-                                    onPressed: () =>
-                                        Navigator.pop(dialogContext, true),
-                                    child: Text('ui_reset_settings'.tr()),
-                                  ),
-                                ],
-                              ),
-                            );
-                            if (confirmed != true || !context.mounted) return;
-                            await notifier.resetPresentationDefaults();
-                            if (context.mounted)
-                              await context.setLocale(const Locale('en', 'US'));
-                          },
-                        ),
-                        if (user?.isAdmin == true) ...[
-                          const SizedBox(height: 32),
-                          _buildSectionTitle('admin_actions'.tr()),
-                          _buildAdminTile(
-                            'manage_users'.tr(),
-                            Icons.people_alt_rounded,
-                            () => Navigator.pushNamed(
-                              context,
-                              AppRoutes.adminUsers,
-                            ),
-                          ),
-                          _buildAdminTile(
-                            'manage_music'.tr(),
-                            Icons.library_music_rounded,
-                            () => Navigator.pushNamed(
-                              context,
-                              AppRoutes.adminMusic,
-                            ),
-                          ),
-                          _buildAdminTile(
-                            'manage_sfx'.tr(),
-                            Icons.graphic_eq_rounded,
-                            () => Navigator.pushNamed(
-                              context,
-                              AppRoutes.adminSfx,
-                            ),
-                          ),
-                        ],
-                      ],
+            child: Material(
+              type: MaterialType.transparency,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Drag Handle for Swipe-Down (God Move)
+                  const SizedBox(height: 12),
+                  Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.white24,
+                      borderRadius: BorderRadius.circular(2),
                     ),
                   ),
-                ),
-              ],
+                  // Header
+                  const Padding(
+                    padding: EdgeInsets.only(top: 12),
+                    child: SizedBox(
+                      height: 52,
+                      child: FittedBox(child: LanternWordmark()),
+                    ),
+                  ),
+                  _buildHeader(context),
+
+                  // Scrollable Content
+                  Flexible(
+                    child: SingleChildScrollView(
+                      physics: const BouncingScrollPhysics(),
+                      padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildSectionTitle('audio'.tr()),
+                          _buildToggleTile(
+                            'music'.tr(),
+                            settings.isMusicEnabled,
+                            Icons.music_note_rounded,
+                            (val) {
+                              notifier.toggleMusic(val);
+                              multimedia.vibrate();
+                            },
+                          ),
+                          if (settings.isMusicEnabled)
+                            Padding(
+                              padding: const EdgeInsets.only(
+                                left: 48,
+                                right: 16,
+                                bottom: 16,
+                              ),
+                              child: SliderTheme(
+                                data: SliderTheme.of(context).copyWith(
+                                  trackHeight: 2,
+                                  thumbShape: const RoundSliderThumbShape(
+                                    enabledThumbRadius: 6,
+                                  ),
+                                  overlayShape: const RoundSliderOverlayShape(
+                                    overlayRadius: 14,
+                                  ),
+                                ),
+                                child: Slider(
+                                  value: settings.musicVolume,
+                                  onChanged: (val) =>
+                                      notifier.setMusicVolume(val),
+                                  activeColor: ThemeConfig.goldAccent,
+                                  inactiveColor: Colors.white10,
+                                ),
+                              ),
+                            ),
+                          _buildToggleTile(
+                            'sound_effects'.tr(),
+                            settings.isSoundEnabled,
+                            Icons.volume_up_rounded,
+                            (val) {
+                              notifier.toggleSound(val);
+                              multimedia.vibrate();
+                            },
+                          ),
+                          if (settings.isSoundEnabled)
+                            Padding(
+                              padding: const EdgeInsets.only(
+                                left: 48,
+                                right: 16,
+                                bottom: 16,
+                              ),
+                              child: SliderTheme(
+                                data: SliderTheme.of(context).copyWith(
+                                  trackHeight: 2,
+                                  thumbShape: const RoundSliderThumbShape(
+                                    enabledThumbRadius: 6,
+                                  ),
+                                  overlayShape: const RoundSliderOverlayShape(
+                                    overlayRadius: 14,
+                                  ),
+                                ),
+                                child: Slider(
+                                  value: settings.soundVolume,
+                                  onChanged: (val) =>
+                                      notifier.setSoundVolume(val),
+                                  activeColor: ThemeConfig.goldAccent,
+                                  inactiveColor: Colors.white10,
+                                ),
+                              ),
+                            ),
+                          _buildToggleTile(
+                            'haptic_feedback'.tr(),
+                            settings.isHapticsEnabled,
+                            Icons.vibration_rounded,
+                            (val) {
+                              notifier.toggleHaptics(val);
+                              HapticFeedback.mediumImpact();
+                            },
+                          ),
+                          _buildToggleTile(
+                            'reduced_motion'.tr(),
+                            settings.reducedMotion,
+                            Icons.animation_rounded,
+                            notifier.setReducedMotion,
+                          ),
+
+                          const SizedBox(height: 24),
+                          _buildSectionTitle('language'.tr()),
+                          _buildLanguageGrid(context, currentLocale),
+
+                          const SizedBox(height: 24),
+                          _buildSectionTitle('theme'.tr()),
+                          _buildThemeSelector(
+                            settings.themeMode,
+                            notifier,
+                            multimedia,
+                          ),
+
+                          const SizedBox(height: 24),
+                          _buildSectionTitle('graphics'.tr()),
+                          _buildToggleTile(
+                            'game_landscape'.tr(),
+                            settings.gameOrientation ==
+                                GameOrientation.landscape,
+                            Icons.screen_rotation_rounded,
+                            (value) => notifier.setGameOrientation(
+                              value
+                                  ? GameOrientation.landscape
+                                  : GameOrientation.portrait,
+                            ),
+                          ),
+                          Text(
+                            'game_orientation_help'.tr(),
+                            style: const TextStyle(color: Colors.white70),
+                          ),
+                          ListTile(
+                            leading: const Icon(
+                              Icons.help_outline,
+                              color: ThemeConfig.goldAccent,
+                            ),
+                            title: Text(
+                              'help_title'.tr(),
+                              style: const TextStyle(color: Colors.white),
+                            ),
+                            onTap: () {
+                              Navigator.pop(context);
+                              Navigator.pushNamed(context, AppRoutes.help);
+                            },
+                          ),
+                          if (!ref.watch(offlineSessionProvider))
+                            _buildToggleTile(
+                              'mode_3d'.tr(),
+                              settings.is3DModeEnabled,
+                              Icons.view_in_ar_rounded,
+                              (val) {
+                                notifier.toggle3DMode(val);
+                                multimedia.vibrate();
+                              },
+                            ),
+
+                          const SizedBox(height: 16),
+                          OutlinedButton.icon(
+                            icon: const Icon(Icons.restore_rounded),
+                            label: Text('ui_reset_settings'.tr()),
+                            onPressed: () async {
+                              final confirmed = await showDialog<bool>(
+                                context: context,
+                                builder: (dialogContext) => AlertDialog(
+                                  title: Text('ui_reset_confirm'.tr()),
+                                  content: Text('ui_reset_detail'.tr()),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () =>
+                                          Navigator.pop(dialogContext, false),
+                                      child: Text('cancel'.tr()),
+                                    ),
+                                    FilledButton(
+                                      onPressed: () =>
+                                          Navigator.pop(dialogContext, true),
+                                      child: Text('ui_reset_settings'.tr()),
+                                    ),
+                                  ],
+                                ),
+                              );
+                              if (confirmed != true || !context.mounted) return;
+                              await notifier.resetPresentationDefaults();
+                              if (context.mounted)
+                                await context.setLocale(
+                                  const Locale('en', 'US'),
+                                );
+                            },
+                          ),
+                          if (user?.isAdmin == true) ...[
+                            const SizedBox(height: 32),
+                            _buildSectionTitle('admin_actions'.tr()),
+                            _buildAdminTile(
+                              'manage_users'.tr(),
+                              Icons.people_alt_rounded,
+                              () => Navigator.pushNamed(
+                                context,
+                                AppRoutes.adminUsers,
+                              ),
+                            ),
+                            _buildAdminTile(
+                              'manage_music'.tr(),
+                              Icons.library_music_rounded,
+                              () => Navigator.pushNamed(
+                                context,
+                                AppRoutes.adminMusic,
+                              ),
+                            ),
+                            _buildAdminTile(
+                              'manage_sfx'.tr(),
+                              Icons.graphic_eq_rounded,
+                              () => Navigator.pushNamed(
+                                context,
+                                AppRoutes.adminSfx,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -356,20 +363,28 @@ class SettingsOverlay extends ConsumerWidget {
         color: Colors.white.withOpacity(0.03),
         borderRadius: BorderRadius.circular(16),
       ),
-      child: SwitchListTile(
-        value: value,
-        onChanged: onChanged,
-        title: Text(
-          title,
-          style: const TextStyle(color: Colors.white, fontSize: 15),
+      child: Material(
+        type: MaterialType.transparency,
+        child: SwitchListTile(
+          value: value,
+          onChanged: onChanged,
+          title: Text(
+            title,
+            style: const TextStyle(color: Colors.white, fontSize: 15),
+          ),
+          secondary: Icon(icon, color: Colors.white70, size: 20),
+          activeColor: TableStyle.ink,
+          activeTrackColor: TableStyle.mint,
+          inactiveThumbColor: Colors.white38,
+          inactiveTrackColor: Colors.white10,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 0,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
         ),
-        secondary: Icon(icon, color: Colors.white70, size: 20),
-        activeColor: TableStyle.ink,
-        activeTrackColor: TableStyle.mint,
-        inactiveThumbColor: Colors.white38,
-        inactiveTrackColor: Colors.white10,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       ),
     );
   }
@@ -518,23 +533,29 @@ class SettingsOverlay extends ConsumerWidget {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: ThemeConfig.goldAccent.withOpacity(0.2)),
       ),
-      child: ListTile(
-        onTap: onTap,
-        leading: Icon(icon, color: ThemeConfig.goldAccent, size: 20),
-        title: Text(
-          label,
-          style: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-            fontSize: 14,
+      child: Material(
+        type: MaterialType.transparency,
+        child: ListTile(
+          onTap: onTap,
+          leading: Icon(icon, color: ThemeConfig.goldAccent, size: 20),
+          title: Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+            ),
+          ),
+          trailing: const Icon(
+            Icons.chevron_right,
+            color: ThemeConfig.goldAccent,
+            size: 18,
+          ),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 4,
           ),
         ),
-        trailing: const Icon(
-          Icons.chevron_right,
-          color: ThemeConfig.goldAccent,
-          size: 18,
-        ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       ),
     );
   }

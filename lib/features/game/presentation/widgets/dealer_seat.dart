@@ -8,6 +8,8 @@ class DealerSeat extends StatelessWidget {
   final bool isDealer;
   final bool compact;
   final bool deckOnLeft;
+  final bool deckBelow;
+  final bool largeDeck;
   final int remaining;
   final String label;
   final GlobalKey? deckKey;
@@ -22,12 +24,14 @@ class DealerSeat extends StatelessWidget {
     this.deckKey,
     this.compact = false,
     this.deckOnLeft = false,
+    this.deckBelow = false,
+    this.largeDeck = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final deck = SizedBox(
-      width: compact ? 44 : 64,
+      width: compact && !largeDeck ? 44 : 64,
       child: isDealer
           ? Semantics(
               label: '$label: $remaining',
@@ -38,12 +42,16 @@ class DealerSeat extends StatelessWidget {
                     key: deckKey,
                     count: remaining,
                     backBuilder: backBuilder,
-                    width: compact ? 30 : 46,
-                    height: compact ? 42 : 66,
+                    width: compact && !largeDeck ? 30 : 46,
+                    height: compact && !largeDeck ? 42 : 66,
                   ),
                   Text(
                     '$remaining',
-                    style: TableStyle.detail.copyWith(color: TableStyle.brass),
+                    style: TableStyle.detail.copyWith(
+                      color: TableStyle.brass,
+                      fontSize: largeDeck ? 16 : 12,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                   Text(
                     label,
@@ -65,16 +73,25 @@ class DealerSeat extends StatelessWidget {
               seat,
               if (isDealer)
                 Positioned(
-                  top: 8,
-                  left: deckOnLeft ? -34 : null,
-                  right: deckOnLeft ? null : -34,
+                  top: deckBelow ? 118 : 8,
+                  left: deckBelow
+                      ? 30
+                      : deckOnLeft
+                      ? (largeDeck ? -52 : -34)
+                      : null,
+                  right: deckBelow || deckOnLeft
+                      ? null
+                      : (largeDeck ? -52 : -34),
                   child: deck,
                 ),
             ],
           )
         : Row(
+            textDirection: TextDirection.ltr,
             mainAxisSize: MainAxisSize.min,
-            children: [const SizedBox(width: 64), seat, deck],
+            children: deckOnLeft
+                ? [deck, seat, const SizedBox(width: 64)]
+                : [const SizedBox(width: 64), seat, deck],
           );
   }
 }

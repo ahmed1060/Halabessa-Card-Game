@@ -94,7 +94,7 @@ class _CardPainter extends CustomPainter {
     );
     canvas.drawRRect(
       shape,
-      Paint()..color = faceUp ? TableStyle.ivory : TableStyle.felt,
+      Paint()..color = faceUp ? TableStyle.ivory : TableStyle.ink,
     );
     canvas.drawRRect(
       shape,
@@ -142,7 +142,7 @@ class _CardPainter extends CustomPainter {
       canvas.drawCircle(
         const Offset(35, 50),
         14,
-        Paint()..color = TableStyle.felt,
+        Paint()..color = TableStyle.ink,
       );
       canvas.drawCircle(const Offset(35, 50), 12, line);
       // A miniature hanging lantern, rather than a generic suit medallion.
@@ -165,7 +165,7 @@ class _CardPainter extends CustomPainter {
           ..lineTo(37, 55)
           ..lineTo(33, 55)
           ..close(),
-        Paint()..color = TableStyle.felt,
+        Paint()..color = TableStyle.ink,
       );
       canvas.drawLine(const Offset(35, 44), const Offset(35, 55), line);
     } else {

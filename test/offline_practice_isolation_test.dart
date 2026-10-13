@@ -19,6 +19,7 @@ import 'package:halabessa/features/game/domain/providers/game_providers.dart';
 import 'package:halabessa/features/game/presentation/pages/offline_practice_app.dart';
 import 'package:halabessa/features/game/presentation/pages/game_board_screen.dart';
 import 'package:halabessa/features/game/presentation/widgets/lantern_controls.dart';
+import 'package:halabessa/features/game/presentation/widgets/table_seat.dart';
 import 'package:halabessa/features/game/presentation/widgets/match_phase_panel.dart';
 import 'package:halabessa/features/game/presentation/providers/chat_providers.dart';
 import 'package:halabessa/features/home/presentation/providers/store_provider.dart';
@@ -75,7 +76,7 @@ void main() {
   });
 
   testWidgets(
-    'real signed-out board accepts a tap and hides the banner on other turns',
+    'real signed-out board accepts a tap and moves the active avatar on other turns',
     (tester) async {
       final c = await setup();
       const card = cards.Card(cards.Suit.clubs, cards.Rank.two);
@@ -106,10 +107,17 @@ void main() {
         ),
       );
       await tester.pump();
-      expect(find.byType(LanternTurnBadge), findsOneWidget);
+      expect(find.byType(LanternTurnBadge), findsNothing);
       expect(
-        tester.widget<LanternTurnBadge>(find.byType(LanternTurnBadge)).hint,
-        isEmpty,
+        tester
+            .widgetList<TableSeat>(find.byType(TableSeat))
+            .where((s) => s.active)
+            .length,
+        1,
+      );
+      expect(
+        tester.widgetList<TableSeat>(find.byType(TableSeat)).first.active,
+        isTrue,
       );
       await tester.tap(find.byKey(ValueKey('hand-card-${card.firebaseKey}')));
       await tester.pump();

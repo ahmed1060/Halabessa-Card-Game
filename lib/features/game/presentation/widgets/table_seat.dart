@@ -27,6 +27,10 @@ class TableSeat extends StatefulWidget {
   final String? dealIdentity;
   final GlobalKey? dealerDeckKey;
   final Widget Function(double, double)? backBuilder;
+  final bool optionB;
+  final bool chatBadge;
+  final bool compactAvatar;
+  final String Function(int)? countdownSemantics;
   const TableSeat({
     super.key,
     required this.name,
@@ -48,6 +52,10 @@ class TableSeat extends StatefulWidget {
     this.dealIdentity,
     this.dealerDeckKey,
     this.backBuilder,
+    this.optionB = false,
+    this.chatBadge = false,
+    this.compactAvatar = false,
+    this.countdownSemantics,
   });
   @override
   State<TableSeat> createState() => _TableSeatState();
@@ -97,13 +105,28 @@ class _TableSeatState extends State<TableSeat> {
     final url = widget.avatarUrl;
     final fallback =
         widget.portraitAsset ?? 'assets/images/avatars/lantern_partner_v1.png';
-    final line = 16.0 * MediaQuery.textScalerOf(context).scale(12) / 12;
+    final line = widget.optionB
+        ? 16.0
+        : 16.0 * MediaQuery.textScalerOf(context).scale(12) / 12;
     final viewport = MediaQuery.sizeOf(context);
+    final smallAvatar =
+        widget.optionB &&
+        widget.compactAvatar &&
+        viewport.width > viewport.height;
     final compact =
-        viewport.width > viewport.height && viewport.height < 500 && line <= 18;
+        !widget.optionB &&
+        viewport.width > viewport.height &&
+        viewport.height < 500 &&
+        line <= 18;
     return SizedBox(
-      width: 110,
-      height: compact ? 146 : 110 + 4 * line,
+      width: widget.optionB ? 126 : 110,
+      height: widget.optionB
+          ? smallAvatar
+                ? 168
+                : 184
+          : compact
+          ? 146
+          : 110 + 4 * line,
       child: Tooltip(
         message: [
           widget.name,
@@ -136,24 +159,49 @@ class _TableSeatState extends State<TableSeat> {
                   children: [
                     Stack(
                       alignment: Alignment.center,
+                      clipBehavior: Clip.none,
                       children: [
                         SizedBox(
-                          width: 72,
-                          height: 72,
-                          child: TurnDeadlineRing(
-                            active: widget.active,
-                            started: widget.turnStarted,
-                            duration: widget.turnDuration ?? Duration(seconds: widget.turnSeconds),
-                            now: widget.serverClock ? OnlineMatchClock.instance.now : null,
-                            clockChanges: widget.serverClock ? OnlineMatchClock.instance : null,
-                            background: widget.accent,
-                            foreground: TableStyle.brass,
+                          width: widget.optionB && !smallAvatar ? 80 : 72,
+                          height: widget.optionB && !smallAvatar ? 80 : 72,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              boxShadow: widget.active
+                                  ? [
+                                      BoxShadow(
+                                        color: TableStyle.brass.withValues(
+                                          alpha: .65,
+                                        ),
+                                        blurRadius: 16,
+                                        spreadRadius: 2,
+                                      ),
+                                    ]
+                                  : null,
+                            ),
+                            child: TurnDeadlineRing(
+                              segmented: widget.optionB,
+                              remainingLabel: widget.countdownSemantics,
+                              active: widget.active,
+                              started: widget.turnStarted,
+                              duration:
+                                  widget.turnDuration ??
+                                  Duration(seconds: widget.turnSeconds),
+                              now: widget.serverClock
+                                  ? OnlineMatchClock.instance.now
+                                  : null,
+                              clockChanges: widget.serverClock
+                                  ? OnlineMatchClock.instance
+                                  : null,
+                              background: widget.accent,
+                              foreground: TableStyle.brass,
+                            ),
                           ),
                         ),
                         ClipOval(
                           child: SizedBox(
-                            width: 64,
-                            height: 64,
+                            width: widget.optionB && !smallAvatar ? 70 : 64,
+                            height: widget.optionB && !smallAvatar ? 70 : 64,
                             child: url == null || url.isEmpty || widget.isBot
                                 ? Image.asset(
                                     fallback,
@@ -185,6 +233,24 @@ class _TableSeatState extends State<TableSeat> {
                                   ),
                           ),
                         ),
+                        if (widget.chatBadge)
+                          Positioned(
+                            top: -2,
+                            right: -4,
+                            child: Container(
+                              width: 24,
+                              height: 24,
+                              decoration: const BoxDecoration(
+                                color: TableStyle.mint,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.chat_bubble_rounded,
+                                size: 14,
+                                color: TableStyle.ivory,
+                              ),
+                            ),
+                          ),
                       ],
                     ),
                     const SizedBox(height: 2),
@@ -234,15 +300,21 @@ class _TableSeatState extends State<TableSeat> {
                             ),
                     ),
                     SizedBox(
-                      height: compact ? 28 : 26 + line,
+                      height: smallAvatar
+                          ? 34
+                          : compact
+                          ? 28
+                          : 26 + line,
                       child: widget.hiddenHandCount == null
-                          ? Text(
-                              widget.detail,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              textAlign: TextAlign.center,
-                              style: TableStyle.detail,
-                            )
+                          ? widget.optionB
+                                ? const SizedBox.shrink()
+                                : Text(
+                                    widget.detail,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    textAlign: TextAlign.center,
+                                    style: TableStyle.detail,
+                                  )
                           : Semantics(
                               label: widget.detail,
                               excludeSemantics: true,
@@ -253,84 +325,98 @@ class _TableSeatState extends State<TableSeat> {
                                     0.0,
                                     bounds.maxWidth - 26,
                                   );
-                                  return Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      SizedBox(
-                                        width: fanWidth,
-                                        height: 32,
-                                        child: Stack(
-                                          clipBehavior: Clip.none,
-                                          children: [
-                                            for (
-                                              var index = 0;
-                                              index < n;
-                                              index++
-                                            )
-                                              if (widget.backBuilder != null)
-                                                Positioned(
-                                                  left:
-                                                      (fanWidth - 16) /
-                                                      3 *
-                                                      (index + (4 - n) / 2),
-                                                  top: 4,
-                                                  child: IgnorePointer(
-                                                    child: Transform.rotate(
-                                                      angle:
-                                                          (index -
-                                                              (n - 1) / 2) *
-                                                          .10,
-                                                      child:
-                                                          widget.dealerDeckKey ==
-                                                              null
-                                                          ? widget.backBuilder!(
-                                                              16,
-                                                              24,
-                                                            )
-                                                          : DealCardMotion(
-                                                              key: ValueKey(
-                                                                '${widget.dealIdentity}-$index',
-                                                              ),
-                                                              sourceKey: widget
-                                                                  .dealerDeckKey!,
-                                                              delay: Duration(
-                                                                milliseconds:
-                                                                    index * 70,
-                                                              ),
-                                                              child:
-                                                                  widget
-                                                                      .backBuilder!(
-                                                                    16,
-                                                                    24,
-                                                                  ),
+                                  final handWidgets = <Widget>[
+                                    SizedBox(
+                                      width: fanWidth,
+                                      height: 32,
+                                      child: Stack(
+                                        clipBehavior: Clip.none,
+                                        children: [
+                                          for (
+                                            var index = 0;
+                                            index < n;
+                                            index++
+                                          )
+                                            if (widget.backBuilder != null)
+                                              Positioned(
+                                                left:
+                                                    (fanWidth -
+                                                        (widget.optionB
+                                                            ? 20
+                                                            : 16)) /
+                                                    3 *
+                                                    (index + (4 - n) / 2),
+                                                top: 4,
+                                                child: IgnorePointer(
+                                                  child: Transform.rotate(
+                                                    angle:
+                                                        (index - (n - 1) / 2) *
+                                                        .10,
+                                                    child:
+                                                        widget.dealerDeckKey ==
+                                                            null
+                                                        ? widget.backBuilder!(
+                                                            widget.optionB
+                                                                ? 20
+                                                                : 16,
+                                                            widget.optionB
+                                                                ? 28
+                                                                : 24,
+                                                          )
+                                                        : DealCardMotion(
+                                                            key: ValueKey(
+                                                              '${widget.dealIdentity}-$index',
                                                             ),
-                                                    ),
+                                                            sourceKey: widget
+                                                                .dealerDeckKey!,
+                                                            delay: Duration(
+                                                              milliseconds:
+                                                                  index * 70,
+                                                            ),
+                                                            child:
+                                                                widget
+                                                                    .backBuilder!(
+                                                                  widget.optionB
+                                                                      ? 20
+                                                                      : 16,
+                                                                  widget.optionB
+                                                                      ? 28
+                                                                      : 24,
+                                                                ),
+                                                          ),
                                                   ),
                                                 ),
-                                          ],
+                                              ),
+                                        ],
+                                      ),
+                                    ),
+                                    Container(
+                                      width: 24,
+                                      height: 24,
+                                      alignment: Alignment.center,
+                                      decoration: BoxDecoration(
+                                        color: TableStyle.ink,
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: TableStyle.brass,
+                                          width: 1.5,
                                         ),
                                       ),
-                                      Container(
-                                        width: 24,
-                                        height: 24,
-                                        alignment: Alignment.center,
-                                        decoration: BoxDecoration(
-                                          color: TableStyle.ink,
-                                          shape: BoxShape.circle,
-                                          border: Border.all(
-                                            color: TableStyle.brass,
-                                            width: 1.5,
-                                          ),
-                                        ),
-                                        child: Text(
-                                          '${widget.hiddenHandCount}',
-                                          textScaler: TextScaler.noScaling,
-                                          style: TableStyle.label.copyWith(
-                                            fontWeight: FontWeight.w700,
-                                          ),
+                                      child: Text(
+                                        '${widget.hiddenHandCount}',
+                                        textScaler: TextScaler.noScaling,
+                                        style: TableStyle.label.copyWith(
+                                          fontWeight: FontWeight.w700,
                                         ),
                                       ),
-                                    ],
+                                    ),
+                                  ];
+                                  return Row(
+                                    textDirection: TextDirection.ltr,
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: widget.optionB
+                                        ? handWidgets.reversed.toList()
+                                        : handWidgets,
                                   );
                                 },
                               ),
