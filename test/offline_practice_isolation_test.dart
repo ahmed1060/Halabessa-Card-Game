@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:halabessa/core/providers/settings_provider.dart';
+import 'package:halabessa/core/providers/native_play_provider.dart';
 import 'package:halabessa/core/providers/global_settings_provider.dart';
 import 'package:halabessa/core/services/default_audio_assets.dart';
 import 'package:halabessa/core/services/multimedia_service.dart';
@@ -211,6 +212,12 @@ void main() {
     );
     await tester.tap(find.byKey(const ValueKey('native-online')));
     await tester.pump();
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(NativePlayEntry)),
+      listen: false,
+    );
+    // Also cover a completed choice whose root frame has not switched yet.
+    container.read(nativeOnlineEnabledProvider.notifier).state = true;
     await tester.tap(find.byKey(const ValueKey('native-offline')));
     await tester.pumpAndSettle();
     expect(
@@ -219,10 +226,74 @@ void main() {
     );
     expect(prefs.getString('offline_player_id_v1'), startsWith('LOCAL_'));
     online.complete();
+    await tester.pump();
+    expect(container.read(nativeOnlineEnabledProvider), isFalse);
+    expect(
+      find.byKey(const ValueKey('start-offline-practice')),
+      findsOneWidget,
+    );
     await tester.pumpWidget(const SizedBox());
     await tester.pump();
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'successful Online preparation activates only the current choice',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      final prefs = await SharedPreferences.getInstance();
+      final online = Completer<void>();
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [sharedPreferencesProvider.overrideWithValue(prefs)],
+          child: MaterialApp(
+            home: NativePlayEntry(onOnline: () => online.future),
+          ),
+        ),
+      );
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(NativePlayEntry)),
+        listen: false,
+      );
+      await tester.tap(find.byKey(const ValueKey('native-online')));
+      await tester.pump();
+      expect(container.read(nativeOnlineEnabledProvider), isFalse);
+      online.complete();
+      await tester.pump();
+      expect(container.read(nativeOnlineEnabledProvider), isTrue);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
+
+  testWidgets(
+    'a stale Online failure cannot replace local play with an error',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      final prefs = await SharedPreferences.getInstance();
+      final online = Completer<void>();
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [sharedPreferencesProvider.overrideWithValue(prefs)],
+          child: MaterialApp(
+            home: NativePlayEntry(onOnline: () => online.future),
+          ),
+        ),
+      );
+      await tester.tap(find.byKey(const ValueKey('native-online')));
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('native-offline')));
+      await tester.pumpAndSettle();
+      online.completeError(StateError('offline'));
+      await tester.pump();
+      expect(
+        find.byKey(const ValueKey('start-offline-practice')),
+        findsOneWidget,
+      );
+      expect(find.text('online_entry_retry'), findsNothing);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
 
   test('local ambience is a cached WAV payload, not an internet URL', () {
     final music = DefaultAudioAssets.getMusic();

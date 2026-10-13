@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import '../providers/settings_provider.dart';
+import '../providers/native_play_provider.dart';
 import '../../features/auth/domain/models/app_user.dart';
 import '../../features/game/presentation/pages/offline_practice_app.dart';
 import '../../features/game/presentation/widgets/table_style.dart';
@@ -20,41 +21,73 @@ class _NativePlayEntryState extends ConsumerState<NativePlayEntry> {
   bool _practice = false;
   AppUser? _player;
   String? _error;
+  int _entryGeneration = 0;
+  bool _localPending = false;
 
   Future<void> _startPractice() async {
-    final preferences = ref.read(sharedPreferencesProvider);
-    var uid = preferences.getString('offline_player_id_v1');
-    if (uid == null || !uid.startsWith('LOCAL_')) {
-      uid = 'LOCAL_${const Uuid().v4()}';
-      if (!await preferences.setString('offline_player_id_v1', uid)) {
-        if (mounted) setState(() => _error = 'offline_save_failed');
-        return;
+    if (_localPending) return;
+    final generation = ++_entryGeneration;
+    ref.read(nativeOnlineEnabledProvider.notifier).state = false;
+    setState(() {
+      _localPending = true;
+      _onlinePending = false;
+      _error = null;
+    });
+    try {
+      final preferences = ref.read(sharedPreferencesProvider);
+      var uid = preferences.getString('offline_player_id_v1');
+      if (uid == null || !uid.startsWith('LOCAL_')) {
+        uid = 'LOCAL_${const Uuid().v4()}';
+        if (!await preferences.setString('offline_player_id_v1', uid)) {
+          if (mounted)
+            setState(() {
+              _error = 'offline_save_failed';
+              _localPending = false;
+            });
+          return;
+        }
+      }
+      if (!mounted || generation != _entryGeneration) return;
+      setState(() {
+        _player = AppUser(
+          uid: uid!,
+          email: '',
+          displayName: 'local_player_name'.tr(),
+          avatarUrl: 'assets/images/avatars/avatar1.png',
+        );
+        _practice = true;
+        _localPending = false;
+      });
+    } catch (_) {
+      if (mounted && generation == _entryGeneration) {
+        setState(() {
+          _localPending = false;
+          _error = 'offline_save_failed';
+        });
       }
     }
-    if (!mounted) return;
-    setState(() {
-      _player = AppUser(
-        uid: uid!,
-        email: '',
-        displayName: 'local_player_name'.tr(),
-        avatarUrl: 'assets/images/avatars/avatar1.png',
-      );
-      _practice = true;
-    });
   }
 
   Future<void> _startOnline() async {
-    if (_onlinePending) return;
+    if (_onlinePending || _localPending) return;
+    final generation = ++_entryGeneration;
     setState(() {
       _onlinePending = true;
       _error = null;
     });
     try {
       await widget.onOnline();
+      // Initializing a native SDK may finish after the player chose local play.
+      // Never let that old request dispose an active offline game.
+      if (mounted && generation == _entryGeneration && !_practice) {
+        ref.read(nativeOnlineEnabledProvider.notifier).state = true;
+      }
     } catch (_) {
-      if (mounted) setState(() => _error = 'online_entry_retry');
+      if (mounted && generation == _entryGeneration)
+        setState(() => _error = 'online_entry_retry');
     } finally {
-      if (mounted) setState(() => _onlinePending = false);
+      if (mounted && generation == _entryGeneration)
+        setState(() => _onlinePending = false);
     }
   }
 
@@ -89,14 +122,16 @@ class _NativePlayEntryState extends ConsumerState<NativePlayEntry> {
                     const SizedBox(height: 24),
                     FilledButton.icon(
                       key: const ValueKey('native-online'),
-                      onPressed: _onlinePending ? null : _startOnline,
+                      onPressed: _onlinePending || _localPending
+                          ? null
+                          : _startOnline,
                       icon: const Icon(Icons.public),
                       label: Text('online_play_title'.tr()),
                     ),
                     const SizedBox(height: 16),
                     OutlinedButton.icon(
                       key: const ValueKey('native-offline'),
-                      onPressed: _startPractice,
+                      onPressed: _localPending ? null : _startPractice,
                       icon: const Icon(Icons.offline_bolt_outlined),
                       label: Text('offline_practice_title'.tr()),
                     ),

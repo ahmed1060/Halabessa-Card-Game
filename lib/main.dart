@@ -112,7 +112,6 @@ class HalabessaApp extends ConsumerWidget {
                 options: DefaultFirebaseOptions.currentPlatform,
               ).timeout(const Duration(seconds: 15));
             }
-            ref.read(nativeOnlineEnabledProvider.notifier).state = true;
           },
         ),
       );

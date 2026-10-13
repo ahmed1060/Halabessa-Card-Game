@@ -3,7 +3,7 @@
 User approved the revised plan on 12 October 2026. Work in ordered release stages;
 do not label pending features as complete.
 
-## Stage 1 — gameplay and UI fixes (implemented, verification in progress)
+## Stage 1 — gameplay and UI fixes (backend and website deployed)
 
 - Close rooms on last confirmed leave/kick, not temporary disconnection. Preserve
   other humans and reconnects; stop progression and fence mirror deletion. Retry
@@ -36,7 +36,7 @@ identity, local eligibility gate and bundled assets/audio. Never create a Fireba
 guest or call Supabase to start/play/finish Practice. Local results never mint
 online coins, rewards or rank. Keep all four Training difficulties.
 
-Verification so far: 476 client tests and 254 backend tests passed. Backend entry
+Verification so far: 478 client tests and 254 backend tests passed. Backend entry
 point type-check passed. Local browser confirmed different Home/Play content and
 portrait/landscape Practice; UI evidence is saved under build/qa-cafe-*.jpg.
 Fresh signed-out Practice tests initialize no Firebase app, exercise all four bot
@@ -54,6 +54,12 @@ Native local mode also disposes prior online catalogue/settings/audio listeners;
 Practice has no shared chat subscription, cloud profile fetch or purchase path.
 The real signed-out game board accepts card input without cloud initialization
 and hides its central turn banner while another player is active.
+
+The first release commit, e1d14160, passed Hosting deployment and the Android
+release build. Its iOS archive was still building when last checked. The live
+website's fingerprinted bootstrap/main files return 200 and match their hashes.
+A native-entry follow-up fixes delayed Online initialization overriding a newer
+Offline choice; stale successes/failures and same-frame mode changes are covered.
 
 ## Stage 3 — mobile-only LAN (pending)
 
