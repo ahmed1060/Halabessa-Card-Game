@@ -9,7 +9,9 @@ export function roomSummary(state: Record<string, unknown>) {
   const replacements = state.protocolVersion === 1 && state.isPublic === true && replacementPhaseAvailable(state as MatchState)
     ? ids.filter(uid => uid.startsWith("bot_") && uid in released).length : 0;
   return {
-    mode: state.mode, playerIds: ids, isPublic: state.isPublic, phase: state.phase,
+    mode: state.mode, playerIds: ids,
+    isPublic: state.isPublic === true && state.roomClosed !== true && ids.some(id => !/^(bot_|waiting_)/.test(id)),
+    roomClosed: state.roomClosed === true, phase: state.phase,
     protocolVersion: state.protocolVersion ?? 0,
     openSeatCount: state.phase === "waitingForPlayers" ? ids.filter(uid => uid.startsWith("waiting_")).length : replacements,
     replacementSeatCount: replacements,

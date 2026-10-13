@@ -28,12 +28,12 @@ void main() {
   });
   test('capture requests one completion, never a decorative stage mutation', () {
     final capture = s.copyWith(phase: GamePhase.capturing);
-    expect(serverProgressDue(capture, start.add(Duration(milliseconds: 599))), false);
-    expect(serverProgressDue(capture, start.add(Duration(milliseconds: 600))), true);
+    expect(serverProgressDue(capture, start.add(Duration(milliseconds: 1399))), false);
+    expect(serverProgressDue(capture, start.add(Duration(milliseconds: 1400))), true);
     expect(serverProgressDue(capture.copyWith(capturingStage: 1),
-      start.add(Duration(milliseconds: 599))), false);
+      start.add(Duration(milliseconds: 1399))), false);
     expect(serverProgressDue(capture.copyWith(capturingStage: 1),
-      start.add(Duration(milliseconds: 600))), true);
+      start.add(Duration(milliseconds: 1400))), true);
   });
   test('one public hand count auto-plays only the active turn, even without a timer', () {
     final single = s.copyWith(timerDurationSeconds: 0,
@@ -58,8 +58,9 @@ void main() {
   test('memory and scoring phases use phase clock instead of turn clock', () {
     for (final phase in [GamePhase.dealingCards, GamePhase.roundScoring]) {
       final current = s.copyWith(phase: phase, turnStartTime: start.subtract(Duration(days: 1)));
-      expect(serverProgressDue(current, start.add(Duration(milliseconds: 4999))), false);
-      expect(serverProgressDue(current, start.add(Duration(seconds: 5))), true);
+      final wait = phase == GamePhase.roundScoring ? 8000 : 5000;
+      expect(serverProgressDue(current, start.add(Duration(milliseconds: wait-1))), false);
+      expect(serverProgressDue(current, start.add(Duration(milliseconds: wait))), true);
     }
   });
   test('empty public hand counts request deal/end without opponent cards', () {

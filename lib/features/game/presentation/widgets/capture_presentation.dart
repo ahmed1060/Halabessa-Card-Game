@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../domain/models/match_state.dart';
 import '../../domain/models/capture_event.dart';
 import '../../domain/logic/online_match_clock.dart';
+import '../../domain/logic/match_presentation_timing.dart';
 
 /// Only the central artwork is held during capture. Hands, legal actions and
 /// deadlines always use the accepted state, never this presentation copy.
@@ -60,7 +61,7 @@ class _CapturePresentationState extends State<CapturePresentation> {
   void _startNext() {
     if (_active != null || _queue.isEmpty || _reduced) return;
     _active = _queue.removeAt(0);
-    _timer = Timer(const Duration(milliseconds: 600), () {
+    _timer = Timer(captureTotalDuration, () {
       if (!mounted) return;
       setState(() { _active = null; _startNext(); });
     });

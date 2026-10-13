@@ -1,10 +1,11 @@
 import type { Card, MatchState } from './match_engine.ts';
 
-export const difficulties = ['easy', 'medium', 'hard', 'expert'] as const;
+// Easy's deliberate missed captures belong to solo Practice, never online.
+export const difficulties = ['medium', 'hard', 'expert'] as const;
 export function assignBotDifficulties(state: MatchState, random = Math.random): MatchState {
   const levels = { ...(state.botDifficulties as Record<string, string> ?? {}) };
   for (const id of state.playerIds ?? []) if (id.startsWith('bot_') && !difficulties.includes(levels[id] as typeof difficulties[number])) {
-    levels[id] = difficulties[Math.floor(random() * 4)];
+    levels[id] = difficulties[Math.floor(random() * difficulties.length)];
   }
   return { ...state, botDifficulties: levels };
 }

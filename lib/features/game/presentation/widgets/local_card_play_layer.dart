@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../domain/models/card.dart' as game_card;
 import 'card_widget.dart';
-import 'table_style.dart';
 
 /// Physical (not directional) geometry of the artwork at the moment of a tap.
 class CardPlayOrigin {
@@ -259,23 +258,6 @@ class _CardFlightState extends State<_CardFlight>
                           width: rect.width,
                           height: rect.height,
                         ),
-                    if (!play.returning && progress == 1)
-                      Positioned(
-                        right: 3,
-                        bottom: 3,
-                        child: Container(
-                          padding: const EdgeInsets.all(3),
-                          decoration: const BoxDecoration(
-                            color: TableStyle.ink,
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.hourglass_top,
-                            size: 12,
-                            color: TableStyle.brass,
-                          ),
-                        ),
-                      ),
                   ],
                 ),
               ),

@@ -103,7 +103,7 @@ void main() {
   });
 
   testWidgets(
-    'Training capture completes in 600 ms and records one collection',
+    'Training capture holds for 1000 ms then collects over 400 ms once',
     (tester) async {
       final container = setup(
         initial.copyWith(
@@ -121,9 +121,11 @@ void main() {
           .playCard('human', ace);
       await tester.pump();
       expect(container.read(matchStateProvider)!.phase, GamePhase.capturing);
-      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pump(const Duration(milliseconds: 999));
+      expect(container.read(matchStateProvider)!.capturingStage, 0);
+      await tester.pump(const Duration(milliseconds: 1));
       expect(container.read(matchStateProvider)!.capturingStage, 1);
-      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pump(const Duration(milliseconds: 400));
       expect(await play, true);
       expect(container.read(matchStateProvider)!.phase, GamePhase.playing);
       expect(

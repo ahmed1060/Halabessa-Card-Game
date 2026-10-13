@@ -81,9 +81,11 @@ class PublicRoomsList extends ConsumerWidget {
                   ),
                 ),
                 subtitle: Text(
-                  'room_players_info'.tr(
+                  'room_seats_info'.tr(
                     args: [
-                      '${match.playerIds.length - match.openSeatCount}/4',
+                      '${match.humanCount}',
+                      '${match.botCount}',
+                      '${match.openSeatCount}',
                       match.id,
                     ],
                   ),

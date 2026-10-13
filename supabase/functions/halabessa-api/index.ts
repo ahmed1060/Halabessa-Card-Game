@@ -5,6 +5,7 @@ import { waitingSeatIndex, type Card, type MatchState } from "./match_engine.ts"
 import { executeMatchIntent, matchCommandTypes } from "./match_commands.ts";
 import { joinCommandRoom } from "./room_seating.ts";
 import { roomSummary } from "./room_summary.ts";
+import { deliverClosedRoom } from './closed_room_delivery.ts';
 import { rewardPlan } from "./match_rewards.ts";
 import { createFirestoreRewardStore } from "./firestore_rewards.ts";
 import { createPublicProfileStore } from "./public_profiles.ts";
@@ -149,12 +150,32 @@ function objectPayload(value: unknown) {
 }
 
 async function mirrorDurableRoom(connection: Client, id: string, lockGameRows = true) {
+  const query: import('./room_publication.ts').PublicationQuery = async(sql,args) =>
+    (await connection.queryObject<Record<string,unknown>>(sql,args)).rows;
   const room = await publishRoom(async(sql,args) =>
     (await connection.queryObject<Record<string,unknown>>(sql,args)).rows, id, async room => {
-    await publishFencedMirror(firebaseRequest, id, room, roomSummary);
+    // The compatibility path already owns an admission and row locks. Reuse
+    // that transaction: opening another socket here would wait on ourselves.
+    await publishCommittedRoomMirror(id, room, work => work(query));
   }, lockGameRows);
   if (!room) throw new Error('publication_busy');
   return room;
+}
+
+async function publishCommittedRoomMirror(id: string, room: import('./match_delivery.ts').CommittedRoom,
+  existingRun?: import('./room_publication.ts').PublicationRunner) {
+  if (room.state.roomClosed === true) {
+    const run: import('./room_publication.ts').PublicationRunner = existingRun ?? (work =>
+      withDatabase(connection => work(async (sql,args) =>
+        (await connection.queryObject<Record<string,unknown>>(sql,args)).rows), undefined, 'background'));
+    await deliverClosedRoom(run,id,room,async(state,createdAt)=>{
+      const plan=await rewardPlan(state,createdAt);
+      await createFirestoreRewardStore(firebaseProject,firebaseAccessToken).settle(plan);
+      return plan.receiptId;
+    },()=>deleteFencedMirror(firebaseRequest,id));
+  } else {
+    await publishFencedMirror(firebaseRequest, id, room, roomSummary);
+  }
 }
 
 async function isAdmin(connection: Client, user: { uid: string; email: string | null }) {
@@ -204,7 +225,7 @@ function scheduleRoomPublication(id: string) {
           (await connection.queryObject<Record<string,unknown>>(sql,args)).rows), undefined, 'background');
       let more = false;
       try {
-        more = !!await publishDetachedRoom(run, id, room => publishFencedMirror(firebaseRequest,id,room,roomSummary));
+        more = !!await publishDetachedRoom(run, id, room => publishCommittedRoomMirror(id,room));
       } catch {
         await run(query => retryPublicationLater(query,id));
       }
@@ -430,7 +451,7 @@ Deno.serve(async (request) => {
             (await connection.queryObject<Record<string,unknown>>(sql,args)).rows));
         try {
           const room = await timing.measure('mirror',()=>publishDetachedRoom(run,id,
-            room=>publishFencedMirror(firebaseRequest,id,room,roomSummary)));
+            room=>publishCommittedRoomMirror(id,room)));
           if(room)published++; else break;
         } catch {
           await run(query=>retryPublicationLater(query,id));pending++;
@@ -466,7 +487,8 @@ Deno.serve(async (request) => {
             return plan.receiptId;
           },
           publish:async(id,room)=>{
-            await publishFencedMirror(firebaseRequest,id,room,roomSummary);
+            // Deletion already owns a database admission/transaction too.
+            await publishCommittedRoomMirror(id,room,work=>work(query));
           },
         }); } catch(error) {
           // A SQL failure rolls back the lease, including its failure marker.

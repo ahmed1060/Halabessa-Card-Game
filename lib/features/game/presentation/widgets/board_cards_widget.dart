@@ -133,7 +133,7 @@ class BoardCardsWidget extends StatelessWidget {
     final reducedMotion = MediaQuery.disableAnimationsOf(context);
     final motionDuration = reducedMotion
         ? Duration.zero
-        : const Duration(milliseconds: 300);
+        : captureFlightDuration;
     final reflowDuration = reducedMotion
         ? Duration.zero
         : const Duration(milliseconds: 240);
@@ -185,7 +185,7 @@ class BoardCardsWidget extends StatelessWidget {
               child: AnimatedScale(
                 duration: motionDuration,
                 curve: Curves.easeOutCubic,
-                scale: isCapturing ? 0.84 : 1,
+                scale: captureFlight ? 0.84 : 1,
                 child: AnimatedOpacity(
                   duration: motionDuration,
                   opacity: captureFlight ? 0.12 : 1,

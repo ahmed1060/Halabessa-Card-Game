@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easy_localization/easy_localization.dart';
 
 import 'package:halabessa/core/providers/settings_provider.dart';
+import '../providers/native_play_provider.dart';
 import 'package:halabessa/features/auth/presentation/providers/auth_providers.dart';
 import 'package:halabessa/core/theme/theme_config.dart';
 import 'package:halabessa/core/services/multimedia_service.dart';
@@ -203,7 +204,7 @@ class SettingsOverlay extends ConsumerWidget {
                             Navigator.pushNamed(context, AppRoutes.help);
                           },
                         ),
-                        _buildToggleTile(
+                        if (!ref.watch(offlineSessionProvider)) _buildToggleTile(
                           'mode_3d'.tr(),
                           settings.is3DModeEnabled,
                           Icons.view_in_ar_rounded,

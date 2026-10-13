@@ -14,6 +14,7 @@ export const matchCommandTypes = new Set([
 export function executeMatchIntent(type: string, state: MatchState, deck: Card[],
   callerUid: string, requestedActor: string, payload: Record<string, unknown>, now = Date.now()) {
   if (requestedActor !== callerUid) throw new Error("invalid_command_actor");
+  if (state.roomClosed === true) throw new Error('room_closed');
   if (!matchCommandTypes.has(type)) throw new Error("unsupported_command");
   if (type === "updateProfile" || type === "sendEmoji") {
     if (!(state.playerIds ?? []).includes(callerUid) || /^(bot_|waiting_)/.test(callerUid)) {

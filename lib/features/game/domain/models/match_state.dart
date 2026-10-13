@@ -10,7 +10,7 @@ class MatchState {
   final String id;
   final GameMode mode;
   final int maxPoints; // 21, 41, 61
-  
+
   // Players Array: [T1_P1, T2_P1, T1_P2, T2_P2] -> [0, 1, 2, 3]
   // Anticlockwise Visual Seats: Bottom(0) -> Right(1) -> Top(2) -> Left(3)
   // Teams: A is indices [0, 2], B is indices [1, 3]
@@ -21,7 +21,7 @@ class MatchState {
 
   // Deck & Board State
   // Removed shared deck list for security (Anti-Cheat)
-  final List<game_card.Card> board; 
+  final List<game_card.Card> board;
   final game_card.Card? cutLastCard; // Revealed card after cut (The Last Card / الاخر)
   final game_card.Card? lastCardRevealed;
   final List<game_card.Card> recentFasha; // Temporarily holds the layout of Fasha for 5s preview
@@ -38,13 +38,15 @@ class MatchState {
   final List<CaptureEvent> captureEvents;
   final bool serverProgressManaged;
   final bool settlementPending;
+  final bool roomClosed;
+  final DateTime? playAvailableAt;
   final int matchSequence;
 
   bool get usesServerCommands => protocolVersion > 0;
-  
+
   // Harvested cards per team grouped by capture event
   final Map<String, List<Capture>> harvestStacks;
-  
+
   // Points tracked match-level
   final int teamAScore;
   final int teamBScore;
@@ -54,7 +56,7 @@ class MatchState {
   final int currentTurnIndex; // Active player
   final GamePhase phase;
   final String? lastCaptureTeam; // Used for "Last Capture Rule" at the end of the round
-  
+
   // Round Counter & Memory Shuffle tracker
   final int roundCount;
   final int handInRound; // 1, 2, or 3
@@ -86,7 +88,7 @@ class MatchState {
   final Map<String, int> earnedCoins;
   final Map<String, String> playerAvatars;
 
-  
+
     MatchState({
       required this.id,
       required this.mode,
@@ -104,6 +106,8 @@ class MatchState {
       this.captureEvents = const [],
       this.serverProgressManaged = false,
       this.settlementPending = false,
+      this.roomClosed = false,
+      this.playAvailableAt,
       this.matchSequence = 0,
       this.harvestStacks = const {'teamA': [], 'teamB': []},
       this.teamAScore = 0,
@@ -186,6 +190,8 @@ class MatchState {
     int? consecutiveTafweetCount,
     DateTime? turnStartTime,
     DateTime? phaseStartedAt,
+    DateTime? playAvailableAt,
+    bool? roomClosed,
     int? timerDurationSeconds,
     Map<String, String>? playerEmojis,
     Map<String, String>? playerEmojiExpiresAt,
@@ -228,6 +234,8 @@ class MatchState {
       captureEvents: captureEvents ?? this.captureEvents,
       serverProgressManaged: serverProgressManaged ?? this.serverProgressManaged,
       settlementPending: settlementPending ?? this.settlementPending,
+      roomClosed: roomClosed ?? this.roomClosed,
+      playAvailableAt: playAvailableAt ?? this.playAvailableAt,
       matchSequence: matchSequence ?? this.matchSequence,
       harvestStacks: harvestStacks ?? this.harvestStacks,
       teamAScore: teamAScore ?? this.teamAScore,
@@ -294,6 +302,8 @@ class MatchState {
       'captureEvents': captureEvents.map((event) => event.toJson()).toList(),
       'serverProgressManaged': serverProgressManaged,
       'settlementPending': settlementPending,
+      'roomClosed': roomClosed,
+      'playAvailableAt': playAvailableAt?.toIso8601String(),
       'matchSequence': matchSequence,
       // handCards is deliberately NOT written here -- MultiplayerSyncService
       // writes it separately to the matchHands/$matchId tree, which
@@ -347,11 +357,11 @@ class MatchState {
       map.forEach((k, v) {
         final key = k.toString();
         // Firebase illegal keys: contains '.', '#', '$', '/', '[', or ']'
-        if (!key.contains('.') && 
-            !key.contains('#') && 
-            !key.contains(r'$') && 
-            !key.contains('/') && 
-            !key.contains('[') && 
+        if (!key.contains('.') &&
+            !key.contains('#') &&
+            !key.contains(r'$') &&
+            !key.contains('/') &&
+            !key.contains('[') &&
             !key.contains(']')) {
           result[key] = v?.toString() ?? '';
         }
@@ -477,18 +487,18 @@ class MatchState {
 
     try {
       final id = json['id']?.toString() ?? '';
-      
+
       final GameMode mode = GameMode.values.firstWhere(
-        (e) => e.name == json['mode']?.toString(), 
+        (e) => e.name == json['mode']?.toString(),
         orElse: () => GameMode.classic
       );
-      
+
       final maxPoints = json['maxPoints'] is int ? json['maxPoints'] as int : 41;
-      
-      final playerIds = (json['playerIds'] is List) 
-          ? (json['playerIds'] as List).map((e) => e.toString()).toList() 
+
+      final playerIds = (json['playerIds'] is List)
+          ? (json['playerIds'] as List).map((e) => e.toString()).toList()
           : <String>[];
-      
+
       // Use ultra-safe map parsing helpers
       final playerEmojis = parseStringMap(json['playerEmojis']);
       final shuffleVotes = parseBoolMap(json['shuffleVotes']);
@@ -533,7 +543,7 @@ class MatchState {
         dealerIndex: json['dealerIndex'] is int ? json['dealerIndex'] as int : 0,
         currentTurnIndex: json['currentTurnIndex'] is int ? json['currentTurnIndex'] as int : 0,
         phase: GamePhase.values.firstWhere(
-          (e) => e.name == json['phase']?.toString(), 
+          (e) => e.name == json['phase']?.toString(),
           orElse: () => GamePhase.waitingForPlayers
         ),
         lastCaptureTeam: json['lastCaptureTeam']?.toString(),
@@ -543,6 +553,8 @@ class MatchState {
         consecutiveTafweetCount: json['consecutiveTafweetCount'] is int ? json['consecutiveTafweetCount'] as int : 0,
         turnStartTime: json['turnStartTime'] != null ? DateTime.tryParse(json['turnStartTime'].toString()) : null,
         phaseStartedAt: json['phaseStartedAt'] != null ? DateTime.tryParse(json['phaseStartedAt'].toString()) : null,
+        roomClosed: json['roomClosed'] == true,
+        playAvailableAt: DateTime.tryParse(json['playAvailableAt']?.toString() ?? ''),
         timerDurationSeconds: json['timerDurationSeconds'] is int ? json['timerDurationSeconds'] as int : 10,
         playerEmojis: playerEmojis,
         playerEmojiExpiresAt: parseStringMap(json['playerEmojiExpiresAt']),

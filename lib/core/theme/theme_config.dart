@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'lantern_page_transitions.dart';
 
 class ThemeConfig {
   static const Color primaryTeal = Color(0xFF78D2AF); // Lantern mint
@@ -23,13 +24,22 @@ class ThemeConfig {
     return ThemeData(
       useMaterial3: true,
       fontFamily: fontBody,
+      scaffoldBackgroundColor: darkBg,
+      pageTransitionsTheme: lanternPageTransitions,
       colorScheme: ColorScheme.fromSeed(
         seedColor: primaryTeal,
         primary: primaryTeal,
         secondary: goldAccent,
         error: crimsonAccent,
+        surface: const Color(0xFF192638),
+        onSurface: const Color(0xFFFFF6E7),
       ),
       textTheme: const TextTheme(
+        bodySmall: TextStyle(color: Color(0xFFFFF6E7)),
+        bodyMedium: TextStyle(color: Color(0xFFFFF6E7)),
+        bodyLarge: TextStyle(color: Color(0xFFFFF6E7)),
+        titleMedium: TextStyle(color: Color(0xFFFFF6E7)),
+        titleLarge: TextStyle(color: Color(0xFFFFF6E7)),
         headlineMedium: TextStyle(fontFamily: fontHeading, fontWeight: FontWeight.bold),
         headlineSmall: TextStyle(fontFamily: fontHeading),
       ),
@@ -40,6 +50,7 @@ class ThemeConfig {
     return ThemeData(
       useMaterial3: true,
       fontFamily: fontBody,
+      pageTransitionsTheme: lanternPageTransitions,
       colorScheme: ColorScheme.fromSeed(
         seedColor: primaryTeal,
         brightness: Brightness.dark,

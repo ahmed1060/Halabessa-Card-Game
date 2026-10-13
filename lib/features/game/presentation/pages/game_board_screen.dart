@@ -23,6 +23,7 @@ import 'package:confetti/confetti.dart';
 import '../widgets/player_profile_preview.dart';
 import '../widgets/board_cards_widget.dart';
 import '../widgets/capture_presentation.dart';
+import '../widgets/match_play_availability.dart';
 import '../widgets/match_table_layout.dart';
 import '../widgets/table_seat.dart';
 import '../widgets/table_style.dart';
@@ -40,6 +41,7 @@ import '../widgets/match_waiting_room_panel.dart';
 import '../widgets/match_recovery_view.dart';
 import '../../../home/presentation/widgets/practice_difficulty_dialog.dart';
 import '../../domain/models/bot_difficulty.dart';
+import '../../../../core/providers/native_play_provider.dart';
 import '../widgets/basra_celebration_overlay.dart';
 import '../widgets/emote_wheel_overlay.dart';
 import 'package:flutter/services.dart';
@@ -93,9 +95,9 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
       multimedia.playRoomMusic('music/room_music.mp3');
       // Unity is optional. Keep its startup/error screen from covering the
       // Flutter board when the player has disabled 3D mode.
-      ref.read(unityLayerVisibilityProvider.notifier).state = ref
-          .read(settingsProvider)
-          .is3DModeEnabled;
+      ref.read(unityLayerVisibilityProvider.notifier).state =
+          !ref.read(offlineSessionProvider) &&
+          ref.read(settingsProvider).is3DModeEnabled;
     });
   }
 
@@ -215,13 +217,21 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
     ref.listen<SettingsState>(settingsProvider, (previous, next) {
       if (previous?.is3DModeEnabled != next.is3DModeEnabled) {
         ref.read(unityLayerVisibilityProvider.notifier).state =
-            next.is3DModeEnabled;
+            !ref.read(offlineSessionProvider) && next.is3DModeEnabled;
       }
     });
 
     // Effects occur on transition, not on each results rebuild.
     ref.listen<MatchState?>(matchStateProvider, (previous, next) {
-      if (next == null) return;
+      if (next == null) {
+        if (previous != null && !previous.id.startsWith('OFFLINE_')) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) _returnToHome();
+          });
+        }
+        return;
+      }
+      if (next.roomClosed) return;
       if (previous?.id != next.id || previous?.roundCount != next.roundCount) {
         // Card IDs repeat on the next deck. Old local tap coordinates must not
         // make a bot's future card appear to arrive from the human's hand.
@@ -254,6 +264,14 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
     });
 
     // Room Expiry Check (Hibernation Timeout)
+    if (matchState != null && matchState.roomClosed) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        ref.read(matchStateProvider.notifier).leaveMatch(notifyServer: false);
+        _returnToHome();
+      });
+      return const Scaffold(backgroundColor: TableStyle.felt);
+    }
     if (matchState != null &&
         matchState.expireAt != null &&
         DateTime.now().isAfter(matchState.expireAt!)) {
@@ -483,6 +501,16 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
                     createParticlePath: _drawStar,
                   ),
                 ),
+                if (matchState.phase == GamePhase.roundScoring)
+                  Positioned.fill(
+                    child: RoundSummaryPanel(
+                      state: matchState,
+                      firstIsA:
+                          _getTeamOfPlayer(myUid, matchState.playerIds) !=
+                          'teamB',
+                      spectator: isSpectator,
+                    ),
+                  ),
               ],
             );
           },
@@ -499,12 +527,43 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
     bool isLandscape, {
     required bool isSpectator,
     required bool show3DHand,
+  }) => CapturePresentation(
+    key: ValueKey('capture-presentation-${state.id}'),
+    state: state,
+    builder: (visualState) => MatchPlayAvailability(
+      availableAt: state.playAvailableAt,
+      serverClock: state.usesServerCommands,
+      builder: (ready) => _buildTableScene(
+        context,
+        ref,
+        state,
+        myUid,
+        isLandscape,
+        isSpectator: isSpectator,
+        show3DHand: show3DHand,
+        visualState: visualState,
+        playReady: ready && visualState.phase != GamePhase.capturing,
+      ),
+    ),
+  );
+
+  Widget _buildTableScene(
+    BuildContext context,
+    WidgetRef ref,
+    MatchState state,
+    String myUid,
+    bool isLandscape, {
+    required bool isSpectator,
+    required bool show3DHand,
+    required MatchState visualState,
+    required bool playReady,
   }) {
     final myTeam = _getTeamOfPlayer(myUid, state.playerIds);
     final firstIsA = myTeam != 'teamB';
     final playing = state.phase == GamePhase.playing;
     final myTurn =
         playing &&
+        playReady &&
         !isSpectator &&
         state.currentTurnIndex == _getAbsoluteIndex(state, myUid, 0);
     final firstLabel = (isSpectator ? 'team_a' : 'my_team').tr();
@@ -514,12 +573,13 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
       final user = _getAvatarUser(ref, state, myUid, offset);
       final active =
           playing &&
+          playReady &&
           state.currentTurnIndex == _getAbsoluteIndex(state, myUid, offset);
       final chat = ref.watch(lastMessageForUserProvider(user.uid))?.text;
       final message = chat ?? _getPlayerEmoji(state, myUid, offset);
       final avatar = TableSeat(
         name: user.uid.startsWith('bot_')
-            ? user.displayName.replaceAll('🤖', '').trim()
+            ? '${user.displayName.replaceAll('🤖', '').trim()} · ${'bot_difficulty_${parseBotDifficulty(state.botDifficulties[user.uid]).name}'.tr()}'
             : user.displayName,
         avatarUrl: user.avatarUrl,
         portraitAsset: offset == 2
@@ -534,7 +594,10 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
             : null,
         isBot: user.uid.startsWith('bot_'),
         active: active,
-        detail: active
+        detail: user.uid.startsWith('bot_')
+            ? 'bot_difficulty_${parseBotDifficulty(state.botDifficulties[user.uid]).name}'
+                  .tr()
+            : active
             ? 'table_playing'.tr()
             : 'cards_count'.tr(
                 args: [state.cardsRemainingFor(user.uid).toString()],
@@ -544,7 +607,8 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
         serverClock: state.usesServerCommands,
         turnDuration: state.cardsRemainingFor(user.uid) == 1
             ? lastCardAutoPlayDuration
-            : user.uid.startsWith('bot_') ? botThinkDuration
+            : user.uid.startsWith('bot_')
+            ? botThinkDuration
             : Duration(seconds: state.timerDurationSeconds),
         message: message,
         messageExpiresAt: chat == null
@@ -705,17 +769,24 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
         ),
         board: SizedBox(
           key: _boardKey,
-          child: _buildBoardCenter(
+          child: _buildPresentedBoardCenter(
             context,
             ref,
-            state,
+            visualState,
             myUid,
             isLandscape,
             is3DActive: show3DHand,
             alreadyPresented: presented,
           ),
         ),
-        status: _buildTableStatus(state, myUid, isSpectator, myTurn),
+        status: state.phase == GamePhase.roundScoring
+            ? const SizedBox.shrink()
+            : _buildTableStatus(
+                visualState.phase == GamePhase.capturing ? visualState : state,
+                myUid,
+                isSpectator,
+                myTurn,
+              ),
         hand:
             isSpectator ||
                 show3DHand ||
@@ -728,7 +799,7 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
                 dealerDeckKey: _dealerDeckKey,
                 cards: state.handCards[myUid] ?? [],
                 isMyTurn: myTurn,
-                interactionEnabled: playing && hiddenCard == null,
+                interactionEnabled: playing && playReady && hiddenCard == null,
                 hiddenCard: hiddenCard,
                 playHint: 'table_play_card'.tr(),
                 queueHint: 'table_queue_card'.tr(),
@@ -902,41 +973,31 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
       );
     }
     if (state.phase == GamePhase.dealingCards ||
-        state.phase == GamePhase.dealingFasha ||
-        state.phase == GamePhase.roundScoring) {
-      if (state.phase == GamePhase.roundScoring) {
-        return RoundSummaryPanel(
-          state: state,
-          firstIsA: _getTeamOfPlayer(uid, state.playerIds) != 'teamB',
-          spectator: spectator,
-        );
-      }
+        state.phase == GamePhase.dealingFasha) {
       final title = switch (state.phase) {
         GamePhase.dealingCards => 'memorize_table_cards',
-        GamePhase.roundScoring => 'round_finished',
         _ => state.cutLastCard != null ? 'last_card_label' : 'dealing_cards',
       };
       return MatchPhasePanel(
         key: ValueKey('${state.id}-${state.phase.name}'),
         title: title.tr(),
-        message:
-            (state.phase == GamePhase.roundScoring
-                    ? 'round_advances_automatically'
-                    : 'next_phase_automatically')
-                .tr(),
+        message: 'next_phase_automatically'.tr(),
         failureMessage: 'match_action_retry'.tr(),
       );
     }
+    if (!myTurn) return const SizedBox.shrink();
     return LanternTurnBadge(
       active: myTurn,
       showCountdown: !spectator && state.phase == GamePhase.playing,
       turnStarted: state.turnStartTime,
       turnSeconds: state.timerDurationSeconds,
       serverClock: state.usesServerCommands,
-      turnDuration: state.cardsRemainingFor(state.playerIds[state.currentTurnIndex]) == 1
+      turnDuration:
+          state.cardsRemainingFor(state.playerIds[state.currentTurnIndex]) == 1
           ? lastCardAutoPlayDuration
           : state.playerIds[state.currentTurnIndex].startsWith('bot_')
-              ? botThinkDuration : Duration(seconds: state.timerDurationSeconds),
+          ? botThinkDuration
+          : Duration(seconds: state.timerDurationSeconds),
       countdownLabel: (seconds) => 'ui_seconds_short'.tr(args: ['$seconds']),
       countdownSemantics: (seconds) =>
           'ui_seconds_remaining'.tr(args: ['$seconds']),
@@ -1089,7 +1150,10 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
           ],
         ),
         content: Text(
-          'leave_game_warning'.tr(),
+          (ref.read(matchStateProvider)?.id.startsWith('OFFLINE_') == true
+                  ? 'offline_leave_warning'
+                  : 'leave_game_warning')
+              .tr(),
           style: const TextStyle(color: Colors.white70, fontSize: 14),
         ),
         actionsPadding: const EdgeInsets.symmetric(
@@ -1139,22 +1203,6 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
     }
     return null;
   }
-
-  Widget _buildBoardCenter(
-    BuildContext context,
-    WidgetRef ref,
-    MatchState matchState,
-    String myUid,
-    bool isLandscape, {
-    bool is3DActive = false,
-    Set<String> alreadyPresented = const {},
-  }) => CapturePresentation(
-    key: ValueKey('capture-presentation-${matchState.id}'),
-    state: matchState,
-    builder: (visualState) => _buildPresentedBoardCenter(context, ref,
-      visualState, myUid, isLandscape, is3DActive: is3DActive,
-      alreadyPresented: alreadyPresented),
-  );
 
   Widget _buildPresentedBoardCenter(
     BuildContext context,
@@ -1585,8 +1633,26 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
     final targetPlayerId =
         matchState.playerIds[absoluteIndex % matchState.playerIds.length];
 
-    // Don't show for bots
-    if (targetPlayerId.startsWith('bot_')) return;
+    if (targetPlayerId.startsWith('bot_')) {
+      final level = parseBotDifficulty(
+        matchState.botDifficulties[targetPlayerId],
+      );
+      showDialog<void>(
+        context: context,
+        builder: (_) => AlertDialog(
+          backgroundColor: TableStyle.ink,
+          title: Text(
+            'bot_difficulty_${level.name}'.tr(),
+            style: TableStyle.label.copyWith(fontSize: 22),
+          ),
+          content: Text(
+            'bot_strategy_${level.name}'.tr(),
+            style: TableStyle.label,
+          ),
+        ),
+      );
+      return;
+    }
 
     final user = _getAvatarUser(ref, matchState, myUid, offset);
 

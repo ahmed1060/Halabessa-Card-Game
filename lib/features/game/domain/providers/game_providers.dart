@@ -77,7 +77,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
   }
 
   MultimediaService get _multimedia => ref.read(multimediaServiceProvider);
-  
+
   // Local secret deck ONLY known by the Host (Anti-Cheat)
   Deck? _secretDeck;
 
@@ -99,10 +99,10 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
       }
     }
   }
-  
+
   // Track last bound match for refresh recovery
   String? lastBoundMatchId;
-  
+
   // Bot decisions can span a network write and capture animation. Match updates
   // received during that window must not be dropped: the final update may be the
   // only notification that the next bot is now active.
@@ -394,7 +394,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
   Timer? _afkWatchdogTimer;
   StreamSubscription<CountdownTimer>? _autoplaySubscription;
   final Map<String, StreamSubscription<CountdownTimer>> _tafweetSubscriptions = {};
-  
+
   // Stream subscription for the match listener
   StreamSubscription? _matchListener;
   StreamSubscription? _presenceListener;
@@ -408,8 +408,12 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     MultiplayerSyncService.validateLegacyWrite(newState);
     final previousState = state;
     final difficulties = Map<String, String>.from(newState.botDifficulties);
+    final allowedLevels = BotDifficulty.values.where((level) =>
+      newState.id.startsWith('OFFLINE_') || level != BotDifficulty.easy).toList();
     for (final id in newState.playerIds.where((id) => id.startsWith('bot_'))) {
-      difficulties.putIfAbsent(id, () => BotDifficulty.values[Random().nextInt(4)].name);
+      if (!allowedLevels.any((level) => level.name == difficulties[id])) {
+        difficulties[id] = allowedLevels[Random().nextInt(allowedLevels.length)].name;
+      }
     }
     newState = newState.copyWith(botDifficulties: difficulties);
     if (previousState?.phase != newState.phase || previousState?.roundCount != newState.roundCount) {
@@ -471,10 +475,10 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     final now = DateTime.now();
     bool changed = false;
     final newOnlineStatus = Map<String, bool>.from(serverState.playerOnlineStatus);
-    
+
     for (var playerId in serverState.playerIds) {
       if (playerId.startsWith('bot_')) continue;
-      
+
       final lastActive = serverState.playerLastActive[playerId];
       if (lastActive != null) {
         final diff = now.difference(lastActive).inSeconds;
@@ -548,12 +552,12 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
           }
         }
         if (notifyServer && s != null && !s.usesServerCommands &&
-            s.phase != GamePhase.waitingForPlayers && 
+            s.phase != GamePhase.waitingForPlayers &&
             s.phase != GamePhase.matchOver &&
             s.phase != GamePhase.rematchVoting) {
           _applyForfeitPenalty(currentUser.uid);
         }
-        
+
         // Server leave revokes membership before this best-effort mirror
         // cleanup. A denied cleanup must not become an unhandled async error.
         unawaited(ref.read(multiplayerSyncServiceProvider)
@@ -594,16 +598,16 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     if (s.id.startsWith('OFFLINE_')) return true;
     final currentUser = ref.read(currentUserProvider);
     if (currentUser == null) return false;
-    
+
     // HUMAN PRIORITY HOST ELECTION:
     // The Host is the first ONLINE human player in the playerIds list.
     for (var id in s.playerIds) {
       if (id.startsWith('bot_')) continue;
-      
-      final isOnline = (presenceMap != null) 
-          ? (presenceMap[id] == true) 
+
+      final isOnline = (presenceMap != null)
+          ? (presenceMap[id] == true)
           : (s.playerOnlineStatus[id] ?? false);
-          
+
       if (isOnline) {
         return id == currentUser.uid;
       }
@@ -636,8 +640,8 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     } else {
       _saveMatchId(matchId);
     }
-    _matchListener?.cancel(); 
-    
+    _matchListener?.cancel();
+
     if (matchId.startsWith('OFFLINE_')) {
       final s = state;
       if (s != null) {
@@ -682,7 +686,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
             _manageAFKWatchdog(serverState);
             _evaluateBotActions(serverState);
             _manageAutoplayTimer(serverState);
-            
+
             // Sync local profile if needed (first join or update)
             _syncProfileWithMatch(serverState);
           } catch (e) {
@@ -706,7 +710,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
         if (kDebugMode) debugPrint('Presence sync unavailable: $error');
       }));
     }
-    
+
     // Listen for Store/Auth changes to sync profile real-time
     ref.listen(storeProvider, (prev, next) {
       final s = state;
@@ -726,7 +730,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
        final serverState = state;
        if (serverState == null) return;
        if (_isSpectating || serverState.usesServerCommands) return;
-       
+
        // Host Transition: We use the ACTUAL presence map from RTDB during this transition to avoid circular locks.
        // If I am the first human online according to the presence map, I take over the state-update duties.
        final imPotentialHost = _amIHost(serverState, presenceMap: presence);
@@ -797,10 +801,10 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     if (_isSpectating) return;
     final user = ref.read(currentUserProvider);
     if (user == null) return;
-    
+
     final store = ref.read(storeProvider);
     final myUid = user.uid;
-    
+
     bool changed = false;
     final skins = Map<String, String>.from(s.playerSkins);
     final avatars = Map<String, String>.from(s.playerAvatars);
@@ -855,7 +859,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     }
     final generation = _bindingGeneration;
     // The generation/turn guards provide safety without artificial settling.
-    
+
     try {
       final currentState = serverState;
       if (generation != _bindingGeneration || !_samePhase(currentState)) return;
@@ -950,13 +954,13 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
                  debugPrint('TURN WATCHDOG: Host resolving stuck turn for $activeId');
                }
              }
-             
+
              final delayMs = (isBot && !isTurnStuck) ? botThinkDuration.inMilliseconds : 200;
              await Future.delayed(Duration(milliseconds: delayMs));
              if (!mounted || generation != _bindingGeneration) return;
              final finalState = state;
              if (finalState != null && sameMatchTurn(finalState, currentState)) {
-                
+
                  try {
                    final decision = BotBrain.decidePlayAdvanced(finalState, activeId,
                      difficulty: parseBotDifficulty(finalState.botDifficulties[activeId]));
@@ -976,7 +980,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
         case GamePhase.shuffleVoting:
           _handleBotVotes(currentState, isRematch: false);
           break;
-          
+
         case GamePhase.rematchVoting:
           _handleBotVotes(currentState, isRematch: true);
           break;
@@ -1014,19 +1018,19 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     _autoplaySubscription?.cancel();
     _autoplaySubscription = null;
     if (matchState.usesServerCommands) return;
-    
+
     if (matchState.phase != GamePhase.playing) return;
-    
+
     final currentUser = ref.read(currentUserProvider);
     if (currentUser == null) return;
-    
+
     final activePlayerId = matchState.playerIds[matchState.currentTurnIndex];
     if (activePlayerId != currentUser.uid) return;
-    
+
     if (matchState.turnStartTime != null) {
       final elapsed = DateTime.now().difference(matchState.turnStartTime!).inSeconds;
       final remaining = matchState.timerDurationSeconds - elapsed;
-      
+
       if (remaining <= 0) {
         _triggerAutoplay(matchState, currentUser.uid);
       } else {
@@ -1051,7 +1055,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
   void _triggerAutoplay(MatchState matchState, String myUid) {
     if (matchState.phase != GamePhase.playing) return;
     if (matchState.playerIds[matchState.currentTurnIndex] != myUid) return;
-    
+
     final hand = matchState.handCards[myUid] ?? [];
     if (hand.isNotEmpty) {
       playCard(myUid, hand[Random().nextInt(hand.length)]);
@@ -1073,7 +1077,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
       playerSkins: {playerId: store.activeCardBackId},
       playerAvatars: {playerId: avatarUrl},
       dealerIndex: 0,
-      currentTurnIndex: 1, 
+      currentTurnIndex: 1,
       phase: GamePhase.waitingForPlayers,
       timerDurationSeconds: timerDurationSeconds,
     );
@@ -1120,14 +1124,14 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
         "bot_3": true,
       },
       dealerIndex: 0,
-      currentTurnIndex: 1, 
+      currentTurnIndex: 1,
       phase: GamePhase.waitingForPlayers,
       timerDurationSeconds: 12,
     );
 
     state = initial;
     bindToMatch(offlineId);
-    
+
     // Automatically transition to round 1 after 350ms
     Future.delayed(const Duration(milliseconds: 350), () {
       if (state?.id == offlineId) {
@@ -1138,7 +1142,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
 
   Future<String> quickMatch(String playerId, String displayName, {GameMode mode = GameMode.classic}) async {
     final syncService = ref.read(multiplayerSyncServiceProvider);
-    
+
     try {
       final snapshot = await syncService.roomsRef.get();
       if (snapshot.exists && snapshot.value is Map) {
@@ -1203,21 +1207,21 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
       await _sendServerIntent('voteForBots');
       return;
     }
-    
+
     final votes = Map<String, bool>.from(currentState.botInjectionVotes);
     votes[playerId] = true;
-    
+
     // Count human players currently in the room
     final humanIds = currentState.playerIds.where((id) => !id.startsWith('waiting_')).toList();
     final humanCount = humanIds.length;
-    
+
     if (votes.length >= humanCount) {
       // All present humans agreed, fill the rest with bots
       final newPlayerIds = List<String>.from(currentState.playerIds);
       final newPlayerNames = Map<String, String>.from(currentState.playerNames);
       final newPlayerAvatars = Map<String, String>.from(currentState.playerAvatars);
       final newPlayerSkins = Map<String, String>.from(currentState.playerSkins);
-      
+
       int botCount = 0;
       for (int i = 0; i < newPlayerIds.length; i++) {
         if (newPlayerIds[i].startsWith('waiting_')) {
@@ -1225,11 +1229,11 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
           final botId = 'bot_${i + 1}'; // Keep ID tied to index for stability
           newPlayerIds[i] = botId;
           newPlayerNames[botId] = 'Bot $botCount';
-          newPlayerAvatars[botId] = ""; 
+          newPlayerAvatars[botId] = "";
           newPlayerSkins[botId] = "classic_blue"; // Default bot skin
         }
       }
-      
+
       await _publishState(currentState.copyWith(
         playerIds: newPlayerIds,
         playerNames: newPlayerNames,
@@ -1253,7 +1257,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
         GamePhase.shuffleVoting, GamePhase.rematchVoting].contains(currentState.phase)) return;
     final source = '${currentState.id}:${currentState.matchSequence}:${currentState.roundCount}:${currentState.phase}:${currentState.phaseStartedAt}';
     if (_lastRoundStartSource == source) return;
-    
+
     // CRITICAL: Ensure we don't start with placeholders
     if (currentState.playerIds.any((id) => id.startsWith('waiting_'))) {
       debugPrint('ABORT: Attempted to start round with placeholders');
@@ -1261,7 +1265,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     }
 
     int nextDealer = isFirstRound ? 0 : (currentState.dealerIndex + 1) % 4;
-    
+
     // Shuffle check
     bool shouldShuffle = isFirstRound || forceShuffle;
     if (shouldShuffle) {
@@ -1314,15 +1318,15 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
       await _sendServerIntent('cut', payload: {'position': index});
       return;
     }
-    
+
     _ensureSecretDeck(currentState);
 
     final result = GameEngine.apply(
-      currentState, 
+      currentState,
       CutAction(currentState.playerIds[(currentState.dealerIndex + 3) % 4], index),
       secretDeck: _secretDeck
     );
-    
+
     await _publishState(result.newState);
     _multimedia.playSfx('sfx/cut.mp3');
   }
@@ -1338,14 +1342,14 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     _initialDealInFlight = true;
     final generation = _bindingGeneration;
     try {
-    await Future.delayed(const Duration(seconds: 2));
+    await Future.delayed(deckRevealDuration);
     if (generation != _bindingGeneration || !_samePhase(currentState)) return;
 
     _ensureSecretDeck(currentState);
 
     final dealerId = currentState.playerIds[currentState.dealerIndex % currentState.playerIds.length];
     final result = GameEngine.apply(
-      currentState, 
+      currentState,
       DealAction(dealerId, isInitial: true),
       secretDeck: _secretDeck
     );
@@ -1354,11 +1358,11 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     _multimedia.playSfx('sfx/deal.mp3');
 
     // Memory phase delay (3s for snappy offline practice, 5s for multiplayer)
-    final memoryDuration = currentState.id.startsWith('OFFLINE_') 
-        ? const Duration(seconds: 3) 
+    final memoryDuration = currentState.id.startsWith('OFFLINE_')
+        ? const Duration(seconds: 3)
         : const Duration(seconds: 5);
     await Future.delayed(memoryDuration);
-    
+
     if (mounted && generation == _bindingGeneration && state?.id == currentState.id &&
         state?.roundCount == currentState.roundCount && state?.matchSequence == currentState.matchSequence &&
         state?.phase == GamePhase.dealingCards) {
@@ -1391,7 +1395,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
 
     final dealerId = currentState.playerIds[currentState.dealerIndex % currentState.playerIds.length];
     final result = GameEngine.apply(
-      currentState, 
+      currentState,
       DealAction(dealerId, isInitial: false),
       secretDeck: _secretDeck
     );
@@ -1414,7 +1418,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     emojis[playerId] = emoji;
     _multimedia.vibrate();
     await _publishState(currentState.copyWith(playerEmojis: emojis));
-    
+
     Future.delayed(const Duration(seconds: 3), () => clearEmoji(playerId));
   }
 
@@ -1458,7 +1462,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
           for (final id in currentState.playerIds)
             id: intermediateHands[id]?.length ?? 0,
         };
-        
+
         await _publishState(currentState.copyWith(
           board: intermediateBoard,
           handCards: intermediateHands,
@@ -1515,11 +1519,11 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
       final currentState = state;
       if (currentState == null || currentState.phase != GamePhase.playing ||
           !currentState.areAllHandsEmpty || currentState.deckCount != 0) return;
-       
+
       final harvest = {for (final entry in currentState.harvestStacks.entries)
         entry.key: List<Capture>.from(entry.value)};
       final board = List<game_card.Card>.from(currentState.board);
-      
+
       // 1. Last Capture Rule
       if (board.isNotEmpty && currentState.lastCaptureTeam != null) {
          harvest[currentState.lastCaptureTeam!]?.add(Capture(
@@ -1550,12 +1554,12 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
          harvestStacks: harvest,
          phase: GamePhase.roundScoring,
       );
-      
+
       await _publishState(scoringState);
-      
+
       // Wait for users to see the result
-      await Future.delayed(const Duration(seconds: 5));
-      
+      await Future.delayed(roundResultsDuration);
+
       // Check if we are still in roundScoring (hasn't been interrupted)
       if (!mounted || state?.id != currentState.id ||
           state?.roundCount != currentState.roundCount ||
@@ -1624,7 +1628,9 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
 
   Future<void> _updateUserStatsAfterMatch(String winnerTeam, int scoreA, int scoreB) async {
     final currentState = state;
-    if (currentState == null) return;
+    // Practice results are local only, including when launched by a signed-in
+    // player. Never mint rewards or update a real player's ranking from it.
+    if (currentState == null || currentState.id.startsWith('OFFLINE_')) return;
 
     final isHost = _amIHost(currentState);
     if (!isHost) return;

@@ -45,19 +45,15 @@ test("public released seats inherit cards/team while active turn and original bo
   assert.throws(() => joinCommandRoom(result.state, "other", profile, now), /no_safe_replacement_seat/);
 });
 
-test("last-human departure can recover its active released seat with a fresh deadline", () => {
+test("last-human departure cannot rejoin an abandoned all-bot room", () => {
   const state: MatchState = { phase: "playing", isPublic: true, currentTurnIndex: 0,
     playerIds: ["bot_1_replacement_14", "bot_2", "bot_3", "bot_4"],
     releasedSeats: { bot_1_replacement_14: { previousUid: "a", reason: "left" } },
     turnStartTime: new Date(now - 60000).toISOString(),
     handCards: { bot_1_replacement_14: [{ suit: "hearts", rank: "ace" }] } };
   const original = JSON.stringify(state);
-  const joined = joinCommandRoom(state, "a", profile, now);
-  assert.equal(joined.seatIndex, 0);
-  assert.equal(joined.state.handCards!.a.length, 1);
-  assert.equal(joined.state.turnStartTime, new Date(now).toISOString());
+  assert.throws(() => joinCommandRoom(state, "a", profile, now), /room_closed/);
   assert.equal(JSON.stringify(state), original);
-  assert.throws(() => joinCommandRoom(joined.state, "other", profile, now), /no_safe_replacement_seat/);
-  assert.throws(() => joinCommandRoom({ ...state, isPublic: false }, "a", profile, now), /no_safe_replacement_seat/);
-  assert.throws(() => joinCommandRoom({ ...state, releasedSeats: {} }, "a", profile, now), /no_safe_replacement_seat/);
+  assert.throws(() => joinCommandRoom({ ...state, isPublic: false }, "a", profile, now), /room_closed/);
+  assert.throws(() => joinCommandRoom({ ...state, releasedSeats: {} }, "a", profile, now), /room_closed/);
 });

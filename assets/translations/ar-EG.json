@@ -1,4 +1,13 @@
 {
+  "online_play_title": "العب أونلاين",
+  "offline_practice_title": "تدريب أوفلاين",
+  "offline_practice_description": "العب ضد بوتات من غير إنترنت أو تسجيل دخول. التدريب مش بيغيّر العملات والمكافآت والترتيب الأونلاين.",
+  "local_player_name": "لاعب محلي",
+  "offline_save_failed": "مش قادرين نحفظ الملف المحلي. جرّب تاني.",
+  "online_entry_retry": "الأونلاين مش متاح دلوقتي. جرّب تاني أو العب أوفلاين.",
+  "offline_leave_warning": "تخرج من التدريب؟ الماتش هينتهي على الجهاز ده، من غير أي تغيير في نقطك أو عملاتك الأونلاين.",
+  "room_seats_info": "لاعبين: {} · بوتات: {} · أماكن متاحة: {} · كود: {}",
+  "home_play_description": "الاقي ماتش، العب مع صحابك أو اتدرّب",
     "ui_presence_all": "الكل",
     "ui_presence_online": "متصل",
     "ui_presence_offline": "مش متصل",

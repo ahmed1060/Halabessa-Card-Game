@@ -164,11 +164,14 @@ void main() {
       expect(key.currentState!.hand, cards);
       expect(key.currentState!.board, isEmpty);
       expect(key.currentState!.requests.single.isCompleted, isFalse);
+      expect(find.byIcon(Icons.hourglass_top), findsNothing);
+      expect(find.byIcon(Icons.hourglass_bottom), findsNothing);
       await tester.tap(target(1));
       await tester.drag(target(2), const Offset(0, -70));
       expect(key.currentState!.requests, hasLength(1));
       await tester.pump(const Duration(seconds: 2));
       expect(tester.getCenter(preview()), settled);
+      expect(find.byIcon(Icons.hourglass_top), findsNothing);
       key.currentState!.requests.single.complete(true);
       await tester.pump();
       expect(preview(), findsOneWidget); // Await the actual private view.

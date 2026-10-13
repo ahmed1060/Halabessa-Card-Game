@@ -9,35 +9,42 @@ class LanternPageFrame extends StatelessWidget {
   final Widget child;
   const LanternPageFrame({super.key, required this.child});
   @override
-  Widget build(BuildContext context) => Stack(
-    fit: StackFit.expand,
-    children: [
-      RepaintBoundary(child: Image.asset(
-        MediaQuery.sizeOf(context).width > MediaQuery.sizeOf(context).height
-            ? 'assets/images/tables/lantern_nights_v1.png'
-            : 'assets/images/tables/lantern_nights_portrait_v2.png',
-        fit: BoxFit.cover,
-        excludeFromSemantics: true,
-        cacheWidth: backgroundDecodeWidth(MediaQuery.sizeOf(context).width,
-          MediaQuery.devicePixelRatioOf(context)),
-      )),
-      const DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            stops: [0, .26, .48, 1],
-            colors: [
-              Color(0x22192638),
-              Color(0x443B274C),
-              Color(0xE63B274C),
-              ThemeConfig.darkBg,
-            ],
+  Widget build(BuildContext context) => ColoredBox(
+    color: ThemeConfig.darkBg,
+    child: Stack(
+      fit: StackFit.expand,
+      children: [
+        RepaintBoundary(
+          child: Image.asset(
+            MediaQuery.sizeOf(context).width > MediaQuery.sizeOf(context).height
+                ? 'assets/images/tables/lantern_nights_v1.png'
+                : 'assets/images/tables/lantern_nights_portrait_v2.png',
+            fit: BoxFit.cover,
+            excludeFromSemantics: true,
+            cacheWidth: backgroundDecodeWidth(
+              MediaQuery.sizeOf(context).width,
+              MediaQuery.devicePixelRatioOf(context),
+            ),
           ),
         ),
-      ),
-      child,
-    ],
+        const DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              stops: [0, .26, .48, 1],
+              colors: [
+                Color(0x22192638),
+                Color(0x443B274C),
+                Color(0xE63B274C),
+                ThemeConfig.darkBg,
+              ],
+            ),
+          ),
+        ),
+        child,
+      ],
+    ),
   );
 }
 

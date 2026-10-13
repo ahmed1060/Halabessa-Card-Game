@@ -15,8 +15,7 @@ test('Training and countdown policy match the server reading beats', () => {
   assert.match(timing, new RegExp(`botThinkDuration = Duration\\(milliseconds: ${BOT_THINK_MS}\\)`));
   assert.match(timing, new RegExp(`lastCardAutoPlayDuration = Duration\\(milliseconds: ${FORCED_CARD_MS}\\)`));
   assert.match(timing, new RegExp(`captureTotalDuration = Duration\\(milliseconds: ${CAPTURE_MS}\\)`));
-  assert.ok(BOT_THINK_MS > CAPTURE_MS);
-  assert.ok(FORCED_CARD_MS > CAPTURE_MS);
+  assert.equal(CAPTURE_MS,1400);
 });
 function room(): MatchState {
   return {id:'ABC12345',protocolVersion:1,phase:'playing',playerIds:['a','bot_1','b','bot_2'],
@@ -47,7 +46,7 @@ test('public deadlines contain no opponent hands and work with counts alone', ()
 });
 test('phase deadlines preserve memory and ten-second voting policies', () => {
   const s=room();
-  for (const [phase,wait] of [['dealingFasha',2000],['dealingCards',5000],['capturing',600],['roundScoring',5000],['shuffleVoting',10000]]) {
+  for (const [phase,wait] of [['dealingFasha',4000],['dealingCards',5000],['capturing',1400],['roundScoring',8000],['shuffleVoting',10000]]) {
     assert.equal(progressDeadline({...s,phase}),start+Number(wait));
   }
   assert.equal(progressDeadline({...s,phase:'shuffleVoting',shuffleVotes:{a:true,b:false}}),0);

@@ -30,8 +30,8 @@ test('capture commits empty authoritative board and next bot deadline with one m
   assert.equal(event.id,'2:3:11'); assert.equal(event.playerUid,'a');
   assert.deepEqual(event.cards,[before.board![0],before.handCards!.a[0]]);
   assert.equal('handCards' in event,false);
-  assert.throws(()=>advanceMatch(after,[],now+799),/no_transition_due/);
-  assert.equal(advanceMatch(after,[],now+800).state.handCards!.bot_2.length,1);
+  assert.throws(()=>advanceMatch(after,[],now+1399),/no_transition_due/);
+  assert.equal(advanceMatch(after,[],now+1400).state.handCards!.bot_2.length,1);
   assert.equal(before.handCards!.a.length,2); // input and event are immutable snapshots
 });
 test('legacy capture still needs its compatible phase; human deadline gets visual grace', () => {
@@ -40,8 +40,9 @@ test('legacy capture still needs its compatible phase; human deadline gets visua
   let before={...original,playerIds:['a','b','bot_3','bot_4']};
   before=declareCapturePresentation(declareCapturePresentation(before,'a',2),'b',2) as typeof before;
   const after=lifecycleCommand('playCard',before,[],'a',{card:before.handCards!.a[0]},now).state;
-  assert.equal(Date.parse(String(after.turnStartTime)),now+600);
-  assert.equal(lifecycleCommand('playCard',after,[],'b',{card:after.handCards!.b[0]},now+1).state.currentTurnIndex,2);
+  assert.equal(Date.parse(String(after.turnStartTime)),now+1400);
+  assert.throws(()=>lifecycleCommand('playCard',after,[],'b',{card:after.handCards!.b[0]},now+1),/capture_presentation_pending/);
+  assert.equal(lifecycleCommand('playCard',after,[],'b',{card:after.handCards!.b[0]},now+1400).state.currentTurnIndex,2);
 });
 
 test('atomic full round conserves 52 cards without a decorative completion mutation', () => {
@@ -54,13 +55,13 @@ test('atomic full round conserves 52 cards without a decorative completion mutat
     if(state.phase==='playing' && state.playerIds!.some(uid=>state.handCards?.[uid]?.length)){
       const uid=state.playerIds![Number(state.currentTurnIndex)],hand=state.handCards![uid];
       const card=hand.find(c=>c.rank===state.board?.at(-1)?.rank)??hand[0];
-      clock+=1000;
+      clock=Math.max(clock+1000,Date.parse(String(state.playAvailableAt??''))||0);
       const before=(state.captureEvents as unknown[]??[]).length;
       ({state,deck}=lifecycleCommand('playCard',state,deck,uid,{card},clock));plays++;
       captures+=(state.captureEvents as unknown[]??[]).length-before;
       state={...state,serverVersion:Number(state.serverVersion)+1};
       assert.equal(state.phase,'playing');
-    } else {clock+=5000;({state,deck}=advanceMatch(state,deck,clock));}
+    } else {clock+=state.phase==='roundScoring'?8000:5000;({state,deck}=advanceMatch(state,deck,clock));}
     const harvested=Object.values(state.harvestStacks as Record<string,any[]>??{})
       .flatMap(stack=>stack.flatMap(c=>[...c.capturedCards,c.leadingCard]));
     const physical=[...deck,...(state.board??[]),...Object.values(state.handCards??{}).flat(),...harvested];

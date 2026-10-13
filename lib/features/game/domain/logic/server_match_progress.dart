@@ -3,7 +3,8 @@ import 'match_presentation_timing.dart';
 
 /// Scheduling is only a request hint: the server independently checks its clock.
 bool serverProgressDue(MatchState s, DateTime now) {
-  if (!s.usesServerCommands || s.playerIds.length != 4) return false;
+  if (s.roomClosed || !s.usesServerCommands || s.playerIds.length != 4) return false;
+  if (s.phase == GamePhase.playing && s.playAvailableAt != null && now.isBefore(s.playAvailableAt!)) return false;
   final phaseStart = s.phaseStartedAt ?? s.turnStartTime;
   bool elapsed(int milliseconds) => phaseStart != null &&
       now.difference(phaseStart).inMilliseconds >= milliseconds;
@@ -15,10 +16,11 @@ bool serverProgressDue(MatchState s, DateTime now) {
       return elapsed(cutter.startsWith('bot_') ? 1000 :
           (s.timerDurationSeconds > 0 ? s.timerDurationSeconds : 15) * 1000);
     case GamePhase.dealingFasha:
-      return elapsed(2000);
+      return elapsed(deckRevealDuration.inMilliseconds);
     case GamePhase.dealingCards:
-    case GamePhase.roundScoring:
       return elapsed(5000);
+    case GamePhase.roundScoring:
+      return elapsed(roundResultsDuration.inMilliseconds);
     case GamePhase.capturing:
       return elapsed(captureTotalDuration.inMilliseconds);
     case GamePhase.playing:

@@ -9,6 +9,7 @@ function record(value: unknown): Record<string, unknown> {
 
 /** Call only on the current SQL state under the room/secrets row lock. */
 export function joinCommandRoom(state: MatchState, uid: string, profile: Profile, now = Date.now()) {
+  if (state.roomClosed === true) throw new Error('room_closed');
   const ids = state.playerIds;
   if (!uid || uid.startsWith("bot_") || uid.startsWith("waiting_")) throw new Error("human_seat_required");
   if (!Array.isArray(ids) || ids.length !== 4) throw new Error("invalid_room_state");

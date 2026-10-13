@@ -12,6 +12,8 @@ import 'core/services/player_presence.dart';
 import 'core/providers/age_eligibility_provider.dart';
 import 'core/widgets/age_eligibility_screen.dart';
 import 'core/widgets/app_orientation_scope.dart';
+import 'core/providers/native_play_provider.dart';
+import 'core/widgets/native_play_entry.dart';
 import 'features/auth/presentation/providers/auth_providers.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/services.dart';
@@ -32,13 +34,14 @@ void main() async {
         : GameOrientation.landscape,
   );
 
-  try {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
-  } catch (e) {
-    debugPrint("Firebase init failed (likely missing config): $e");
-  }
+  if (!isNativeMobile)
+    try {
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+    } catch (e) {
+      debugPrint("Firebase init failed (likely missing config): $e");
+    }
 
   runApp(
     ProviderScope(
@@ -80,6 +83,40 @@ class HalabessaApp extends ConsumerWidget {
         home: const AgeEligibilityScreen(),
       );
     }
+    if (isNativeMobile && !ref.watch(nativeOnlineEnabledProvider)) {
+      return MaterialApp(
+        key: const ValueKey('native-local-entry'),
+        title: 'Halabessa',
+        localizationsDelegates: context.localizationDelegates,
+        supportedLocales: context.supportedLocales,
+        locale: context.locale,
+        theme: ThemeConfig.lightTheme,
+        darkTheme: ThemeConfig.darkTheme,
+        themeMode: settings.themeMode,
+        debugShowCheckedModeBanner: false,
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context).copyWith(
+            disableAnimations:
+                settings.reducedMotion ||
+                MediaQuery.disableAnimationsOf(context),
+          ),
+          child: ColoredBox(
+            color: ThemeConfig.darkBg,
+            child: child ?? const SizedBox.shrink(),
+          ),
+        ),
+        home: NativePlayEntry(
+          onOnline: () async {
+            if (Firebase.apps.isEmpty) {
+              await Firebase.initializeApp(
+                options: DefaultFirebaseOptions.currentPlatform,
+              ).timeout(const Duration(seconds: 15));
+            }
+            ref.read(nativeOnlineEnabledProvider.notifier).state = true;
+          },
+        ),
+      );
+    }
     final uid = ref.watch(authStateChangesProvider).valueOrNull?.uid;
 
     return MaterialApp(
@@ -101,23 +138,26 @@ class HalabessaApp extends ConsumerWidget {
                 settings.reducedMotion ||
                 MediaQuery.disableAnimationsOf(context),
           ),
-          child: Stack(
-            children: [
-              const UnityPersistentOverlay(), // Move to background
-              if (child != null)
-                Listener(
-                  behavior: HitTestBehavior.translucent,
-                  onPointerDown: (_) =>
-                      ref.read(multimediaServiceProvider).handleInteraction(),
-                  child: uid == null
-                      ? child
-                      : PlayerPresenceSession(
-                          key: ValueKey(uid),
-                          uid: uid,
-                          child: child,
-                        ),
-                ),
-            ],
+          child: ColoredBox(
+            color: ThemeConfig.darkBg,
+            child: Stack(
+              children: [
+                const UnityPersistentOverlay(), // Move to background
+                if (child != null)
+                  Listener(
+                    behavior: HitTestBehavior.translucent,
+                    onPointerDown: (_) =>
+                        ref.read(multimediaServiceProvider).handleInteraction(),
+                    child: uid == null
+                        ? child
+                        : PlayerPresenceSession(
+                            key: ValueKey(uid),
+                            uid: uid,
+                            child: child,
+                          ),
+                  ),
+              ],
+            ),
           ),
         );
       },

@@ -8,6 +8,15 @@ import 'dart:typed_data';
 class DefaultAudioAssets {
   static final Map<String, String> _cache = {};
 
+  /// Quiet, seamless local ambience. No downloaded music or remote overrides.
+  static String getMusic() => _cache.putIfAbsent('local_music', () =>
+    _synthesize(durationSeconds: 4, generator: (t) {
+      // Integer-cycle frequencies make the four-second loop continuous.
+      final slow = .7 + .3 * sin(2 * pi * .25 * t);
+      return (sin(2 * pi * 130.75 * t) + .5 * sin(2 * pi * 196 * t) +
+        .3 * sin(2 * pi * 261.5 * t)) * slow * .08;
+    }));
+
   static String? getSfx(String assetPath) {
     if (_cache.containsKey(assetPath)) {
       return _cache[assetPath];

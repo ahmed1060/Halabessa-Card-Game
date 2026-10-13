@@ -12,8 +12,8 @@ test("complete server round conserves all 52 cards and reaches visible results",
   let { state, deck } = advanceMatch(room(), [], now);
   assert.equal(state.phase, "preRoundCut");
   ({ state, deck } = lifecycleCommand("cut", state, deck, "d", { position: 20 }, now));
-  assert.throws(() => advanceMatch(state, deck, now + 1999), /no_transition_due/);
-  now += 2000;
+  assert.throws(() => advanceMatch(state, deck, now + 3999), /no_transition_due/);
+  now += 4000;
   ({ state, deck } = advanceMatch(state, deck, now));
   assert.equal(state.phase, "dealingCards");
   assert.throws(() => advanceMatch(state, deck, now + 4999), /no_transition_due/);
@@ -28,7 +28,7 @@ test("complete server round conserves all 52 cards and reaches visible results",
       ({ state, deck } = lifecycleCommand("playCard", state, deck, uid, { card }, now));
       plays++;
     } else {
-      now += 5000;
+      now += state.phase === 'roundScoring' ? 8000 : 5000;
       ({ state, deck } = advanceMatch(state, deck, now));
     }
     if (state.phase !== "capturing") {
@@ -95,12 +95,12 @@ test("capture animation has one harvest record and grants the next turn a fresh 
   assert.equal(captured.state.phase, "capturing");
   assert.deepEqual(captured.state.playHistory, [state.handCards!.a[0]]);
   assert.throws(() => lifecycleCommand("playCard", captured.state, [], "b", { card: state.handCards!.a[0] }, now + 1), /play_not_ready/);
-  assert.throws(() => advanceMatch(captured.state, [], now + 599), /no_transition_due/);
-  const finished = advanceMatch(captured.state, [], now + 600);
+  assert.throws(() => advanceMatch(captured.state, [], now + 1399), /no_transition_due/);
+  const finished = advanceMatch(captured.state, [], now + 1400);
   assert.equal(finished.state.phase, "playing");
   assert.deepEqual(finished.state.board, []);
   assert.equal(JSON.stringify(finished.state.harvestStacks), harvest);
-  assert.equal(finished.state.turnStartTime, new Date(now + 600).toISOString());
+  assert.equal(finished.state.turnStartTime, new Date(now + 1400).toISOString());
 });
 
 test("unanimous rematch cannot discard pending rewards; settled rematch resets scores", () => {
@@ -156,8 +156,8 @@ test('last-card capture has a single harvest entry and one completion transition
   assert.equal(captured.capturingStage, 0);
   assert.equal(captured.handCards!.a.length, 0);
   const harvest = JSON.stringify(captured.harvestStacks);
-  assert.throws(() => advanceMatch(captured, [], now + 1499), /no_transition_due/);
-  const finished = advanceMatch(captured, [], now + 1500).state;
+  assert.throws(() => advanceMatch(captured, [], now + 2299), /no_transition_due/);
+  const finished = advanceMatch(captured, [], now + 2300).state;
   assert.equal(finished.phase, 'playing');
   assert.deepEqual(finished.board, []);
   assert.equal(JSON.stringify(finished.harvestStacks), harvest);
@@ -192,7 +192,7 @@ test('a complete round with twelve forced last cards neither skips a deal nor lo
         manual++;
       }
     } else {
-      clock += state.phase === 'capturing' ? 600 : 5000;
+      clock += state.phase === 'capturing' ? 1400 : state.phase === 'roundScoring' ? 8000 : 5000;
       ({state, deck} = advanceMatch(state, deck, clock));
     }
     if (state.phase !== 'capturing') {

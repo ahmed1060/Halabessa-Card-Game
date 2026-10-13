@@ -17,14 +17,16 @@ class RoomSummary {
   final int replacementSeatCount;
   final int safeReplacementSeatCount;
 
+  int get humanCount => playerIds.where((id) =>
+      !id.startsWith('bot_') && !id.startsWith('waiting_')).length;
+  int get botCount => playerIds.where((id) => id.startsWith('bot_')).length;
+
   int get openSeatCount => phase == GamePhase.waitingForPlayers
       ? playerIds.where((id) => id.startsWith('waiting_')).length : replacementSeatCount;
   bool get isActiveReplacementRoom => protocolVersion == 1 &&
-      (phase == GamePhase.playing ||
-        (playerIds.length == 4 && playerIds.every((id) => id.startsWith('bot_')) &&
-          [GamePhase.preRoundCut, GamePhase.dealingFasha, GamePhase.dealingCards,
-            GamePhase.capturing].contains(phase))) && replacementSeatCount > 0;
+      humanCount > 0 && phase == GamePhase.playing && replacementSeatCount > 0;
   bool isVisiblePublic(DateTime now) => isPublic &&
+      playerIds.any((id) => !id.startsWith('bot_') && !id.startsWith('waiting_')) &&
       (expireAt == null || expireAt!.isAfter(now)) &&
       (phase == GamePhase.waitingForPlayers || isActiveReplacementRoom);
   bool isJoinable(DateTime now) => isVisiblePublic(now) &&

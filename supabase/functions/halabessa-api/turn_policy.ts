@@ -1,5 +1,6 @@
 import { playCard, type Card, type MatchState } from "./match_engine.ts";
 import { assignBotDifficulties } from './bot_strategy.ts';
+import { closeEmptyRoom } from './room_closure.ts';
 
 function record<T>(value: unknown): Record<string, T> {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -7,7 +8,7 @@ function record<T>(value: unknown): Record<string, T> {
 }
 
 /** Preserve the seat/team and cards; disconnection alone never calls this. */
-export function releasePlayer(state: MatchState, uid: string, reason: "left" | "inactivity") {
+export function releasePlayer(state: MatchState, uid: string, reason: "left" | "inactivity", now = Date.now()) {
   const seats = [...(state.playerIds ?? [])];
   const seat = seats.indexOf(uid);
   if (seat < 0 || uid.startsWith("bot_") || uid.startsWith("waiting_")) {
@@ -49,7 +50,7 @@ export function releasePlayer(state: MatchState, uid: string, reason: "left" | "
     skips[id] = skips[id].map(skip => skip.endsWith(`:${uid}`) ? `${skip.slice(0, -(uid.length + 1))}:${bot}` : skip);
   }
   next.skippedMatches = skips;
-  return assignBotDifficulties(next);
+  return closeEmptyRoom(assignBotDifficulties(next), now);
 }
 
 /** Server wall time decides timeout eligibility, never a client-supplied flag. */
@@ -72,10 +73,12 @@ export function timeoutPlay(state: MatchState, now = Date.now()) {
   const count = Number(counts[uid] ?? 0) + 1;
   const next: MatchState = { ...played, turnStartTime: new Date(now).toISOString(),
     consecutiveTimeouts: { ...counts, [uid]: count } };
-  return count >= 3 ? releasePlayer(next, uid, "inactivity") : next;
+  return count >= 3 ? releasePlayer(next, uid, "inactivity", now) : next;
 }
 
 export function manualPlay(state: MatchState, uid: string, card: unknown, now = Date.now()) {
+  const available = Date.parse(String(state.playAvailableAt ?? ''));
+  if (Number.isFinite(available) && now < available) throw new Error('capture_presentation_pending');
   const duration = Number(state.timerDurationSeconds);
   const started = Date.parse(String(state.turnStartTime ?? ""));
   if (duration > 0 && (!Number.isFinite(started) || now >= started + duration * 1000)) {
@@ -92,6 +95,9 @@ export function manualPlay(state: MatchState, uid: string, card: unknown, now = 
 export function claimReplacement(state: MatchState, uid: string, profile: {
   displayName: string; cardBackId: string; avatarUrl: string;
 }) {
+  if (state.roomClosed === true || !(state.playerIds ?? []).some(id => !/^(bot_|waiting_)/.test(id))) {
+    throw new Error('room_closed');
+  }
   if (!uid || uid.startsWith("bot_") || uid.startsWith("waiting_")) throw new Error("human_seat_required");
   if ((state.playerIds ?? []).includes(uid)) throw new Error("already_seated");
   const seat = replacementSeatIndex(state);
@@ -130,21 +136,19 @@ export function replacementSeatIndex(state: MatchState) {
 }
 
 export function replacementSeatIndices(state: MatchState) {
-  if (!state.isPublic || !replacementPhaseAvailable(state)) return [];
+  if (!state.isPublic || state.roomClosed === true || !replacementPhaseAvailable(state)) return [];
   const released = record<unknown>(state.releasedSeats);
-  // An all-bot room has no human who can request advances. Permit recovery of
-  // its explicitly released active seat under the same room transaction lock.
+  // A live human-controlled room may replace only an explicitly released,
+  // inactive bot seat. Unattended rooms are closed rather than revived.
   const ids = state.playerIds ?? [];
-  const unattended = ids.length === 4 && ids.every(uid => uid.startsWith("bot_"));
   return ids.flatMap((uid, index) =>
-    uid.startsWith("bot_") && uid in released && (unattended || index !== Number(state.currentTurnIndex)) ? [index] : []);
+    uid.startsWith("bot_") && uid in released && index !== Number(state.currentTurnIndex) ? [index] : []);
 }
 
-/** Only live preparation/animation phases may recover an unattended room.
+/** Only live play with a human controller allows replacing a released seat.
  * Voting, scoring and results are excluded to avoid joining a settled roster. */
 export function replacementPhaseAvailable(state: MatchState) {
-  if (state.phase === "playing") return true;
   const ids = state.playerIds ?? [];
-  return ids.length === 4 && ids.every(uid => uid.startsWith("bot_")) &&
-    ["preRoundCut", "dealingFasha", "dealingCards", "capturing"].includes(String(state.phase));
+  return state.roomClosed !== true && state.phase === 'playing' &&
+    ids.some(uid => !/^(bot_|waiting_)/.test(uid));
 }

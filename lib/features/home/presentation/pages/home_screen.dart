@@ -141,125 +141,140 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   children: [
                     const LanternWordmark(),
                     const SizedBox(height: 24),
-                    _lobbyAction(
-                      title: 'quick_match'.tr(),
-                      subtitle:
-                          (_isQuickMatching
-                                  ? 'searching_match'
-                                  : 'quick_match_desc')
-                              .tr(),
-                      icon: Icons.groups_rounded,
-                      primary: true,
-                      onTap: () => _handleQuickMatch(context, user),
-                    ),
-                    const SizedBox(height: 12),
-                    _lobbyAction(
-                      title: 'practice_bots'.tr(),
-                      subtitle: 'practice_bots_desc'.tr(),
-                      icon: Icons.person_rounded,
-                      onTap: () => _startOfflinePractice(context, user),
-                    ),
-                    const SizedBox(height: 12),
-                    _lobbyAction(
-                      title: 'create_room'.tr(),
-                      subtitle: 'room_code'.tr(),
-                      icon: Icons.add_rounded,
-                      onTap: () => _showCreateRoomDialog(
-                        context,
-                        user?.uid ?? '',
-                        user?.displayName ?? '',
+                    if (!widget.playFocus) ...[
+                      _lobbyAction(
+                        title: 'ui_play'.tr(),
+                        subtitle: 'home_play_description'.tr(),
+                        icon: Icons.style_rounded,
+                        primary: true,
+                        onTap: () => Navigator.pushNamed(context, '/play'),
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    _lobbyAction(
-                      title: 'join_room'.tr(),
-                      subtitle: 'room_code'.tr(),
-                      icon: Icons.login_rounded,
-                      onTap: () {
-                        if (user == null) return;
-                        showModalBottomSheet(
-                          context: context,
-                          isScrollControlled: true,
-                          backgroundColor: Colors.transparent,
-                          builder: (_) => RoomEntrySheet(
-                            child: _buildJoinCodeBar(context, user),
-                          ),
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 20),
-                    Wrap(
-                      alignment: WrapAlignment.spaceEvenly,
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        _lobbyUtility(
-                          'friends_tab'.tr(),
-                          Icons.people_rounded,
-                          () => showModalBottomSheet(
+                    ],
+                    if (widget.playFocus) ...[
+                      _lobbyAction(
+                        title: 'quick_match'.tr(),
+                        subtitle:
+                            (_isQuickMatching
+                                    ? 'searching_match'
+                                    : 'quick_match_desc')
+                                .tr(),
+                        icon: Icons.groups_rounded,
+                        primary: true,
+                        onTap: () => _handleQuickMatch(context, user),
+                      ),
+                      const SizedBox(height: 12),
+                      _lobbyAction(
+                        title: 'practice_bots'.tr(),
+                        subtitle: 'practice_bots_desc'.tr(),
+                        icon: Icons.person_rounded,
+                        onTap: () => _startOfflinePractice(context, user),
+                      ),
+                      const SizedBox(height: 12),
+                      _lobbyAction(
+                        title: 'create_room'.tr(),
+                        subtitle: 'room_code'.tr(),
+                        icon: Icons.add_rounded,
+                        onTap: () => _showCreateRoomDialog(
+                          context,
+                          user?.uid ?? '',
+                          user?.displayName ?? '',
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      _lobbyAction(
+                        title: 'join_room'.tr(),
+                        subtitle: 'room_code'.tr(),
+                        icon: Icons.login_rounded,
+                        onTap: () {
+                          if (user == null) return;
+                          showModalBottomSheet(
                             context: context,
                             isScrollControlled: true,
                             backgroundColor: Colors.transparent,
-                            builder: (_) => const social_ui.SocialOverlay(),
-                          ),
-                        ),
-                        _lobbyUtility(
-                          'store'.tr(),
-                          Icons.shopping_bag_rounded,
-                          () => Navigator.pushNamed(context, '/store'),
-                        ),
-                        _lobbyUtility(
-                          'leaderboard_title'.tr(),
-                          Icons.emoji_events_rounded,
-                          () => Navigator.pushNamed(context, '/leaderboard'),
-                        ),
-                        _lobbyUtility(
-                          'daily_reward_title'.tr(),
-                          Icons.card_giftcard_rounded,
-                          () async {
-                            final status =
-                                await DailyStreakService.checkStatus();
-                            if (context.mounted) {
-                              showDialog(
-                                context: context,
-                                builder: (_) =>
-                                    DailyStreakDialog(status: status),
-                              );
-                            }
-                          },
-                        ),
-                      ],
-                    ),
-                    if (user != null && (user.username?.isEmpty ?? true))
-                      TextButton.icon(
-                        icon: const Icon(Icons.alternate_email),
-                        label: Text('setup_username_optional'.tr()),
-                        onPressed: () => showModalBottomSheet(
-                          context: context,
-                          isScrollControlled: true,
-                          backgroundColor: Colors.transparent,
-                          builder: (_) => const UsernameOnboardingOverlay(),
-                        ),
+                            builder: (_) => RoomEntrySheet(
+                              child: _buildJoinCodeBar(context, user),
+                            ),
+                          );
+                        },
                       ),
-                    const SizedBox(height: 20),
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: TableStyle.ink,
-                        borderRadius: BorderRadius.circular(18),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                    ],
+                    if (!widget.playFocus) ...[
+                      const SizedBox(height: 20),
+                      Wrap(
+                        alignment: WrapAlignment.spaceEvenly,
+                        spacing: 8,
+                        runSpacing: 8,
                         children: [
-                          Text(
-                            'available_matches'.tr(),
-                            style: TableStyle.label,
+                          _lobbyUtility(
+                            'friends_tab'.tr(),
+                            Icons.people_rounded,
+                            () => showModalBottomSheet(
+                              context: context,
+                              isScrollControlled: true,
+                              backgroundColor: Colors.transparent,
+                              builder: (_) => const social_ui.SocialOverlay(),
+                            ),
                           ),
-                          const SizedBox(height: 12),
-                          const PublicRoomsList(),
+                          _lobbyUtility(
+                            'store'.tr(),
+                            Icons.shopping_bag_rounded,
+                            () => Navigator.pushNamed(context, '/store'),
+                          ),
+                          _lobbyUtility(
+                            'leaderboard_title'.tr(),
+                            Icons.emoji_events_rounded,
+                            () => Navigator.pushNamed(context, '/leaderboard'),
+                          ),
+                          _lobbyUtility(
+                            'daily_reward_title'.tr(),
+                            Icons.card_giftcard_rounded,
+                            () async {
+                              final status =
+                                  await DailyStreakService.checkStatus();
+                              if (context.mounted) {
+                                showDialog(
+                                  context: context,
+                                  builder: (_) =>
+                                      DailyStreakDialog(status: status),
+                                );
+                              }
+                            },
+                          ),
                         ],
                       ),
-                    ),
+                      if (user != null && (user.username?.isEmpty ?? true))
+                        TextButton.icon(
+                          icon: const Icon(Icons.alternate_email),
+                          label: Text('setup_username_optional'.tr()),
+                          onPressed: () => showModalBottomSheet(
+                            context: context,
+                            isScrollControlled: true,
+                            backgroundColor: Colors.transparent,
+                            builder: (_) => const UsernameOnboardingOverlay(),
+                          ),
+                        ),
+                    ],
+                    if (widget.playFocus) ...[
+                      const SizedBox(height: 20),
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: TableStyle.ink,
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Text(
+                              'available_matches'.tr(),
+                              style: TableStyle.label,
+                            ),
+                            const SizedBox(height: 12),
+                            const PublicRoomsList(),
+                          ],
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),

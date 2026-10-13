@@ -2,87 +2,113 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/global_settings.dart';
+import 'dart:async';
+import 'native_play_provider.dart';
 
 class GlobalSettingsNotifier extends StateNotifier<GlobalSettings> {
-  GlobalSettingsNotifier() : super(GlobalSettings()) {
-    _listenToSettings();
+  final List<StreamSubscription<dynamic>> _subscriptions = [];
+  GlobalSettingsNotifier({bool listenRemote = true}) : super(GlobalSettings()) {
+    if (listenRemote) _listenToSettings();
   }
 
   void _listenToSettings() {
     // Listen to main global document (timer, score)
-    FirebaseFirestore.instance
-        .collection('settings')
-        .doc('global')
-        .snapshots()
-        .listen((snapshot) {
-      if (snapshot.exists && snapshot.data() != null) {
-        state = state.copyWith(
-          defaultTurnTimer: snapshot.data()?['defaultTurnTimer'] as int? ?? 10,
-          defaultTargetScore: snapshot.data()?['defaultTargetScore'] as int? ?? 41,
-        );
-      }
-    });
+    _subscriptions.add(
+      FirebaseFirestore.instance
+          .collection('settings')
+          .doc('global')
+          .snapshots()
+          .listen((snapshot) {
+            if (!mounted) return;
+            if (snapshot.exists && snapshot.data() != null) {
+              state = state.copyWith(
+                defaultTurnTimer:
+                    snapshot.data()?['defaultTurnTimer'] as int? ?? 10,
+                defaultTargetScore:
+                    snapshot.data()?['defaultTargetScore'] as int? ?? 41,
+              );
+            }
+          }, onError: (Object _) {}),
+    );
 
     // Listen to overrides sub-collection (audio data and backups)
-    FirebaseFirestore.instance
-        .collection('settings')
-        .doc('global')
-        .collection('overrides')
-        .snapshots()
-        .listen((snapshot) {
-      Map<String, String> newSfx = {};
-      Map<String, String> newSfxBackups = {};
-      String? newMusic;
-      String? newMusicBackup;
-      String? newRoomMusic;
-      String? newRoomMusicBackup;
+    _subscriptions.add(
+      FirebaseFirestore.instance
+          .collection('settings')
+          .doc('global')
+          .collection('overrides')
+          .snapshots()
+          .listen(
+            (snapshot) {
+              if (!mounted) return;
+              Map<String, String> newSfx = {};
+              Map<String, String> newSfxBackups = {};
+              String? newMusic;
+              String? newMusicBackup;
+              String? newRoomMusic;
+              String? newRoomMusicBackup;
 
-      for (var doc in snapshot.docs) {
-        final data = doc.data();
-        final url = data['url'] as String?;
-        final isBackup = data['isBackup'] as bool? ?? false;
-        final assetPath = data['assetPath'] as String?;
+              for (var doc in snapshot.docs) {
+                final data = doc.data();
+                final url = data['url'] as String?;
+                final isBackup = data['isBackup'] as bool? ?? false;
+                final assetPath = data['assetPath'] as String?;
 
-        if (doc.id == 'music') {
-          newMusic = url;
-        } else if (doc.id == 'music_backup') {
-          newMusicBackup = url;
-        } else if (doc.id == 'room_music') {
-          newRoomMusic = url;
-        } else if (doc.id == 'room_music_backup') {
-          newRoomMusicBackup = url;
-        } else if (doc.id.startsWith('sfx_')) {
-          if (assetPath != null && url != null) {
-            if (doc.id.endsWith('_backup')) {
-              newSfxBackups[assetPath] = url;
-            } else {
-              newSfx[assetPath] = url;
-            }
-          }
-        }
-      }
+                if (doc.id == 'music') {
+                  newMusic = url;
+                } else if (doc.id == 'music_backup') {
+                  newMusicBackup = url;
+                } else if (doc.id == 'room_music') {
+                  newRoomMusic = url;
+                } else if (doc.id == 'room_music_backup') {
+                  newRoomMusicBackup = url;
+                } else if (doc.id.startsWith('sfx_')) {
+                  if (assetPath != null && url != null) {
+                    if (doc.id.endsWith('_backup')) {
+                      newSfxBackups[assetPath] = url;
+                    } else {
+                      newSfx[assetPath] = url;
+                    }
+                  }
+                }
+              }
 
-      state = state.copyWith(
-        sfxOverrides: newSfx,
-        sfxBackups: newSfxBackups,
-        musicOverrideUrl: newMusic,
-        musicBackupUrl: newMusicBackup,
-        roomMusicOverrideUrl: newRoomMusic,
-        roomMusicBackupUrl: newRoomMusicBackup,
-      );
-    }, onError: (error) {
-      debugPrint('GlobalSettingsNotifier: Firestore Error: $error');
-      if (error.toString().contains('permission-denied')) {
-        debugPrint('GlobalSettingsNotifier: Possible Ad-blocker or Permission issue.');
-      }
-    });
+              state = state.copyWith(
+                sfxOverrides: newSfx,
+                sfxBackups: newSfxBackups,
+                musicOverrideUrl: newMusic,
+                musicBackupUrl: newMusicBackup,
+                roomMusicOverrideUrl: newRoomMusic,
+                roomMusicBackupUrl: newRoomMusicBackup,
+              );
+            },
+            onError: (error) {
+              debugPrint('GlobalSettingsNotifier: Firestore Error: $error');
+              if (error.toString().contains('permission-denied')) {
+                debugPrint(
+                  'GlobalSettingsNotifier: Possible Ad-blocker or Permission issue.',
+                );
+              }
+            },
+          ),
+    );
+  }
+
+  @override
+  void dispose() {
+    for (final subscription in _subscriptions) {
+      unawaited(subscription.cancel());
+    }
+    super.dispose();
   }
 
   Future<void> updateSettings(GlobalSettings newSettings) async {
     final batch = FirebaseFirestore.instance.batch();
-    final mainDoc = FirebaseFirestore.instance.collection('settings').doc('global');
+    final mainDoc = FirebaseFirestore.instance
+        .collection('settings')
+        .doc('global');
     final overridesColl = mainDoc.collection('overrides');
-    
+
     // 1. Update main document
     batch.set(mainDoc, {
       'defaultTurnTimer': newSettings.defaultTurnTimer,
@@ -91,10 +117,14 @@ class GlobalSettingsNotifier extends StateNotifier<GlobalSettings> {
 
     // 2. Music logic
     if (newSettings.musicOverrideUrl != null) {
-       batch.set(overridesColl.doc('music'), {'url': newSettings.musicOverrideUrl});
+      batch.set(overridesColl.doc('music'), {
+        'url': newSettings.musicOverrideUrl,
+      });
     }
     if (newSettings.roomMusicOverrideUrl != null) {
-       batch.set(overridesColl.doc('room_music'), {'url': newSettings.roomMusicOverrideUrl});
+      batch.set(overridesColl.doc('room_music'), {
+        'url': newSettings.roomMusicOverrideUrl,
+      });
     }
 
     // 3. SFX logic
@@ -102,7 +132,7 @@ class GlobalSettingsNotifier extends StateNotifier<GlobalSettings> {
       final assetPath = entry.key;
       final url = entry.value;
       final safeId = assetPath.replaceAll('/', '_');
-      
+
       batch.set(overridesColl.doc('sfx_$safeId'), {
         'assetPath': assetPath,
         'url': url,
@@ -113,7 +143,9 @@ class GlobalSettingsNotifier extends StateNotifier<GlobalSettings> {
   }
 
   Future<void> markAsDefault(String assetPath, String type) async {
-    final mainDoc = FirebaseFirestore.instance.collection('settings').doc('global');
+    final mainDoc = FirebaseFirestore.instance
+        .collection('settings')
+        .doc('global');
     final overridesColl = mainDoc.collection('overrides');
 
     if (type == 'music') {
@@ -144,7 +176,9 @@ class GlobalSettingsNotifier extends StateNotifier<GlobalSettings> {
   }
 
   Future<bool> clearOverride(String assetPath, String type) async {
-    final mainDoc = FirebaseFirestore.instance.collection('settings').doc('global');
+    final mainDoc = FirebaseFirestore.instance
+        .collection('settings')
+        .doc('global');
     final overridesColl = mainDoc.collection('overrides');
 
     if (type == 'music') {
@@ -157,7 +191,9 @@ class GlobalSettingsNotifier extends StateNotifier<GlobalSettings> {
       }
     } else if (type == 'room_music') {
       if (state.roomMusicBackupUrl != null) {
-        await overridesColl.doc('room_music').set({'url': state.roomMusicBackupUrl});
+        await overridesColl.doc('room_music').set({
+          'url': state.roomMusicBackupUrl,
+        });
         return true;
       } else {
         await overridesColl.doc('room_music').delete();
@@ -179,6 +215,8 @@ class GlobalSettingsNotifier extends StateNotifier<GlobalSettings> {
   }
 }
 
-final globalSettingsProvider = StateNotifierProvider<GlobalSettingsNotifier, GlobalSettings>((ref) {
-  return GlobalSettingsNotifier();
-});
+final globalSettingsProvider =
+    StateNotifierProvider<GlobalSettingsNotifier, GlobalSettings>((ref) {
+      final online = ref.watch(nativeOnlineEnabledProvider);
+      return GlobalSettingsNotifier(listenRemote: !isNativeMobile || online);
+    });

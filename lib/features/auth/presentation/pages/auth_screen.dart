@@ -11,6 +11,7 @@ import '../providers/auth_providers.dart';
 import '../../../../core/utils/error_handler.dart';
 import '../../../../core/theme/theme_config.dart';
 import '../../../../core/services/web_platform_service.dart';
+import '../../../../core/providers/native_play_provider.dart';
 
 class AuthScreen extends ConsumerStatefulWidget {
   const AuthScreen({super.key});
@@ -292,6 +293,11 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                     ),
                   ),
                   const SizedBox(height: 16),
+                  if (isNativeMobile) OutlinedButton.icon(
+                    onPressed: () => ref.read(nativeOnlineEnabledProvider.notifier).state = false,
+                    icon: const Icon(Icons.offline_bolt_outlined),
+                    label: Text('offline_practice_title'.tr()),
+                  ),
                   Text(
                     'or_connect_with'.tr(),
                     style: const TextStyle(color: Color(0xFFFFF6E7)),

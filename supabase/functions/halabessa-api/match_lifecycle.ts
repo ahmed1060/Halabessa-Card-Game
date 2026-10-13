@@ -1,7 +1,7 @@
 import { cut, deal, playCard, startRound, type Card, type MatchState } from "./match_engine.ts";
 import { manualPlay, releasePlayer, timeoutPlay } from "./turn_policy.ts";
 import { assignBotDifficulties, chooseBotCard } from './bot_strategy.ts';
-import { BOT_THINK_MS, CAPTURE_MS, FORCED_CARD_MS } from './match_progress.ts';
+import { BOT_THINK_MS, CAPTURE_MS, FORCED_CARD_MS, DECK_REVEAL_MS, ROUND_RESULTS_MS } from './match_progress.ts';
 import { atomicCaptureSupported } from './capture_presentation.ts';
 
 type Capture = { leadingCard: Card; capturedCards: Card[]; isRoundAward?: boolean };
@@ -43,7 +43,7 @@ function nextRound(state: MatchState, shuffle: boolean, now: number): Transition
   }
   started.state = { ...started.state, roundsSinceLastShuffle: shuffle ? 0 : integer(state.roundsSinceLastShuffle) + 1,
     turnStartTime: new Date(now).toISOString(), capturingCards: [], capturingTeam: null,
-    capturingStage: 0, captureEvents: [], playHistory: [], earnedStars: {}, earnedCoins: {}, expireAt: null,
+    capturingStage: 0, captureEvents: [], playAvailableAt: null, playHistory: [], earnedStars: {}, earnedCoins: {}, expireAt: null,
     settlementPending: false, rewardRoster: [], rewardScores: null, rewardReceiptId: null, rewardCompletedAt: null };
   return stamp({ ...started, state: assignBotDifficulties(started.state) }, now);
 }
@@ -64,8 +64,9 @@ function finishRound(state: MatchState, deck: Card[], now: number): Transition {
     teamBScore: integer(state.teamBScore) + (b > a ? 3 : 0) }, deck }, now);
 }
 function animateCapture(before: MatchState, after: MatchState, deck: Card[], now: number): Transition {
+  if (after.roomClosed === true) return { state: after, deck: [] };
   const captured = (before.board ?? []).length > 0 && !(after.board ?? []).length;
-  if (!captured) return { state: { ...after, turnStartTime: new Date(now).toISOString() }, deck };
+  if (!captured) return { state: { ...after, playAvailableAt: null, turnStartTime: new Date(now).toISOString() }, deck };
   const team = String(after.lastCaptureTeam);
   const captures = map<Capture[]>(after.harvestStacks)[team] ?? [];
   const leading = captures.at(-1)!.leadingCard;
@@ -80,6 +81,7 @@ function animateCapture(before: MatchState, after: MatchState, deck: Card[], now
     return stamp({ state: { ...after, phase: 'playing', board: [],
       capturingCards: [], capturingTeam: null, capturingStage: 0,
       turnStartTime: new Date(now + grace).toISOString(),
+      playAvailableAt: new Date(now + CAPTURE_MS).toISOString(),
       captureEvents: [...events, {
         id: `${integer(before.matchSequence)}:${integer(before.roundCount)}:${integer(before.serverVersion) + 1}`,
         cards, team, playerUid: before.playerIds?.[integer(before.currentTurnIndex)],
@@ -93,6 +95,7 @@ function animateCapture(before: MatchState, after: MatchState, deck: Card[], now
 
 /** All timed transitions use a supplied server clock, never a client clock. */
 export function advanceMatch(state: MatchState, deck: Card[], now = Date.now()): Transition {
+  if (state.roomClosed === true) throw new Error('room_closed');
   state = assignBotDifficulties(state);
   const ids = state.playerIds ?? [];
   if (ids.length !== 4) throw new Error("four_players_required");
@@ -108,7 +111,7 @@ export function advanceMatch(state: MatchState, deck: Card[], now = Date.now()):
       return stamp(cut(state, deck, cutter, Math.floor(deck.length / 2)), now);
     }
     case "dealingFasha":
-      if (elapsed(state, now) < 2000) throw new Error("no_transition_due");
+      if (elapsed(state, now) < DECK_REVEAL_MS) throw new Error("no_transition_due");
       return stamp(deal(state, deck, ids[integer(state.dealerIndex)], true), now);
     case "dealingCards":
       if (elapsed(state, now) < 5000) throw new Error("no_transition_due");
@@ -121,6 +124,8 @@ export function advanceMatch(state: MatchState, deck: Card[], now = Date.now()):
       // publication round trip just to advance decorative animation frames.
       throw new Error("no_transition_due");
     case "playing": {
+      const available = Date.parse(String(state.playAvailableAt ?? ''));
+      if (Number.isFinite(available) && now < available) throw new Error('no_transition_due');
       if (ids.every(uid => !(state.handCards?.[uid] ?? []).length)) {
         if (!deck.length) return finishRound(state, deck, now);
         const dealt = deal(state, deck, ids[integer(state.dealerIndex)], false);
@@ -146,7 +151,7 @@ export function advanceMatch(state: MatchState, deck: Card[], now = Date.now()):
       return animateCapture(state, timeoutPlay(state, now), deck, now);
     }
     case "roundScoring": {
-      if (elapsed(state, now) < 5000) throw new Error("no_transition_due");
+      if (elapsed(state, now) < ROUND_RESULTS_MS) throw new Error("no_transition_due");
       if (integer(state.teamAScore) >= integer(state.maxPoints, 41) || integer(state.teamBScore) >= integer(state.maxPoints, 41)) {
         const winner = integer(state.teamAScore) >= integer(state.maxPoints, 41) ? 0 : 1;
         const stars: Record<string, number> = {}, coins: Record<string, number> = {};
@@ -199,7 +204,10 @@ export function lifecycleCommand(type: string, state: MatchState, deck: Card[], 
   }
   if (type === "advance") return advanceMatch(state, deck, now);
   if (type === "playCard") return animateCapture(state, manualPlay(state, uid, payload.card, now), deck, now);
-  if (type === "leave") return { state: releasePlayer(state, uid, "left"), deck };
+  if (type === "leave") {
+    const next = releasePlayer(state, uid, 'left', now);
+    return { state: next, deck: next.roomClosed === true ? [] : deck };
+  }
   if (type === "cut") {
     if (state.phase !== "preRoundCut") throw new Error("cut_not_ready");
     // The timer-free gameplay option still has a bounded preparation phase.

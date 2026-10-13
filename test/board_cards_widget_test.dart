@@ -63,9 +63,11 @@ void main() {
 
   testWidgets('capture has a distinct merge and teamward flight', (tester) async {
     await tester.pumpWidget(scene(const [first, second], capture: true));
-    expect(tester.widget<AnimatedScale>(find.byType(AnimatedScale)).scale, 0.84);
+    // Keep every face readable during the hold, then shrink during collection.
+    expect(tester.widget<AnimatedScale>(find.byType(AnimatedScale)).scale, 1);
     await tester.pumpAndSettle();
     await tester.pumpWidget(scene(const [first, second], capture: true, stage: 1));
+    expect(tester.widget<AnimatedScale>(find.byType(AnimatedScale)).scale, 0.84);
     expect(tester.widget<AnimatedSlide>(
       find.byKey(const ValueKey('capture-flight'))).offset,
         const Offset(0, 1.3));
@@ -105,9 +107,11 @@ void main() {
     await tester.pump(const Duration(milliseconds: 200));
     // An identical realtime snapshot/clock rebuild must not restart the pause.
     await tester.pumpWidget(scene(const [first, second], capture: true));
-    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump(const Duration(milliseconds: 799));
+    expect(tester.widget<AnimatedSlide>(flight).offset, Offset.zero);
+    await tester.pump(const Duration(milliseconds: 1));
     expect(tester.widget<AnimatedSlide>(flight).offset, const Offset(0, 1.3));
-    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump(const Duration(milliseconds: 400));
     expect(tester.widget<AnimatedOpacity>(find.byType(AnimatedOpacity)).opacity, .12);
     // The authoritative flag remained stage 0 throughout the entire flight.
     expect(tester.widget<BoardCardsWidget>(find.byType(BoardCardsWidget)).capturingStage, 0);

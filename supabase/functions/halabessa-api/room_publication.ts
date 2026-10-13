@@ -31,6 +31,12 @@ export async function publishDetachedRoom(run: PublicationRunner, id: string,
   });
   if (!room) return null;
   await publish(room); // MUST use external version-checked publication.
+  if (room.state.roomClosed === true && room.state.settlementPending !== true) {
+    // Only after the external deletion fences succeed. Never purge a newer
+    // revision, an occupied room, or a completed game's pending rewards.
+    await run(query => query(`delete from halabessa.rooms where room_id=$1 and version=$2
+      and state->>'roomClosed'='true' and coalesce(state->>'settlementPending','false')='false'`, [id, room.version]));
+  }
   await run(query => query('delete from halabessa.room_publications where room_id=$1 and version<=$2', [id, room.version]));
   return room;
 }
@@ -67,6 +73,10 @@ export async function publishRoom(query: PublicationQuery, id: string,
     if (!row) throw new Error('room_not_found');
     const room = committedRoom(row), version = room.version;
     await publish(room);
+    if (room.state.roomClosed === true && room.state.settlementPending !== true) {
+      await query(`delete from halabessa.rooms where room_id=$1 and version=$2
+        and state->>'roomClosed'='true' and coalesce(state->>'settlementPending','false')='false'`, [id, version]);
+    }
     // Commits after our SELECT have higher versions and retain their intents.
     await query('delete from halabessa.room_publications where room_id=$1 and version<=$2', [id, version]);
     await query('commit', []);

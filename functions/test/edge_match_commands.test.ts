@@ -56,10 +56,10 @@ test("nonhost human can advance preparation; outsiders and bot identities cannot
 test("compatibility phase commands cannot skip server animation delays or restart an active match", () => {
   const round = executeMatchIntent("startRound", room(), [], "a", "a", {}, now);
   const cut = executeMatchIntent("cut", round.state, round.deck, "d", "d", { position: 20 }, now);
-  assert.throws(() => executeMatchIntent('dealInitial', cut.state, cut.deck, 'b', 'b', {}, now + 1999), /no_transition_due/);
-  const dealt = executeMatchIntent("dealInitial", cut.state, cut.deck, "b", "b", {}, now + 2000);
-  assert.throws(() => executeMatchIntent("beginPlay", dealt.state, dealt.deck, "a", "a", {}, now + 6999), /no_transition_due/);
-  const ready = executeMatchIntent("beginPlay", dealt.state, dealt.deck, "b", "b", {}, now + 7000);
+  assert.throws(() => executeMatchIntent('dealInitial', cut.state, cut.deck, 'b', 'b', {}, now + 3999), /no_transition_due/);
+  const dealt = executeMatchIntent("dealInitial", cut.state, cut.deck, "b", "b", {}, now + 4000);
+  assert.throws(() => executeMatchIntent("beginPlay", dealt.state, dealt.deck, "a", "a", {}, now + 8999), /no_transition_due/);
+  const ready = executeMatchIntent("beginPlay", dealt.state, dealt.deck, "b", "b", {}, now + 9000);
   assert.equal(ready.state.phase, "playing");
   assert.throws(() => executeMatchIntent("startRound", ready.state, ready.deck, "a", "a", {}, now), /phase_not_ready/);
   assert.throws(() => executeMatchIntent("dealSubsequent", ready.state, ready.deck, "a", "a", {}, now), /hands_not_empty/);

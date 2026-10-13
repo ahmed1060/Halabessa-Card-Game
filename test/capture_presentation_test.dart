@@ -25,9 +25,9 @@ void main() {
       'board':[{'suit':'clubs','rank':'two'}]});
     await tester.pumpWidget(view(following));
     expect(find.text('capturing:ace,ace'),findsOneWidget);
-    await tester.pump(const Duration(milliseconds:600));
+    await tester.pump(const Duration(milliseconds:1400));
     expect(find.text('capturing:king,king'),findsOneWidget);
-    await tester.pump(const Duration(milliseconds:600));
+    await tester.pump(const Duration(milliseconds:1400));
     expect(find.text('playing:two'),findsOneWidget);
     await tester.pumpWidget(view(following.copyWith(serverVersion:5)));
     expect(find.text('playing:two'),findsOneWidget);

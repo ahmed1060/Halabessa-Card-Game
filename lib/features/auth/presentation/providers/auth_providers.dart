@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/services/supabase_backend_service.dart';
+import '../../../../core/providers/native_play_provider.dart';
 
 import '../../domain/models/app_user.dart';
 import '../../domain/models/ranking_period.dart';
@@ -19,6 +20,8 @@ final authRepositoryProvider = Provider<AuthRepository>((ref) {
 
 // 3. Streams the User Authentication State
 final authStateChangesProvider = StreamProvider<AppUser?>((ref) {
+  final online = ref.watch(nativeOnlineEnabledProvider);
+  if (isNativeMobile && !online) return Stream.value(null);
   return ref.watch(authRepositoryProvider).authStateChanges;
 });
 

@@ -1,4 +1,13 @@
 {
+  "online_play_title": "Play online",
+  "offline_practice_title": "Offline Practice",
+  "offline_practice_description": "Play against bots without internet or signing in. Practice does not affect online coins, rewards or rankings.",
+  "local_player_name": "Local Player",
+  "offline_save_failed": "Could not save the local profile. Please try again.",
+  "online_entry_retry": "Online play could not start. Retry, or play offline.",
+  "offline_leave_warning": "Leave Practice? This match will end on this device. No online points or coins will change.",
+  "room_seats_info": "Humans: {} · Bots: {} · Open seats: {} · Code: {}",
+  "home_play_description": "Find a match, play with friends or practice",
     "ui_presence_all": "All",
     "ui_presence_online": "Online",
     "ui_presence_offline": "Offline",

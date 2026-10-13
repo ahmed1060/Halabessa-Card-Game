@@ -43,6 +43,9 @@ final chatMessagesProvider = StreamProvider.autoDispose<List<ChatMessage>>((
           .toList(),
     );
   }
+  // Practice has no shared chat storage. Mounting the hidden overlay/bubbles
+  // must not create a database client just to subscribe to an offline room.
+  if (matchId.startsWith('OFFLINE_')) return Stream.value([]);
   final (seat, protocol) = ref.watch(
     matchStateProvider.select(
       (state) => (
