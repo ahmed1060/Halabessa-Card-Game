@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:halabessa/core/providers/settings_provider.dart';
+import 'package:halabessa/core/routes/app_routes.dart';
 import 'package:halabessa/core/providers/native_play_provider.dart';
 import 'package:halabessa/core/providers/global_settings_provider.dart';
 import 'package:halabessa/core/services/default_audio_assets.dart';
@@ -21,6 +22,7 @@ import 'package:halabessa/features/game/presentation/pages/game_board_screen.dar
 import 'package:halabessa/features/game/presentation/widgets/lantern_controls.dart';
 import 'package:halabessa/features/game/presentation/widgets/table_seat.dart';
 import 'package:halabessa/features/game/presentation/widgets/match_phase_panel.dart';
+import 'package:halabessa/features/game/presentation/widgets/card_widget.dart';
 import 'package:halabessa/features/game/presentation/providers/chat_providers.dart';
 import 'package:halabessa/features/home/presentation/providers/store_provider.dart';
 
@@ -172,6 +174,84 @@ void main() {
       await tester.pump(const Duration(seconds: 15));
     },
   );
+
+  testWidgets(
+    'last-card reveal stays visible without the automatic-phase message',
+    (tester) async {
+      final c = await setup();
+      const card = cards.Card(cards.Suit.hearts, cards.Rank.six);
+      final n = c.read(matchStateProvider.notifier);
+      // ignore: invalid_use_of_protected_member, invalid_use_of_visible_for_testing_member
+      n.state = MatchState(
+        id: 'OFFLINE_LAST_REVEAL_QA',
+        mode: GameMode.classic,
+        playerIds: [localUid, 'bot_1', 'bot_2', 'bot_3'],
+        dealerIndex: 0,
+        currentTurnIndex: 0,
+        phase: GamePhase.dealingFasha,
+        cutLastCard: card,
+      );
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: c,
+          child: const MaterialApp(home: GameBoardScreen()),
+        ),
+      );
+      await tester.pump();
+      expect(find.byType(MatchPhasePanel), findsNothing);
+      expect(find.text('next_phase_automatically'), findsNothing);
+      expect(find.text('last_card_label'), findsNothing);
+      expect(
+        find.byWidgetPredicate(
+          (w) =>
+              w is CardWidget &&
+              w.isFaceUp &&
+              w.card.firebaseKey == card.firebaseKey,
+        ),
+        findsOneWidget,
+      );
+      expect(c.read(matchStateProvider)!.phase, GamePhase.dealingFasha);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+      c.dispose();
+      await tester.pump(const Duration(seconds: 15));
+    },
+  );
+
+  testWidgets('missing saved match returns home without a snackbar', (
+    tester,
+  ) async {
+    final c = await setup();
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: c,
+        child: MaterialApp(
+          initialRoute: '/game',
+          routes: {
+            AppRoutes.initial: (_) => const Scaffold(body: Text('QA home')),
+            '/game': (_) => const GameBoardScreen(),
+          },
+        ),
+      ),
+    );
+    for (var i = 0; i < 5; i++) {
+      await tester.runAsync(() async {
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      });
+      await tester.pump();
+    }
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.text('QA home'), findsOneWidget);
+    expect(find.byType(GameBoardScreen), findsNothing);
+    expect(find.byType(SnackBar), findsNothing);
+    expect(find.text('recovery_no_saved_match'), findsNothing);
+    expect(c.read(matchStateProvider), isNull);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+    c.dispose();
+    await tester.pump(const Duration(seconds: 15));
+  });
 
   for (final level in BotDifficulty.values) {
     testWidgets(

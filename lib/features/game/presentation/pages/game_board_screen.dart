@@ -337,18 +337,7 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
                   return;
                 }
                 ref.read(matchStateProvider.notifier).leaveMatch();
-                final messenger = ScaffoldMessenger.of(context);
                 _returnToHome();
-                messenger.showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      (result == MatchRecoveryStart.offlinePracticeNotSaved
-                              ? 'recovery_practice_restart'
-                              : 'recovery_no_saved_match')
-                          .tr(),
-                    ),
-                  ),
-                );
               },
         onExit: () {
           ref.read(matchStateProvider.notifier).leaveMatch();
@@ -713,8 +702,7 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
         showPhase:
             state.phase == GamePhase.shuffleVoting ||
             state.phase == GamePhase.rematchVoting ||
-            state.phase == GamePhase.preRoundCut ||
-            state.phase == GamePhase.dealingFasha,
+            state.phase == GamePhase.preRoundCut,
         board: SizedBox(
           key: _boardKey,
           child: _buildPresentedBoardCenter(
@@ -904,17 +892,7 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
     if (state.phase == GamePhase.dealingCards) {
       return const SizedBox.shrink();
     }
-    if (state.phase == GamePhase.dealingFasha) {
-      final title = state.cutLastCard != null
-          ? 'last_card_label'
-          : 'dealing_cards';
-      return MatchPhasePanel(
-        key: ValueKey('${state.id}-${state.phase.name}'),
-        title: title.tr(),
-        message: 'next_phase_automatically'.tr(),
-        failureMessage: 'match_action_retry'.tr(),
-      );
-    }
+    // Automatic reveals stay visible on the board without a text panel.
     // Turn feedback belongs to the avatar; no layout-shifting banner.
     return const SizedBox.shrink();
   }
