@@ -9,28 +9,45 @@ void main() {
   const firstKey = ValueKey('card-hearts_two');
   const secondKey = ValueKey('card-clubs_king');
 
-  Widget scene(List<game_card.Card> cards, {bool capture = false,
-      int stage = 0, bool reduceMotion = false, String? captureLabel}) =>
-      MaterialApp(home: MediaQuery(
-    data: MediaQueryData(disableAnimations: reduceMotion),
-    child: Scaffold(body: Center(child: SizedBox(width: 230, height: 200,
-      child: BoardCardsWidget(
-        cards: cards, isCapturing: capture, capturingStage: stage,
-        captureToBottom: true,
-        captureLabel: captureLabel,
-        arrivalOffsets: const {
-          'hearts_two': Offset(0, 100),
-          'clubs_king': Offset(100, 0),
-        },
-        cardBuilder: (card, width, height) => SizedBox(
-          key: ValueKey('card-${card.firebaseKey}'),
-          width: width, height: height,
+  Widget scene(
+    List<game_card.Card> cards, {
+    bool capture = false,
+    int stage = 0,
+    bool reduceMotion = false,
+    String? captureLabel,
+  }) => MaterialApp(
+    home: MediaQuery(
+      data: MediaQueryData(disableAnimations: reduceMotion),
+      child: Scaffold(
+        body: Center(
+          child: SizedBox(
+            width: 230,
+            height: 200,
+            child: BoardCardsWidget(
+              cards: cards,
+              isCapturing: capture,
+              capturingStage: stage,
+              captureToBottom: true,
+              captureLabel: captureLabel,
+              arrivalOffsets: const {
+                'hearts_two': Offset(0, 100),
+                'clubs_king': Offset(100, 0),
+              },
+              cardBuilder: (card, width, height) => SizedBox(
+                key: ValueKey('card-${card.firebaseKey}'),
+                width: width,
+                height: height,
+              ),
+            ),
+          ),
         ),
       ),
-    ))),
-  ));
+    ),
+  );
 
-  testWidgets('a new play arrives while settled cards glide into the new fan', (tester) async {
+  testWidgets('a new play arrives while settled cards glide into the new fan', (
+    tester,
+  ) async {
     await tester.pumpWidget(scene(const [first]));
     await tester.pumpAndSettle();
     final firstBefore = tester.getRect(find.byKey(firstKey)).center;
@@ -56,51 +73,86 @@ void main() {
     final firstAtStart = tester.getRect(find.byKey(firstKey)).center;
     await tester.pump(const Duration(milliseconds: 120));
     expect(tester.getRect(find.byKey(firstKey)).center, firstAtStart);
-    expect(tester.widget<AnimatedSlide>(
-      find.byKey(const ValueKey('board-position-hearts_two'))).duration,
-      Duration.zero);
+    expect(
+      tester
+          .widget<AnimatedSlide>(
+            find.byKey(const ValueKey('board-position-hearts_two')),
+          )
+          .duration,
+      Duration.zero,
+    );
   });
 
-  testWidgets('capture has a distinct merge and teamward flight', (tester) async {
+  testWidgets('capture has a distinct merge and teamward flight', (
+    tester,
+  ) async {
     await tester.pumpWidget(scene(const [first, second], capture: true));
     // Keep every face readable during the hold, then shrink during collection.
     expect(tester.widget<AnimatedScale>(find.byType(AnimatedScale)).scale, 1);
     await tester.pumpAndSettle();
-    await tester.pumpWidget(scene(const [first, second], capture: true, stage: 1));
-    expect(tester.widget<AnimatedScale>(find.byType(AnimatedScale)).scale, 0.84);
-    expect(tester.widget<AnimatedSlide>(
-      find.byKey(const ValueKey('capture-flight'))).offset,
-        const Offset(0, 1.3));
+    await tester.pumpWidget(
+      scene(const [first, second], capture: true, stage: 1),
+    );
+    expect(
+      tester.widget<AnimatedScale>(find.byType(AnimatedScale)).scale,
+      0.84,
+    );
+    expect(
+      tester
+          .widget<AnimatedSlide>(find.byKey(const ValueKey('capture-flight')))
+          .offset,
+      const Offset(0, 1.3),
+    );
     await tester.pumpAndSettle();
-    expect(tester.widget<AnimatedOpacity>(find.byType(AnimatedOpacity)).opacity,
-        0.12);
+    expect(
+      tester.widget<AnimatedOpacity>(find.byType(AnimatedOpacity)).opacity,
+      0.12,
+    );
   });
 
-  testWidgets('capture names the collector and card count once', (tester) async {
+  testWidgets('capture announces the collector without a visible badge', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
     const label = 'My Team · Cards: 3';
-    await tester.pumpWidget(scene(const [first, second], capture: true,
-      captureLabel: label));
-    expect(find.text(label), findsOneWidget);
-    await tester.pumpAndSettle();
-    await tester.pumpWidget(scene(const [first, second], capture: true,
-      stage: 1, captureLabel: label));
-    final cue = find.byKey(ValueKey('capture-cue-$label'));
-    expect(tester.widget<Opacity>(find.descendant(
-      of: cue, matching: find.byType(Opacity))).opacity, 1);
-    await tester.pumpWidget(scene(const [first, second],
-      captureLabel: label));
+    await tester.pumpWidget(
+      scene(const [first, second], capture: true, captureLabel: label),
+    );
     expect(find.text(label), findsNothing);
+    expect(find.bySemanticsLabel(label), findsOneWidget);
+    await tester.pumpAndSettle();
+    await tester.pumpWidget(
+      scene(
+        const [first, second],
+        capture: true,
+        stage: 1,
+        captureLabel: label,
+      ),
+    );
+    expect(find.text(label), findsNothing);
+    expect(find.bySemanticsLabel(label), findsOneWidget);
+    await tester.pumpWidget(scene(const [first, second], captureLabel: label));
+    expect(find.text(label), findsNothing);
+    expect(find.bySemanticsLabel(label), findsNothing);
+      semantics.dispose();
   });
 
-  testWidgets('capture cue respects reduced motion', (tester) async {
-    await tester.pumpWidget(scene(const [first, second], capture: true,
-      captureLabel: 'Cards: 3', reduceMotion: true));
-    expect(tester.widget<TweenAnimationBuilder<double>>(
-      find.byKey(const ValueKey('capture-cue-Cards: 3'))).duration,
-      Duration.zero);
+  testWidgets('capture badge stays hidden with reduced motion', (tester) async {
+    await tester.pumpWidget(
+      scene(
+        const [first, second],
+        capture: true,
+        captureLabel: 'Cards: 3',
+        reduceMotion: true,
+      ),
+    );
+    expect(find.text('Cards: 3'), findsNothing);
+    expect(find.byKey(const ValueKey('capture-cue-Cards: 3')), findsNothing);
   });
 
-  testWidgets('capture flies locally without waiting for another server stage', (tester) async {
+  testWidgets('capture flies locally without waiting for another server stage', (
+    tester,
+  ) async {
     await tester.pumpWidget(scene(const [first, second], capture: true));
     final flight = find.byKey(const ValueKey('capture-flight'));
     expect(tester.widget<AnimatedSlide>(flight).offset, Offset.zero);
@@ -112,9 +164,17 @@ void main() {
     await tester.pump(const Duration(milliseconds: 1));
     expect(tester.widget<AnimatedSlide>(flight).offset, const Offset(0, 1.3));
     await tester.pump(const Duration(milliseconds: 400));
-    expect(tester.widget<AnimatedOpacity>(find.byType(AnimatedOpacity)).opacity, .12);
+    expect(
+      tester.widget<AnimatedOpacity>(find.byType(AnimatedOpacity)).opacity,
+      .12,
+    );
     // The authoritative flag remained stage 0 throughout the entire flight.
-    expect(tester.widget<BoardCardsWidget>(find.byType(BoardCardsWidget)).capturingStage, 0);
+    expect(
+      tester
+          .widget<BoardCardsWidget>(find.byType(BoardCardsWidget))
+          .capturingStage,
+      0,
+    );
     await tester.pumpWidget(scene(const [first]));
     expect(tester.widget<AnimatedSlide>(flight).offset, Offset.zero);
     await tester.pumpWidget(scene(const [first, second], capture: true));
@@ -122,14 +182,23 @@ void main() {
     await tester.pumpAndSettle();
   });
 
-  testWidgets('removing a capture cancels its timer and reduced motion flies immediately', (tester) async {
-    await tester.pumpWidget(scene(const [first, second], capture: true));
-    await tester.pumpWidget(scene(const []));
-    await tester.pump(const Duration(milliseconds: 600));
-    expect(tester.takeException(), isNull);
-    await tester.pumpWidget(scene(const [first, second], capture: true, reduceMotion: true));
-    expect(tester.widget<AnimatedSlide>(find.byKey(const ValueKey('capture-flight'))).offset,
-      const Offset(0, 1.3));
-    await tester.pumpWidget(const SizedBox.shrink());
-  });
+  testWidgets(
+    'removing a capture cancels its timer and reduced motion flies immediately',
+    (tester) async {
+      await tester.pumpWidget(scene(const [first, second], capture: true));
+      await tester.pumpWidget(scene(const []));
+      await tester.pump(const Duration(milliseconds: 600));
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(
+        scene(const [first, second], capture: true, reduceMotion: true),
+      );
+      expect(
+        tester
+            .widget<AnimatedSlide>(find.byKey(const ValueKey('capture-flight')))
+            .offset,
+        const Offset(0, 1.3),
+      );
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
 }

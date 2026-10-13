@@ -4,22 +4,44 @@ import 'package:halabessa/features/game/presentation/widgets/lantern_controls.da
 import 'package:halabessa/features/game/presentation/widgets/table_seat.dart';
 
 void main() {
-  testWidgets('expired server deadline shows confirmation without a fake remaining timer', (tester) async {
-    final start=DateTime.utc(2026,10,12);
-    await tester.pumpWidget(MaterialApp(home:TurnCountdown(started:start,seconds:0,
-      duration:const Duration(milliseconds:450),now:()=>start.add(const Duration(milliseconds:451)),
-      waitingLabel:'Confirming…')));
-    expect(find.text('Confirming…'),findsOneWidget);
-    expect(find.text('0s'),findsNothing);
-    await tester.pumpWidget(const SizedBox());
-  });
-  testWidgets('forced last-card countdown works in a timer-free room', (tester) async {
+  testWidgets(
+    'expired server deadline hides the clock and confirmation message',
+    (tester) async {
+      final start = DateTime.utc(2026, 10, 12);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: TurnCountdown(
+            started: start,
+            seconds: 0,
+            duration: const Duration(milliseconds: 450),
+            now: () => start.add(const Duration(milliseconds: 451)),
+            hideWhenExpired: true,
+          ),
+        ),
+      );
+      expect(find.text('Confirming…'), findsNothing);
+      expect(find.byIcon(Icons.timer_outlined), findsNothing);
+      expect(find.text('0s'), findsNothing);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
+  testWidgets('forced last-card countdown works in a timer-free room', (
+    tester,
+  ) async {
     final started = DateTime.utc(2026, 10, 12);
     var now = started;
-    await tester.pumpWidget(MaterialApp(home: Scaffold(body: TurnCountdown(
-      started: started, seconds: 0, duration: const Duration(milliseconds: 600),
-      now: () => now,
-    ))));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: TurnCountdown(
+            started: started,
+            seconds: 0,
+            duration: const Duration(milliseconds: 600),
+            now: () => now,
+          ),
+        ),
+      ),
+    );
     expect(find.text('1s'), findsOneWidget);
     now = started.add(const Duration(milliseconds: 600));
     await tester.pump(const Duration(milliseconds: 250));

@@ -5,7 +5,6 @@ import '../../domain/models/card.dart' as game_card;
 import '../../../../core/theme/theme_config.dart';
 import 'card_widget.dart';
 import 'board_card_motion.dart';
-import 'table_style.dart';
 import 'card_face_flip.dart';
 import 'local_card_play_layer.dart';
 import '../../domain/logic/match_presentation_timing.dart';
@@ -207,48 +206,11 @@ class BoardCardsWidget extends StatelessWidget {
             ),
 
             if (isCapturing && captureLabel != null && captureLabel!.isNotEmpty)
-              Positioned(
-                top: -48,
-                child: TweenAnimationBuilder<double>(
-                  key: ValueKey('capture-cue-$captureLabel'),
-                  tween: Tween(begin: 0, end: 1),
-                  duration: reducedMotion
-                      ? Duration.zero
-                      : const Duration(milliseconds: 180),
-                  builder: (context, progress, child) => Transform.translate(
-                    offset: Offset(0, 8 * (1 - progress)),
-                    child: Opacity(opacity: progress, child: child),
-                  ),
-                  child: Semantics(
-                    liveRegion: true,
-                    label: captureLabel,
-                    excludeSemantics: true,
-                    child: Container(
-                      constraints: const BoxConstraints(maxWidth: 220),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 7,
-                      ),
-                      decoration: BoxDecoration(
-                        color: TableStyle.ink,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: TableStyle.brass.withValues(alpha: 0.7),
-                        ),
-                      ),
-                      child: Text(
-                        captureLabel!,
-                        textAlign: TextAlign.center,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TableStyle.detail.copyWith(
-                          color: TableStyle.ivory,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
+              // Announce the capture for screen readers without covering cards.
+              Semantics(
+                liveRegion: true,
+                label: captureLabel,
+                child: const SizedBox.shrink(),
               ),
 
             // Card Count Badge (if more than 3 cards on table)

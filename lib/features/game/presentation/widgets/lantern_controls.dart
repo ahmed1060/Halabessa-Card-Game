@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
-import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'table_style.dart';
 import '../../domain/logic/online_match_clock.dart';
 
@@ -110,8 +109,10 @@ class LanternTurnBadge extends StatelessWidget {
                         color: active ? TableStyle.ink : TableStyle.ivory,
                       ),
                     ),
-                    if ((active || showCountdown) && turnStarted != null &&
-                        (turnDuration ?? Duration(seconds: turnSeconds)) > Duration.zero)
+                    if ((active || showCountdown) &&
+                        turnStarted != null &&
+                        (turnDuration ?? Duration(seconds: turnSeconds)) >
+                            Duration.zero)
                       TurnCountdown(
                         started: turnStarted!,
                         seconds: turnSeconds,
@@ -119,7 +120,7 @@ class LanternTurnBadge extends StatelessWidget {
                         now: serverClock ? OnlineMatchClock.instance.now : null,
                         label: countdownLabel,
                         semanticsLabel: countdownSemantics,
-                        waitingLabel: serverClock ? 'ui_waiting_confirmation'.tr() : null,
+                        hideWhenExpired: serverClock,
                         color: active ? TableStyle.ink : TableStyle.ivory,
                       ),
                   ],
@@ -159,7 +160,7 @@ class TurnCountdown extends StatefulWidget {
   final DateTime Function()? now;
   final String Function(int)? label;
   final String Function(int)? semanticsLabel;
-  final String? waitingLabel;
+  final bool hideWhenExpired;
   final bool onlyWhenExpired;
   final Color color;
   const TurnCountdown({
@@ -170,7 +171,7 @@ class TurnCountdown extends StatefulWidget {
     this.now,
     this.label,
     this.semanticsLabel,
-    this.waitingLabel,
+    this.hideWhenExpired = false,
     this.onlyWhenExpired = false,
     this.color = TableStyle.ink,
   });
@@ -201,18 +202,23 @@ class _TurnCountdownState extends State<TurnCountdown> {
         .add(duration)
         .difference(widget.now?.call() ?? DateTime.now())
         .inMilliseconds;
-    final remaining = (remainingMs / 1000).ceil().clamp(0, (duration.inMilliseconds / 1000).ceil());
+    final remaining = (remainingMs / 1000).ceil().clamp(
+      0,
+      (duration.inMilliseconds / 1000).ceil(),
+    );
     if (widget.onlyWhenExpired && remaining > 0) return const SizedBox.shrink();
+    if (widget.hideWhenExpired && remaining == 0) {
+      return const SizedBox.shrink();
+    }
     return Semantics(
       label:
-          remaining == 0 && widget.waitingLabel != null ? widget.waitingLabel! :
-          widget.semanticsLabel?.call(remaining) ?? '$remaining seconds remaining',
+          widget.semanticsLabel?.call(remaining) ??
+          '$remaining seconds remaining',
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(Icons.timer_outlined, size: 18, color: widget.color),
           Text(
-            remaining == 0 && widget.waitingLabel != null ? widget.waitingLabel! :
             widget.label?.call(remaining) ?? '${remaining}s',
             key: const ValueKey('local-turn-countdown'),
             textDirection: TextDirection.ltr,

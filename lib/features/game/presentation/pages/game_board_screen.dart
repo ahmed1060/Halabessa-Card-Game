@@ -972,12 +972,13 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
         failureMessage: 'match_action_retry'.tr(),
       );
     }
-    if (state.phase == GamePhase.dealingCards ||
-        state.phase == GamePhase.dealingFasha) {
-      final title = switch (state.phase) {
-        GamePhase.dealingCards => 'memorize_table_cards',
-        _ => state.cutLastCard != null ? 'last_card_label' : 'dealing_cards',
-      };
+    if (state.phase == GamePhase.dealingCards) {
+      return const SizedBox.shrink();
+    }
+    if (state.phase == GamePhase.dealingFasha) {
+      final title = state.cutLastCard != null
+          ? 'last_card_label'
+          : 'dealing_cards';
       return MatchPhasePanel(
         key: ValueKey('${state.id}-${state.phase.name}'),
         title: title.tr(),
@@ -1008,9 +1009,7 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
           : state.phase == GamePhase.playing
           ? 'table_waiting'.tr()
           : _tablePhaseLabel(state.phase),
-      hint: spectator || state.phase != GamePhase.playing
-          ? ''
-          : (myTurn ? 'table_play_hint' : 'table_wait_or_queue').tr(),
+      hint: '',
     );
   }
 

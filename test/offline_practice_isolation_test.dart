@@ -19,6 +19,7 @@ import 'package:halabessa/features/game/domain/providers/game_providers.dart';
 import 'package:halabessa/features/game/presentation/pages/offline_practice_app.dart';
 import 'package:halabessa/features/game/presentation/pages/game_board_screen.dart';
 import 'package:halabessa/features/game/presentation/widgets/lantern_controls.dart';
+import 'package:halabessa/features/game/presentation/widgets/match_phase_panel.dart';
 import 'package:halabessa/features/game/presentation/providers/chat_providers.dart';
 import 'package:halabessa/features/home/presentation/providers/store_provider.dart';
 
@@ -106,6 +107,10 @@ void main() {
       );
       await tester.pump();
       expect(find.byType(LanternTurnBadge), findsOneWidget);
+      expect(
+        tester.widget<LanternTurnBadge>(find.byType(LanternTurnBadge)).hint,
+        isEmpty,
+      );
       await tester.tap(find.byKey(ValueKey('hand-card-${card.firebaseKey}')));
       await tester.pump();
       expect(c.read(matchStateProvider)!.board, [card]);
@@ -116,6 +121,47 @@ void main() {
       c.dispose();
       await tester.pump(const Duration(seconds: 15));
       expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'table-card reveal keeps cards visible without the reminder panel',
+    (tester) async {
+      final c = await setup();
+      const card = cards.Card(cards.Suit.clubs, cards.Rank.two);
+      final n = c.read(matchStateProvider.notifier);
+      // ignore: invalid_use_of_protected_member, invalid_use_of_visible_for_testing_member
+      n.state = MatchState(
+        id: 'OFFLINE_REVEAL_UI_QA',
+        mode: GameMode.classic,
+        playerIds: [localUid, 'bot_1', 'bot_2', 'bot_3'],
+        dealerIndex: 0,
+        currentTurnIndex: 0,
+        phase: GamePhase.dealingCards,
+        board: const [card],
+        handCards: const {
+          localUid: [card],
+        },
+      );
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: c,
+          child: const MaterialApp(home: GameBoardScreen()),
+        ),
+      );
+      await tester.pump();
+      expect(find.byType(MatchPhasePanel), findsNothing);
+      expect(find.text('memorize_table_cards'), findsNothing);
+      expect(find.text('next_phase_automatically'), findsNothing);
+      expect(
+        find.byKey(ValueKey('board-position-${card.firebaseKey}')),
+        findsOneWidget,
+      );
+      expect(c.read(matchStateProvider)!.phase, GamePhase.dealingCards);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+      c.dispose();
+      await tester.pump(const Duration(seconds: 15));
     },
   );
 
