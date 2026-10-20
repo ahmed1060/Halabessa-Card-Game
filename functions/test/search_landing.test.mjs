@@ -11,6 +11,11 @@ const homepage = await readFile(new URL('web/landing.html', root), 'utf8');
 const routing = await readFile(new URL('web/landing-route.js', root), 'utf8');
 const origin = 'https://halabessa-card-game1.web.app';
 
+test('Google ownership file retains the supplied verification response', async () => {
+  const verification = await readFile(new URL('web/google902e70cc206e0f62.html', root), 'utf8');
+  assert.equal(verification.trim(), 'google-site-verification: google902e70cc206e0f62.html');
+});
+
 test('homepage exposes honest bilingual search content without the app runtime', async () => {
   assert.match(homepage, /<!DOCTYPE html>/);
   assert.match(homepage, /<html lang="ar" dir="rtl">/);
