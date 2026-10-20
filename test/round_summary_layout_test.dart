@@ -4,6 +4,7 @@ import 'package:halabessa/features/game/domain/models/card.dart' as cards;
 import 'package:halabessa/features/game/domain/models/capture.dart';
 import 'package:halabessa/features/game/domain/models/match_state.dart';
 import 'package:halabessa/features/game/presentation/widgets/round_summary_panel.dart';
+import 'package:halabessa/features/game/presentation/widgets/velvet_score_frame.dart';
 
 void main() {
   const card = cards.Card(cards.Suit.hearts, cards.Rank.ace);
@@ -51,17 +52,37 @@ void main() {
                   child: Directionality(
                     textDirection: direction,
                     child: Scaffold(
-                      body: SizedBox.expand(child: RoundSummaryPanel(state: state, firstIsA: true)),
+                      body: SizedBox.expand(
+                        child: RoundSummaryPanel(state: state, firstIsA: true),
+                      ),
                     ),
                   ),
                 ),
               ),
             );
             await tester.pump();
-            expect(find.text('ui_round_points: 9'), findsOneWidget);
-            expect(find.text('ui_round_score: 29'), findsOneWidget);
-            expect(find.text('ui_majority_bonus: 3'), findsOneWidget);
-            expect(tester.getSize(find.byKey(const ValueKey('round-results-fullscreen'))), size);
+            expect(find.text('+9'), findsOneWidget);
+            expect(
+              tester
+                  .widget<VelvetScoreTile>(
+                    find.byKey(const ValueKey('round-score-teamA')),
+                  )
+                  .score,
+              29,
+            );
+            expect(
+              find.descendant(
+                of: find.byKey(const ValueKey('round-stat-ui_majority_bonus')),
+                matching: find.text('3'),
+              ),
+              findsOneWidget,
+            );
+            expect(
+              tester.getSize(
+                find.byKey(const ValueKey('round-results-fullscreen')),
+              ),
+              size,
+            );
             expect(find.byType(BackdropFilter), findsOneWidget);
             expect(tester.takeException(), isNull);
             await tester.pumpWidget(const SizedBox());

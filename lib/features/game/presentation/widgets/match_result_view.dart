@@ -1,9 +1,9 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'table_style.dart';
 import 'match_table_layout.dart';
-import '../../../../core/widgets/lantern_page_frame.dart';
-import '../../../../core/widgets/lantern_panel.dart';
+import 'velvet_score_frame.dart';
 
 /// The only final-results surface. It owns no match rules or reward writes.
 class MatchResultView extends StatefulWidget {
@@ -87,242 +87,244 @@ class _MatchResultViewState extends State<MatchResultView> {
     onPopInvokedWithResult: (didPop, result) {
       if (!didPop) _home();
     },
-    child: LanternPageFrame(
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        body: SafeArea(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final compact =
-                  constraints.maxWidth >= 560 &&
-                  constraints.maxHeight < 600 &&
-                  MediaQuery.textScalerOf(context).scale(14) <= 20;
-              return Center(
-                child: SingleChildScrollView(
-                  padding: EdgeInsets.all(
-                    compact && widget.decision != null ? 12 : 20,
-                  ),
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(maxWidth: compact ? 880 : 440),
-                    child: compact
-                        ? Row(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              Expanded(child: _summary(compact: true)),
-                              const SizedBox(width: 32),
-                              Expanded(
-                                flex: widget.decision != null ? 2 : 1,
-                                child: _details(compact: true),
-                              ),
-                            ],
-                          )
-                        : Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              _summary(),
-                              const SizedBox(height: 24),
-                              _details(),
-                            ],
-                          ),
-                  ),
-                ),
-              );
-            },
+    child: Scaffold(
+      backgroundColor: TableStyle.felt,
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          LayoutBuilder(
+            builder: (context, bounds) => Image.asset(
+              bounds.maxWidth > bounds.maxHeight
+                  ? 'assets/images/tables/halabessa_tabletop_landscape_v1.png'
+                  : 'assets/images/tables/halabessa_tabletop_portrait_v1.png',
+              fit: BoxFit.fill,
+              excludeFromSemantics: true,
+            ),
           ),
-        ),
+          const ColoredBox(color: Color(0x33000000)),
+          SafeArea(
+            child: LayoutBuilder(
+              builder: (context, bounds) {
+                final compact =
+                    bounds.maxWidth >= 560 &&
+                    bounds.maxWidth > bounds.maxHeight &&
+                    MediaQuery.textScalerOf(context).scale(14) <= 20;
+                return Center(
+                  child: SingleChildScrollView(
+                    padding: EdgeInsets.all(compact ? 12 : 16),
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxWidth: compact ? 900 : 440,
+                      ),
+                      child: compact && widget.decision != null
+                          ? Row(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      _summary(compact: true),
+                                      const SizedBox(height: 8),
+                                      Row(
+                                        textDirection: TextDirection.ltr,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Expanded(
+                                            child: _team(false, compact: true),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: _team(true, compact: true),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  flex: 2,
+                                  child: _details(compact: true),
+                                ),
+                              ],
+                            )
+                          : Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                _summary(compact: compact),
+                                SizedBox(height: compact ? 8 : 14),
+                                if (compact)
+                                  Row(
+                                    textDirection: TextDirection.ltr,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Expanded(
+                                        child: _team(false, compact: true),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: _team(true, compact: true),
+                                      ),
+                                    ],
+                                  )
+                                else ...[
+                                  _team(widget.firstWon),
+                                  const SizedBox(height: 12),
+                                  _team(!widget.firstWon),
+                                ],
+                                SizedBox(height: compact ? 8 : 14),
+                                _details(compact: compact),
+                              ],
+                            ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
       ),
     ),
   );
 
-  Widget _summary({bool compact = false}) => LanternPanel(
-    padding: EdgeInsets.all(compact ? 16 : 24),
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        SizedBox(
-          height: compact ? 56 : 80,
-          child: const FittedBox(child: LanternWordmark()),
-        ),
-        SizedBox(height: compact ? 12 : 24),
-        Icon(
+  Widget _summary({required bool compact}) => Column(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      SizedBox(
+        height: compact ? 34 : 56,
+        child: const FittedBox(child: LanternWordmark()),
+      ),
+      if (!compact) ...[
+        const SizedBox(height: 8),
+        const Icon(
           Icons.emoji_events_rounded,
-          size: compact ? 42 : 52,
+          size: 32,
           color: TableStyle.brass,
         ),
-        const SizedBox(height: 12),
-        Text(
-          widget.title,
-          textAlign: TextAlign.center,
-          style: TableStyle.label.copyWith(
-            fontSize: 28,
-            fontWeight: FontWeight.bold,
-            color: TableStyle.ink,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          widget.subtitle,
-          textAlign: TextAlign.center,
-          style: TableStyle.label.copyWith(color: TableStyle.ink),
-        ),
-        if ((widget.firstWon ? widget.firstPlayers : widget.secondPlayers) !=
-            null) ...[
-          const SizedBox(height: 16),
-          (widget.firstWon ? widget.firstPlayers : widget.secondPlayers)!,
-          const SizedBox(height: 8),
-          Text(
-            widget.firstWon ? widget.firstTeam : widget.secondTeam,
-            style: TableStyle.label.copyWith(color: TableStyle.ink),
-          ),
-        ],
-        if ((widget.firstWon ? widget.secondPlayers : widget.firstPlayers) !=
-                null &&
-            !compact) ...[
-          const SizedBox(height: 16),
-          (widget.firstWon ? widget.secondPlayers : widget.firstPlayers)!,
-          const SizedBox(height: 8),
-          Text(
-            widget.firstWon ? widget.secondTeam : widget.firstTeam,
-            style: TableStyle.detail.copyWith(color: TableStyle.ink),
-          ),
-        ],
       ],
-    ),
-  );
-
-  Widget _details({bool compact = false}) => Column(
-    mainAxisSize: MainAxisSize.min,
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      if (compact && widget.decision != null)
-        Row(
-          children: [
-            Expanded(
-              child: _score(
-                widget.firstTeam,
-                widget.firstScore,
-                TableStyle.mint,
-                compact: true,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: _score(
-                widget.secondTeam,
-                widget.secondScore,
-                TableStyle.red,
-                compact: true,
-              ),
-            ),
-          ],
-        )
-      else ...[
-        _score(
-          widget.firstTeam,
-          widget.firstScore,
-          TableStyle.mint,
-          compact: compact,
+      Text(
+        widget.title,
+        textAlign: TextAlign.center,
+        style: TableStyle.label.copyWith(
+          fontSize: compact ? 24 : 28,
+          fontWeight: FontWeight.w900,
         ),
-        const SizedBox(height: 8),
-        _score(
-          widget.secondTeam,
-          widget.secondScore,
-          TableStyle.red,
-          compact: compact,
-        ),
-      ],
-      SizedBox(
-        height: compact && widget.decision != null
-            ? 6
-            : compact
-            ? 12
-            : 16,
       ),
-      Wrap(
-        alignment: WrapAlignment.center,
-        spacing: 24,
-        runSpacing: 12,
-        children: [
-          _reward(Icons.star_rounded, widget.starsLabel, widget.stars),
-          _reward(
-            Icons.monetization_on_rounded,
-            widget.coinsLabel,
-            widget.coins,
-          ),
-        ],
-      ),
-      SizedBox(
-        height: compact && widget.decision != null
-            ? 6
-            : compact
-            ? 12
-            : 20,
-      ),
-      if (widget.decision != null) ...[
-        widget.decision!,
-        const SizedBox(height: 10),
-      ],
-      if (widget.onReplay != null) ...[
-        FilledButton(
-          style: FilledButton.styleFrom(
-            backgroundColor: TableStyle.brass,
-            foregroundColor: TableStyle.ink,
-            minimumSize: const Size(48, 52),
-          ),
-          onPressed: _leaving || _replayRequested ? null : _replay,
-          child: Text(widget.replayLabel),
-        ),
-        const SizedBox(height: 10),
-      ],
-      OutlinedButton(
-        style: OutlinedButton.styleFrom(
-          foregroundColor: TableStyle.ivory,
-          minimumSize: const Size(48, 52),
-        ),
-        onPressed: _leaving ? null : _home,
-        child: Text(widget.homeLabel),
+      Text(
+        widget.subtitle,
+        textAlign: TextAlign.center,
+        style: TableStyle.detail,
       ),
     ],
   );
 
-  Widget _score(String label, int score, Color color, {bool compact = false}) =>
-      Semantics(
-        label: '$label: $score',
-        excludeSemantics: true,
-        child: Container(
-          padding: EdgeInsets.all(compact ? 12 : 16),
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Text.rich(
-            TextSpan(
-              children: [
-                TextSpan(
-                  text: '$label  ',
-                  style: TableStyle.label.copyWith(color: TableStyle.ink),
-                ),
-                TextSpan(
-                  text: '$score',
-                  style: TableStyle.label.copyWith(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: TableStyle.ink,
-                  ),
-                ),
-              ],
+  Widget _team(bool first, {bool compact = false}) => SizedBox(
+    width: double.infinity,
+    child: VelvetScoreTile(
+      key: ValueKey(first ? 'final-first-team' : 'final-second-team'),
+      label: first ? widget.firstTeam : widget.secondTeam,
+      score: first ? widget.firstScore : widget.secondScore,
+      scoreLabel: 'ui_round_score'.tr(),
+      color: first ? TableStyle.mint : TableStyle.red,
+      compact: compact,
+      winner: first == widget.firstWon,
+      players: first ? widget.firstPlayers : widget.secondPlayers,
+    ),
+  );
+
+  Widget _details({required bool compact}) {
+    final actions = <Widget>[
+      if (widget.onReplay != null)
+        FilledButton(
+          style: FilledButton.styleFrom(
+            backgroundColor: TableStyle.brass,
+            foregroundColor: TableStyle.ink,
+            minimumSize: const Size(48, 48),
+            side: const BorderSide(color: Color(0xFFFFE2A4)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
             ),
+          ),
+          onPressed: _leaving || _replayRequested ? null : _replay,
+          child: Text(
+            widget.replayLabel,
             textAlign: TextAlign.center,
+            style: TableStyle.label.copyWith(
+              color: TableStyle.ink,
+              fontWeight: FontWeight.w800,
+            ),
           ),
         ),
-      );
+      OutlinedButton(
+        style: OutlinedButton.styleFrom(
+          backgroundColor: TableStyle.ink,
+          foregroundColor: TableStyle.ivory,
+          side: const BorderSide(color: TableStyle.brass),
+          minimumSize: const Size(48, 48),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+        ),
+        onPressed: _leaving ? null : _home,
+        child: Text(widget.homeLabel, textAlign: TextAlign.center),
+      ),
+    ];
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+          decoration: BoxDecoration(
+            color: TableStyle.ink,
+            border: Border.all(color: TableStyle.brass.withValues(alpha: .65)),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 24,
+            runSpacing: 8,
+            children: [
+              _reward(Icons.star_rounded, widget.starsLabel, widget.stars),
+              _reward(
+                Icons.monetization_on_rounded,
+                widget.coinsLabel,
+                widget.coins,
+              ),
+            ],
+          ),
+        ),
+        if (widget.decision != null) ...[
+          const SizedBox(height: 8),
+          widget.decision!,
+        ],
+        const SizedBox(height: 8),
+        if (compact)
+          Row(
+            children: [
+              for (var i = 0; i < actions.length; i++) ...[
+                if (i > 0) const SizedBox(width: 10),
+                Expanded(child: actions[i]),
+              ],
+            ],
+          )
+        else
+          for (var i = 0; i < actions.length; i++) ...[
+            if (i > 0) const SizedBox(height: 8),
+            actions[i],
+          ],
+      ],
+    );
+  }
+
   Widget _reward(IconData icon, String label, int value) => Semantics(
     label: '$label: $value',
     excludeSemantics: true,
     child: Wrap(
       crossAxisAlignment: WrapCrossAlignment.center,
-      alignment: WrapAlignment.center,
       spacing: 6,
       children: [
         Icon(icon, size: 20, color: TableStyle.brass),

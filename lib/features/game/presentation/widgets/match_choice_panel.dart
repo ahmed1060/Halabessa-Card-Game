@@ -125,7 +125,14 @@ class _MatchChoicePanelState extends State<MatchChoicePanel> {
               ),
               OutlinedButton(
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: TableStyle.ink,
+                  // The application theme gives outlined buttons an ink fill.
+                  // Keep the label readable on it, including pending requests.
+                  backgroundColor: TableStyle.ink,
+                  foregroundColor: TableStyle.ivory,
+                  disabledBackgroundColor: TableStyle.ink,
+                  disabledForegroundColor: TableStyle.ivory.withValues(
+                    alpha: .6,
+                  ),
                   minimumSize: const Size(112, 48),
                 ),
                 onPressed: _pending || widget.onSecond == null

@@ -60,6 +60,7 @@ void main() {
         g.menu,
         g.rivalPile,
         g.partner,
+        g.deck,
         g.left,
         g.right,
         g.ourPile,
@@ -74,6 +75,10 @@ void main() {
       expect(g.ourPile.overlaps(g.hand), isFalse);
       expect(g.right.overlaps(g.rivalPile), isFalse);
       expect(g.history.overlaps(g.menu), isFalse);
+      expect(g.board.center, g.size.center(Offset.zero));
+      expect(g.hand.center.dx, closeTo(g.size.width / 2, .001));
+      expect(g.hand.top, g.size.height - (g.landscape ? 134 : 212));
+      expect(g.board.overlaps(g.hand), isFalse);
     });
   }
 
@@ -274,8 +279,10 @@ void main() {
           'teamB': [Capture(leadingCard: capture, capturedCards: hand)],
         },
       );
-      await tester.binding.setSurfaceSize(size);
-      addTearDown(() => tester.binding.setSurfaceSize(null));
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = size;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
       final boundaryKey = GlobalKey();
       await tester.pumpWidget(
         UncontrolledProviderScope(
@@ -366,14 +373,47 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 350));
       final initial = c.read(matchStateProvider)!;
+      expect(find.byType(CompactCollectedPile), findsNothing);
+      expect(
+        find.byKey(const ValueKey('seat-horizontal-fan')),
+        findsNWidgets(3),
+      );
+      expect(find.byKey(const ValueKey('history-our-count')), findsOneWidget);
+      expect(find.byKey(const ValueKey('history-rival-count')), findsOneWidget);
+      Rect? fixedDeck;
       for (var dealer = 0; dealer < 4; dealer++) {
         // ignore: invalid_use_of_protected_member, invalid_use_of_visible_for_testing_member
         n.state = initial.copyWith(dealerIndex: dealer);
         await tester.pump();
-        final seat = tester
-            .widgetList<DealerSeat>(find.byType(DealerSeat))
-            .singleWhere((s) => s.isDealer);
+        final partner = find.byWidgetPredicate(
+          (w) => w is TableSeat && w.handOnRight,
+        );
+        final sideHand = tester.getRect(
+          find.descendant(
+            of: partner,
+            matching: find.byKey(const ValueKey('seat-horizontal-fan')),
+          ),
+        );
+        for (final name in ['history', 'menu']) {
+          expect(
+            sideHand.overlaps(
+              tester.getRect(find.byKey(ValueKey('option-b-$name'))),
+            ),
+            isFalse,
+            reason: 'Bot 2 hand avoids $name for dealer $dealer',
+          );
+        }
+        final seat = tester.widget<DealDeck>(find.byType(DealDeck));
         final deck = tester.getRect(find.byKey(seat.deckKey!));
+        fixedDeck ??= deck;
+        expect(deck, fixedDeck, reason: 'deal deck has a fixed Option B slot');
+        expect(
+          deck.right,
+          lessThan(
+            tester.getCenter(find.byKey(const ValueKey('option-b-partner'))).dx,
+          ),
+          reason: 'deal deck stays left of top player, regardless of dealer',
+        );
         expect(deck.left, greaterThanOrEqualTo(0));
         expect(deck.right, lessThanOrEqualTo(size.width));
         expect(deck.top, greaterThanOrEqualTo(0));

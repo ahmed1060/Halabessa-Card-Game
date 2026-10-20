@@ -6,6 +6,16 @@ import 'package:halabessa/features/game/domain/models/card.dart' as game;
 import 'package:halabessa/features/game/presentation/widgets/fanned_hand_widget.dart';
 
 void main() {
+  test('roomier local fan preserves card size while increasing separation', () {
+    for (final width in [281.12, 310.0]) {
+      final before = HandFanGeometry(width);
+      final after = HandFanGeometry(width * 1.15, spread: 1.15);
+      expect(after.width, closeTo(before.width, .0001));
+      expect(after.height, closeTo(before.height, .0001));
+      expect(after.spacing, greaterThan(before.spacing * 1.2));
+      expect(after.width + after.spacing * 3, lessThanOrEqualTo(width * 1.15));
+    }
+  });
   const cards = [
     game.Card(game.Suit.hearts, game.Rank.two),
     game.Card(game.Suit.clubs, game.Rank.five),
@@ -18,6 +28,8 @@ void main() {
     List<game.Card> values = cards,
     double width = 390,
     bool enabled = true,
+    bool renderArtwork = true,
+    void Function(game.Card, bool, double, double)? onVisualPose,
     TextDirection direction = TextDirection.ltr,
   }) => MaterialApp(
     home: Scaffold(
@@ -32,6 +44,8 @@ void main() {
               isMyTurn: myTurn,
               onCardTap: onTap,
               interactionEnabled: enabled,
+              renderArtwork: renderArtwork,
+              onVisualPose: onVisualPose,
               cardBuilder: (card, width, height) => SizedBox(
                 key: ValueKey('visual-${card.firebaseKey}'),
                 width: width,
@@ -45,6 +59,37 @@ void main() {
   );
   Finder card(int index) =>
       find.byKey(ValueKey('hand-card-${cards[index].firebaseKey}'));
+
+  testWidgets(
+    'native artwork keeps the same Flutter hit targets and one play owner',
+    (tester) async {
+      final played = <game.Card>[];
+      final poses = <bool>[];
+      await tester.pumpWidget(
+        hand(
+          true,
+          (value, _) => played.add(value),
+          renderArtwork: false,
+          onVisualPose: (_, peek, __, ___) => poses.add(peek),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final rect = tester.getRect(card(1));
+      final gesture = await tester.startGesture(rect.center);
+      await tester.pump(const Duration(milliseconds: 120));
+      await tester.pump();
+      expect(poses, contains(true));
+      expect(tester.getRect(card(1)), rect);
+      await gesture.up();
+      await tester.pump();
+      expect(played, [cards[1]]);
+      await tester.tap(card(2));
+      expect(played, [
+        cards[1],
+      ], reason: 'native input uses the existing shared request guard');
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
 
   testWidgets('simple and repeated taps play the tapped card only once', (
     tester,
@@ -76,8 +121,9 @@ void main() {
       findsOneWidget,
     );
     expect(find.byIcon(Icons.hourglass_top), findsNothing);
-    final pendingSemantics = tester.widget<Semantics>(find.ancestor(
-      of: card(1), matching: find.byType(Semantics)).first);
+    final pendingSemantics = tester.widget<Semantics>(
+      find.ancestor(of: card(1), matching: find.byType(Semantics)).first,
+    );
     expect(pendingSemantics.properties.value, isNotNull);
     await tester.tap(card(2));
     await tester.drag(card(3), const Offset(0, -70));

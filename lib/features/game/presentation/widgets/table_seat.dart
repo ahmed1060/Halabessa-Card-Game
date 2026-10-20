@@ -30,6 +30,7 @@ class TableSeat extends StatefulWidget {
   final bool optionB;
   final bool chatBadge;
   final bool compactAvatar;
+  final bool handOnRight;
   final String Function(int)? countdownSemantics;
   const TableSeat({
     super.key,
@@ -55,6 +56,7 @@ class TableSeat extends StatefulWidget {
     this.optionB = false,
     this.chatBadge = false,
     this.compactAvatar = false,
+    this.handOnRight = false,
     this.countdownSemantics,
   });
   @override
@@ -64,6 +66,8 @@ class TableSeat extends StatefulWidget {
 class _TableSeatState extends State<TableSeat> {
   Timer? _messageExpiry;
   bool _messageExpired = false;
+  bool _avatarHovered = false;
+  bool _focused = false;
   @override
   void initState() {
     super.initState();
@@ -109,10 +113,7 @@ class _TableSeatState extends State<TableSeat> {
         ? 16.0
         : 16.0 * MediaQuery.textScalerOf(context).scale(12) / 12;
     final viewport = MediaQuery.sizeOf(context);
-    final smallAvatar =
-        widget.optionB &&
-        widget.compactAvatar &&
-        viewport.width > viewport.height;
+    final smallAvatar = widget.optionB && widget.compactAvatar;
     final compact =
         !widget.optionB &&
         viewport.width > viewport.height &&
@@ -121,9 +122,7 @@ class _TableSeatState extends State<TableSeat> {
     return SizedBox(
       width: widget.optionB ? 126 : 110,
       height: widget.optionB
-          ? smallAvatar
-                ? 168
-                : 184
+          ? 184
           : compact
           ? 146
           : 110 + 4 * line,
@@ -145,7 +144,13 @@ class _TableSeatState extends State<TableSeat> {
           child: InkWell(
             onTap: widget.onPressed,
             borderRadius: BorderRadius.circular(12),
-            focusColor: TableStyle.brass.withValues(alpha: .4),
+            // Keep the full accessible click target, but never tint the large
+            // reserved seat rectangle. Feedback is painted on the avatar only.
+            hoverColor: Colors.transparent,
+            focusColor: Colors.transparent,
+            highlightColor: Colors.transparent,
+            splashColor: Colors.transparent,
+            onFocusChange: (focused) => setState(() => _focused = focused),
             child: DecoratedBox(
               key: const ValueKey('seat-active-surface'),
               decoration: BoxDecoration(
@@ -157,101 +162,125 @@ class _TableSeatState extends State<TableSeat> {
                 padding: const EdgeInsets.all(4),
                 child: Column(
                   children: [
-                    Stack(
-                      alignment: Alignment.center,
-                      clipBehavior: Clip.none,
-                      children: [
-                        SizedBox(
-                          width: widget.optionB && !smallAvatar ? 80 : 72,
-                          height: widget.optionB && !smallAvatar ? 80 : 72,
-                          child: DecoratedBox(
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              boxShadow: widget.active
-                                  ? [
-                                      BoxShadow(
-                                        color: TableStyle.brass.withValues(
-                                          alpha: .65,
-                                        ),
-                                        blurRadius: 16,
-                                        spreadRadius: 2,
-                                      ),
-                                    ]
-                                  : null,
-                            ),
-                            child: TurnDeadlineRing(
-                              segmented: widget.optionB,
-                              remainingLabel: widget.countdownSemantics,
-                              active: widget.active,
-                              started: widget.turnStarted,
-                              duration:
-                                  widget.turnDuration ??
-                                  Duration(seconds: widget.turnSeconds),
-                              now: widget.serverClock
-                                  ? OnlineMatchClock.instance.now
-                                  : null,
-                              clockChanges: widget.serverClock
-                                  ? OnlineMatchClock.instance
-                                  : null,
-                              background: widget.accent,
-                              foreground: TableStyle.brass,
-                            ),
-                          ),
-                        ),
-                        ClipOval(
-                          child: SizedBox(
-                            width: widget.optionB && !smallAvatar ? 70 : 64,
-                            height: widget.optionB && !smallAvatar ? 70 : 64,
-                            child: url == null || url.isEmpty || widget.isBot
-                                ? Image.asset(
-                                    fallback,
-                                    fit: BoxFit.cover,
-                                    cacheWidth: 160,
-                                    errorBuilder: (_, __, ___) => const Icon(
-                                      Icons.person_outline,
-                                      color: TableStyle.ivory,
-                                    ),
-                                  )
-                                : url.startsWith('assets/')
-                                ? Image.asset(
-                                    url,
-                                    fit: BoxFit.cover,
-                                    cacheWidth: 160,
-                                    errorBuilder: (_, __, ___) => const Icon(
-                                      Icons.person_outline,
-                                      color: TableStyle.ivory,
-                                    ),
-                                  )
-                                : Image.network(
-                                    url,
-                                    fit: BoxFit.cover,
-                                    cacheWidth: 160,
-                                    errorBuilder: (_, __, ___) => const Icon(
-                                      Icons.person_outline,
-                                      color: TableStyle.ivory,
-                                    ),
-                                  ),
-                          ),
-                        ),
-                        if (widget.chatBadge)
-                          Positioned(
-                            top: -2,
-                            right: -4,
-                            child: Container(
-                              width: 24,
-                              height: 24,
-                              decoration: const BoxDecoration(
-                                color: TableStyle.mint,
+                    MouseRegion(
+                      key: const ValueKey('avatar-hover-target'),
+                      onEnter: (_) => setState(() => _avatarHovered = true),
+                      onExit: (_) => setState(() => _avatarHovered = false),
+                      child: Stack(
+                        alignment: Alignment.center,
+                        clipBehavior: Clip.none,
+                        children: [
+                          SizedBox(
+                            width: widget.optionB
+                                ? (smallAvatar ? 64 : 80)
+                                : 72,
+                            height: widget.optionB
+                                ? (smallAvatar ? 64 : 80)
+                                : 72,
+                            child: DecoratedBox(
+                              key: const ValueKey('avatar-feedback-circle'),
+                              decoration: BoxDecoration(
                                 shape: BoxShape.circle,
+                                boxShadow: widget.active
+                                    ? [
+                                        BoxShadow(
+                                          color: TableStyle.brass.withValues(
+                                            alpha: .65,
+                                          ),
+                                          blurRadius: 16,
+                                          spreadRadius: 2,
+                                        ),
+                                      ]
+                                    : _avatarHovered || _focused
+                                    ? [
+                                        BoxShadow(
+                                          color: widget.accent.withValues(
+                                            alpha: .4,
+                                          ),
+                                          blurRadius: 10,
+                                          spreadRadius: 1,
+                                        ),
+                                      ]
+                                    : null,
                               ),
-                              child: const Icon(
-                                Icons.chat_bubble_rounded,
-                                size: 14,
-                                color: TableStyle.ivory,
+                              child: TurnDeadlineRing(
+                                liquid: widget.optionB,
+                                remainingLabel: widget.countdownSemantics,
+                                active: widget.active,
+                                started: widget.turnStarted,
+                                duration:
+                                    widget.turnDuration ??
+                                    Duration(seconds: widget.turnSeconds),
+                                now: widget.serverClock
+                                    ? OnlineMatchClock.instance.now
+                                    : null,
+                                clockChanges: widget.serverClock
+                                    ? OnlineMatchClock.instance
+                                    : null,
+                                background: widget.accent,
+                                foreground: TableStyle.brass,
                               ),
                             ),
                           ),
-                      ],
+                          ClipOval(
+                            child: SizedBox(
+                              width: widget.optionB
+                                  ? (smallAvatar ? 56 : 70)
+                                  : 64,
+                              height: widget.optionB
+                                  ? (smallAvatar ? 56 : 70)
+                                  : 64,
+                              child: url == null || url.isEmpty || widget.isBot
+                                  ? Image.asset(
+                                      fallback,
+                                      fit: BoxFit.cover,
+                                      cacheWidth: 160,
+                                      errorBuilder: (_, __, ___) => const Icon(
+                                        Icons.person_outline,
+                                        color: TableStyle.ivory,
+                                      ),
+                                    )
+                                  : url.startsWith('assets/')
+                                  ? Image.asset(
+                                      url,
+                                      fit: BoxFit.cover,
+                                      cacheWidth: 160,
+                                      errorBuilder: (_, __, ___) => const Icon(
+                                        Icons.person_outline,
+                                        color: TableStyle.ivory,
+                                      ),
+                                    )
+                                  : Image.network(
+                                      url,
+                                      fit: BoxFit.cover,
+                                      cacheWidth: 160,
+                                      errorBuilder: (_, __, ___) => const Icon(
+                                        Icons.person_outline,
+                                        color: TableStyle.ivory,
+                                      ),
+                                    ),
+                            ),
+                          ),
+                          if (widget.chatBadge)
+                            Positioned(
+                              top: -2,
+                              right: -4,
+                              child: Container(
+                                width: 24,
+                                height: 24,
+                                decoration: const BoxDecoration(
+                                  color: TableStyle.mint,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.chat_bubble_rounded,
+                                  size: 14,
+                                  color: TableStyle.ivory,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 2),
                     Container(
@@ -277,7 +306,11 @@ class _TableSeatState extends State<TableSeat> {
                       ),
                     ),
                     SizedBox(
-                      height: compact ? 0 : line,
+                      height:
+                          compact ||
+                              (widget.optionB && widget.dealerLabel == null)
+                          ? 0
+                          : line,
                       child: compact || widget.dealerLabel == null
                           ? const SizedBox.shrink()
                           : Container(
@@ -300,8 +333,8 @@ class _TableSeatState extends State<TableSeat> {
                             ),
                     ),
                     SizedBox(
-                      height: smallAvatar
-                          ? 34
+                      height: widget.optionB
+                          ? (widget.hiddenHandCount == null ? 0 : 74)
                           : compact
                           ? 28
                           : 26 + line,
@@ -320,6 +353,25 @@ class _TableSeatState extends State<TableSeat> {
                               excludeSemantics: true,
                               child: LayoutBuilder(
                                 builder: (context, bounds) {
+                                  if (widget.optionB) {
+                                    final hand = _horizontalHand();
+                                    // Keep the avatar/name and its hit target fixed.
+                                    // Only the public backs/count move to its right.
+                                    return widget.handOnRight
+                                        ? Transform.translate(
+                                            key: const ValueKey(
+                                              'seat-side-hand',
+                                            ),
+                                            offset: Offset(
+                                              92,
+                                              widget.dealerLabel == null
+                                                  ? -64
+                                                  : -80,
+                                            ),
+                                            child: hand,
+                                          )
+                                        : hand;
+                                  }
                                   final n = widget.hiddenHandCount!.clamp(0, 4);
                                   final fanWidth = math.max(
                                     0.0,
@@ -423,7 +475,7 @@ class _TableSeatState extends State<TableSeat> {
                             ),
                     ),
                     SizedBox(
-                      height: line,
+                      height: widget.optionB && message == null ? 0 : line,
                       child: message == null
                           ? const SizedBox.shrink()
                           : Text(
@@ -439,6 +491,60 @@ class _TableSeatState extends State<TableSeat> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _horizontalHand() {
+    final count = widget.hiddenHandCount!;
+    final n = count.clamp(0, 4);
+    return SizedBox(
+      key: const ValueKey('seat-horizontal-fan'),
+      width: 118,
+      height: 74,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          for (var i = 0; i < n; i++)
+            Positioned(
+              left: 7 + (i + (4 - n) / 2) * 24,
+              top: (i - (n - 1) / 2).abs() * 2,
+              child: Transform.rotate(
+                angle: (i - (n - 1) / 2) * .12,
+                child: IgnorePointer(
+                  child: widget.dealerDeckKey == null
+                      ? widget.backBuilder?.call(32, 46) ?? const SizedBox()
+                      : DealCardMotion(
+                          key: ValueKey('${widget.dealIdentity}-$i'),
+                          sourceKey: widget.dealerDeckKey!,
+                          delay: Duration(milliseconds: i * 70),
+                          child:
+                              widget.backBuilder?.call(32, 46) ??
+                              const SizedBox(),
+                        ),
+                ),
+              ),
+            ),
+          Positioned(
+            top: 47,
+            left: 47,
+            child: Container(
+              width: 24,
+              height: 24,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: TableStyle.ink,
+                shape: BoxShape.circle,
+                border: Border.all(color: TableStyle.brass, width: 1.5),
+              ),
+              child: Text(
+                '$count',
+                textScaler: TextScaler.noScaling,
+                style: TableStyle.label.copyWith(fontWeight: FontWeight.w700),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

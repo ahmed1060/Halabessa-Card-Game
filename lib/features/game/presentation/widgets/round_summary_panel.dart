@@ -1,191 +1,226 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:easy_localization/easy_localization.dart';
+import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import '../../domain/models/match_state.dart';
 import '../../domain/models/round_score_breakdown.dart';
 import 'table_style.dart';
 import 'lantern_controls.dart';
+import 'velvet_score_frame.dart';
 import '../../domain/logic/online_match_clock.dart';
 import '../../domain/logic/match_presentation_timing.dart';
 
-/// Only public, real totals. Tafweet bonuses cannot be inferred from card count.
+/// Public recorded awards only. This scoreboard cannot advance a round.
 class RoundSummaryPanel extends StatelessWidget {
   final MatchState state;
-  final bool firstIsA;
-  final bool spectator;
+  final bool firstIsA, spectator;
   const RoundSummaryPanel({
     super.key,
     required this.state,
     required this.firstIsA,
     this.spectator = false,
   });
-  @override
-  Widget build(BuildContext context) => ColoredBox(
-    key: const ValueKey('round-results-fullscreen'),
-    color: Colors.black.withValues(alpha: .32),
-    child: SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(28),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-            child: DecoratedBox(
+
+  String get _first => firstIsA ? 'teamA' : 'teamB';
+  String get _second => firstIsA ? 'teamB' : 'teamA';
+  int _cards(String id) => (state.harvestStacks[id] ?? []).fold(
+    0,
+    (n, capture) => n + capture.cardCount,
+  );
+  int _plays(String id) =>
+      (state.harvestStacks[id] ?? []).where((c) => !c.isRoundAward).length;
+
+  Widget _score(String id, String label, Color color) {
+    final breakdown = RoundScoreBreakdown.forTeam(state, id);
+    final score = id == 'teamA' ? state.teamAScore : state.teamBScore;
+    return VelvetScoreTile(
+      key: ValueKey('round-score-$id'),
+      label: label,
+      score: score,
+      scoreLabel: 'ui_round_score'.tr(),
+      color: color,
+      compact: true,
+      footer: breakdown == null
+          ? null
+          : Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    TableStyle.ink.withValues(alpha: .9),
-                    TableStyle.ink.withValues(alpha: .68),
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(28),
-                border: Border.all(
-                  color: TableStyle.brass.withValues(alpha: .55),
-                ),
+                color: color.withValues(alpha: .13),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: color.withValues(alpha: .6)),
               ),
-              child: LayoutBuilder(
-                builder: (context, bounds) {
-                  final first = _team(
-                    firstIsA ? 'teamA' : 'teamB',
-                    (spectator ? 'team_a' : 'my_team').tr(),
-                    TableStyle.mint,
-                  );
-                  final second = _team(
-                    firstIsA ? 'teamB' : 'teamA',
-                    (spectator ? 'team_b' : 'opponent_team').tr(),
-                    TableStyle.red,
-                  );
-                  final wide =
-                      bounds.maxWidth > 600 &&
-                      MediaQuery.textScalerOf(context).scale(16) < 26;
-                  return SingleChildScrollView(
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(minHeight: bounds.maxHeight),
-                      child: Padding(
-                        padding: const EdgeInsets.all(24),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              'round_finished'.tr(),
-                              textAlign: TextAlign.center,
-                              style: TableStyle.label.copyWith(
-                                fontSize: 30,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                            const SizedBox(height: 24),
-                            if (wide)
-                              Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Expanded(child: first),
-                                  const SizedBox(width: 32),
-                                  Expanded(child: second),
-                                ],
-                              )
-                            else ...[
-                              first,
-                              const SizedBox(height: 24),
-                              second,
-                            ],
-                            const SizedBox(height: 24),
-                            Text(
-                              'round_advances_automatically'.tr(),
-                              textAlign: TextAlign.center,
-                              style: TableStyle.label,
-                            ),
-                            if (state.phaseStartedAt != null) ...[
-                              const SizedBox(height: 8),
-                              TurnCountdown(
-                                started: state.phaseStartedAt!,
-                                seconds: roundResultsDuration.inSeconds,
-                                now: state.usesServerCommands
-                                    ? OnlineMatchClock.instance.now
-                                    : DateTime.now,
-                                color: TableStyle.brass,
-                                label: (seconds) =>
-                                    'ui_seconds_short'.tr(args: ['$seconds']),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
+              child: Column(
+                children: [
+                  Text('ui_round_points'.tr(), style: TableStyle.detail),
+                  Text(
+                    '+${breakdown.total}',
+                    key: ValueKey('round-points-$id'),
+                    textDirection: TextDirection.ltr,
+                    style: TableStyle.label.copyWith(
+                      color: color,
+                      fontSize: 24,
+                      fontWeight: FontWeight.w800,
                     ),
-                  );
-                },
+                  ),
+                ],
+              ),
+            ),
+    );
+  }
+
+  Widget _stats() {
+    final a = RoundScoreBreakdown.forTeam(state, _first);
+    final b = RoundScoreBreakdown.forTeam(state, _second);
+    Widget row(String key, int? first, int? second) => Container(
+      key: ValueKey('round-stat-$key'),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        border: Border(
+          bottom: BorderSide(color: TableStyle.ivory.withValues(alpha: .13)),
+        ),
+      ),
+      child: Row(
+        textDirection: TextDirection.ltr,
+        children: [
+          SizedBox(
+            width: 38,
+            child: Text(
+              second?.toString() ?? '—',
+              textAlign: TextAlign.center,
+              style: TableStyle.label.copyWith(
+                color: TableStyle.red,
+                fontWeight: FontWeight.w800,
+                fontSize: 17,
               ),
             ),
           ),
-        ),
+          Expanded(
+            child: Text(
+              key.tr(),
+              textAlign: TextAlign.center,
+              style: TableStyle.label,
+            ),
+          ),
+          SizedBox(
+            width: 38,
+            child: Text(
+              first?.toString() ?? '—',
+              textAlign: TextAlign.center,
+              style: TableStyle.label.copyWith(
+                color: TableStyle.mint,
+                fontWeight: FontWeight.w800,
+                fontSize: 17,
+              ),
+            ),
+          ),
+        ],
       ),
-    ),
-  );
-  Widget _team(String id, String label, Color color) {
-    final breakdown = RoundScoreBreakdown.forTeam(state, id);
-    final captures = state.harvestStacks[id] ?? [];
-    final plays = captures.where((capture) => !capture.isRoundAward).length;
-    final cards = captures.fold<int>(
-      0,
-      (total, capture) => total + capture.cardCount,
     );
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(
-          label,
-          style: TableStyle.label.copyWith(
-            color: color,
-            fontSize: 22,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        Text(
-          '${'ui_round_captures'.tr()}: $plays',
-          textAlign: TextAlign.center,
-          style: TableStyle.detail,
-        ),
-        Text(
-          '${'ui_round_cards'.tr()}: $cards',
-          textAlign: TextAlign.center,
-          style: TableStyle.detail,
-        ),
-        const SizedBox(height: 4),
-        if (breakdown != null) ...[
-          Text(
-            '${'ui_capture_points'.tr()}: ${breakdown.captures}',
-            textAlign: TextAlign.center,
-            style: TableStyle.detail,
-          ),
+        row('ui_round_captures', _plays(_first), _plays(_second)),
+        row('ui_round_cards', _cards(_first), _cards(_second)),
+        if (a != null || b != null) ...[
+          row('ui_capture_points', a?.captures, b?.captures),
           if (state.mode == GameMode.tafweet)
-            Text(
-              '${'ui_tafweet_bonus'.tr()}: ${breakdown.tafweetBonus}',
-              textAlign: TextAlign.center,
-              style: TableStyle.detail,
-            ),
-          Text(
-            '${'ui_majority_bonus'.tr()}: ${breakdown.majorityBonus}',
-            textAlign: TextAlign.center,
-            style: TableStyle.detail,
-          ),
-          Text(
-            '${'ui_round_points'.tr()}: ${breakdown.total}',
-            textAlign: TextAlign.center,
-            style: TableStyle.label.copyWith(color: color),
-          ),
+            row('ui_tafweet_bonus', a?.tafweetBonus, b?.tafweetBonus),
+          row('ui_majority_bonus', a?.majorityBonus, b?.majorityBonus),
         ],
-        Text(
-          '${'ui_round_score'.tr()}: ${id == 'teamA' ? state.teamAScore : state.teamBScore}',
-          textAlign: TextAlign.center,
-          style: TableStyle.label.copyWith(
-            color: color,
-            fontSize: 28,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
       ],
     );
   }
+
+  @override
+  Widget build(BuildContext context) => ColoredBox(
+    key: const ValueKey('round-results-fullscreen'),
+    color: Colors.black.withValues(alpha: .35),
+    child: BackdropFilter(
+      filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+      child: SafeArea(
+        child: LayoutBuilder(
+          builder: (context, bounds) {
+            final wide =
+                bounds.maxWidth >= 700 &&
+                MediaQuery.textScalerOf(context).scale(14) <= 22;
+            final first = _score(
+              _first,
+              (spectator ? 'team_a' : 'my_team').tr(),
+              TableStyle.mint,
+            );
+            final second = _score(
+              _second,
+              (spectator ? 'team_b' : 'opponent_team').tr(),
+              TableStyle.red,
+            );
+            return Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 900),
+                  child: VelvetScoreFrame(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'round_finished'.tr(),
+                          textAlign: TextAlign.center,
+                          style: TableStyle.label.copyWith(
+                            fontSize: wide ? 25 : 24,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        if (wide)
+                          Row(
+                            textDirection: TextDirection.ltr,
+                            children: [
+                              Expanded(flex: 3, child: second),
+                              const SizedBox(width: 16),
+                              Expanded(flex: 6, child: _stats()),
+                              const SizedBox(width: 16),
+                              Expanded(flex: 3, child: first),
+                            ],
+                          )
+                        else ...[
+                          Row(
+                            textDirection: TextDirection.ltr,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(child: second),
+                              const SizedBox(width: 10),
+                              Expanded(child: first),
+                            ],
+                          ),
+                          const SizedBox(height: 14),
+                          _stats(),
+                        ],
+                        const SizedBox(height: 14),
+                        Text(
+                          'round_advances_automatically'.tr(),
+                          textAlign: TextAlign.center,
+                          style: TableStyle.detail,
+                        ),
+                        if (state.phaseStartedAt != null) ...[
+                          const SizedBox(height: 6),
+                          TurnCountdown(
+                            started: state.phaseStartedAt!,
+                            seconds: roundResultsDuration.inSeconds,
+                            now: state.usesServerCommands
+                                ? OnlineMatchClock.instance.now
+                                : DateTime.now,
+                            color: TableStyle.brass,
+                            label: (s) => 'ui_seconds_short'.tr(args: ['$s']),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    ),
+  );
 }

@@ -29,7 +29,7 @@ void main() {
       final art = tester.widget<LanternCardArt>(find.byType(LanternCardArt));
       expect(art.faceUp, faceUp);
       expect(find.byType(CardWidget), findsNothing);
-      expect(find.byType(Image), findsNothing);
+      expect(find.byType(Image), faceUp ? findsNothing : findsOneWidget);
       expect(tester.takeException(), isNull);
     });
   }

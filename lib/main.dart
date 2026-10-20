@@ -12,6 +12,7 @@ import 'core/services/player_presence.dart';
 import 'core/providers/age_eligibility_provider.dart';
 import 'core/widgets/age_eligibility_screen.dart';
 import 'core/widgets/app_orientation_scope.dart';
+import 'core/widgets/web_orientation_gate.dart';
 import 'core/providers/native_play_provider.dart';
 import 'core/widgets/native_play_entry.dart';
 import 'features/auth/presentation/providers/auth_providers.dart';
@@ -100,9 +101,11 @@ class HalabessaApp extends ConsumerWidget {
                 settings.reducedMotion ||
                 MediaQuery.disableAnimationsOf(context),
           ),
-          child: ColoredBox(
-            color: ThemeConfig.darkBg,
-            child: child ?? const SizedBox.shrink(),
+          child: WebOrientationGate(
+            child: ColoredBox(
+              color: ThemeConfig.darkBg,
+              child: child ?? const SizedBox.shrink(),
+            ),
           ),
         ),
         home: NativePlayEntry(
@@ -137,25 +140,28 @@ class HalabessaApp extends ConsumerWidget {
                 settings.reducedMotion ||
                 MediaQuery.disableAnimationsOf(context),
           ),
-          child: ColoredBox(
-            color: ThemeConfig.darkBg,
-            child: Stack(
-              children: [
-                const UnityPersistentOverlay(), // Move to background
-                if (child != null)
-                  Listener(
-                    behavior: HitTestBehavior.translucent,
-                    onPointerDown: (_) =>
-                        ref.read(multimediaServiceProvider).handleInteraction(),
-                    child: uid == null
-                        ? child
-                        : PlayerPresenceSession(
-                            key: ValueKey(uid),
-                            uid: uid,
-                            child: child,
-                          ),
-                  ),
-              ],
+          child: WebOrientationGate(
+            child: ColoredBox(
+              color: ThemeConfig.darkBg,
+              child: Stack(
+                children: [
+                  const UnityPersistentOverlay(), // Move to background
+                  if (child != null)
+                    Listener(
+                      behavior: HitTestBehavior.translucent,
+                      onPointerDown: (_) => ref
+                          .read(multimediaServiceProvider)
+                          .handleInteraction(),
+                      child: uid == null
+                          ? child
+                          : PlayerPresenceSession(
+                              key: ValueKey(uid),
+                              uid: uid,
+                              child: child,
+                            ),
+                    ),
+                ],
+              ),
             ),
           ),
         );

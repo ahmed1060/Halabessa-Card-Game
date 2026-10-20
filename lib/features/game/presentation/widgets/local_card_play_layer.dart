@@ -2,6 +2,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../domain/models/card.dart' as game_card;
 import 'card_widget.dart';
+import 'dart:math' as math;
+import '../providers/visual_action_queue.dart';
+import 'option_b_table.dart';
 
 /// Physical (not directional) geometry of the artwork at the moment of a tap.
 class CardPlayOrigin {
@@ -12,9 +15,26 @@ class CardPlayOrigin {
 }
 
 /// Shared by the authoritative pile and its local, provisional top card.
+Offset boardCardOffset(int index, int count, double width) {
+  if (count > 4) return Offset.zero;
+  if (count < 4) return Offset((index - (count - 1) / 2) * width * .45, 0);
+  const positions = [
+    Offset(-.48, .13),
+    Offset(0, -.36),
+    Offset(.46, .05),
+    Offset(.12, .54),
+  ];
+  return positions[index.clamp(0, 3)] * width;
+}
+
+double boardCardAngle(int index, int count) => count > 4
+    ? 0
+    : count < 4
+    ? (index - (count - 1) / 2) * .08
+    : [-.12, -.02, .12, .02][index.clamp(0, 3)];
 Offset boardTopCardOffset(int count, double width) =>
-    count <= 4 ? Offset((count - 1) * width * .225, 0) : Offset.zero;
-double boardTopCardAngle(int count) => count <= 4 ? (count - 1) * .04 : 0;
+    boardCardOffset(count - 1, count, width);
+double boardTopCardAngle(int count) => boardCardAngle(count - 1, count);
 
 typedef PresentCard = Future<void> Function(game_card.Card, CardPlayOrigin);
 
@@ -31,6 +51,8 @@ class LocalCardPlayLayer extends StatefulWidget {
   final Widget Function(game_card.Card?, Set<String>, PresentCard) builder;
   final Widget Function(game_card.Card, double, double)? cardBuilder;
   final String pendingLabel;
+  final void Function(game_card.Card)? onContact;
+  final VoidCallback? onRejected;
 
   const LocalCardPlayLayer({
     super.key,
@@ -44,6 +66,8 @@ class LocalCardPlayLayer extends StatefulWidget {
     this.enabled = true,
     this.cardBuilder,
     this.pendingLabel = 'Sending move',
+    this.onContact,
+    this.onRejected,
   });
 
   @override
@@ -81,8 +105,8 @@ class _LocalCardPlayLayerState extends State<LocalCardPlayLayer> {
       await widget.submit(card, origin);
       return;
     }
-    final width = widget.isLandscape ? 72.0 : 64.0;
-    final height = widget.isLandscape ? 104.0 : 92.0;
+    final width = OptionBGeometry.tableCardSize.width;
+    final height = OptionBGeometry.tableCardSize.height;
     final target = Rect.fromCenter(
       center:
           board.size.center(Offset.zero) +
@@ -118,6 +142,7 @@ class _LocalCardPlayLayerState extends State<LocalCardPlayLayer> {
     }
     if (!mounted || widget.identity != identity || _pending != pending) return;
     if (!accepted) {
+      widget.onRejected?.call();
       setState(() => pending.returning = true);
       await pending.returned.future;
     }
@@ -151,6 +176,7 @@ class _LocalCardPlayLayerState extends State<LocalCardPlayLayer> {
               pendingLabel: widget.pendingLabel,
               cardBuilder: widget.cardBuilder,
               onReturned: () => _restore(pending),
+              onContact: () => widget.onContact?.call(pending.card),
             ),
           ),
         ),
@@ -172,12 +198,14 @@ class _CardFlight extends StatefulWidget {
   final String pendingLabel;
   final Widget Function(game_card.Card, double, double)? cardBuilder;
   final VoidCallback onReturned;
+  final VoidCallback? onContact;
   const _CardFlight({
     super.key,
     required this.play,
     required this.pendingLabel,
     required this.onReturned,
     this.cardBuilder,
+    this.onContact,
   });
   @override
   State<_CardFlight> createState() => _CardFlightState();
@@ -188,9 +216,12 @@ class _CardFlightState extends State<_CardFlight>
   late final _controller = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 220),
-    reverseDuration: const Duration(milliseconds: 180),
+    reverseDuration: const Duration(milliseconds: cardJuiceEnabled ? 250 : 180),
   );
   bool _started = false, _returnStarted = false;
+  Timer? _contact;
+  double _returnFrom = 1;
+  double _returnControllerFrom = 1;
 
   @override
   void didChangeDependencies() {
@@ -201,6 +232,9 @@ class _CardFlightState extends State<_CardFlight>
         _controller.value = 1;
       } else {
         _controller.forward();
+        _contact = Timer(const Duration(milliseconds: 190), () {
+          if (mounted && !widget.play.returning) widget.onContact?.call();
+        });
       }
     }
   }
@@ -210,14 +244,19 @@ class _CardFlightState extends State<_CardFlight>
     super.didUpdateWidget(oldWidget);
     if (widget.play.returning && !_returnStarted) {
       _returnStarted = true;
+      _contact?.cancel();
+      _returnFrom = Curves.easeOutCubic.transform(_controller.value);
+      _returnControllerFrom = _controller.value;
       if (MediaQuery.disableAnimationsOf(context)) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) widget.onReturned();
         });
       } else {
-        _controller.reverse().whenCompleteOrCancel(() {
-          if (mounted) widget.onReturned();
-        });
+        _controller
+            .animateTo(0, duration: _controller.reverseDuration)
+            .whenCompleteOrCancel(() {
+              if (mounted) widget.onReturned();
+            });
       }
     }
   }
@@ -225,6 +264,7 @@ class _CardFlightState extends State<_CardFlight>
   @override
   void dispose() {
     _controller.dispose();
+    _contact?.cancel();
     if (!widget.play.returned.isCompleted) widget.play.returned.complete();
     super.dispose();
   }
@@ -233,10 +273,33 @@ class _CardFlightState extends State<_CardFlight>
   Widget build(BuildContext context) => AnimatedBuilder(
     animation: _controller,
     builder: (context, _) {
-      final progress = Curves.easeOutCubic.transform(_controller.value);
+      final progress = widget.play.returning && cardJuiceEnabled
+          ? _returnFrom *
+                (1 -
+                    Curves.easeOutBack.transform(
+                      1 -
+                          (_controller.value /
+                                  (_returnControllerFrom == 0
+                                      ? 1
+                                      : _returnControllerFrom))
+                              .clamp(0, 1),
+                    ))
+          : Curves.easeOutCubic.transform(_controller.value);
       final play = widget.play;
-      final rect = Rect.lerp(play.from, play.to, progress)!;
-      final angle = play.fromAngle + (play.toAngle - play.fromAngle) * progress;
+      final rect = Rect.lerp(play.from, play.to, progress)!.shift(
+        Offset(
+          0,
+          cardJuiceEnabled && !widget.play.returning
+              ? -math.sin(math.pi * _controller.value) * 16
+              : 0,
+        ),
+      );
+      final angle =
+          play.fromAngle +
+          (play.toAngle - play.fromAngle) * progress +
+          (cardJuiceEnabled && !widget.play.returning
+              ? math.sin(math.pi * _controller.value) * .07
+              : 0);
       return Stack(
         clipBehavior: Clip.none,
         children: [

@@ -18,39 +18,50 @@ class LanternCardArt extends StatelessWidget {
     required this.height,
   });
   @override
-  Widget build(BuildContext context) => SizedBox(
-    width: width,
-    height: height,
-    child: Stack(
-      children: [
-        Positioned.fill(
-          child: CustomPaint(painter: _CardPainter(card, faceUp)),
-        ),
-        if (faceUp && card.rank != game.Rank.ace && card.rank.value > 10)
-          Positioned(
-            left: width * .19,
-            top: height * .04,
-            width: width * .62,
-            height: height * .92,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(2),
-              child: Image.asset(
-                'assets/images/cards/lantern/${card.rank.name}_v1.png',
-                fit: BoxFit.fill,
-                cacheWidth: 160,
-                errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+  Widget build(BuildContext context) => !faceUp
+      ? ClipRRect(
+          borderRadius: BorderRadius.circular(width * .08),
+          child: Image.asset(
+            'assets/images/cards/lantern/ornate_back_v1.png',
+            width: width,
+            height: height,
+            fit: BoxFit.fill,
+            cacheWidth: 280,
+          ),
+        )
+      : SizedBox(
+          width: width,
+          height: height,
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: CustomPaint(painter: _CardPainter(card, faceUp)),
               ),
-            ),
+              if (faceUp && card.rank != game.Rank.ace && card.rank.value > 10)
+                Positioned(
+                  left: width * .19,
+                  top: height * .04,
+                  width: width * .62,
+                  height: height * .92,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(2),
+                    child: Image.asset(
+                      'assets/images/cards/lantern/${card.rank.name}_v1.png',
+                      fit: BoxFit.fill,
+                      cacheWidth: 160,
+                      errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                    ),
+                  ),
+                ),
+              if (faceUp && card.rank != game.Rank.ace && card.rank.value > 10)
+                Positioned.fill(
+                  child: CustomPaint(
+                    painter: _CardPainter(card, true, indicesOnly: true),
+                  ),
+                ),
+            ],
           ),
-        if (faceUp && card.rank != game.Rank.ace && card.rank.value > 10)
-          Positioned.fill(
-            child: CustomPaint(
-              painter: _CardPainter(card, true, indicesOnly: true),
-            ),
-          ),
-      ],
-    ),
-  );
+        );
 }
 
 class _CardPainter extends CustomPainter {

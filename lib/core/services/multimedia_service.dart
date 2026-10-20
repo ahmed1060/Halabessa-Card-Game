@@ -237,8 +237,25 @@ class MultimediaService extends ChangeNotifier {
     }
   }
 
-  // Audio - Sound Effects
-  Future<void> playSfx(String assetPath) async {
+  // Existing domain callers stay unchanged. A mounted presentation scope owns
+  // only card contact sounds; every other sound/music path remains pass-through.
+  Object? _cardAudioOwner;
+  void Function() ownCardPresentationAudio(Object owner) {
+    _cardAudioOwner = owner;
+    return () {
+      if (identical(_cardAudioOwner, owner)) _cardAudioOwner = null;
+    };
+  }
+
+  Future<void> playSfx(String assetPath) => _playSfx(assetPath);
+  Future<void> playPresentationSfx(String assetPath) =>
+      _playSfx(assetPath, presentation: true);
+  Future<void> _playSfx(String assetPath, {bool presentation = false}) async {
+    if (!presentation &&
+        _cardAudioOwner != null &&
+        (assetPath == 'sfx/play.mp3' || assetPath == 'sfx/capture.mp3')) {
+      return;
+    }
     try {
       final settings = _ref.read(settingsProvider);
       if (settings.isSoundEnabled) {

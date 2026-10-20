@@ -12,9 +12,7 @@ import 'package:halabessa/features/game/domain/models/card.dart' as game_card;
 import 'package:halabessa/features/game/presentation/widgets/card_widget.dart';
 import 'package:halabessa/features/game/presentation/widgets/fanned_hand_widget.dart';
 import 'package:halabessa/features/game/domain/models/capture.dart';
-import 'package:halabessa/features/home/presentation/providers/store_provider.dart';
 import 'package:halabessa/core/theme/theme_config.dart';
-import 'package:halabessa/core/widgets/background_decode_size.dart';
 import 'package:halabessa/core/widgets/settings_overlay.dart';
 import 'package:halabessa/core/providers/settings_provider.dart';
 import 'package:halabessa/features/game/presentation/providers/chat_providers.dart';
@@ -23,8 +21,10 @@ import 'package:confetti/confetti.dart';
 import '../widgets/player_profile_preview.dart';
 import '../widgets/board_cards_widget.dart';
 import '../widgets/capture_presentation.dart';
+import '../providers/card_feedback.dart';
 import '../widgets/match_play_availability.dart';
 import '../widgets/option_b_table.dart';
+import '../widgets/game_table_background.dart';
 import '../widgets/table_seat.dart';
 import '../widgets/table_style.dart';
 import '../widgets/table_motion_geometry.dart';
@@ -60,12 +60,87 @@ class GameBoardScreen extends ConsumerStatefulWidget {
 class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
   late ConfettiController _confettiController;
   final GlobalKey _boardKey = GlobalKey();
+  final GlobalKey _sceneKey = GlobalKey();
   final GlobalKey _dealerDeckKey = GlobalKey();
   final GlobalKey _ourPileKey = GlobalKey();
   final GlobalKey _rivalPileKey = GlobalKey();
   final List<GlobalKey> _seatKeys = List.generate(4, (_) => GlobalKey());
   bool _isEmoteWheelOpen = false;
   bool _offlinePracticeEnded = false;
+  bool _anchorSyncScheduled = false;
+
+  void _syncVisualAnchors(MatchState state) {
+    if (_anchorSyncScheduled) return;
+    _anchorSyncScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _anchorSyncScheduled = false;
+      if (!mounted) return;
+      final scene = _sceneKey.currentContext?.findRenderObject();
+      if (scene is! RenderBox || !scene.hasSize) return;
+      final viewport = MediaQuery.sizeOf(context);
+      if (viewport.isEmpty) return;
+      final g = OptionBGeometry(scene.size);
+      Map<String, dynamic> anchor(String name, Offset point, [Size? size]) {
+        final global = scene.localToGlobal(point);
+        final extent = size == null
+            ? null
+            : scene.localToGlobal(point + Offset(size.width, size.height)) -
+                  global;
+        return {
+          'name': name,
+          'x': (global.dx / viewport.width).clamp(0, 1),
+          'y': (global.dy / viewport.height).clamp(0, 1),
+          if (extent != null) 'width': extent.dx / viewport.width,
+          if (extent != null) 'height': extent.dy / viewport.height,
+        };
+      }
+
+      // Share the existing fan's logical geometry, not Unity world-unit guesses.
+      // These are visual coordinates only; membership still comes from SYNC_STATE.
+      final hand = state.handCards[ref.read(currentUserProvider)?.uid] ?? [];
+      final fan = HandFanGeometry(
+        g.hand.width,
+        spread: OptionBGeometry.localHandSpread,
+      );
+      final cardWidth = fan.width;
+      final cardHeight = fan.height;
+      final spacing = fan.spacing;
+      final cardSize = Size(cardWidth, cardHeight);
+      final boardSize = OptionBGeometry.tableCardSize;
+
+      ref.read(unityCommunicationServiceProvider).updateVisualAnchors([
+        anchor('hand', g.hand.center, cardSize),
+        anchor('board', g.board.center, boardSize),
+        for (var i = 0; i < hand.length; i++)
+          anchor(
+            'hand$i',
+            g.hand.center +
+                Offset(
+                  (i - (hand.length - 1) / 2) * spacing,
+                  6 -
+                      7 *
+                          (2.25 - pow(i - (hand.length - 1) / 2, 2)).clamp(
+                            0,
+                            2.25,
+                          ),
+                ),
+            cardSize,
+          ),
+        anchor('ourPile', g.ourPile.center),
+        anchor('rivalPile', g.rivalPile.center),
+        if (_dealerDeckKey.currentContext?.findRenderObject()
+            case final RenderBox deck when deck.hasSize)
+          anchor(
+            'deck',
+            scene.globalToLocal(
+              deck.localToGlobal(deck.size.center(Offset.zero)),
+            ),
+          ),
+        for (var i = 0; i < 4; i++)
+          anchor('seat$i', [g.local, g.right, g.partner, g.left][i].center),
+      ], reducedMotion: MediaQuery.disableAnimationsOf(context));
+    });
+  }
 
   void _returnToHome() {
     Navigator.of(
@@ -375,7 +450,6 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
                   child: Consumer(
                     builder: (context, ref, child) {
                       final settings = ref.watch(settingsProvider);
-                      final activeTable = ref.watch(activeTableSkinProvider);
                       final is3DActive =
                           settings.is3DModeEnabled &&
                           ref.watch(unityLayerActiveProvider);
@@ -385,35 +459,7 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
                             ? const Duration(milliseconds: 500)
                             : Duration.zero,
                         opacity: is3DActive ? 0.0 : 1.0,
-                        child: activeTable.id == 'default_table'
-                            ? RepaintBoundary(
-                                child: Image.asset(
-                                  MediaQuery.sizeOf(context).width <
-                                          MediaQuery.sizeOf(context).height
-                                      ? 'assets/images/tables/lantern_nights_portrait_v2.png'
-                                      : 'assets/images/tables/lantern_nights_v1.png',
-                                  fit: BoxFit.cover,
-                                  cacheWidth: backgroundDecodeWidth(
-                                    MediaQuery.sizeOf(context).width,
-                                    MediaQuery.devicePixelRatioOf(context),
-                                  ),
-                                  errorBuilder: (_, __, ___) =>
-                                      const ColoredBox(color: TableStyle.felt),
-                                ),
-                              )
-                            : activeTable.assetPath.startsWith('http')
-                            ? Image.network(
-                                activeTable.assetPath,
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) =>
-                                    Container(color: ThemeConfig.boardGreen),
-                              )
-                            : Image.asset(
-                                activeTable.assetPath,
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) =>
-                                    Container(color: ThemeConfig.boardGreen),
-                              ),
+                        child: const GameTableBackground(),
                       );
                     },
                   ),
@@ -518,6 +564,14 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
   }) => CapturePresentation(
     key: ValueKey('capture-presentation-${state.id}'),
     state: state,
+    onReducedContact: show3DHand
+        ? null
+        : (event) => ref
+              .read(cardFeedbackProvider)
+              .contact(
+                'capture:${event.cards.map((c) => c.firebaseKey).join(',')}',
+                slam: true,
+              ),
     builder: (visualState) => MatchPlayAvailability(
       availableAt: state.playAvailableAt,
       serverClock: state.usesServerCommands,
@@ -547,6 +601,14 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
     required bool playReady,
   }) {
     final myTeam = _getTeamOfPlayer(myUid, state.playerIds);
+    if (show3DHand) _syncVisualAnchors(state);
+    final feedback = ref.watch(cardFeedbackProvider);
+    feedback.bind(
+      '${state.id}:${state.matchSequence}:${state.roundCount}:$myUid',
+      ownsAudio:
+          !show3DHand ||
+          ref.read(unityCommunicationServiceProvider).supportsVisualActions,
+    );
     final firstIsA = myTeam != 'teamB';
     final playing = state.phase == GamePhase.playing;
     final myTurn =
@@ -572,7 +634,8 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
             ? '${user.displayName.replaceAll('🤖', '').trim()}${offset == 2 ? '' : ' · ${'bot_difficulty_${parseBotDifficulty(state.botDifficulties[user.uid]).name}'.tr()}'}'
             : user.displayName,
         optionB: true,
-        compactAvatar: offset == 1 || offset == 3,
+        compactAvatar: offset != 0,
+        handOnRight: offset == 2,
         countdownSemantics: (seconds) =>
             'ui_seconds_remaining'.tr(args: ['$seconds']),
         chatBadge: offset == 0 && !isSpectator,
@@ -613,7 +676,9 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
         messageExpiresAt: chat == null
             ? DateTime.tryParse(state.playerEmojiExpiresAt[user.uid] ?? '')
             : null,
-        hiddenHandCount: offset == 0 ? null : state.cardsRemainingFor(user.uid),
+        hiddenHandCount: offset == 0 || state.phase == GamePhase.preRoundCut
+            ? null
+            : state.cardsRemainingFor(user.uid),
         dealIdentity:
             '${state.id}-${state.roundCount}-${state.handInRound}-${user.uid}',
         dealerDeckKey: _dealerDeckKey,
@@ -622,26 +687,7 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
             ? () => ref.read(chatStateProvider.notifier).toggleOverlay()
             : () => _showPlayerProfile(context, ref, state, myUid, offset),
       );
-      return KeyedSubtree(
-        key: _seatKeys[offset],
-        child: DealerSeat(
-          seat: avatar,
-          isDealer:
-              _getAbsoluteIndex(state, myUid, offset) == state.dealerIndex,
-          compact: true,
-          largeDeck: true,
-          // Portrait has space below us; landscape reserves that space for
-          // the left opponent, so keep our dealer deck on our right instead.
-          deckBelow: offset == 0 && !isLandscape,
-          deckOnLeft: offset == 1 || offset == 2,
-          remaining: state.deckCount,
-          label: 'table_deal_deck'.tr(),
-          deckKey: _getAbsoluteIndex(state, myUid, offset) == state.dealerIndex
-              ? _dealerDeckKey
-              : null,
-          backBuilder: _cardBack,
-        ),
-      );
+      return KeyedSubtree(key: _seatKeys[offset], child: avatar);
     }
 
     return LocalCardPlayLayer(
@@ -650,9 +696,13 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
       hand: state.handCards[myUid] ?? const [],
       boardCount: state.board.length,
       boardKey: _boardKey,
-      enabled: state.usesServerCommands,
+      // Native owns accepted card flights. Do not draw a second Flutter ghost
+      // over its hand/board; the Flutter-only renderer retains optimistic play.
+      enabled: state.usesServerCommands && !show3DHand,
       isLandscape: isLandscape,
       pendingLabel: 'table_sending_move'.tr(),
+      onContact: (card) => feedback.contact('play:${card.firebaseKey}'),
+      onRejected: feedback.reject,
       cardBuilder: _cardFace,
       submit: (card, geometry) {
         final box = _boardKey.currentContext?.findRenderObject() as RenderBox?;
@@ -664,6 +714,7 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
             .playCard(myUid, card, origin: origin);
       },
       builder: (hiddenCard, presented, play) => OptionBTable(
+        sceneKey: _sceneKey,
         scores: ClearScoreDisplay(
           ourScore: firstIsA ? state.teamAScore : state.teamBScore,
           rivalScore: firstIsA ? state.teamBScore : state.teamAScore,
@@ -674,28 +725,34 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
           showLabel: 'table_show_scores'.tr(),
         ),
         partner: seat(2),
+        deck: DealDeck(
+          thematic: true,
+          shuffleIdentity:
+              state.phase == GamePhase.preRoundCut &&
+                  state.roundsSinceLastShuffle == 0
+              ? '${state.id}-${state.matchSequence}-${state.roundCount}'
+              : null,
+          shuffleStartedAt: state.phaseStartedAt,
+          remaining: state.deckCount,
+          label: 'table_deal_deck'.tr(),
+          deckKey: _dealerDeckKey,
+          backBuilder: _cardBack,
+        ),
         left: seat(3),
         right: seat(1),
         local: seat(0),
-        ourPile: CompactCollectedPile(
-          label: firstLabel,
-          count: _captureCount(state, firstIsA ? 'teamA' : 'teamB'),
-          small: true,
-          pileKey: _ourPileKey,
-          backBuilder: _cardBack,
-        ),
-        rivalPile: CompactCollectedPile(
-          label: secondLabel,
-          count: _captureCount(state, firstIsA ? 'teamB' : 'teamA'),
-          accent: TableStyle.red,
-          pileKey: _rivalPileKey,
-          backBuilder: _cardBack,
-        ),
+        ourPile: SizedBox(key: _ourPileKey, width: 20, height: 20),
+        rivalPile: SizedBox(key: _rivalPileKey, width: 20, height: 20),
         history: TeamCapturePreview(
+          semanticsLabel:
+              '$firstLabel: ${_captureCount(state, firstIsA ? 'teamA' : 'teamB')}, $secondLabel: ${_captureCount(state, firstIsA ? 'teamB' : 'teamA')}, ${'table_capture_cards'.tr()}',
           captures: isSpectator
               ? const []
               : state.harvestStacks[firstIsA ? 'teamA' : 'teamB'] ?? const [],
           label: 'table_capture_cards'.tr(),
+          ourCount: _captureCount(state, firstIsA ? 'teamA' : 'teamB'),
+          rivalCount: _captureCount(state, firstIsA ? 'teamB' : 'teamA'),
+          emptyBackBuilder: _cardBack,
           faceBuilder: _cardFace,
           onPressed: isSpectator ? null : () => _showCaptures(context),
         ),
@@ -703,6 +760,7 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
             state.phase == GamePhase.shuffleVoting ||
             state.phase == GamePhase.rematchVoting ||
             state.phase == GamePhase.preRoundCut,
+        deckSidePhase: state.phase == GamePhase.preRoundCut,
         board: SizedBox(
           key: _boardKey,
           child: _buildPresentedBoardCenter(
@@ -723,16 +781,26 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
                 isSpectator,
                 myTurn,
               ),
-        hand:
-            isSpectator ||
-                show3DHand ||
-                (state.handCards[myUid]?.isEmpty ?? true)
+        hand: isSpectator || (state.handCards[myUid]?.isEmpty ?? true)
             ? const SizedBox(height: 24)
             : FannedHandWidget(
                 key: ValueKey(
                   'hand-${state.id}-${state.roundCount}-${state.handInRound}',
                 ),
                 dealerDeckKey: _dealerDeckKey,
+                renderArtwork: !show3DHand,
+                largeCards: true,
+                onVisualPose: show3DHand
+                    ? (card, peek, drag, velocity) => ref
+                          .read(unityCommunicationServiceProvider)
+                          .updateHandPose(
+                            card.firebaseKey,
+                            peek,
+                            drag,
+                            velocity,
+                          )
+                    : null,
+                onPick: feedback.pick,
                 cards: state.handCards[myUid] ?? [],
                 isMyTurn: myTurn,
                 interactionEnabled: playing && playReady && hiddenCard == null,
@@ -880,6 +948,12 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
         key: ValueKey('${state.id}-${state.roundCount}-cut'),
         title: 'pre_round_cut'.tr(),
         message: (canCut ? 'your_turn_cut_deck' : 'waiting_deck_cut').tr(),
+        deckSide: true,
+        shuffleIntro: state.roundsSinceLastShuffle == 0,
+        startedAt: state.phaseStartedAt,
+        shuffleTitle: 'ui_shuffling_title'.tr(),
+        shuffleMessage: 'ui_shuffling_message'.tr(),
+        shuffleNext: 'ui_shuffle_then_cut'.tr(),
         actionLabel: canCut ? 'cut_the_deck'.tr() : null,
         onAction: canCut
             ? () => ref.read(matchStateProvider.notifier).performCut(20)
@@ -1082,10 +1156,10 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
     bool is3DActive = false,
     Set<String> alreadyPresented = const {},
   }) {
-    if (is3DActive) {
+    if (matchState.phase == GamePhase.preRoundCut ||
+        matchState.phase == GamePhase.waitingForPlayers) {
       return const SizedBox.shrink();
     }
-
     if (matchState.phase == GamePhase.dealingFasha &&
         matchState.cutLastCard != null) {
       return Center(
@@ -1095,6 +1169,9 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
           height: 138,
         ),
       );
+    }
+    if (is3DActive) {
+      return const SizedBox.shrink();
     }
     final isCapturing = matchState.phase == GamePhase.capturing;
     final collector = matchState.capturingTeam;
@@ -1138,6 +1215,8 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
     return BoardCardsWidget(
       key: ValueKey('board-${matchState.id}'),
       cards: matchState.board,
+      onContact: (id, slam) =>
+          ref.read(cardFeedbackProvider).contact(id, slam: slam),
       showEmptyPlaceholder: false,
       alreadyPresented: alreadyPresented,
       isLandscape: isLandscape,
@@ -1334,35 +1413,72 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
       for (var index = parity; index < state.playerIds.length; index += 2)
         Flexible(
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                UserAvatar(
-                  radius: 32,
-                  user: AppUser(
-                    uid: state.playerIds[index],
-                    email: '',
-                    displayName:
-                        state.playerNames[state.playerIds[index]] ??
-                        'player_default_name'.tr(),
-                    avatarUrl: state.playerAvatars[state.playerIds[index]],
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  state.playerNames[state.playerIds[index]] ??
-                      'player_default_name'.tr(),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TableStyle.detail.copyWith(color: TableStyle.ink),
-                ),
-              ],
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            child: _resultPlayer(state, index),
           ),
         ),
     ],
   );
+
+  Widget _resultPlayer(MatchState state, int index) {
+    final uid = state.playerIds[index];
+    final viewer = ref.read(currentUserProvider);
+    final viewerIndex = state.playerIds.indexOf(viewer?.uid ?? '');
+    final offset = (index - (viewerIndex < 0 ? 0 : viewerIndex) + 4) % 4;
+    final color = viewerIndex < 0
+        ? (index.isEven ? TableStyle.mint : TableStyle.red)
+        : (offset.isEven ? TableStyle.mint : TableStyle.red);
+    final raw = state.playerNames[uid];
+    final name = uid == viewer?.uid
+        ? 'table_you'.tr()
+        : uid.startsWith('bot_') && (raw == null || raw == 'bot_name_template')
+        ? '${'bot_name'.tr()} ${uid.split('_').last}'
+        : (raw ?? 'player_default_name').tr();
+    final avatar =
+        state.playerAvatars[uid] ??
+        (uid == viewer?.uid ? viewer?.avatarUrl : null);
+    final fallback = offset == 0 || offset == 3
+        ? 'assets/images/avatars/lantern_rival_man_v1.png'
+        : offset == 2
+        ? 'assets/images/avatars/lantern_partner_v1.png'
+        : 'assets/images/avatars/lantern_rival_woman_v1.png';
+    final Widget image = avatar != null && avatar.isNotEmpty
+        ? (avatar.startsWith('assets/')
+              ? Image.asset(
+                  avatar,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) =>
+                      Image.asset(fallback, fit: BoxFit.cover),
+                )
+              : Image.network(
+                  avatar,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) =>
+                      Image.asset(fallback, fit: BoxFit.cover),
+                ))
+        : Image.asset(fallback, fit: BoxFit.cover);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 48,
+          height: 48,
+          padding: const EdgeInsets.all(2),
+          decoration: BoxDecoration(shape: BoxShape.circle, color: color),
+          child: ClipOval(child: image),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          name,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
+          style: TableStyle.detail,
+        ),
+      ],
+    );
+  }
+
   void _showInviteFriendDialog(
     BuildContext context,
     WidgetRef ref,
