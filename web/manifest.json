@@ -1,11 +1,13 @@
 {
     "name": "Halabessa",
     "short_name": "Halabessa",
-    "start_url": ".",
+    "id": "/",
+    "start_url": "/play.html",
+    "scope": "/",
     "display": "fullscreen",
     "background_color": "#3B274C",
     "theme_color": "#3B274C",
-    "description": "Halabessa - The ultimate Egyptian card game experience.",
+    "description": "Halabessa Card Game — لعبة حلبسة، كوتشينة مصرية مع صحابك أو مع البوت.",
     "orientation": "any",
     "prefer_related_applications": false,
     "icons": [

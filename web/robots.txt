@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://halabessa-card-game1.web.app/sitemap.xml
