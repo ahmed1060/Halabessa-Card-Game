@@ -17,7 +17,12 @@ class LanternPageTransitionsBuilder extends PageTransitionsBuilder {
   ) {
     final reduced = MediaQuery.disableAnimationsOf(context);
     return ColoredBox(
-      color: const Color(0xFF3B274C),
+      // The retained Unity view is beneath Navigator. An opaque settled game
+      // route hides both its cards and the shared cafe background forever.
+      // The app-root cafe backdrop still protects this route from white flashes.
+      color: route?.settings.name == '/game'
+          ? Colors.transparent
+          : const Color(0xFF3B274C),
       child: reduced
           ? child
           : FadeTransition(

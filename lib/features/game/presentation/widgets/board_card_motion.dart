@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
+import 'dart:math' as math;
+import '../providers/visual_action_queue.dart';
 
 /// One-shot travel for a card arriving on the board. The card's identity is
 /// supplied as the widget key, so unrelated table rebuilds do not replay it.
@@ -9,6 +12,7 @@ class BoardCardMotion extends StatefulWidget {
   final Duration travelDuration;
   final double initialOpacity;
   final bool alreadyArrived;
+  final VoidCallback? onContact;
 
   const BoardCardMotion({
     super.key,
@@ -18,6 +22,7 @@ class BoardCardMotion extends StatefulWidget {
     this.initialOpacity = 0.75,
     this.alreadyArrived = false,
     required this.child,
+    this.onContact,
   });
 
   @override
@@ -30,20 +35,40 @@ class _BoardCardMotionState extends State<BoardCardMotion>
     vsync: this,
     duration: widget.travelDuration + widget.delay,
   );
+  Timer? _contact;
+  bool _started = false;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (widget.alreadyArrived || MediaQuery.disableAnimationsOf(context)) {
       _controller.value = 1;
-    } else if (_controller.value == 0) {
+      if (!widget.alreadyArrived && !_started) {
+        _started = true;
+        _contact = Timer(Duration.zero, () {
+          if (mounted) widget.onContact?.call();
+        });
+      }
+    } else if (!_started) {
+      _started = true;
       _controller.forward();
+      if (widget.onContact != null) {
+        _contact = Timer(
+          widget.travelDuration +
+              widget.delay -
+              const Duration(milliseconds: 30),
+          () {
+            if (mounted) widget.onContact?.call();
+          },
+        );
+      }
     }
   }
 
   @override
   void dispose() {
     _controller.dispose();
+    _contact?.cancel();
     super.dispose();
   }
 
@@ -60,9 +85,17 @@ class _BoardCardMotionState extends State<BoardCardMotion>
           .toDouble();
       final progress = Curves.easeOutCubic.transform(travel);
       return Transform.translate(
-        offset: widget.origin * (1 - progress),
+        offset:
+            widget.origin * (1 - progress) +
+            Offset(0, cardJuiceEnabled ? -math.sin(math.pi * travel) * 12 : 0),
         child: Transform.scale(
-          scale: 0.84 + 0.16 * progress,
+          scale:
+              0.84 +
+              0.16 * progress +
+              (cardJuiceEnabled
+                  ? math.sin(math.pi * ((travel - .75) / .25).clamp(0, 1)) *
+                        .025
+                  : 0),
           child: Opacity(
             opacity:
                 widget.initialOpacity + (1 - widget.initialOpacity) * progress,

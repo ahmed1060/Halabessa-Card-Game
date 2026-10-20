@@ -66,7 +66,15 @@ service cloud.firestore {
     // global_settings_provider.dart, now actually enforced server-side).
     match /settings/{docId} {
       allow read: if activeAccount();
-      allow write: if activeAccount() && request.auth.token.admin == true;
+      // Presentation visibility is reserved for the verified primary admin,
+      // not delegated administrators. Never trust a profile isAdmin field.
+      allow write: if activeAccount() && request.auth.token.get('admin', false) == true
+        && (docId != 'orientation' || (
+          request.auth.token.get('email', '') == 'ahmed.hossam1060@gmail.com'
+          && request.auth.token.get('email_verified', false) == true
+          && request.resource.data.keys().hasOnly(['showPlayerControl'])
+          && request.resource.data.showPlayerControl is bool
+        ));
 
       match /overrides/{overrideId} {
         allow read: if activeAccount();

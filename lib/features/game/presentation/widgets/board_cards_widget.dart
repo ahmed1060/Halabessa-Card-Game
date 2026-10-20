@@ -8,6 +8,8 @@ import 'board_card_motion.dart';
 import 'card_face_flip.dart';
 import 'local_card_play_layer.dart';
 import '../../domain/logic/match_presentation_timing.dart';
+import 'card_juice_controller.dart';
+import 'option_b_table.dart';
 
 /// Decorative capture staging never waits for another server publication.
 class _CaptureTimeline extends StatefulWidget {
@@ -79,6 +81,7 @@ class BoardCardsWidget extends StatelessWidget {
   final Offset? captureOffset;
   final Widget Function(double, double)? backBuilder;
   final Widget Function(game_card.Card, double, double)? cardBuilder;
+  final void Function(String id, bool slam)? onContact;
 
   const BoardCardsWidget({
     super.key,
@@ -95,6 +98,7 @@ class BoardCardsWidget extends StatelessWidget {
     this.cardBuilder,
     this.captureOffset,
     this.backBuilder,
+    this.onContact,
   });
 
   @override
@@ -129,8 +133,8 @@ class BoardCardsWidget extends StatelessWidget {
       );
     }
 
-    final cardWidth = isLandscape ? 72.0 : 64.0;
-    final cardHeight = isLandscape ? 104.0 : 92.0;
+    final cardWidth = OptionBGeometry.tableCardSize.width;
+    final cardHeight = OptionBGeometry.tableCardSize.height;
 
     final reducedMotion = MediaQuery.disableAnimationsOf(context);
     final motionDuration = reducedMotion
@@ -140,128 +144,143 @@ class BoardCardsWidget extends StatelessWidget {
         ? Duration.zero
         : const Duration(milliseconds: 240);
 
-    return _CaptureTimeline(
+    return CardTableImpact(
       identity: isCapturing
-          ? '$capturingTeam:${cards.map((card) => card.firebaseKey).join(',')}'
+          ? '$capturingTeam:${cards.map((c) => c.firebaseKey).join(',')}'
           : null,
-      immediate: reducedMotion || capturingStage > 0,
-      builder: (captureFlight) => Center(
-        child: Stack(
-          alignment: Alignment.center,
-          clipBehavior: Clip.none,
-          children: [
-            // Ambient table glow under the cards
-            Container(
-              width: (cardWidth * 2.2),
-              height: (cardHeight * 1.6),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: isCapturing
-                        ? (capturingTeam == 'teamA'
-                              ? ThemeConfig.primaryTeal.withValues(alpha: 0.45)
-                              : ThemeConfig.goldAccent.withValues(alpha: 0.45))
-                        : ThemeConfig.goldAccent.withValues(alpha: 0.15),
-                    blurRadius: 35,
-                    spreadRadius: 8,
-                  ),
-                ],
-              ),
-            ),
-
-            // The pile compresses on capture, then travels toward the winning
-            // team. New cards independently arrive from their player's seat.
-            AnimatedSlide(
-              key: const ValueKey('capture-flight'),
-              duration: motionDuration,
-              curve: Curves.easeInOutCubic,
-              offset: captureFlight
-                  ? (captureOffset == null
-                        ? Offset(0, captureToBottom ? 1.3 : -1.3)
-                        : Offset(
-                            captureOffset!.dx / (cardWidth * 2.2),
-                            captureOffset!.dy / (cardHeight * 1.6),
-                          ))
-                  : Offset.zero,
-              child: AnimatedScale(
-                duration: motionDuration,
-                curve: Curves.easeOutCubic,
-                scale: captureFlight ? 0.84 : 1,
-                child: AnimatedOpacity(
-                  duration: motionDuration,
-                  opacity: captureFlight ? 0.12 : 1,
-                  child: SizedBox(
-                    width: cardWidth * 2.2,
-                    height: cardHeight * 1.6,
-                    child: Stack(
-                      alignment: Alignment.center,
-                      clipBehavior: Clip.none,
-                      children: _buildCardStack(
-                        cardWidth,
-                        cardHeight,
-                        reflowDuration,
-                      ),
+      onContact: () => onContact?.call(
+        'capture:${cards.map((c) => c.firebaseKey).join(',')}',
+        true,
+      ),
+      child: _CaptureTimeline(
+        identity: isCapturing
+            ? '$capturingTeam:${cards.map((card) => card.firebaseKey).join(',')}'
+            : null,
+        immediate: reducedMotion || capturingStage > 0,
+        builder: (captureFlight) => Center(
+          child: Stack(
+            alignment: Alignment.center,
+            clipBehavior: Clip.none,
+            children: [
+              // Ambient table glow under the cards
+              Container(
+                width: (cardWidth * 2.2),
+                height: (cardHeight * 1.6),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: isCapturing
+                          ? (capturingTeam == 'teamA'
+                                ? ThemeConfig.primaryTeal.withValues(
+                                    alpha: 0.45,
+                                  )
+                                : ThemeConfig.goldAccent.withValues(
+                                    alpha: 0.45,
+                                  ))
+                          : Colors.transparent,
+                      blurRadius: 35,
+                      spreadRadius: 8,
                     ),
-                  ),
+                  ],
                 ),
               ),
-            ),
 
-            if (isCapturing && captureLabel != null && captureLabel!.isNotEmpty)
-              // Announce the capture for screen readers without covering cards.
-              Semantics(
-                liveRegion: true,
-                label: captureLabel,
-                child: const SizedBox.shrink(),
-              ),
-
-            // Card Count Badge (if more than 3 cards on table)
-            if (cards.length > 3)
-              Positioned(
-                bottom: -22,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 3,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.75),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: ThemeConfig.goldAccent.withValues(alpha: 0.4),
-                      width: 1,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.4),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.style,
-                        size: 12,
-                        color: ThemeConfig.goldAccent,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        '${cards.length}',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
+              // The pile compresses on capture, then travels toward the winning
+              // team. New cards independently arrive from their player's seat.
+              AnimatedSlide(
+                key: const ValueKey('capture-flight'),
+                duration: motionDuration,
+                curve: Curves.easeInOutCubic,
+                offset: captureFlight
+                    ? (captureOffset == null
+                          ? Offset(0, captureToBottom ? 1.3 : -1.3)
+                          : Offset(
+                              captureOffset!.dx / (cardWidth * 2.2),
+                              captureOffset!.dy / (cardHeight * 1.6),
+                            ))
+                    : Offset.zero,
+                child: AnimatedScale(
+                  duration: motionDuration,
+                  curve: Curves.easeOutCubic,
+                  scale: captureFlight ? 0.84 : 1,
+                  child: AnimatedOpacity(
+                    duration: motionDuration,
+                    opacity: captureFlight ? 0.12 : 1,
+                    child: SizedBox(
+                      width: cardWidth * 2.2,
+                      height: cardHeight * 1.6,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        clipBehavior: Clip.none,
+                        children: _buildCardStack(
+                          cardWidth,
+                          cardHeight,
+                          reflowDuration,
                         ),
                       ),
-                    ],
+                    ),
                   ),
                 ),
               ),
-          ],
+
+              if (isCapturing &&
+                  captureLabel != null &&
+                  captureLabel!.isNotEmpty)
+                // Announce the capture for screen readers without covering cards.
+                Semantics(
+                  liveRegion: true,
+                  label: captureLabel,
+                  child: const SizedBox.shrink(),
+                ),
+
+              // Card Count Badge (if more than 3 cards on table)
+              if (isCapturing && cards.length > 3)
+                Positioned(
+                  bottom: -22,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.75),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: ThemeConfig.goldAccent.withValues(alpha: 0.4),
+                        width: 1,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.4),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.style,
+                          size: 12,
+                          color: ThemeConfig.goldAccent,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${cards.length}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );
@@ -271,6 +290,10 @@ class BoardCardsWidget extends StatelessWidget {
     key: ValueKey('board-${card.firebaseKey}'),
     origin: arrivalOffsets[card.firebaseKey] ?? const Offset(0, -95),
     alreadyArrived: alreadyPresented.contains(card.firebaseKey),
+    travelDuration: Duration(milliseconds: isCapturing ? 220 : 320),
+    onContact: isCapturing
+        ? null
+        : () => onContact?.call('play:${card.firebaseKey}', false),
     child: child,
   );
 
@@ -310,26 +333,18 @@ class BoardCardsWidget extends StatelessWidget {
     final List<Widget> cardWidgets = [];
 
     if (count <= 4) {
-      final totalSpan = (count - 1) * (width * 0.45);
-      final startOffset = -totalSpan / 2;
-
       for (int i = 0; i < count; i++) {
         final card = cards[i];
         final isTop = i == count - 1;
-        final xOffset = isTop
-            ? boardTopCardOffset(count, width).dx
-            : startOffset + (i * width * 0.45);
-        // Pre-defined subtle angles for natural Egyptian card table feel
-        final angle = isTop
-            ? boardTopCardAngle(count)
-            : (i - (count - 1) / 2) * 0.08;
+        final position = boardCardOffset(i, count, width);
+        final angle = boardCardAngle(i, count);
 
         cardWidgets.add(
           _positionedCard(
             card,
             width,
             height,
-            Offset(xOffset, 0),
+            position,
             angle,
             _buildCardWithHighlight(card, width, height, isTop),
             reflowDuration,
@@ -394,12 +409,6 @@ class BoardCardsWidget extends StatelessWidget {
             blurRadius: isTopCard ? 14 : 8,
             offset: const Offset(0, 5),
           ),
-          if (isTopCard)
-            BoxShadow(
-              color: ThemeConfig.goldAccent.withValues(alpha: 0.35),
-              blurRadius: 10,
-              spreadRadius: 1,
-            ),
         ],
       ),
       child: _card(card, width, height),

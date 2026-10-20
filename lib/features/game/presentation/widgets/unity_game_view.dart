@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_unity_widget/flutter_unity_widget.dart';
 import '../providers/unity_communication_service.dart';
 import '../../domain/providers/game_providers.dart';
+import '../providers/unity_layer_provider.dart';
 
 class UnityGameView extends ConsumerStatefulWidget {
   const UnityGameView({super.key});
@@ -12,13 +13,39 @@ class UnityGameView extends ConsumerStatefulWidget {
   ConsumerState<UnityGameView> createState() => _UnityGameViewState();
 }
 
-class _UnityGameViewState extends ConsumerState<UnityGameView> {
+class _UnityGameViewState extends ConsumerState<UnityGameView>
+    with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    ref.read(unityCommunicationServiceProvider).resyncVisuals();
+  }
+
   @override
   Widget build(BuildContext context) {
+    ref.listen(unityLayerActiveProvider, (_, __) {
+      final state = ref.read(matchStateProvider);
+      if (state != null) {
+        ref.read(unityCommunicationServiceProvider).syncState(state);
+      }
+    });
     // Listen to match state changes and sync with Unity
     ref.listen(matchStateProvider, (previous, next) {
       if (next != null) {
         ref.read(unityCommunicationServiceProvider).syncState(next);
+      } else {
+        ref.read(unityCommunicationServiceProvider).clearVisuals();
       }
     });
 
@@ -29,7 +56,7 @@ class _UnityGameViewState extends ConsumerState<UnityGameView> {
       unityWidget = HtmlElementView(
         viewType: 'unity-web-view',
         onPlatformViewCreated: (id) {
-          // Fallback: If we don't get a UNITY_READY message soon, 
+          // Fallback: If we don't get a UNITY_READY message soon,
           // we could mark as initialized here, but we prefer the bridge signal.
         },
       );
@@ -37,7 +64,7 @@ class _UnityGameViewState extends ConsumerState<UnityGameView> {
       unityWidget = UnityWidget(
         onUnityCreated: (controller) {
           comms.setController(controller);
-          
+
           // Initial sync of the current match state
           final matchState = ref.read(matchStateProvider);
           if (matchState != null) {

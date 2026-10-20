@@ -45,10 +45,26 @@
     var unityInstance = null;
     var unityStartupState = 'idle';
     var unityCanvas = null;
+    var pendingUnityBridgeMessages = [];
+
+    function forwardUnityBridgeMessage(data) {
+      if (unityInstance) {
+        unityInstance.SendMessage('UnityBridge', data.methodName, data.message || '');
+      } else if (unityStartupState === 'starting') {
+        // Unity's READY callback can precede resolution of its loader Promise.
+        // Preserve the initial snapshot, but never grow an unbounded backlog.
+        if (pendingUnityBridgeMessages.length >= 8) {
+          failUnityStartup('startup_bridge_overflow');
+          return;
+        }
+        pendingUnityBridgeMessages.push(data);
+      }
+    }
 
     function failUnityStartup(reason) {
       if (unityStartupState === 'failed') return;
       unityStartupState = 'failed';
+      pendingUnityBridgeMessages = [];
       if (unityCanvas) {
         unityCanvas.style.visibility = 'hidden';
         unityCanvas.style.pointerEvents = 'none';
@@ -77,6 +93,7 @@
         companyName: "SHSD",
         productName: "Halabessa",
         productVersion: "1.0",
+        halabessaTransparentOverlay: true,
         premultipliedAlpha: false,
         webglContextAttributes: {
           preserveDrawingBuffer: true,
@@ -88,6 +105,9 @@
         if (unityStartupState === 'failed') return;
         unityInstance = instance;
         unityStartupState = 'running';
+        var pending = pendingUnityBridgeMessages;
+        pendingUnityBridgeMessages = [];
+        pending.forEach(forwardUnityBridgeMessage);
         canvasElement.style.visibility = 'visible';
         // Restrict keyboard listening to the canvas element only
         if (instance.Module) {
@@ -155,9 +175,7 @@
         var data = JSON.parse(event.data);
         var isBridgeMessage = data.objectName === 'UnityBridge' &&
           (data.methodName === 'OnFlutterMessage' || data.methodName === 'ToggleConsole');
-        if (isBridgeMessage && unityInstance) {
-          unityInstance.SendMessage('UnityBridge', data.methodName, data.message || "");
-        }
+        if (isBridgeMessage) forwardUnityBridgeMessage(data);
       } catch (e) { }
     });
   </script>

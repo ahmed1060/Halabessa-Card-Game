@@ -281,7 +281,7 @@ void main() {
           await tester.tap(target(0));
           await tester.pumpAndSettle();
           final rect = tester.getRect(preview());
-          expect(rect.width, closeTo((landscape ? 72 : 64) * .75, 1));
+          expect(rect.width, closeTo(64 * .75, 1));
           expect(
             rect.center,
             tester.getCenter(find.byKey(key.currentState!.boardKey)),

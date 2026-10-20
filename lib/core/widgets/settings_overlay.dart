@@ -12,6 +12,7 @@ import 'package:halabessa/core/theme/theme_config.dart';
 import 'package:halabessa/core/services/multimedia_service.dart';
 import 'package:halabessa/core/routes/app_routes.dart';
 import 'package:halabessa/features/game/presentation/widgets/table_style.dart';
+import 'orientation_settings_control.dart';
 
 class SettingsOverlay extends ConsumerWidget {
   const SettingsOverlay({super.key});
@@ -178,21 +179,7 @@ class SettingsOverlay extends ConsumerWidget {
 
                           const SizedBox(height: 24),
                           _buildSectionTitle('graphics'.tr()),
-                          _buildToggleTile(
-                            'game_landscape'.tr(),
-                            settings.gameOrientation ==
-                                GameOrientation.landscape,
-                            Icons.screen_rotation_rounded,
-                            (value) => notifier.setGameOrientation(
-                              value
-                                  ? GameOrientation.landscape
-                                  : GameOrientation.portrait,
-                            ),
-                          ),
-                          Text(
-                            'game_orientation_help'.tr(),
-                            style: const TextStyle(color: Colors.white70),
-                          ),
+                          const OrientationSettingsControl(),
                           ListTile(
                             leading: const Icon(
                               Icons.help_outline,

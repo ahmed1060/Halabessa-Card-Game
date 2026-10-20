@@ -11,6 +11,9 @@ import 'package:halabessa/features/auth/presentation/providers/auth_providers.da
 import 'package:halabessa/core/providers/settings_provider.dart';
 import 'package:halabessa/features/game/presentation/providers/unity_layer_provider.dart';
 import 'unity_startup_state.dart';
+import 'unity_visual_presentation.dart';
+import 'card_feedback.dart';
+import 'visual_action_queue.dart';
 
 final unityCommunicationServiceProvider = Provider((ref) {
   final service = UnityCommunicationService(ref)..init();
@@ -25,6 +28,50 @@ class UnityCommunicationService {
   final UnityStartupState _startup = UnityStartupState();
   Timer? _startupTimer;
   StreamSubscription<dynamic>? _webMessages;
+  late final _visual = UnityVisualPresentation(
+    send: (message) =>
+        postMessage('UnityBridge', 'OnFlutterMessage', jsonEncode(message)),
+    onContact: (id, slam) =>
+        _ref.read(cardFeedbackProvider).contact(id, slam: slam),
+  );
+  bool get supportsVisualActions => _visual.capable;
+  bool _platformReduced = false;
+  bool _disposed = false;
+  final _handPoses = <String, String>{};
+  void updateHandPose(
+    String cardId,
+    bool peek,
+    double dragFraction,
+    double velocity,
+  ) {
+    if (!_visual.capable || !_ref.read(unityLayerActiveProvider)) return;
+    final message = jsonEncode({
+      'type': 'HAND_POSE',
+      'generation': _visual.generation,
+      'cardId': cardId,
+      'peek': peek,
+      'dragFraction': dragFraction,
+      'velocity': velocity,
+    });
+    if (_handPoses[cardId] == message) return;
+    if (_handPoses.length > 8) _handPoses.clear();
+    _handPoses[cardId] = message;
+    postMessage('UnityBridge', 'OnFlutterMessage', message);
+  }
+
+  void updateVisualAnchors(
+    List<Map<String, dynamic>> anchors, {
+    bool reducedMotion = false,
+  }) {
+    _visual.updateAnchors(anchors);
+    _platformReduced = reducedMotion;
+  }
+
+  void clearVisuals() => _visual.clear();
+  void resyncVisuals() {
+    _handPoses.clear();
+    _visual.resync();
+  }
 
   UnityCommunicationService(this._ref);
 
@@ -38,16 +85,17 @@ class UnityCommunicationService {
           // Unity's WebGL callbacks and Flutter's outbound bridge messages
           // are posted by this document. Ignore messages injected by a
           // foreign window before decoding an event that can trigger gameplay.
-          if (event.origin != WebUtils.window.location.origin || event.source != WebUtils.window) {
+          if (event.origin != WebUtils.window.location.origin ||
+              event.source != WebUtils.window) {
             return;
           }
           final message = event.data;
           if (message is String) {
             final data = jsonDecode(message);
-            
+
             // Ignore echoes (messages from Flutter to Unity)
             if (data is Map && data.containsKey('objectName')) return;
-            
+
             handleUnityMessage(message);
           }
         } catch (e) {
@@ -63,6 +111,7 @@ class UnityCommunicationService {
 
   void _fallbackTo2D() {
     _startup.handleEvent('UNITY_FAILED');
+    _visual.clear();
     _startupTimer?.cancel();
     isReady.value = false;
     _ref.read(unityInitializedProvider.notifier).state = false;
@@ -71,8 +120,10 @@ class UnityCommunicationService {
   }
 
   void dispose() {
+    _disposed = true;
     _startupTimer?.cancel();
     _webMessages?.cancel();
+    _visual.dispose();
     isReady.dispose();
   }
 
@@ -96,15 +147,28 @@ class UnityCommunicationService {
         _controller?.postMessage(objectName, methodName, message);
       }
     } catch (e) {
-      debugPrint("UnityCommunicationService: Failed to postMessage ($methodName): $e");
+      debugPrint(
+        "UnityCommunicationService: Failed to postMessage ($methodName): $e",
+      );
     }
   }
 
-
   void syncState(MatchState state) {
+    if (cardJuiceEnabled) {
+      final settings = _ref.read(settingsProvider);
+      _visual.accept(
+        state,
+        _ref.read(currentUserProvider)?.uid,
+        active: isReady.value && _ref.read(unityLayerActiveProvider),
+        reduced: settings.reducedMotion || _platformReduced,
+      );
+      return;
+    }
     final currentUserUid = _ref.read(currentUserProvider)?.uid;
-    final handCards = currentUserUid != null ? (state.handCards[currentUserUid] ?? []) : [];
-    
+    final handCards = currentUserUid != null
+        ? (state.handCards[currentUserUid] ?? [])
+        : [];
+
     final message = {
       'type': 'SYNC_STATE',
       'board': state.board.map((c) => c.toJson()).toList(),
@@ -126,24 +190,30 @@ class UnityCommunicationService {
   }
 
   void updateSkins(String skinId) {
-    postMessage('UnityBridge', 'OnFlutterMessage', jsonEncode({
-      'type': 'UPDATE_SKINS',
-      'skinId': skinId,
-    }));
+    postMessage(
+      'UnityBridge',
+      'OnFlutterMessage',
+      jsonEncode({'type': 'UPDATE_SKINS', 'skinId': skinId}),
+    );
   }
 
   void startTimer(int durationSeconds) {
-    postMessage('UnityBridge', 'OnFlutterMessage', jsonEncode({
-      'type': 'START_TIMER',
-      'duration': durationSeconds.toDouble(),
-    }));
+    postMessage(
+      'UnityBridge',
+      'OnFlutterMessage',
+      jsonEncode({
+        'type': 'START_TIMER',
+        'duration': durationSeconds.toDouble(),
+      }),
+    );
   }
 
   void setMode(String mode) {
-    postMessage('UnityBridge', 'OnFlutterMessage', jsonEncode({
-      'type': 'SET_MODE',
-      'mode': mode,
-    }));
+    postMessage(
+      'UnityBridge',
+      'OnFlutterMessage',
+      jsonEncode({'type': 'SET_MODE', 'mode': mode}),
+    );
   }
 
   void handleUnityMessage(String message) {
@@ -170,9 +240,34 @@ class UnityCommunicationService {
       }
       if (!isReady.value || _startup.hasFailed) return;
       final settings = _ref.read(settingsProvider);
+      if (event == 'UNITY_VISUAL_READY') {
+        _visual.negotiate(data['data'] == '1' ? 1 : 0);
+        final state = _ref.read(matchStateProvider);
+        if (state != null) syncState(state);
+        return;
+      }
+      if (event == 'VISUAL_CONTACT' || event == 'VISUAL_ACTION_COMPLETE') {
+        final id = data['eventId'], generation = data['generation'];
+        if (id is String && generation is int) {
+          if (event == 'VISUAL_CONTACT') {
+            _visual.contact(id, generation);
+          } else {
+            _visual.acknowledge(id, generation);
+          }
+        }
+        return;
+      }
+      if (event == 'VISUAL_PICK') {
+        if (_ref.read(unityLayerActiveProvider)) {
+          _ref.read(cardFeedbackProvider).pick();
+        }
+        return;
+      }
 
       if (event == 'BASRA_EVENT') {
-        if (settings.isHapticsEnabled) HapticFeedback.heavyImpact();
+        if (settings.isHapticsEnabled && !supportsVisualActions) {
+          HapticFeedback.heavyImpact();
+        }
       } else if (event == 'PLAY_CARD') {
         final cardId = data['data'];
         if (cardId is! String) return;
@@ -184,11 +279,37 @@ class UnityCommunicationService {
             final hand = matchState.handCards[currentUserUid] ?? [];
             try {
               final card = hand.firstWhere(
-                (c) => c.suit.name + "_" + c.rank.name == cardId, 
-                orElse: () => hand.firstWhere((c) => c.firebaseKey == cardId)
+                (c) => '${c.suit.name}_${c.rank.name}' == cardId,
+                orElse: () => hand.firstWhere((c) => c.firebaseKey == cardId),
               );
-              _ref.read(matchStateProvider.notifier).playCard(currentUserUid, card);
-              if (settings.isHapticsEnabled) HapticFeedback.mediumImpact();
+              final generation = _visual.generation;
+              unawaited(
+                _ref
+                    .read(matchStateProvider.notifier)
+                    .playCard(currentUserUid, card)
+                    .then<void>((accepted) {
+                      if (accepted || _disposed || !supportsVisualActions) {
+                        return;
+                      }
+                      final current = _ref.read(matchStateProvider);
+                      if (current?.id != matchState.id ||
+                          current?.matchSequence != matchState.matchSequence ||
+                          current?.roundCount != matchState.roundCount ||
+                          _ref.read(currentUserProvider)?.uid !=
+                              currentUserUid) {
+                        return;
+                      }
+                      if (_visual.reject(card.firebaseKey, generation)) {
+                        _ref.read(cardFeedbackProvider).reject();
+                      }
+                    })
+                    .catchError((Object error) {
+                      // Ambiguous transport failure stays with existing recovery.
+                    }),
+              );
+              if (settings.isHapticsEnabled && !supportsVisualActions) {
+                HapticFeedback.mediumImpact();
+              }
             } catch (e) {
               debugPrint("Card $cardId not found in hand.");
             }

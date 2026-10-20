@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
@@ -12,7 +11,7 @@ class TurnDeadlineRing extends StatefulWidget {
   final Color background;
   final DateTime Function()? now;
   final Listenable? clockChanges;
-  final bool segmented;
+  final bool liquid;
   final String Function(int)? remainingLabel;
   const TurnDeadlineRing({
     super.key,
@@ -23,7 +22,7 @@ class TurnDeadlineRing extends StatefulWidget {
     required this.background,
     this.now,
     this.clockChanges,
-    this.segmented = false,
+    this.liquid = false,
     this.remainingLabel,
   });
 
@@ -129,7 +128,7 @@ class _TurnDeadlineRingState extends State<TurnDeadlineRing>
                       widget.duration.inMicroseconds)
               .clamp(0.0, 1.0);
     return RepaintBoundary(
-      child: widget.segmented
+      child: widget.liquid
           ? Semantics(
               label: widget.active && widget.duration > Duration.zero
                   ? (widget.remainingLabel?.call(
@@ -139,7 +138,8 @@ class _TurnDeadlineRingState extends State<TurnDeadlineRing>
                         '${(remaining * widget.duration.inMilliseconds / 1000).ceil()} seconds remaining')
                   : null,
               child: CustomPaint(
-                painter: _SegmentedRing(
+                key: const ValueKey('liquid-deadline-ring'),
+                painter: LiquidDeadlineRingPainter(
                   widget.active,
                   remaining,
                   widget.foreground,
@@ -158,37 +158,70 @@ class _TurnDeadlineRingState extends State<TurnDeadlineRing>
   }
 }
 
-class _SegmentedRing extends CustomPainter {
+/// A closed annulus at every remaining value, never an arc or segmented timer.
+/// Only thickness changes; time/expiry still come from the existing clock above.
+class LiquidDeadlineRingPainter extends CustomPainter {
   final bool active;
   final double remaining;
   final Color foreground, background;
-  _SegmentedRing(this.active, this.remaining, this.foreground, this.background);
+  LiquidDeadlineRingPainter(
+    this.active,
+    this.remaining,
+    this.foreground,
+    this.background,
+  );
+  double get thickness => active ? 5 * remaining.clamp(0, 1) : 3;
   @override
   void paint(Canvas canvas, Size size) {
-    final rect = (Offset.zero & size).deflate(3);
+    final center = size.center(Offset.zero);
     final paint = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = active ? 5 : 3;
+      ..isAntiAlias = true;
     if (!active) {
-      canvas.drawOval(rect, paint..color = background);
+      canvas.drawCircle(
+        center,
+        size.shortestSide / 2 - 3,
+        paint
+          ..strokeWidth = 3
+          ..color = background,
+      );
       return;
     }
-    for (var i = 0; i < 16; i++) {
-      paint.color = i / 16 < remaining
-          ? foreground
-          : foreground.withValues(alpha: .18);
-      canvas.drawArc(
-        rect,
-        -math.pi / 2 + i * math.pi / 8,
-        math.pi / 8 - .06,
-        false,
-        paint,
-      );
-    }
+    if (thickness <= 0) return;
+    // Fixed outside diameter. Smooth radial shading suggests liquid depth,
+    // without a sweep-gradient seam, ticks, detached droplets or a draining gap.
+    final radius = size.shortestSide / 2 - 1 - thickness / 2;
+    canvas.drawCircle(
+      center,
+      radius,
+      paint
+        ..strokeWidth = thickness + 1
+        ..color = foreground.withValues(alpha: .3)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2),
+    );
+    paint
+      ..maskFilter = null
+      ..strokeWidth = thickness
+      ..shader =
+          RadialGradient(
+            colors: [
+              foreground.withValues(alpha: .75),
+              Color.lerp(foreground, Colors.white, .7)!,
+              foreground,
+            ],
+            stops: [
+              ((radius - thickness / 2) / (radius + thickness / 2)).clamp(0, 1),
+              (radius / (radius + thickness / 2)).clamp(0, 1),
+              1,
+            ],
+          ).createShader(
+            Rect.fromCircle(center: center, radius: radius + thickness / 2),
+          );
+    canvas.drawCircle(center, radius, paint);
   }
 
   @override
-  bool shouldRepaint(_SegmentedRing old) =>
+  bool shouldRepaint(LiquidDeadlineRingPainter old) =>
       active != old.active ||
       remaining != old.remaining ||
       foreground != old.foreground ||

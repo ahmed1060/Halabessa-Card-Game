@@ -4,17 +4,23 @@ import 'package:flutter/foundation.dart';
 import 'unity_game_view.dart';
 import '../providers/unity_layer_provider.dart';
 import '../../../../core/utils/web_registry.dart';
+import 'game_table_background.dart';
 
 class UnityPersistentOverlay extends ConsumerStatefulWidget {
-  const UnityPersistentOverlay({super.key, this.unityView = const UnityGameView()});
+  const UnityPersistentOverlay({
+    super.key,
+    this.unityView = const UnityGameView(),
+  });
 
   final Widget unityView;
 
   @override
-  ConsumerState<UnityPersistentOverlay> createState() => _UnityPersistentOverlayState();
+  ConsumerState<UnityPersistentOverlay> createState() =>
+      _UnityPersistentOverlayState();
 }
 
-class _UnityPersistentOverlayState extends ConsumerState<UnityPersistentOverlay> {
+class _UnityPersistentOverlayState
+    extends ConsumerState<UnityPersistentOverlay> {
   bool _hasMountedEngine = false;
 
   @override
@@ -25,7 +31,9 @@ class _UnityPersistentOverlayState extends ConsumerState<UnityPersistentOverlay>
 
     if (kIsWeb) {
       ref.listen<bool>(unityLayerActiveProvider, (_, next) {
-        setWebUnityPointerEvents(next);
+        // Flutter owns the hand hit targets and HUD. Native rendering receives
+        // visual poses, not duplicate DOM taps beneath Flutter's canvas.
+        setWebUnityPointerEvents(false);
       });
     }
 
@@ -34,14 +42,22 @@ class _UnityPersistentOverlayState extends ConsumerState<UnityPersistentOverlay>
     _hasMountedEngine = _hasMountedEngine || (requested && !failed);
     if (!_hasMountedEngine) return const SizedBox.shrink();
 
-    // Keep Flutter's playable board visible throughout loading and failure.
-    // A visible request alone is not evidence that Unity can render a scene.
+    // Paint the platform view while loading: Opacity(0) skips the paint that
+    // attaches HtmlElementView, so waiting for READY before painting deadlocks
+    // startup. The Navigator's opaque Flutter table stays above this until the
+    // handshake; unityLayerActiveProvider still alone controls the hand-off.
     return Positioned.fill(
       child: IgnorePointer(
-        ignoring: !active,
+        ignoring: true,
         child: Opacity(
-          opacity: active ? 1 : 0,
-          child: widget.unityView,
+          opacity: requested && !failed ? 1 : 0,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              if (active) const GameTableBackground(),
+              widget.unityView,
+            ],
+          ),
         ),
       ),
     );
