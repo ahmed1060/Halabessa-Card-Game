@@ -62,6 +62,7 @@ jobs:
           functions/test/unity_web_startup.test.js functions/test/web_build_versioning.test.mjs
           functions/test/web_viewport.test.mjs
           functions/test/release_pages.test.mjs
+          functions/test/search_landing.test.mjs
           functions/test/hosting_archives.test.mjs
       - name: Typecheck complete Edge entrypoint
         run: npm exec --yes --package=deno@2.5.4 -- deno check supabase/functions/halabessa-api/index.ts

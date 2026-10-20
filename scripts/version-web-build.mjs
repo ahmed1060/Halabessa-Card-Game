@@ -10,6 +10,14 @@ export async function versionWebBuild(directory) {
   const main = await readFile(resolve(directory, 'main.dart.js'));
   const originalBootstrap = await readFile(resolve(directory, 'flutter_bootstrap.js'), 'utf8');
   const originalIndex = await readFile(resolve(directory, 'index.html'), 'utf8');
+  // Flutter still builds its own shell normally. Publish that shell separately
+  // only when the approved static homepage is present in this build.
+  let landing;
+  try {
+    landing = await readFile(resolve(directory, 'landing.html'), 'utf8');
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
+  }
   if (!originalBootstrap.includes('"mainJsPath":"main.dart.js"') ||
       !originalIndex.includes('src="flutter_bootstrap.js"')) {
     throw new Error('Unexpected Flutter entrypoint format; refusing an unversioned deployment');
@@ -23,7 +31,8 @@ export async function versionWebBuild(directory) {
   // paths that cannot resolve to an older HTTP/service-worker cached bundle.
   await writeFile(resolve(directory, mainName), main);
   await writeFile(resolve(directory, bootstrapName), bootstrap);
-  await writeFile(resolve(directory, 'index.html'), index);
+  await writeFile(resolve(directory, landing ? 'play.html' : 'index.html'), index);
+  if (landing) await writeFile(resolve(directory, 'index.html'), landing);
   return { mainName, bootstrapName, artworkCount };
 }
 
