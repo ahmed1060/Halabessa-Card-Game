@@ -26,6 +26,11 @@ test('homepage exposes honest bilingual search content without the app runtime',
   assert.equal(structured.url, `${origin}/`);
   assert.equal(structured.name, 'Halabessa');
   assert.ok(structured.alternateName.includes('لعبه حلبسه'));
+  const english = homepage.match(/<section id="english"[\s\S]*?<\/section>/)[0];
+  for (const name of ['7alabessa', 'halabesa', '7alabesa']) {
+    assert.ok(structured.alternateName.includes(name), `${name} is an alternate website name`);
+    assert.ok(english.includes(name), `${name} is visible to visitors without running JavaScript`);
+  }
   for (const [, path] of homepage.matchAll(/(?:href|src)="([^"#]+)"/g)) {
     if (/^(https?:|mailto:)/.test(path) || path === '/' || path === 'play.html') continue;
     await access(new URL(`web/${path}`, root));
