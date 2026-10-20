@@ -62,3 +62,8 @@ verified by SHA256. Existing Android/iOS binary exports remain unchanged and
 are not certified for the new Unity visual features. The orientation document's
 Firestore rule still requires emulator allow/deny verification before deployment.
 Earlier local-only statements in the review documents describe their audit time.
+
+The user subsequently authorized merging into `main`. The orientation-rule
+release gate was resolved first: **36 emulator tests passed**, including the
+nine new orientation cases. They now run in the existing pre-deployment CI
+suite. See `docs/orientation-review-2026-10-20.md` for the merge-time update.

@@ -64,6 +64,19 @@ This does not promise a browser/OS orientation lock or pause an online match.
 
 ### Remaining release gates
 
+**Merge-time update (2026-10-20): the emulator gate below is now resolved.**
+Using a short local Java socket/temp path fixed the Windows loopback failure.
+All **36** Firestore/database emulator tests passed, including nine new
+orientation allow/deny cases in `rules-tests/orientation.test.mjs`. They cover
+the verified primary admin, delegated/non-admin/missing claims, invalid schema,
+forged profile flags, deletion-blocked/anonymous sessions, and unchanged general
+settings permissions. The standard `npm test` script now includes these tests,
+so the existing main-branch CI runs them before any rules deployment.
+Evidence: `build/merge-rules-short-temp.log`. No production writes occurred.
+The real-device and real-account qualification limitations still apply.
+
+The following paragraph records the earlier local-review blocker:
+
 The isolated Firestore emulator could not start: the installed Java 21 runtime
 fails creating its local selector/loopback socket, including after the Windows
 selector compatibility retry. Thus server-rule enforcement is **not yet
