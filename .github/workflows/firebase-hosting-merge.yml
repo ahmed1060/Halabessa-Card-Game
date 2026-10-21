@@ -64,6 +64,9 @@ jobs:
           functions/test/release_pages.test.mjs
           functions/test/search_landing.test.mjs
           functions/test/hosting_archives.test.mjs
+          functions/test/card_reveal.test.ts
+          functions/test/native_entrypoints.test.mjs
+          functions/test/android_ci_disk.test.mjs
       - name: Typecheck complete Edge entrypoint
         run: npm exec --yes --package=deno@2.5.4 -- deno check supabase/functions/halabessa-api/index.ts
       - uses: actions/setup-java@v4

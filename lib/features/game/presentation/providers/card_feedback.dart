@@ -19,11 +19,16 @@ class CardFeedback {
   String _scope = '';
   final _seen = <String>{};
   void Function()? _releaseAudio;
+  void Function()? _releaseDeckAudio;
   bool _disposed = false;
   bool get _foreground =>
       WidgetsBinding.instance.lifecycleState == null ||
       WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
-  void bind(String scope, {required bool ownsAudio}) {
+  void bind(
+    String scope, {
+    required bool ownsAudio,
+    bool ownsDeckAudio = false,
+  }) {
     if (_disposed) return;
     if (scope != _scope) {
       _scope = scope;
@@ -31,6 +36,17 @@ class CardFeedback {
     }
     _releaseAudio?.call();
     _releaseAudio = null;
+    _releaseDeckAudio?.call();
+    _releaseDeckAudio = null;
+    if (ownsDeckAudio && cardJuiceEnabled) {
+      try {
+        _releaseDeckAudio = _ref
+            .read(multimediaServiceProvider)
+            .ownDeckPresentationAudio(this);
+      } catch (_) {
+        /* Optional adapters may omit presentation audio. */
+      }
+    }
     if (ownsAudio && cardJuiceEnabled) {
       try {
         _releaseAudio = _ref
@@ -42,8 +58,51 @@ class CardFeedback {
     }
   }
 
-  void pick() => _haptic('light');
-  void reject() => _haptic('error');
+  void pick() {
+    if (_disposed || !cardJuiceEnabled) return;
+    _haptic('light');
+    unawaited(_audio('sfx/pick.mp3'));
+  }
+
+  void holdPulse() {
+    if (_disposed || !cardJuiceEnabled) return;
+    _haptic('light'); // No duplicate grab sound during the hold build-up.
+  }
+
+  void reject() {
+    if (_disposed || !cardJuiceEnabled) return;
+    _haptic('error');
+    unawaited(_audio('sfx/return.mp3'));
+  }
+
+  void reveal(String id) => _gestureContact(id, 'sfx/reveal.mp3', 'medium');
+  void deckAction(String id, String kind) {
+    final path = switch (kind) {
+      'cutSeparate' => 'sfx/pick.mp3',
+      'shuffleMix' => 'sfx/shuffle.mp3',
+      _ => 'sfx/cut.mp3',
+    };
+    _gestureContact(
+      'deck:$id',
+      path,
+      kind == 'cutContact' || kind == 'shuffleContact' ? 'light' : 'none',
+    );
+  }
+
+  void gestureSlam(String id) => _gestureContact(
+    id,
+    'sfx/slam_${id.codeUnits.fold<int>(0, (sum, unit) => sum + unit) % 3}.mp3',
+    'heavy',
+  );
+  void _gestureContact(String id, String path, String haptic) {
+    if (_disposed || !cardJuiceEnabled || !_seen.add('$_scope:$id')) return;
+    while (_seen.length > 256) {
+      _seen.remove(_seen.first);
+    }
+    if (haptic != 'none') _haptic(haptic);
+    unawaited(_audio(path));
+  }
+
   void contact(String id, {bool slam = false}) {
     if (_disposed || !cardJuiceEnabled || !_seen.add('$_scope:$id')) return;
     while (_seen.length > 256) {
@@ -105,5 +164,7 @@ class CardFeedback {
     _disposed = true;
     _releaseAudio?.call();
     _releaseAudio = null;
+    _releaseDeckAudio?.call();
+    _releaseDeckAudio = null;
   }
 }

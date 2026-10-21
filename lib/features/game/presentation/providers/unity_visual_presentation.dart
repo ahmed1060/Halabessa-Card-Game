@@ -1,3 +1,5 @@
+import 'dart:async';
+import '../../domain/models/card_feature_state.dart';
 import '../../domain/models/match_state.dart';
 import 'visual_action_queue.dart';
 
@@ -6,34 +8,52 @@ import 'visual_action_queue.dart';
 class UnityVisualPresentation {
   final void Function(Map<String, dynamic>) send;
   final void Function(String id, bool slam) onContact;
+  final void Function(String id)? onGestureContact;
   final DateTime Function() now;
+  final void Function()? onRecoverableTimeout;
   late final VisualActionQueue<Map<String, dynamic>> _queue;
   MatchState? _previous, _latest;
   String? _uid;
   String _scope = '';
   String? _contacted;
   bool _capable = false, _active = false, _reduced = false;
-  // An animation watchdog may disable pacing, never the negotiated coordinate
-  // system. Otherwise the still-visible native hand jumps to legacy world units.
+  // A missed ACK cancels one visual sequence, not the negotiated renderer or
+  // coordinate system. Future accepted actions must still get native motion.
   bool _managedLayout = false;
+  bool _interactionsCapable = false, _interactionPreview = false;
+  final _selections = <String, Map<String, dynamic>>{};
+  Timer? _captureContact;
   final _seenCaptures = <String>{};
   List<Map<String, dynamic>> anchors = const [];
   bool get capable => _capable;
+  bool get interactionsCapable => _capable && _interactionsCapable;
   int get generation => _queue.generation;
   UnityVisualPresentation({
     required this.send,
     required this.onContact,
+    this.onGestureContact,
+    this.onRecoverableTimeout,
     DateTime Function()? now,
   }) : now = now ?? DateTime.now {
     _queue = VisualActionQueue(
       allowance: const Duration(milliseconds: 350),
-      onStart: (action) => send({...action.value, 'generation': generation}),
+      onStart: (action) {
+        send({...action.value, 'generation': generation});
+        // Starting native flight cancels transient poses. Restore only the
+        // still-owned local selection, not an opponent's hand or a play intent.
+        if (interactionsCapable) {
+          for (final pose in _selections.values) {
+            send({'type': 'HAND_SELECTION', 'generation': generation, ...pose});
+          }
+        }
+      },
       onFinish: (_, timedOut) {
         if (timedOut) {
-          // Never wait indefinitely for a rebuilt/crashed renderer. Cancel all
-          // outstanding artwork and use snapshots in the SAME layout space.
-          _capable = false;
+          // Bound the stale sequence, reconcile in the SAME layout space, and
+          // leave the negotiated capability intact. A slow/dropped ACK is not
+          // proof that Unity is unavailable for the rest of this game.
           resync();
+          onRecoverableTimeout?.call();
         } else if (_queue.pendingCount == 0 && _latest != null) {
           send(_snapshot(_latest!));
         }
@@ -42,11 +62,31 @@ class UnityVisualPresentation {
     );
   }
 
-  void negotiate(int protocol) {
+  void negotiate(int protocol, {bool interactions = false}) {
     if (protocol != 1 || !cardJuiceEnabled) return;
     _capable = true;
     _managedLayout = true;
+    _interactionsCapable = interactions;
     resync();
+  }
+
+  /// Private renderer state only. Never includes an opponent's selection.
+  void updateHandSelection(String cardId, bool queued, bool slam) {
+    if (!interactionsCapable ||
+        !_active ||
+        !(_latest?.handCards[_uid] ?? []).any((c) => c.firebaseKey == cardId)) {
+      return;
+    }
+    final previous = _selections[cardId];
+    if (previous?['queued'] == queued && previous?['slam'] == slam) return;
+    if (!queued && !slam && previous == null) return;
+    final pose = {'cardId': cardId, 'queued': queued, 'slam': slam};
+    if (queued || slam) {
+      _selections[cardId] = pose;
+    } else {
+      _selections.remove(cardId);
+    }
+    send({'type': 'HAND_SELECTION', 'generation': generation, ...pose});
   }
 
   Map<String, dynamic> _snapshot(MatchState state) => {
@@ -65,9 +105,10 @@ class UnityVisualPresentation {
     'turnIndex': state.currentTurnIndex,
     'reducedMotion': _reduced,
     'anchors': anchors,
+    if (interactionsCapable) 'handSelections': _selections.values.toList(),
   };
 
-  void updateAnchors(List<Map<String, dynamic>> next) {
+  void updateAnchors(List<Map<String, dynamic>> next, {bool reconcile = true}) {
     final unchanged =
         next.length == anchors.length &&
         List.generate(next.length, (i) => i).every(
@@ -79,7 +120,8 @@ class UnityVisualPresentation {
               next[i]['height'] == anchors[i]['height'],
         );
     anchors = next;
-    if (!unchanged &&
+    if (reconcile &&
+        !unchanged &&
         _managedLayout &&
         _active &&
         _queue.active == null &&
@@ -105,6 +147,7 @@ class UnityVisualPresentation {
   }
 
   void resync() {
+    _captureContact?.cancel();
     _queue.reset();
     _contacted = null;
     send({'type': 'CANCEL_VISUALS', 'generation': generation});
@@ -122,6 +165,7 @@ class UnityVisualPresentation {
     String? uid, {
     required bool active,
     required bool reduced,
+    bool interactions = false,
   }) {
     final scope = '${state.id}:${state.matchSequence}:${state.roundCount}:$uid';
     final old = _previous;
@@ -132,6 +176,27 @@ class UnityVisualPresentation {
     }
     _latest = state;
     _uid = uid;
+    _interactionPreview = interactions;
+    if (scope != _scope || !active) _selections.clear();
+    _selections.removeWhere(
+      (id, _) => !(state.handCards[uid] ?? []).any((c) => c.firebaseKey == id),
+    );
+    final lastSlam = CardFeatureState(state).data['lastSlam'];
+    final oldSlam = old == null ? null : CardFeatureState(old).data['lastSlam'];
+    final gestureId =
+        interactionsCapable &&
+            _interactionPreview &&
+            lastSlam is Map &&
+            lastSlam['eventId'] is String &&
+            (oldSlam is! Map || oldSlam['eventId'] != lastSlam['eventId'])
+        ? lastSlam['eventId'] as String
+        : '';
+    String slamFor(List<Map<String, dynamic>> cards) =>
+        gestureId.isNotEmpty &&
+            cards.isNotEmpty &&
+            '${cards.last['suit']}_${cards.last['rank']}' == lastSlam['cardId']
+        ? gestureId
+        : '';
     final reset = scope != _scope || active != _active || reduced != _reduced;
     _scope = scope;
     _active = active;
@@ -162,6 +227,7 @@ class UnityVisualPresentation {
         team: e.team,
         actor: state.playerIds.indexOf(e.playerUid),
         duration: 1400,
+        gestureId: slamFor(e.cards.map((c) => c.toJson()).toList()),
       );
       return;
     }
@@ -175,7 +241,8 @@ class UnityVisualPresentation {
           state,
           cards: state.board.map((c) => c.toJson()).toList(),
           team: state.capturingTeam ?? '',
-          duration: 220,
+          duration: gestureId.isEmpty ? 220 : 470,
+          gestureId: slamFor(state.board.map((c) => c.toJson()).toList()),
         );
       }
       return;
@@ -193,7 +260,8 @@ class UnityVisualPresentation {
         actor: state.playerIds.indexOf(
           state.cardOwnership[c.firebaseKey] ?? '',
         ),
-        duration: 350,
+        duration: gestureId.isEmpty ? 350 : 470,
+        gestureId: slamFor([c.toJson()]),
       );
     } else if ((state.handCards[uid]?.length ?? 0) >
         (old.handCards[uid]?.length ?? 0)) {
@@ -214,6 +282,7 @@ class UnityVisualPresentation {
     String team = '',
     int actor = -1,
     required int duration,
+    String gestureId = '',
   }) {
     final base = state.playerIds.indexOf(_uid ?? '');
     final relativeActor = actor < 0
@@ -230,6 +299,8 @@ class UnityVisualPresentation {
         'round': state.roundCount,
         'stateRevision': state.serverVersion,
         'kind': kind,
+        if (gestureId.isNotEmpty) 'gestureEventId': gestureId,
+        if (gestureId.isNotEmpty) 'deliveryStyle': 'slam',
         'cards': cards,
         'actor': relativeActor,
         'team': team,
@@ -255,15 +326,29 @@ class UnityVisualPresentation {
       return false;
     }
     _contacted = '$generation:$id';
-    onContact(
-      id,
-      action!.value['kind'] == 'CardsCollected' ||
-          action.value['kind'] == 'CardSlammed',
-    );
+    final gestureId = action!.value['gestureEventId'];
+    final capture =
+        action.value['kind'] == 'CardsCollected' ||
+        action.value['kind'] == 'CardSlammed';
+    if (gestureId is String && onGestureContact != null) {
+      onGestureContact!(gestureId);
+      if (capture) {
+        _captureContact?.cancel();
+        _captureContact = Timer(Duration(milliseconds: _reduced ? 0 : 160), () {
+          if (generation == this.generation && _active) {
+            onContact('$id:celebrate', true);
+          }
+        });
+      }
+      return true;
+    }
+    onContact(id, capture);
     return true;
   }
 
   void clear() {
+    _captureContact?.cancel();
+    _selections.clear();
     _queue.reset();
     _previous = null;
     _latest = null;
@@ -272,6 +357,7 @@ class UnityVisualPresentation {
   }
 
   void dispose() {
+    _captureContact?.cancel();
     _queue.dispose();
   }
 }

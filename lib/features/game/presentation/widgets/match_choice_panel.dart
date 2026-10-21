@@ -8,6 +8,7 @@ import '../../../../core/widgets/lantern_panel.dart';
 class MatchChoicePanel extends StatefulWidget {
   final String title, detail, firstLabel, secondLabel, failureMessage;
   final bool canVote;
+  final bool deckSide;
   final DateTime? voteStartedAt;
   final String Function(int)? countdownLabel;
   final Future<void> Function()? onFirst, onSecond;
@@ -19,6 +20,7 @@ class MatchChoicePanel extends StatefulWidget {
     required this.secondLabel,
     required this.failureMessage,
     required this.canVote,
+    this.deckSide = false,
     this.onFirst,
     this.onSecond,
     this.voteStartedAt,
@@ -66,84 +68,152 @@ class _MatchChoicePanelState extends State<MatchChoicePanel> {
       await action();
       if (mounted) setState(() => _pending = false);
     } catch (_) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _pending = false;
           _failed = true;
         });
+      }
     }
   }
 
   @override
-  Widget build(BuildContext context) => LanternPanel(
-    padding: EdgeInsets.all(MediaQuery.sizeOf(context).height < 400 ? 6 : 12),
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Semantics(
-          liveRegion: true,
-          child: Text(
-            widget.title,
-            textAlign: TextAlign.center,
-            style: TableStyle.label.copyWith(
-              color: TableStyle.ink,
-              fontWeight: FontWeight.bold,
+  Widget build(BuildContext context) => Stack(
+    clipBehavior: Clip.none,
+    children: [
+      if (widget.deckSide)
+        Positioned(
+          left:
+              MediaQuery.sizeOf(context).width >
+                  MediaQuery.sizeOf(context).height
+              ? 124
+              : -8,
+          top:
+              MediaQuery.sizeOf(context).width >
+                  MediaQuery.sizeOf(context).height
+              ? -8
+              : 28,
+          child: Transform.rotate(
+            angle: .785398,
+            child: const SizedBox(
+              width: 18,
+              height: 18,
+              child: ColoredBox(color: TableStyle.ivory),
             ),
           ),
         ),
-        const SizedBox(height: 6),
-        Text(
-          _failed ? widget.failureMessage : widget.detail,
-          textAlign: TextAlign.center,
-          style: TableStyle.label.copyWith(color: TableStyle.ink),
+      LanternPanel(
+        selected: widget.deckSide,
+        padding: EdgeInsets.all(
+          MediaQuery.sizeOf(context).height < 400
+              ? 6
+              : widget.deckSide
+              ? 8
+              : 12,
         ),
-        if (widget.countdownLabel != null) ...[
-          const SizedBox(height: 6),
-          Text(
-            widget.countdownLabel!(_remaining),
-            textAlign: TextAlign.center,
-            style: TableStyle.label.copyWith(color: TableStyle.ink),
-          ),
-        ],
-        if (widget.canVote && _remaining > 0) ...[
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            alignment: WrapAlignment.center,
-            children: [
-              FilledButton(
-                style: FilledButton.styleFrom(
-                  backgroundColor: TableStyle.brass,
-                  foregroundColor: TableStyle.ink,
-                  minimumSize: const Size(112, 48),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Semantics(
+              liveRegion: true,
+              child: Text(
+                widget.title,
+                textAlign: TextAlign.center,
+                style: TableStyle.label.copyWith(
+                  color: TableStyle.ink,
+                  fontWeight: FontWeight.bold,
                 ),
-                onPressed: _pending || widget.onFirst == null
-                    ? null
-                    : () => _submit(widget.onFirst),
-                child: Text(widget.firstLabel, textAlign: TextAlign.center),
               ),
-              OutlinedButton(
-                style: OutlinedButton.styleFrom(
-                  // The application theme gives outlined buttons an ink fill.
-                  // Keep the label readable on it, including pending requests.
-                  backgroundColor: TableStyle.ink,
-                  foregroundColor: TableStyle.ivory,
-                  disabledBackgroundColor: TableStyle.ink,
-                  disabledForegroundColor: TableStyle.ivory.withValues(
-                    alpha: .6,
-                  ),
-                  minimumSize: const Size(112, 48),
-                ),
-                onPressed: _pending || widget.onSecond == null
-                    ? null
-                    : () => _submit(widget.onSecond),
-                child: Text(widget.secondLabel, textAlign: TextAlign.center),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              _failed ? widget.failureMessage : widget.detail,
+              textAlign: TextAlign.center,
+              style: TableStyle.label.copyWith(color: TableStyle.ink),
+            ),
+            if (widget.countdownLabel != null) ...[
+              const SizedBox(height: 6),
+              Text(
+                widget.countdownLabel!(_remaining),
+                textAlign: TextAlign.center,
+                style: TableStyle.label.copyWith(color: TableStyle.ink),
               ),
             ],
-          ),
-        ],
-      ],
-    ),
+            if (widget.canVote && _remaining > 0) ...[
+              const SizedBox(height: 10),
+              LayoutBuilder(
+                builder: (context, bounds) => Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  alignment: WrapAlignment.center,
+                  children: [
+                    SizedBox(
+                      width: widget.deckSide
+                          ? (bounds.maxWidth < 184
+                                ? bounds.maxWidth
+                                : (bounds.maxWidth - 8) / 2)
+                          : null,
+                      child: FilledButton(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: TableStyle.brass,
+                          foregroundColor: TableStyle.ink,
+                          minimumSize: Size(widget.deckSide ? 96 : 112, 48),
+                          padding: widget.deckSide
+                              ? const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 8,
+                                )
+                              : null,
+                        ),
+                        onPressed: _pending || widget.onFirst == null
+                            ? null
+                            : () => _submit(widget.onFirst),
+                        child: Text(
+                          widget.firstLabel,
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                    SizedBox(
+                      width: widget.deckSide
+                          ? (bounds.maxWidth < 184
+                                ? bounds.maxWidth
+                                : (bounds.maxWidth - 8) / 2)
+                          : null,
+                      child: OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          // The application theme gives outlined buttons an ink fill.
+                          // Keep the label readable on it, including pending requests.
+                          backgroundColor: TableStyle.ink,
+                          foregroundColor: TableStyle.ivory,
+                          disabledBackgroundColor: TableStyle.ink,
+                          disabledForegroundColor: TableStyle.ivory.withValues(
+                            alpha: .6,
+                          ),
+                          minimumSize: Size(widget.deckSide ? 96 : 112, 48),
+                          padding: widget.deckSide
+                              ? const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 8,
+                                )
+                              : null,
+                        ),
+                        onPressed: _pending || widget.onSecond == null
+                            ? null
+                            : () => _submit(widget.onSecond),
+                        child: Text(
+                          widget.secondLabel,
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    ],
   );
 }

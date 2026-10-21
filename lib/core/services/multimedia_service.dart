@@ -11,6 +11,19 @@ import '../providers/native_play_provider.dart';
 class MultimediaService extends ChangeNotifier {
   final AudioPlayer _musicPlayer = AudioPlayer();
   final AudioPlayer _sfxPlayer = AudioPlayer();
+  final List<AudioPlayer> _presentationVoices = [];
+  int _nextPresentationVoice = 0;
+  AudioPlayer _presentationVoice() {
+    if (_presentationVoices.length < 3) {
+      final voice = AudioPlayer();
+      _presentationVoices.add(voice);
+      return voice;
+    }
+    final voice = _presentationVoices[_nextPresentationVoice];
+    _nextPresentationVoice = (_nextPresentationVoice + 1) % 3;
+    return voice;
+  }
+
   final Ref _ref;
 
   MultimediaService(this._ref) {
@@ -45,6 +58,12 @@ class MultimediaService extends ChangeNotifier {
 
       if (previous?.soundVolume != next.soundVolume) {
         _sfxPlayer.setVolume(next.soundVolume);
+        for (final voice in _presentationVoices) {
+          voice.setVolume(next.soundVolume);
+        }
+      }
+      if (previous?.isSoundEnabled == true && !next.isSoundEnabled) {
+        stopSfx();
       }
     });
   }
@@ -240,6 +259,14 @@ class MultimediaService extends ChangeNotifier {
   // Existing domain callers stay unchanged. A mounted presentation scope owns
   // only card contact sounds; every other sound/music path remains pass-through.
   Object? _cardAudioOwner;
+  Object? _deckAudioOwner;
+  void Function() ownDeckPresentationAudio(Object owner) {
+    _deckAudioOwner = owner;
+    return () {
+      if (identical(_deckAudioOwner, owner)) _deckAudioOwner = null;
+    };
+  }
+
   void Function() ownCardPresentationAudio(Object owner) {
     _cardAudioOwner = owner;
     return () {
@@ -251,6 +278,10 @@ class MultimediaService extends ChangeNotifier {
   Future<void> playPresentationSfx(String assetPath) =>
       _playSfx(assetPath, presentation: true);
   Future<void> _playSfx(String assetPath, {bool presentation = false}) async {
+    if (!presentation &&
+        _deckAudioOwner != null &&
+        (assetPath == 'sfx/cut.mp3' || assetPath == 'sfx/shuffle.mp3'))
+      return;
     if (!presentation &&
         _cardAudioOwner != null &&
         (assetPath == 'sfx/play.mp3' || assetPath == 'sfx/capture.mp3')) {
@@ -274,8 +305,11 @@ class MultimediaService extends ChangeNotifier {
         }
 
         if (source != null) {
-          await _sfxPlayer.setVolume(settings.soundVolume);
-          await _sfxPlayer
+          final player = presentation ? _presentationVoice() : _sfxPlayer;
+          await player.setVolume(settings.soundVolume);
+          // Preferences may change while a platform player is initializing.
+          if (!_ref.read(settingsProvider).isSoundEnabled) return;
+          await player
               .play(source)
               .then((_) {
                 handleInteraction(); // Success! Mark interaction and rescue music
@@ -297,6 +331,7 @@ class MultimediaService extends ChangeNotifier {
   Future<void> stopSfx() async {
     try {
       await _sfxPlayer.stop();
+      await Future.wait(_presentationVoices.map((voice) => voice.stop()));
     } catch (e) {
       debugPrint('MultimediaService: Failed to stop SFX: $e');
     }
@@ -305,6 +340,9 @@ class MultimediaService extends ChangeNotifier {
   void dispose() {
     _musicPlayer.dispose();
     _sfxPlayer.dispose();
+    for (final voice in _presentationVoices) {
+      voice.dispose();
+    }
     super.dispose();
   }
 }

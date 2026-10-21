@@ -1,10 +1,11 @@
 import { lifecycleCommand } from "./match_lifecycle.ts";
 import type { Card, MatchState } from "./match_engine.ts";
+import { showCard, assertGestureSlam, recordGestureSlam, reconcileCardFeatures } from './card_reveal.ts';
 
 export const matchCommandTypes = new Set([
   "advance", "playCard", "cut", "leave", "voteShuffle", "voteRematch", "voteForBots",
   "startRound", "dealInitial", "beginPlay", "dealSubsequent",
-  "updateProfile", "sendEmoji",
+  "updateProfile", "sendEmoji", "showCard",
 ]);
 
 /** The verified JWT caller is the actor. Nobody proxies another human or bot.
@@ -16,6 +17,7 @@ export function executeMatchIntent(type: string, state: MatchState, deck: Card[]
   if (requestedActor !== callerUid) throw new Error("invalid_command_actor");
   if (state.roomClosed === true) throw new Error('room_closed');
   if (!matchCommandTypes.has(type)) throw new Error("unsupported_command");
+  if (type === 'showCard') return { state: reconcileCardFeatures(showCard(state, callerUid, payload.card)), deck };
   if (type === "updateProfile" || type === "sendEmoji") {
     if (!(state.playerIds ?? []).includes(callerUid) || /^(bot_|waiting_)/.test(callerUid)) {
       throw new Error("human_participant_required");
@@ -54,7 +56,12 @@ export function executeMatchIntent(type: string, state: MatchState, deck: Card[]
     if (type === "dealSubsequent" && (state.playerIds ?? []).some(uid => (state.handCards?.[uid] ?? []).length)) {
       throw new Error("hands_not_empty");
     }
-    return lifecycleCommand("advance", state, deck, callerUid, {}, now);
+    const result = lifecycleCommand("advance", state, deck, callerUid, {}, now);
+    return { ...result, state: reconcileCardFeatures(result.state) };
   }
-  return lifecycleCommand(type, state, deck, callerUid, payload, now);
+  const slam = type === 'playCard' && payload.deliveryStyle === 'slam';
+  if (slam) assertGestureSlam(state, callerUid, payload.card);
+  const result = lifecycleCommand(type, state, deck, callerUid, payload, now);
+  const accepted = slam ? recordGestureSlam(state, result.state, callerUid, payload.card) : result.state;
+  return { ...result, state: reconcileCardFeatures(accepted) };
 }

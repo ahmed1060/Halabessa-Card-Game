@@ -7,6 +7,7 @@ import 'dart:math';
 import 'dart:async';
 import 'package:quiver/async.dart';
 import '../../domain/models/match_state.dart';
+import '../../domain/models/card_feature_state.dart';
 import '../../domain/models/room_summary.dart';
 import '../../domain/models/capture.dart';
 import '../../domain/models/card.dart' as game_card;
@@ -1431,7 +1432,31 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     await _publishState(currentState.copyWith(playerEmojis: emojis));
   }
 
-  Future<bool> playCard(String playerId, game_card.Card card, {Offset? origin}) async {
+  Future<bool> showCard(String playerId, game_card.Card card) async {
+    final current = state;
+    if (current == null || _isSpectating || _leavePending ||
+        current.phase != GamePhase.playing || !current.playerIds.contains(playerId) ||
+        !(current.handCards[playerId]?.contains(card) ?? false)) return false;
+    if (current.usesServerCommands) {
+      if (playerId != ref.read(currentUserProvider)?.uid) return false;
+      // A reveal never occupies the gameplay-intent slot. Existing transport
+      // retains command identity on ambiguous responses; server validates hand.
+      final generation = _bindingGeneration;
+      try {
+        final accepted = await ref.read(multiplayerSyncServiceProvider).submitMatchCommand(
+          matchState: current, commandType: 'showCard', callerUid: playerId,
+          payload: {'card': card.toJson()}, commandId: MultiplayerSyncService.newCommandId());
+        if (mounted && generation == _bindingGeneration) _adoptServerSnapshot(accepted);
+        return true;
+      } catch (_) { return false; }
+    }
+    try {
+      await _publishState(CardFeatureState(current).showLocal(playerId, card));
+      return true;
+    } catch (_) { return false; }
+  }
+
+  Future<bool> playCard(String playerId, game_card.Card card, {Offset? origin, bool gestureSlam = false}) async {
     if (_playInFlight) return false;
     _playInFlight = true;
     try {
@@ -1439,6 +1464,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
       if (currentState == null || currentState.phase != GamePhase.playing ||
           currentState.playerIds.indexOf(playerId) != currentState.currentTurnIndex ||
           !(currentState.handCards[playerId]?.contains(card) ?? false)) return false;
+      if (gestureSlam && CardFeatureState(currentState).remaining(playerId, slam: true) == 0) return false;
 
       if (origin != null) {
         ref.read(localPlayOriginsProvider.notifier).update((m) => {...m, card.firebaseKey: origin});
@@ -1446,12 +1472,14 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
 
       if (currentState.usesServerCommands) {
         if (playerId != ref.read(currentUserProvider)?.uid) return false;
-        return await _sendServerIntent('playCard', payload: {'card': card.toJson()});
+        return await _sendServerIntent('playCard', payload: {'card': card.toJson(),
+          if (gestureSlam) 'deliveryStyle': 'slam'});
       }
 
       final result = GameEngine.apply(currentState, PlayCardAction(playerId, card));
-      final newState = result.newState;
-      if (identical(newState, currentState)) return false;
+      if (identical(result.newState, currentState)) return false;
+      final newState = gestureSlam ? CardFeatureState(currentState)
+          .acceptedLocalSlam(result.newState, playerId, card) : result.newState;
 
       if (result.capturedCards.isNotEmpty) {
         final intermediateBoard = List<game_card.Card>.from(currentState.board)..add(card);
@@ -1464,6 +1492,7 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
         };
 
         await _publishState(currentState.copyWith(
+          cardFeatures: newState.cardFeatures,
           board: intermediateBoard,
           handCards: intermediateHands,
           handCounts: intermediateHandCounts,

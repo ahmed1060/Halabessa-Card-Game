@@ -2,6 +2,8 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import '../../domain/models/capture.dart';
+import '../../domain/models/match_state.dart';
+import 'deck_action_presentation.dart';
 import 'team_capture_stack.dart';
 import 'table_style.dart';
 
@@ -91,7 +93,39 @@ class OptionBGeometry {
   Rect get preCutPartner => landscape ? partner : partner.translate(0, -94);
   Rect get cutPopover => landscape
       ? Rect.fromLTWH(deck.left - 40, deck.top + 116, 252, 172)
-      : Rect.fromLTWH(deck.right + 8, deck.top + 30, 240, 180);
+      : Rect.fromLTWH(
+          deck.right + 8,
+          deck.top + 30,
+          math.min(240, menu.left - deck.right - 16),
+          math.min(180, math.max(64, left.top - deck.top - 42)),
+        );
+  // A taller decision stays below the deck in landscape, beside it in portrait.
+  // The teammate uses the existing pre-deal slot while these prompts are shown.
+  Rect get deckVotePopover => landscape
+      ? Rect.fromLTWH(deck.left - 104, deck.top + 112, 252, 260)
+      : left.top - deck.top - 24 < 150
+      // On short portrait screens the side avatars start too high for a wide
+      // popover. A narrow column BETWEEN them keeps both vote choices visible.
+      ? Rect.fromLTWH(
+          deck.right + 8,
+          deck.top + 12,
+          right.left - deck.right - 16,
+          math.min(330, hand.top - deck.top - 32),
+        )
+      : Rect.fromLTWH(
+          deck.right + 8,
+          deck.top + 12,
+          math.min(240, menu.left - deck.right - 16),
+          math.min(260, math.max(84, left.top - deck.top - 24)),
+        );
+  Rect get activeCutPopover => landscape
+      ? Rect.fromLTWH(deck.left - 168, deck.top + 4, 152, 100)
+      : Rect.fromLTWH(
+          deck.right + 16,
+          deck.top + 22,
+          math.min(224, menu.left - deck.right - 24),
+          math.min(100, math.max(64, left.top - deck.top - 34)),
+        );
   Rect get phase => landscape
       ? Rect.fromLTWH(size.width * .22, 194, size.width * .5, 204)
       : Rect.fromLTWH(56, size.height * .39, 318, 260);
@@ -104,6 +138,15 @@ class OptionBTable extends StatelessWidget {
   final bool showPhase;
   final bool deckSidePhase;
   final GlobalKey? sceneKey;
+  final Widget Function(OptionBGeometry)? shownCards;
+  final MatchState? deckActionState;
+  final Object deckRendererIdentity;
+  final Widget Function(bool hidden)? deckBuilder;
+  final Widget Function(double, double)? deckBackBuilder;
+  final void Function(String, DeckFeedback)? onDeckFeedback;
+  final String shuffleLabel;
+  final bool deckVotePhase;
+  final Widget? activeDeckPhase;
   const OptionBTable({
     super.key,
     required this.local,
@@ -122,6 +165,15 @@ class OptionBTable extends StatelessWidget {
     this.deckSidePhase = false,
     this.deck = const SizedBox.shrink(),
     this.sceneKey,
+    this.shownCards,
+    this.deckActionState,
+    this.deckRendererIdentity = false,
+    this.deckBuilder,
+    this.deckBackBuilder,
+    this.onDeckFeedback,
+    this.shuffleLabel = '',
+    this.deckVotePhase = false,
+    this.activeDeckPhase,
   });
 
   @override
@@ -136,49 +188,86 @@ class OptionBTable extends StatelessWidget {
           child: child,
         ),
       );
+      Widget scene(bool hidden, Widget? overlay) => Stack(
+        clipBehavior: Clip.none,
+        children: [
+          slot('board', g.board, SizedBox.expand(child: board)),
+          if (shownCards != null) Positioned.fill(child: shownCards!(g)),
+          slot('local', g.local, local),
+          slot('partner', deckSidePhase ? g.preCutPartner : g.partner, partner),
+          slot('deck', g.deck, deckBuilder?.call(hidden) ?? deck),
+          slot('left', g.left, left),
+          slot('right', g.right, right),
+          slot('our-pile', g.ourPile, ourPile),
+          slot('rival-pile', g.rivalPile, rivalPile),
+          slot('hand', g.hand, SizedBox.expand(child: hand)),
+          slot('history', g.history, history),
+          slot('menu', g.menu, menu),
+          slot('scores', g.scores, scores),
+          if (overlay != null) overlay,
+          if (showPhase)
+            slot(
+              'phase',
+              activeDeckPhase != null &&
+                      (hidden || (!g.landscape && g.cutPopover.height < 120))
+                  ? g.activeCutPopover
+                  : deckVotePhase
+                  ? g.deckVotePopover
+                  : deckSidePhase
+                  ? g.cutPopover
+                  : g.phase,
+              SizedBox.expand(
+                child: ClipRect(
+                  clipper: deckSidePhase ? const _DeckPopoverClip() : null,
+                  clipBehavior: deckSidePhase ? Clip.hardEdge : Clip.none,
+                  child: SingleChildScrollView(
+                    clipBehavior: Clip.none,
+                    child:
+                        activeDeckPhase != null &&
+                            (hidden ||
+                                (!g.landscape && g.cutPopover.height < 120))
+                        ? activeDeckPhase!
+                        : phase,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      );
       return FittedBox(
         fit: BoxFit.contain,
         child: SizedBox(
           key: sceneKey,
           width: g.size.width,
           height: g.size.height,
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              slot('board', g.board, SizedBox.expand(child: board)),
-              slot('local', g.local, local),
-              slot(
-                'partner',
-                deckSidePhase ? g.preCutPartner : g.partner,
-                partner,
-              ),
-              slot('deck', deckSidePhase ? g.cutDeck : g.deck, deck),
-              slot('left', g.left, left),
-              slot('right', g.right, right),
-              slot('our-pile', g.ourPile, ourPile),
-              slot('rival-pile', g.rivalPile, rivalPile),
-              slot('hand', g.hand, SizedBox.expand(child: hand)),
-              slot('history', g.history, history),
-              slot('menu', g.menu, menu),
-              // The collapsible HUD is an overlay, never a row that pushes the seats.
-              slot('scores', g.scores, scores),
-              if (showPhase)
-                slot(
-                  'phase',
-                  deckSidePhase ? g.cutPopover : g.phase,
-                  SizedBox.expand(
-                    child: SingleChildScrollView(
-                      clipBehavior: Clip.none,
-                      child: phase,
-                    ),
-                  ),
+          child: deckActionState == null || deckBackBuilder == null
+              ? scene(false, null)
+              : DeckActionPresentation(
+                  state: deckActionState!,
+                  rendererIdentity: deckRendererIdentity,
+                  home: Rect.fromLTWH(g.deck.left + 4, g.deck.top, 56, 76),
+                  tableSize: g.size,
+                  backBuilder: deckBackBuilder!,
+                  shuffleLabel: shuffleLabel,
+                  onFeedback: onDeckFeedback,
+                  allowFreshFirstShuffle: true,
+                  builder: scene,
                 ),
-            ],
-          ),
         ),
       );
     },
   );
+}
+
+// Keep the small attachment pointer, but clip enlarged text to its scroll slot
+// rather than painting a tall decision over the next player's avatar.
+class _DeckPopoverClip extends CustomClipper<Rect> {
+  const _DeckPopoverClip();
+  @override
+  Rect getClip(Size size) =>
+      Rect.fromLTRB(-12, -12, size.width + 12, size.height);
+  @override
+  bool shouldReclip(_DeckPopoverClip oldClipper) => false;
 }
 
 class ClearScoreDisplay extends StatefulWidget {
@@ -517,12 +606,10 @@ class TeamCapturePreview extends StatelessWidget {
     key: ValueKey(
       accent == TableStyle.mint ? 'history-our-count' : 'history-rival-count',
     ),
-    constraints: const BoxConstraints(minWidth: 20),
-    padding: const EdgeInsets.symmetric(horizontal: 2),
-    decoration: BoxDecoration(
-      color: accent,
-      borderRadius: BorderRadius.circular(4),
-    ),
+    width: 24,
+    height: 24,
+    alignment: Alignment.center,
+    decoration: BoxDecoration(color: accent, shape: BoxShape.circle),
     child: Text(
       '$count',
       textAlign: TextAlign.center,

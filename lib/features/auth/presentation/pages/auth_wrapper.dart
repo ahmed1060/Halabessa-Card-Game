@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -22,12 +23,28 @@ class _AuthWrapperState extends ConsumerState<AuthWrapper> {
   bool _deletionChecked = false;
   bool _hasDeletionReceipt = false;
   bool _deletionReadFailed = false;
+  bool _splashReadable = false;
+  Timer? _splashTimer;
 
   @override
   void initState() {
     super.initState();
     _initAssets();
     _checkDeletionReceipt();
+    // Give the real loading surface one readable beat, starting only after
+    // it has painted. This does not fabricate progress or wait for Unity.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _splashTimer = Timer(const Duration(seconds: 1), () {
+        if (mounted) setState(() => _splashReadable = true);
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _splashTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _checkDeletionReceipt() async {
@@ -79,7 +96,7 @@ class _AuthWrapperState extends ConsumerState<AuthWrapper> {
         ),
       );
     }
-    if (!_assetsPreloaded || !_deletionChecked) {
+    if (!_splashReadable || !_assetsPreloaded || !_deletionChecked) {
       return LoadingScreen(
         progressStream: ref.read(assetPreloaderServiceProvider).loadProgress,
       );

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:halabessa/core/utils/web_utils.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_unity_widget/flutter_unity_widget.dart';
 import '../../domain/models/match_state.dart';
@@ -20,6 +21,13 @@ final unityCommunicationServiceProvider = Provider((ref) {
   ref.onDispose(service.dispose);
   return service;
 });
+// Optional rebuilt-renderer capability; old exports never enable new gestures.
+final unityCardInteractionsReadyProvider = StateProvider<bool>((ref) => false);
+const _cardInteractionsPreview = bool.fromEnvironment(
+  'HALABESSA_CARD_INTERACTIONS',
+);
+// Explicit local QA only. Never log card/room/player identity or hand payloads.
+const _visualTrace = bool.fromEnvironment('HALABESSA_VISUAL_TRACE');
 
 class UnityCommunicationService {
   final Ref _ref;
@@ -29,14 +37,37 @@ class UnityCommunicationService {
   Timer? _startupTimer;
   StreamSubscription<dynamic>? _webMessages;
   late final _visual = UnityVisualPresentation(
-    send: (message) =>
-        postMessage('UnityBridge', 'OnFlutterMessage', jsonEncode(message)),
+    send: (message) {
+      if (_visualTrace) {
+        debugPrint(
+          'Visual QA TX ${message['type']} ${message['kind'] ?? ''} '
+          'generation=${message['generation']} instant=${message['instant']}',
+        );
+      }
+      postMessage(
+        'UnityBridge',
+        'OnFlutterMessage',
+        jsonEncode({...message, if (_visualTrace) 'trace': true}),
+      );
+    },
     onContact: (id, slam) =>
         _ref.read(cardFeedbackProvider).contact(id, slam: slam),
+    onGestureContact: (id) => _ref.read(cardFeedbackProvider).gestureSlam(id),
+    onRecoverableTimeout: () => debugPrint(
+      'Unity visual ACK timed out: resynced current cards; later effects remain enabled.',
+    ),
   );
   bool get supportsVisualActions => _visual.capable;
+  void updateHandSelection(String cardId, bool queued, bool slam) {
+    _visual.updateHandSelection(cardId, queued, slam);
+  }
+
   bool _platformReduced = false;
   bool _disposed = false;
+  bool _visualForeground = true;
+  MatchState? _lastVisualState;
+  MatchState? _pendingVisualState;
+  bool _visualSyncScheduled = false;
   final _handPoses = <String, String>{};
   void updateHandPose(
     String cardId,
@@ -44,7 +75,11 @@ class UnityCommunicationService {
     double dragFraction,
     double velocity,
   ) {
-    if (!_visual.capable || !_ref.read(unityLayerActiveProvider)) return;
+    if (!_visualForeground ||
+        !_visual.capable ||
+        !_ref.read(unityLayerActiveProvider)) {
+      return;
+    }
     final message = jsonEncode({
       'type': 'HAND_POSE',
       'generation': _visual.generation,
@@ -63,14 +98,51 @@ class UnityCommunicationService {
     List<Map<String, dynamic>> anchors, {
     bool reducedMotion = false,
   }) {
-    _visual.updateAnchors(anchors);
+    _visual.updateAnchors(anchors, reconcile: _pendingVisualState == null);
     _platformReduced = reducedMotion;
   }
 
-  void clearVisuals() => _visual.clear();
+  void clearVisuals() {
+    _lastVisualState = null;
+    _pendingVisualState = null;
+    _visual.clear();
+  }
+
   void resyncVisuals() {
     _handPoses.clear();
     _visual.resync();
+  }
+
+  /// Cancel presentation on focus loss; never pause the accepted match state.
+  /// Hidden tabs can consume state without frames, and resume catches up once
+  /// layout has supplied fresh anchors instead of replaying missed effects.
+  void setVisualForeground(bool foreground) {
+    if (_disposed || foreground == _visualForeground) return;
+    _visualForeground = foreground;
+    _handPoses.clear();
+    final state = _pendingVisualState ?? _lastVisualState;
+    _pendingVisualState = null;
+    if (state == null) {
+      _visual.resync();
+    } else if (foreground) {
+      syncState(state);
+    } else {
+      _acceptVisualState(state);
+    }
+  }
+
+  void _acceptVisualState(MatchState state) {
+    final settings = _ref.read(settingsProvider);
+    _visual.accept(
+      state,
+      _ref.read(currentUserProvider)?.uid,
+      active:
+          _visualForeground &&
+          isReady.value &&
+          _ref.read(unityLayerActiveProvider),
+      reduced: settings.reducedMotion || _platformReduced,
+      interactions: _cardInteractionsPreview && state.id.startsWith('OFFLINE_'),
+    );
   }
 
   UnityCommunicationService(this._ref);
@@ -110,6 +182,7 @@ class UnityCommunicationService {
   }
 
   void _fallbackTo2D() {
+    _ref.read(unityCardInteractionsReadyProvider.notifier).state = false;
     _startup.handleEvent('UNITY_FAILED');
     _visual.clear();
     _startupTimer?.cancel();
@@ -121,6 +194,8 @@ class UnityCommunicationService {
 
   void dispose() {
     _disposed = true;
+    _lastVisualState = null;
+    _pendingVisualState = null;
     _startupTimer?.cancel();
     _webMessages?.cancel();
     _visual.dispose();
@@ -155,13 +230,27 @@ class UnityCommunicationService {
 
   void syncState(MatchState state) {
     if (cardJuiceEnabled) {
-      final settings = _ref.read(settingsProvider);
-      _visual.accept(
-        state,
-        _ref.read(currentUserProvider)?.uid,
-        active: isReady.value && _ref.read(unityLayerActiveProvider),
-        reduced: settings.reducedMotion || _platformReduced,
-      );
+      _lastVisualState = state;
+      if (!_visualForeground) {
+        _pendingVisualState = null;
+        _acceptVisualState(state);
+        return;
+      }
+      // Accepted state is immediate; only its visual handoff waits for layout.
+      // Flush after ALL post-frame anchors, not before the new fan is measured.
+      _pendingVisualState = state;
+      if (_visualSyncScheduled || _disposed) return;
+      _visualSyncScheduled = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        scheduleMicrotask(() {
+          _visualSyncScheduled = false;
+          final next = _pendingVisualState;
+          _pendingVisualState = null;
+          if (_disposed || next == null) return;
+          _acceptVisualState(next);
+        });
+      });
+      WidgetsBinding.instance.ensureVisualUpdate();
       return;
     }
     final currentUserUid = _ref.read(currentUserProvider)?.uid;
@@ -222,6 +311,16 @@ class UnityCommunicationService {
       if (data is! Map) return;
 
       final event = data['event'];
+      if (_visualTrace &&
+          (event == 'VISUAL_ACTION_COMPLETE' ||
+              event == 'VISUAL_CONTACT' ||
+              event == 'UNITY_VISUAL_READY' ||
+              event == 'UNITY_CARD_FEEL_READY')) {
+        debugPrint(
+          'Visual QA RX $event generation=${data['generation']} '
+          'typed=${data['generation'] is int} identified=${data['eventId'] is String}',
+        );
+      }
       if (event == 'UNITY_FAILED') {
         _fallbackTo2D();
         return;
@@ -241,7 +340,15 @@ class UnityCommunicationService {
       if (!isReady.value || _startup.hasFailed) return;
       final settings = _ref.read(settingsProvider);
       if (event == 'UNITY_VISUAL_READY') {
+        _ref.read(unityCardInteractionsReadyProvider.notifier).state = false;
         _visual.negotiate(data['data'] == '1' ? 1 : 0);
+        final state = _ref.read(matchStateProvider);
+        if (state != null) syncState(state);
+        return;
+      }
+      if (event == 'UNITY_CARD_FEEL_READY' && data['data'] == '1') {
+        _visual.negotiate(1, interactions: true);
+        _ref.read(unityCardInteractionsReadyProvider.notifier).state = true;
         final state = _ref.read(matchStateProvider);
         if (state != null) syncState(state);
         return;

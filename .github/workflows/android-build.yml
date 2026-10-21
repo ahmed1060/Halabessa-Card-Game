@@ -24,7 +24,35 @@ jobs:
     timeout-minutes: 35
 
     steps:
+      - name: Prepare Android runner disk space
+        # The previous runner exhausted its disk during Gradle transforms.
+        # Remove only unused, preinstalled SDKs on this disposable Linux runner;
+        # preserve Android, Java, Flutter and the rest of the tool cache.
+        shell: bash
+        run: |
+          set -euo pipefail
+          df -h /
+          for target in /usr/share/dotnet /opt/ghc /usr/local/share/boost /opt/hostedtoolcache/CodeQL; do
+            if [[ -e "$target" ]]; then
+              [[ ! -L "$target" && "$(realpath -- "$target")" == "$target" ]] || exit 1
+              sudo rm -rf -- "$target"
+            fi
+          done
+          df -h /
+          available_kib=$(df -Pk / | awk 'NR == 2 {print $4}')
+          if (( available_kib < 12 * 1024 * 1024 )); then
+            echo "::error::Less than 12 GiB free before the Android build tool installation."
+            exit 1
+          fi
+
       - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Test card privacy, native entrypoints and runner preparation
+        run: node --test functions/test/card_reveal.test.ts functions/test/native_entrypoints.test.mjs functions/test/android_ci_disk.test.mjs
 
       - name: Verify Unity native libraries
         run: |
@@ -68,6 +96,13 @@ jobs:
 
       - name: Test
         run: flutter test
+
+      - name: Test opt-in card and deck presentation
+        run: >-
+          flutter test --dart-define=HALABESSA_CARD_INTERACTIONS=true
+          --dart-define=HALABESSA_DECK_SPICES=true
+          test/card_gesture_intents_test.dart test/card_reveal_two_client_test.dart
+          test/deck_action_presentation_test.dart test/unity_visual_handoff_test.dart
 
       - name: Prepare optional persistent Android signing identity
         if: github.event_name != 'pull_request'

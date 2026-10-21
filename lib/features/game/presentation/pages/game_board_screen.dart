@@ -49,6 +49,14 @@ import 'package:halabessa/core/utils/error_handler.dart';
 import 'package:halabessa/core/routes/app_routes.dart';
 import '../providers/unity_communication_service.dart';
 import '../providers/unity_layer_provider.dart';
+import '../../domain/models/card_feature_state.dart';
+import '../widgets/shown_card_layer.dart';
+
+// Local review only. Never call an undeployed command on a production room.
+const _cardInteractionsPreview = bool.fromEnvironment(
+  'HALABESSA_CARD_INTERACTIONS',
+);
+const _deckSpicesPreview = bool.fromEnvironment('HALABESSA_DECK_SPICES');
 
 class GameBoardScreen extends ConsumerStatefulWidget {
   const GameBoardScreen({super.key});
@@ -97,7 +105,11 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
 
       // Share the existing fan's logical geometry, not Unity world-unit guesses.
       // These are visual coordinates only; membership still comes from SYNC_STATE.
-      final hand = state.handCards[ref.read(currentUserProvider)?.uid] ?? [];
+      final hand =
+          ref.read(matchStateProvider)?.handCards[ref
+              .read(currentUserProvider)
+              ?.uid] ??
+          [];
       final fan = HandFanGeometry(
         g.hand.width,
         spread: OptionBGeometry.localHandSpread,
@@ -608,9 +620,20 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
       ownsAudio:
           !show3DHand ||
           ref.read(unityCommunicationServiceProvider).supportsVisualActions,
+      ownsDeckAudio: _deckSpicesPreview,
     );
     final firstIsA = myTeam != 'teamB';
     final playing = state.phase == GamePhase.playing;
+    final featurePreview =
+        _cardInteractionsPreview &&
+        state.id.startsWith('OFFLINE_') &&
+        !isSpectator &&
+        (!show3DHand ||
+            (ref.watch(unityCardInteractionsReadyProvider) &&
+                ref
+                    .read(unityCommunicationServiceProvider)
+                    .supportsVisualActions));
+    final features = CardFeatureState(state);
     final myTurn =
         playing &&
         playReady &&
@@ -715,6 +738,24 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
       },
       builder: (hiddenCard, presented, play) => OptionBTable(
         sceneKey: _sceneKey,
+        shownCards: !featurePreview
+            ? null
+            : (geometry) => ShownCardLayer(
+                key: ValueKey(
+                  'shown:${state.id}:${state.matchSequence}:${state.roundCount}:${state.handInRound}:$myUid',
+                ),
+                cards: features.visible,
+                seats: List.generate(
+                  4,
+                  (offset) =>
+                      state.playerIds[_getAbsoluteIndex(state, myUid, offset)],
+                ),
+                localUid: myUid,
+                geometry: geometry,
+                faceBuilder: _cardFace,
+                backBuilder: _cardBack,
+                onContact: feedback.reveal,
+              ),
         scores: ClearScoreDisplay(
           ourScore: firstIsA ? state.teamAScore : state.teamBScore,
           rivalScore: firstIsA ? state.teamBScore : state.teamAScore,
@@ -725,6 +766,21 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
           showLabel: 'table_show_scores'.tr(),
         ),
         partner: seat(2),
+        deckActionState: _deckSpicesPreview ? state : null,
+        deckRendererIdentity: show3DHand,
+        deckBackBuilder: _cardBack,
+        shuffleLabel: 'ui_shuffling_title'.tr(),
+        onDeckFeedback: (id, kind) => feedback.deckAction(id, kind.name),
+        deckBuilder: _deckSpicesPreview
+            ? (hidden) => DealDeck(
+                thematic: true,
+                hideArtwork: hidden,
+                remaining: state.deckCount,
+                label: 'table_deal_deck'.tr(),
+                deckKey: _dealerDeckKey,
+                backBuilder: _cardBack,
+              )
+            : null,
         deck: DealDeck(
           thematic: true,
           shuffleIdentity:
@@ -760,7 +816,11 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
             state.phase == GamePhase.shuffleVoting ||
             state.phase == GamePhase.rematchVoting ||
             state.phase == GamePhase.preRoundCut,
-        deckSidePhase: state.phase == GamePhase.preRoundCut,
+        deckSidePhase:
+            state.phase == GamePhase.preRoundCut ||
+            (_deckSpicesPreview && state.phase == GamePhase.shuffleVoting),
+        deckVotePhase:
+            _deckSpicesPreview && state.phase == GamePhase.shuffleVoting,
         board: SizedBox(
           key: _boardKey,
           child: _buildPresentedBoardCenter(
@@ -773,6 +833,16 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
             alreadyPresented: presented,
           ),
         ),
+        activeDeckPhase:
+            _deckSpicesPreview && state.phase == GamePhase.preRoundCut
+            ? _buildTableStatus(
+                state,
+                myUid,
+                isSpectator,
+                myTurn,
+                compactDeck: true,
+              )
+            : null,
         phase: state.phase == GamePhase.roundScoring
             ? const SizedBox.shrink()
             : _buildTableStatus(
@@ -801,6 +871,12 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
                           )
                     : null,
                 onPick: feedback.pick,
+                onHoldPulse: feedback.holdPulse,
+                onSelectionPose: !show3DHand
+                    ? null
+                    : (card, queued, slam) => ref
+                          .read(unityCommunicationServiceProvider)
+                          .updateHandSelection(card.firebaseKey, queued, slam),
                 cards: state.handCards[myUid] ?? [],
                 isMyTurn: myTurn,
                 interactionEnabled: playing && playReady && hiddenCard == null,
@@ -814,6 +890,41 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
                   ],
                 ),
                 onCardTap: play,
+                onCardSlam: !featurePreview
+                    ? null
+                    : (card, geometry) async {
+                        final box =
+                            _boardKey.currentContext?.findRenderObject()
+                                as RenderBox?;
+                        final origin = box == null
+                            ? Offset.zero
+                            : box.globalToLocal(geometry.center) -
+                                  box.size.center(Offset.zero);
+                        final accepted = await ref
+                            .read(matchStateProvider.notifier)
+                            .playCard(
+                              myUid,
+                              card,
+                              origin: origin,
+                              gestureSlam: true,
+                            );
+                        if (!accepted) feedback.reject();
+                      },
+                onCardReveal: !featurePreview
+                    ? null
+                    : (card, _) async {
+                        if (!await ref
+                            .read(matchStateProvider.notifier)
+                            .showCard(myUid, card))
+                          feedback.reject();
+                      },
+                slamUsesRemaining: featurePreview
+                    ? features.remaining(myUid, slam: true)
+                    : 0,
+                revealUsesRemaining: featurePreview
+                    ? features.remaining(myUid)
+                    : 0,
+                onUnavailable: featurePreview ? feedback.reject : null,
                 pendingHint: 'table_sending_move'.tr(),
               ),
         menu: DecoratedBox(
@@ -879,8 +990,9 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
     MatchState state,
     String uid,
     bool spectator,
-    bool myTurn,
-  ) {
+    bool myTurn, {
+    bool compactDeck = false,
+  }) {
     if (state.phase == GamePhase.shuffleVoting ||
         state.phase == GamePhase.rematchVoting) {
       final shuffle = state.phase == GamePhase.shuffleVoting;
@@ -892,6 +1004,7 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
       final myTeam = _getTeamOfPlayer(uid, state.playerIds);
       final winner = state.teamAScore >= state.teamBScore ? 'teamA' : 'teamB';
       return MatchChoicePanel(
+        deckSide: _deckSpicesPreview && shuffle,
         key: ValueKey(
           '${state.id}-${state.roundCount}-${state.phase.name}-$uid',
         ),
@@ -949,7 +1062,8 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
         title: 'pre_round_cut'.tr(),
         message: (canCut ? 'your_turn_cut_deck' : 'waiting_deck_cut').tr(),
         deckSide: true,
-        shuffleIntro: state.roundsSinceLastShuffle == 0,
+        compact: compactDeck,
+        shuffleIntro: !_deckSpicesPreview && state.roundsSinceLastShuffle == 0,
         startedAt: state.phaseStartedAt,
         shuffleTitle: 'ui_shuffling_title'.tr(),
         shuffleMessage: 'ui_shuffling_message'.tr(),
@@ -1215,8 +1329,31 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
     return BoardCardsWidget(
       key: ValueKey('board-${matchState.id}'),
       cards: matchState.board,
-      onContact: (id, slam) =>
-          ref.read(cardFeedbackProvider).contact(id, slam: slam),
+      gestureSlams:
+          !_cardInteractionsPreview || !matchState.id.startsWith('OFFLINE_')
+          ? const {}
+          : {
+              for (final card in matchState.board)
+                if (CardFeatureState(matchState).wasGestureSlam(card))
+                  card.firebaseKey,
+            },
+      onContact: (id, capture) {
+        final features = CardFeatureState(matchState);
+        if (!capture &&
+            _cardInteractionsPreview &&
+            matchState.id.startsWith('OFFLINE_') &&
+            matchState.board.any(
+              (card) =>
+                  id == 'play:${card.firebaseKey}' &&
+                  features.wasGestureSlam(card),
+            )) {
+          ref
+              .read(cardFeedbackProvider)
+              .gestureSlam(features.data['lastSlam']['eventId'] as String);
+        } else {
+          ref.read(cardFeedbackProvider).contact(id, slam: capture);
+        }
+      },
       showEmptyPlaceholder: false,
       alreadyPresented: alreadyPresented,
       isLandscape: isLandscape,

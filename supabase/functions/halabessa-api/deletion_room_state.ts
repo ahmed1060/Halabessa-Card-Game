@@ -1,5 +1,6 @@
 import {releasePlayer} from './turn_policy.ts';
 import type {MatchState} from './match_engine.ts';
+import type {CardFeatures} from './card_reveal.ts';
 
 const referenceFields = ['uid','senderId','playerId','playerUid','playedBy','actorUid','previousUid','ownerUid','hostUid'];
 const identityMaps = ['players','handCards','handCounts','shuffleVotes','rematchVotes','botInjectionVotes',
@@ -8,6 +9,8 @@ const identityMaps = ['players','handCards','handCounts','shuffleVotes','rematch
 export function roomReferencesDeletedPlayer(state: MatchState, uid: string) {
   if (['playerIds','rewardRoster'].some(field => Array.isArray(state[field]) && state[field].includes(uid))) return true;
   if (identityMaps.some(field => state[field] && typeof state[field] === 'object' && uid in state[field])) return true;
+  const features = state.cardFeatures as CardFeatures | undefined;
+  if (features?.players && Object.hasOwn(features.players, uid)) return true;
   if (state.cardOwnership && typeof state.cardOwnership === 'object' && Object.values(state.cardOwnership).includes(uid)) return true;
   if (state.skippedMatches && typeof state.skippedMatches === 'object' && Object.values(state.skippedMatches)
     .some(values => Array.isArray(values) && values.some(v => typeof v === 'string' && v.endsWith(`:${uid}`)))) return true;
@@ -47,6 +50,12 @@ export function anonymizeDeletedPlayer(state: MatchState, uid: string, anonymous
     }));
   }
   const result = scrub(next) as MatchState;
+  // Reveals are ephemeral copies, not cards to transfer to a replacement bot.
+  // Their event IDs also contain the owner's identity; discard that owner's
+  // feature record rather than changing real card/score/turn fields.
+  const features = result.cardFeatures as CardFeatures | undefined;
+  if (features?.players) delete features.players[uid];
+  if ((state.cardFeatures as CardFeatures | undefined)?.lastSlam?.ownerUid === uid && features) delete features.lastSlam;
   // Only schema-defined identity fields are rewritten. A custom UID can be
   // "king", or equal another player's display name; global string replacement
   // would corrupt real cards and unrelated profile/skin values.

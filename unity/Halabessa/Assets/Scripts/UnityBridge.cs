@@ -48,6 +48,11 @@ public class UnityBridge : MonoBehaviour {
 
     void Start() {
 #if UNITY_WEBGL && !UNITY_EDITOR
+        // Flutter owns the transparent host's input, so the Unity canvas is
+        // intentionally not focused. Losing CANVAS focus must not stop its
+        // visual coroutines while the surrounding Flutter game keeps playing.
+        // Browser tab throttling and Flutter's lifecycle resync still apply.
+        Application.runInBackground = true;
         WebGLInput.captureAllKeyboardInput = false;
 #endif
         // FORCE TRANSPARENCY AT RUNTIME (God Move)
@@ -59,6 +64,7 @@ public class UnityBridge : MonoBehaviour {
         EnsurePointerInput();
         NotifyFlutter("UNITY_READY", "Unity initialized");
         NotifyFlutter("UNITY_VISUAL_READY", "1");
+        NotifyFlutter("UNITY_CARD_FEEL_READY", "1");
     }
 
     private void EnsurePointerInput() {
@@ -99,6 +105,8 @@ public class UnityBridge : MonoBehaviour {
         try {
             MessageData data = JsonUtility.FromJson<MessageData>(messageJson);
             if (data == null) return;
+            if (data.trace && (data.type == "VISUAL_ACTION" || data.type == "CANCEL_VISUALS"))
+                Debug.Log($"Visual QA native {data.type} {data.kind} generation={data.generation} frame={Time.frameCount} focused={Application.isFocused} background={Application.runInBackground}");
             if (data.type == "CANCEL_VISUALS") {
                 if (data.generation < visualGeneration) return;
                 CancelVisuals(); visualGeneration = data.generation; seenVisuals.Clear(); return;
@@ -113,7 +121,12 @@ public class UnityBridge : MonoBehaviour {
                 visualAction = StartCoroutine(PerformVisualAction(data)); return;
             }
             
-            if (data.type == "HAND_POSE") {
+            if (data.type == "HAND_SELECTION") {
+                if (!managedVisuals || data.generation != visualGeneration || !localHandIds.Contains(data.cardId ?? "")) return;
+                GameObject handCard;
+                if (activeCards.TryGetValue(data.cardId, out handCard))
+                    handCard.GetComponent<CardJuiceController>()?.SetHandSelection(data.queued, data.slam);
+            } else if (data.type == "HAND_POSE") {
                 if (!managedVisuals || data.generation != visualGeneration || !localHandIds.Contains(data.cardId ?? "")) return;
                 GameObject handCard;
                 if (activeCards.TryGetValue(data.cardId, out handCard))
@@ -122,6 +135,7 @@ public class UnityBridge : MonoBehaviour {
                 managedVisuals = data.instant;
                 visualAnchors = data.anchors ?? visualAnchors;
                 HandleSyncState(data.board, data.handCards, data.instant);
+                ApplyHandSelections(data.handSelections);
                 foreach (var card in activeCards.Values) {
                     var juice = card.GetComponent<CardJuiceController>();
                     if (juice != null) juice.ReducedMotion = data.reducedMotion;
@@ -145,6 +159,15 @@ public class UnityBridge : MonoBehaviour {
             }
         } catch (Exception e) {
             Debug.LogError("Error parsing Flutter message: " + e.Message);
+        }
+    }
+
+    private void ApplyHandSelections(List<HandSelection> selections) {
+        foreach (var id in localHandIds) {
+            GameObject card;
+            if (!activeCards.TryGetValue(id, out card)) continue;
+            var pose = selections?.Find(item => item.cardId == id);
+            card.GetComponent<CardJuiceController>()?.SetHandSelection(pose != null && pose.queued, pose != null && pose.slam);
         }
     }
 
@@ -349,6 +372,8 @@ public class UnityBridge : MonoBehaviour {
         var generation = visualGeneration;
         var started = Time.realtimeSinceStartup;
         var capture = data.kind == "CardsCollected" || data.kind == "CardSlammed";
+        // Gesture delivery is independent of capture rules and legacy CardSlammed.
+        var gesture = data.deliveryStyle == "slam";
         var oldPositions = new Dictionary<string, Vector3>();
         foreach (var entry in activeCards) if (entry.Value != null) oldPositions[entry.Key] = entry.Value.transform.position;
         var displayedBoard = capture && data.cards != null ? data.cards : data.board;
@@ -372,8 +397,8 @@ public class UnityBridge : MonoBehaviour {
                     card.GetComponent<CardInstance>()?.SetPresentationPosition(oldPositions.TryGetValue(id, out previous) ? previous
                         : Anchor("seat" + data.actor, target + Vector3.up * 2));
                     var juice = card.GetComponent<CardJuiceController>();
-                    if (juice != null) yield return juice.Fly(target, data.reducedMotion ? 0 : .22f, capture, contact,
-                        () => Impact(target, data.team == data.ownTeam));
+                    if (juice != null) yield return juice.Fly(target, data.reducedMotion ? 0 : gesture ? .2f : .22f, capture || gesture, contact,
+                        () => Impact(target, capture ? data.team == data.ownTeam : data.actor == 0 || data.actor == 2), gesture);
                     else { card.transform.position = target; contact(); }
                 }
             }
@@ -412,6 +437,7 @@ public class UnityBridge : MonoBehaviour {
         }
         if (generation != visualGeneration) yield break;
         HandleSyncState(data.board, data.handCards, true);
+        ApplyHandSelections(data.handSelections);
         visualAction = null;
         SendVisualSignal("VISUAL_ACTION_COMPLETE", data);
     }
@@ -464,6 +490,8 @@ public class UnityBridge : MonoBehaviour {
         }
     }
     private void SendVisualSignal(string name, MessageData data) {
+        if (data.trace)
+            Debug.Log($"Visual QA native {name} generation={data.generation} frame={Time.frameCount}");
         SendToFlutter(JsonUtility.ToJson(new VisualSignal { @event = name,
             eventId = data.eventId, generation = data.generation }));
     }
@@ -487,11 +515,12 @@ public class UnityBridge : MonoBehaviour {
     [Serializable]
     public class MessageData {
         public int protocol, generation, durationMs, contactLeadMs, pauseMs, shakeMs, actor;
-        public string eventId, kind, team, ownTeam;
-        public bool instant, reducedMotion, peek;
+        public string eventId, kind, team, ownTeam, deliveryStyle;
+        public bool instant, reducedMotion, peek, queued, slam, trace;
         public float dragFraction, velocity;
         public List<CardJson> cards;
         public List<VisualAnchor> anchors;
+        public List<HandSelection> handSelections;
         public string type;
         public string cardId;
         public float x;
@@ -503,6 +532,7 @@ public class UnityBridge : MonoBehaviour {
         public string mode;
     }
     [Serializable] public class VisualAnchor { public string name; public float x, y, width, height; }
+    [Serializable] public class HandSelection { public string cardId; public bool queued, slam; }
     [Serializable] private class StringSignal { public string @event, data; }
     [Serializable] private class VisualSignal { public string @event, eventId; public int generation; }
 

@@ -30,6 +30,25 @@ class DefaultAudioAssets {
   }
 
   static String? _generateSfx(String assetPath) {
+    // Bounded, cached local fallbacks, distinct from capture/scoring chimes.
+    if (RegExp(r'^sfx/slam_[0-2]\.mp3$').hasMatch(assetPath) ||
+        assetPath == 'sfx/reveal.mp3') {
+      final variant = assetPath == 'sfx/reveal.mp3' ? 0 : int.parse(assetPath[9]);
+      final random = Random(8701 + variant);
+      final strong = assetPath != 'sfx/reveal.mp3';
+      return _synthesize(durationSeconds: strong ? .14 : .10, generator: (t) {
+        final snap = (random.nextDouble() * 2 - 1) * exp(-t * (strong ? 85 : 100));
+        final body = sin(2 * pi * (190 + variant * 17) * t) * exp(-t * 43);
+        final flutter = sin(2 * pi * 47 * t) *
+          (random.nextDouble() * 2 - 1) * exp(-t * 35);
+        return (snap * .64 + body * .24 + flutter * .12) * (strong ? .9 : .6);
+      });
+    }
+    if (assetPath == 'sfx/pick.mp3' || assetPath == 'sfx/return.mp3') {
+      final random = Random(394);
+      return _synthesize(durationSeconds: .045, generator: (t) =>
+        (random.nextDouble() * 2 - 1) * exp(-t * 110) * .14);
+    }
     switch (assetPath) {
       case 'sfx/play.mp3':
         // Crisp card snap on felt table: short noise burst with steep exponential decay
