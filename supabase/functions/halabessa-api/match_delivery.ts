@@ -47,8 +47,12 @@ export function matchMirrorUpdates(id: string, room: CommittedRoom,
   const updates: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(state)) {
     if (!/^[A-Za-z][A-Za-z0-9]*$/.test(key)) throw new Error("invalid_state_field");
+    // Shown faces are disclosed to seated participants, not lobby browsers.
+    // Keep the metadata in SQL and each authenticated single-revision view.
+    if (key === 'cardFeatures') continue;
     updates[`matches/${id}/${key}`] = value;
   }
+  updates[`matches/${id}/cardFeatures`] = null;
   updates[`matches/${id}/handCards`] = null;
   updates[`matches/${id}/deck`] = null;
   updates[`matchHands/${id}`] = room.hands;
@@ -61,7 +65,8 @@ export function matchMirrorUpdates(id: string, room: CommittedRoom,
       return [uid, { ...participantSnapshot(room, uid), recipientUid: uid }];
     }));
   updates[`matchSecrets/${id}`] = null;
-  updates[`rooms/${id}`] = summarize(state);
+  const { cardFeatures: _, ...lobbyState } = state;
+  updates[`rooms/${id}`] = summarize(lobbyState);
   return updates;
 }
 

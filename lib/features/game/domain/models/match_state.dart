@@ -41,6 +41,8 @@ class MatchState {
   final bool roomClosed;
   final DateTime? playAvailableAt;
   final int matchSequence;
+  /// Optional public-show/delivery metadata. Never part of capture eligibility.
+  final Map<String, dynamic> cardFeatures;
 
   bool get usesServerCommands => protocolVersion > 0;
 
@@ -109,6 +111,7 @@ class MatchState {
       this.roomClosed = false,
       this.playAvailableAt,
       this.matchSequence = 0,
+      this.cardFeatures = const {},
       this.harvestStacks = const {'teamA': [], 'teamB': []},
       this.teamAScore = 0,
       this.teamBScore = 0,
@@ -177,6 +180,7 @@ class MatchState {
     bool? serverProgressManaged,
     bool? settlementPending,
     int? matchSequence,
+    Map<String, dynamic>? cardFeatures,
     Map<String, List<Capture>>? harvestStacks,
     int? teamAScore,
     int? teamBScore,
@@ -237,6 +241,7 @@ class MatchState {
       roomClosed: roomClosed ?? this.roomClosed,
       playAvailableAt: playAvailableAt ?? this.playAvailableAt,
       matchSequence: matchSequence ?? this.matchSequence,
+      cardFeatures: cardFeatures ?? this.cardFeatures,
       harvestStacks: harvestStacks ?? this.harvestStacks,
       teamAScore: teamAScore ?? this.teamAScore,
       teamBScore: teamBScore ?? this.teamBScore,
@@ -305,6 +310,7 @@ class MatchState {
       'roomClosed': roomClosed,
       'playAvailableAt': playAvailableAt?.toIso8601String(),
       'matchSequence': matchSequence,
+      if (cardFeatures.isNotEmpty) 'cardFeatures': cardFeatures,
       // handCards is deliberately NOT written here -- MultiplayerSyncService
       // writes it separately to the matchHands/$matchId tree, which
       // database.rules.json restricts to this match's own participants.
@@ -537,6 +543,7 @@ class MatchState {
         captureEvents: CaptureEvent.parse(json['captureEvents']),
         settlementPending: json['settlementPending'] == true,
         matchSequence: json['matchSequence'] is num ? (json['matchSequence'] as num).toInt() : 0,
+        cardFeatures: json['cardFeatures'] is Map ? Map<String, dynamic>.from(json['cardFeatures']) : const {},
         harvestStacks: parseCaptureMap(json['harvestStacks'] ?? {}),
         teamAScore: json['teamAScore'] is int ? json['teamAScore'] as int : 0,
         teamBScore: json['teamBScore'] is int ? json['teamBScore'] as int : 0,

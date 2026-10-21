@@ -15,6 +15,7 @@ import 'package:halabessa/features/game/domain/models/match_state.dart';
 import 'package:halabessa/features/game/presentation/widgets/round_summary_panel.dart';
 import 'package:halabessa/features/game/presentation/widgets/match_result_view.dart';
 import 'package:halabessa/features/game/presentation/widgets/match_phase_panel.dart';
+import 'package:halabessa/features/game/presentation/widgets/match_choice_panel.dart';
 import 'package:halabessa/features/game/presentation/widgets/option_b_table.dart';
 import 'package:halabessa/features/game/presentation/widgets/dealer_seat.dart';
 import 'package:halabessa/features/game/presentation/widgets/lantern_card_art.dart';
@@ -29,7 +30,15 @@ class _Loader extends AssetLoader {
 
 void main() {
   for (final size in [const Size(1004, 430), const Size(430, 932)]) {
-    for (final scenario in ['round', 'final', 'cut', 'shuffle']) {
+    for (final scenario in [
+      'round',
+      'final',
+      'cut',
+      'shuffle',
+      'vote',
+      'center-shuffle',
+      'split-cut',
+    ]) {
       testWidgets('approved $scenario $size', (tester) async {
         SharedPreferences.setMockInitialValues({});
         await EasyLocalization.ensureInitialized();
@@ -60,6 +69,21 @@ void main() {
         addTearDown(tester.view.resetPhysicalSize);
         addTearDown(tester.view.resetDevicePixelRatio);
         final key = GlobalKey();
+        final deckState = ValueNotifier(
+          MatchState(
+            id: 'OFFLINE_DECK_REFERENCE',
+            mode: GameMode.classic,
+            playerIds: const ['a', 'b', 'c', 'd'],
+            dealerIndex: 0,
+            currentTurnIndex: 0,
+            phase: scenario == 'split-cut'
+                ? GamePhase.preRoundCut
+                : GamePhase.shuffleVoting,
+            roundCount: 2,
+            roundsSinceLastShuffle: 1,
+          ),
+        );
+        addTearDown(deckState.dispose);
         await tester.pumpWidget(
           EasyLocalization(
             supportedLocales: const [Locale('ar', 'EG')],
@@ -75,7 +99,14 @@ void main() {
                 localizationsDelegates: context.localizationDelegates,
                 home: RepaintBoundary(
                   key: key,
-                  child: _Preview(scenario: scenario, size: size),
+                  child: ValueListenableBuilder<MatchState>(
+                    valueListenable: deckState,
+                    builder: (_, state, __) => _Preview(
+                      scenario: scenario,
+                      size: size,
+                      deckState: state,
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -88,6 +119,38 @@ void main() {
           );
         }
         expect(tester.takeException(), isNull);
+        if (scenario == 'center-shuffle' || scenario == 'split-cut') {
+          deckState.value = deckState.value.copyWith(
+            phase: scenario == 'center-shuffle'
+                ? GamePhase.preRoundCut
+                : GamePhase.dealingFasha,
+            roundsSinceLastShuffle: 0,
+            serverVersion: 2,
+            phaseStartedAt: DateTime.now(),
+          );
+          await tester.pump();
+          await tester.pump(
+            Duration(milliseconds: scenario == 'center-shuffle' ? 430 : 210),
+          );
+        }
+        if (scenario == 'vote') {
+          final panel = tester.getRect(find.byType(MatchChoicePanel));
+          for (final id in [0, 1, 2, 3]) {
+            expect(
+              panel.overlaps(
+                tester.getRect(find.byKey(ValueKey('reference-avatar-$id'))),
+              ),
+              false,
+              reason: 'Vote must not cover avatar $id',
+            );
+          }
+          for (final type in [FilledButton, OutlinedButton]) {
+            expect(
+              tester.getSize(find.byType(type)).height,
+              greaterThanOrEqualTo(48),
+            );
+          }
+        }
         if (scenario == 'shuffle') {
           expect(find.text('خلط الورق'), findsOneWidget);
           // Legal cut stays enabled during a cosmetic shuffle.
@@ -128,7 +191,12 @@ void main() {
 class _Preview extends StatelessWidget {
   final String scenario;
   final Size size;
-  const _Preview({required this.scenario, required this.size});
+  final MatchState deckState;
+  const _Preview({
+    required this.scenario,
+    required this.size,
+    required this.deckState,
+  });
   Widget _players(List<int> ids, Color color) => Row(
     mainAxisAlignment: MainAxisAlignment.center,
     children: [
@@ -139,6 +207,7 @@ class _Preview extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
+                key: ValueKey('reference-avatar-$id'),
                 width: 48,
                 height: 48,
                 padding: const EdgeInsets.all(2),
@@ -211,7 +280,10 @@ class _Preview extends StatelessWidget {
         ],
       },
     );
-    final deckPhase = scenario == 'cut' || scenario == 'shuffle';
+    final spices = ['vote', 'center-shuffle', 'split-cut'].contains(scenario);
+    final deckPhase = scenario == 'cut' || scenario == 'shuffle' || spices;
+    Widget back(double w, double h) =>
+        LanternCardArt(card: card, faceUp: false, width: w, height: h);
     return Scaffold(
       backgroundColor: TableStyle.felt,
       body: Stack(
@@ -240,6 +312,29 @@ class _Preview extends StatelessWidget {
               hand: const SizedBox(),
               showPhase: true,
               deckSidePhase: true,
+              deckVotePhase: scenario == 'vote',
+              deckActionState: spices ? deckState : null,
+              activeDeckPhase: scenario == 'center-shuffle'
+                  ? MatchPhasePanel(
+                      title: 'القطعة',
+                      message: 'دورك تقطع الكوتشينة!',
+                      compact: true,
+                      failureMessage: 'حاول تاني',
+                      actionLabel: 'اقطع الورق',
+                      onAction: () async {},
+                    )
+                  : null,
+              deckBackBuilder: back,
+              shuffleLabel: 'خلط الورق',
+              deckBuilder: spices
+                  ? (hidden) => DealDeck(
+                      remaining: 52,
+                      label: 'ورق التوزيع',
+                      thematic: true,
+                      hideArtwork: hidden,
+                      backBuilder: back,
+                    )
+                  : null,
               deck: DealDeck(
                 remaining: 52,
                 label: 'ورق التوزيع',
@@ -252,18 +347,33 @@ class _Preview extends StatelessWidget {
                   height: h,
                 ),
               ),
-              phase: MatchPhasePanel(
-                title: 'القطعة',
-                message: 'دورك تقطع الكوتشينة!',
-                failureMessage: 'حاول تاني',
-                actionLabel: 'اقطع الورق',
-                onAction: () async {},
-                deckSide: true,
-                shuffleIntro: scenario == 'shuffle',
-                shuffleTitle: 'خلط الورق',
-                shuffleMessage: 'جاري خلط الكوتشينة…',
-                shuffleNext: 'القطع ثم التوزيع تلقائيًا',
-              ),
+              phase: scenario == 'vote'
+                  ? MatchChoicePanel(
+                      deckSide: true,
+                      title: 'الكوتشينة خلصت!',
+                      detail: 'تصويت اللاعبين: ٠ من ٤',
+                      firstLabel: 'نخلط',
+                      secondLabel: 'خليها زي ما هي',
+                      failureMessage: 'حاول تاني',
+                      canVote: true,
+                countdownLabel: (s) => 'باقي $s ثانية · اللي ما يصوّتش صوته لأ',
+                      onFirst: () async {},
+                      onSecond: () async {},
+                    )
+                  : scenario == 'split-cut'
+                  ? const SizedBox()
+                  : MatchPhasePanel(
+                      title: 'القطعة',
+                      message: 'دورك تقطع الكوتشينة!',
+                      failureMessage: 'حاول تاني',
+                      actionLabel: 'اقطع الورق',
+                      onAction: () async {},
+                      deckSide: true,
+                      shuffleIntro: scenario == 'shuffle',
+                      shuffleTitle: 'خلط الورق',
+                      shuffleMessage: 'جاري خلط الكوتشينة…',
+                      shuffleNext: 'القطع ثم التوزيع تلقائيًا',
+                    ),
             ),
         ],
       ),

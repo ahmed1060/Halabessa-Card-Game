@@ -14,6 +14,7 @@ import 'package:halabessa/core/providers/settings_provider.dart';
 import 'package:halabessa/core/theme/theme_config.dart';
 import 'package:halabessa/features/auth/domain/models/app_user.dart';
 import 'package:halabessa/features/game/domain/models/card.dart' as cards;
+import 'package:halabessa/features/game/domain/models/card_feature_state.dart';
 import 'package:halabessa/features/game/domain/models/capture.dart';
 import 'package:halabessa/features/game/domain/models/match_state.dart';
 import 'package:halabessa/features/game/domain/providers/game_providers.dart';
@@ -22,6 +23,7 @@ import 'package:halabessa/features/game/presentation/pages/offline_practice_app.
 import 'package:halabessa/features/game/presentation/widgets/table_seat.dart';
 import 'package:halabessa/features/game/presentation/widgets/option_b_table.dart';
 import 'package:halabessa/features/game/presentation/widgets/match_phase_panel.dart';
+import 'package:halabessa/features/game/presentation/widgets/match_choice_panel.dart';
 import 'offline_practice_isolation_test.dart' show QuietLocalAudio;
 
 class _Translations extends AssetLoader {
@@ -32,9 +34,22 @@ class _Translations extends AssetLoader {
 }
 
 void main() {
-  for (final size in [const Size(1004, 430), const Size(430, 932)]) {
-    for (final cut in [false, true]) {
-      testWidgets('actual tabletop reference $size cut=$cut', (tester) async {
+  for (final size in [
+    const Size(1004, 430),
+    const Size(430, 932),
+    if (const bool.fromEnvironment('CARD_REVEAL_REFERENCE'))
+      const Size(760, 430),
+    if (const bool.fromEnvironment('CARD_REVEAL_REFERENCE'))
+      const Size(430, 740),
+  ]) {
+    for (final scenario in [
+      'play',
+      'cut',
+      if (const bool.fromEnvironment('HALABESSA_DECK_SPICES')) 'vote',
+    ]) {
+      final cut = scenario == 'cut';
+      final vote = scenario == 'vote';
+      testWidgets('actual tabletop reference $size $scenario', (tester) async {
         SharedPreferences.setMockInitialValues({});
         final prefs = await SharedPreferences.getInstance();
         await EasyLocalization.ensureInitialized();
@@ -93,7 +108,7 @@ void main() {
               (card) => [...hand, ...board, king, jack].contains(card),
             );
         // 16 held + 4 on table + 16 collected + 16 in deck = 52, all unique.
-        final state = MatchState(
+        var state = MatchState(
           id: 'OFFLINE_REFERENCE',
           mode: GameMode.classic,
           playerIds: ['LOCAL_reference', 'bot_1', 'bot_2', 'bot_3'],
@@ -142,6 +157,33 @@ void main() {
                   ],
                 },
         );
+        if (vote) {
+          state = state.copyWith(
+            phase: GamePhase.shuffleVoting,
+            phaseStartedAt: DateTime.now(),
+            handCards: {},
+            handCounts: {},
+            board: [],
+            deckCount: 0,
+            harvestStacks: {
+              'teamA': [
+                Capture(
+                  leadingCard: king,
+                  capturedCards: [...hand, ...board, jack, ...spare],
+                ),
+              ],
+              'teamB': [],
+            },
+          );
+        }
+        const revealReference = bool.fromEnvironment('CARD_REVEAL_REFERENCE');
+        if (revealReference && scenario == 'play') {
+          for (final uid in state.playerIds) {
+            for (final card in state.handCards[uid]!.take(3)) {
+              state = CardFeatureState(state).showLocal(uid, card);
+            }
+          }
+        }
         final n = c.read(matchStateProvider.notifier);
         // ignore: invalid_use_of_protected_member, invalid_use_of_visible_for_testing_member
         n.state = state;
@@ -191,7 +233,7 @@ void main() {
           tester.getCenter(find.byKey(const ValueKey('option-b-hand'))).dx,
           closeTo(size.width / 2, .001),
         );
-        if (!cut) {
+        if (scenario == 'play') {
           final partner = find.byWidgetPredicate(
             (w) => w is TableSeat && w.handOnRight,
           );
@@ -217,7 +259,14 @@ void main() {
             );
           }
         } else {
-          final phase = tester.getRect(find.byType(MatchPhasePanel));
+          var phase = tester.getRect(
+            find.byType(vote ? MatchChoicePanel : MatchPhasePanel),
+          );
+          if (vote) {
+            phase = phase.intersect(
+              tester.getRect(find.byKey(const ValueKey('option-b-phase'))),
+            );
+          }
           for (final avatar
               in find
                   .byKey(const ValueKey('avatar-feedback-circle'))
@@ -226,6 +275,33 @@ void main() {
               phase.overlaps(tester.getRect(find.byWidget(avatar.widget))),
               isFalse,
             );
+          }
+          if (vote) {
+            for (final name in ['history', 'menu', 'scores']) {
+              expect(
+                phase.overlaps(
+                  tester.getRect(find.byKey(ValueKey('option-b-$name'))),
+                ),
+                false,
+              );
+            }
+            final viewport = tester.getRect(
+              find.byKey(const ValueKey('option-b-phase')),
+            );
+            for (final type in [FilledButton, OutlinedButton]) {
+              final button = tester.getRect(find.byType(type));
+              expect(
+                viewport.contains(button.topLeft),
+                true,
+                reason:
+                    'vote choice must be visible without discovering a scroll',
+              );
+              expect(
+                viewport.contains(button.bottomRight),
+                true,
+                reason: 'both vote choices must fit the attached prompt',
+              );
+            }
           }
         }
         expect(g.hand.top, g.size.height - (g.landscape ? 134 : 212));
@@ -242,10 +318,41 @@ void main() {
             final folder = Directory('build/design-review')
               ..createSync(recursive: true);
             await File(
-              '${folder.path}/tabletop-${size.width.toInt()}-${cut ? 'cut' : 'play'}.png',
+              '${folder.path}/tabletop-${size.width.toInt()}-$scenario${revealReference ? '-reveals' : ''}.png',
             ).writeAsBytes(bytes!.buffer.asUint8List());
             image.dispose();
           });
+        }
+        if (revealReference && scenario == 'play') {
+          final shown = CardFeatureState(state).visible;
+          expect(shown, hasLength(12));
+          final protected = [
+            for (final name in ['board', 'hand', 'history', 'menu', 'scores'])
+              tester.getRect(find.byKey(ValueKey('option-b-$name'))),
+            for (final avatar
+                in find
+                    .byKey(const ValueKey('avatar-feedback-circle'))
+                    .evaluate())
+              tester.getRect(find.byWidget(avatar.widget)),
+            for (final fan
+                in find.byKey(const ValueKey('seat-horizontal-fan')).evaluate())
+              tester.getRect(find.byWidget(fan.widget)),
+          ];
+          for (final card in shown) {
+            final rect = tester.getRect(
+              find.byKey(ValueKey('shown-${card.eventId}')),
+            );
+            for (final area in protected) {
+              expect(
+                rect.overlaps(area),
+                false,
+                reason:
+                    'Shown card ${card.ownerUid}/${card.card.firebaseKey} must not obscure live cards, HUD or an avatar',
+              );
+            }
+            expect((Offset.zero & size).contains(rect.topLeft), true);
+            expect((Offset.zero & size).contains(rect.bottomRight), true);
+          }
         }
         await tester.pumpWidget(const SizedBox());
         c.dispose();

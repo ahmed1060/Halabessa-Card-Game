@@ -19,6 +19,12 @@ class _UnityGameViewState extends ConsumerState<UnityGameView>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    final lifecycle = WidgetsBinding.instance.lifecycleState;
+    ref
+        .read(unityCommunicationServiceProvider)
+        .setVisualForeground(
+          lifecycle == null || lifecycle == AppLifecycleState.resumed,
+        );
   }
 
   @override
@@ -29,7 +35,9 @@ class _UnityGameViewState extends ConsumerState<UnityGameView>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    ref.read(unityCommunicationServiceProvider).resyncVisuals();
+    ref
+        .read(unityCommunicationServiceProvider)
+        .setVisualForeground(state == AppLifecycleState.resumed);
   }
 
   @override

@@ -88,6 +88,7 @@ class DealDeck extends StatelessWidget {
   final bool thematic;
   final String? shuffleIdentity;
   final DateTime? shuffleStartedAt;
+  final bool hideArtwork;
   const DealDeck({
     super.key,
     required this.remaining,
@@ -99,6 +100,7 @@ class DealDeck extends StatelessWidget {
     this.thematic = false,
     this.shuffleIdentity,
     this.shuffleStartedAt,
+    this.hideArtwork = false,
   });
 
   @override
@@ -111,12 +113,15 @@ class DealDeck extends StatelessWidget {
         children: [
           _shuffle(
             context,
-            FaceDownStack(
-              key: deckKey,
-              count: remaining,
-              backBuilder: backBuilder,
-              width: small ? 30 : 46,
-              height: small ? 42 : 66,
+            Opacity(
+              opacity: hideArtwork ? 0 : 1,
+              child: FaceDownStack(
+                key: deckKey,
+                count: remaining,
+                backBuilder: backBuilder,
+                width: small ? 30 : 46,
+                height: small ? 42 : 66,
+              ),
             ),
           ),
           Container(

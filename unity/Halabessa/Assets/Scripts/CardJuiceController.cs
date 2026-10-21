@@ -30,6 +30,13 @@ public class CardJuiceController : MonoBehaviour, IPointerEnterHandler,
     private Plane dragPlane;
     private Vector3 pointerOffset;
     private float externalDrag;
+    private bool queuedSelection, slamSelection;
+    private LineRenderer selectionRim, slamRim;
+    private Material rimMaterial;
+    public void SetHandSelection(bool queued, bool slam) {
+        if (!Managed || !localHand) return;
+        queuedSelection = queued; slamSelection = slam;
+    }
     public void SetHandPose(bool raised, float dragFraction, float speed) {
         if (!Managed || !localHand || animating) return;
         peek = raised; externalDrag = Mathf.Clamp(dragFraction, -.5f, .25f);
@@ -42,7 +49,8 @@ public class CardJuiceController : MonoBehaviour, IPointerEnterHandler,
         // snapshots, but must not move a root owned by this managed renderer.
         var legacy = GetComponent<Studio.OverOne.DragMe.Components.DragMe>();
         if (legacy != null) legacy.enabled = !Managed;
-        if (!hand) { pointer = null; dragging = false; peek = false; }
+        if (!hand) { pointer = null; dragging = false; peek = false;
+            queuedSelection = slamSelection = false; SetRims(false, false); }
     }
     private bool CanInteract => Managed && localHand && !animating &&
         UnityBridge.Instance != null && UnityBridge.Instance.CanSubmitVisualIntent;
@@ -74,10 +82,12 @@ public class CardJuiceController : MonoBehaviour, IPointerEnterHandler,
     }
     void LateUpdate() {
         if (!Managed || visual == null || animating) return;
-        var targetScale = Vector3.one * (peek ? 1.2f : 1f);
+        var raised = peek || queuedSelection || slamSelection;
+        SetRims(queuedSelection || slamSelection, slamSelection);
+        var targetScale = Vector3.one * (raised ? 1.2f : 1f);
         visual.localScale = ReducedMotion ? targetScale : Vector3.SmoothDamp(
             visual.localScale, targetScale, ref scaleVelocity, .07f, Mathf.Infinity, Time.unscaledDeltaTime);
-        var target = new Vector3(0, (peek ? .06f : 0) - externalDrag, peek ? -.06f : 0);
+        var target = new Vector3(0, (raised ? .06f : 0) - externalDrag, raised ? -.06f : 0);
         visual.localPosition = ReducedMotion ? target : Vector3.SmoothDamp(
             visual.localPosition, target, ref velocity, .06f, Mathf.Infinity, Time.unscaledDeltaTime);
         var tilt = ReducedMotion ? Vector3.zero : new Vector3(
@@ -87,7 +97,41 @@ public class CardJuiceController : MonoBehaviour, IPointerEnterHandler,
             Quaternion.Euler(tilt), 1 - Mathf.Exp(-22 * Time.unscaledDeltaTime));
         if (!dragging) dragVelocity = Vector2.Lerp(dragVelocity, Vector2.zero,
             1 - Mathf.Exp(-18 * Time.unscaledDeltaTime));
-        face.sortingOrder = peek ? 100 : BaseSortingOrder;
+        face.sortingOrder = raised ? 100 : BaseSortingOrder;
+        if (selectionRim != null) selectionRim.sortingOrder = face.sortingOrder + 1;
+        if (slamRim != null) slamRim.sortingOrder = face.sortingOrder + 2;
+    }
+    private void SetRims(bool selected, bool slam) {
+        if (selected && selectionRim == null && visual != null) {
+            var shader = Shader.Find("Sprites/Default");
+            if (shader == null) return;
+            rimMaterial = new Material(shader);
+            selectionRim = CreateRim("PrivateSelectionRim", .365f, .515f);
+            slamRim = CreateRim("PrivateSlamRim", .342f, .492f);
+        }
+        if (selectionRim != null) selectionRim.enabled = selected;
+        if (slamRim != null) slamRim.enabled = selected && slam;
+    }
+    private LineRenderer CreateRim(string name, float halfWidth, float halfHeight) {
+        var go = new GameObject(name); go.transform.SetParent(visual, false);
+        var line = go.AddComponent<LineRenderer>();
+        line.useWorldSpace = false; line.loop = true; line.positionCount = 32;
+        line.sharedMaterial = rimMaterial; line.widthMultiplier = .012f;
+        line.startColor = line.endColor = new Color(1f, .79f, .33f);
+        line.numCapVertices = line.numCornerVertices = 4;
+        // Rounded rectangle follows the imported .7 x 1 card, not its collider.
+        const float radius = .035f;
+        for (var corner = 0; corner < 4; corner++) {
+            var center = new Vector2((corner == 0 || corner == 3 ? 1 : -1) * (halfWidth - radius),
+                (corner < 2 ? 1 : -1) * (halfHeight - radius));
+            for (var point = 0; point < 8; point++) {
+                var angle = (corner * 90 + point * 90f / 7) * Mathf.Deg2Rad;
+                line.SetPosition(corner * 8 + point, new Vector3(center.x + Mathf.Cos(angle) * radius,
+                    center.y + Mathf.Sin(angle) * radius, -.004f));
+            }
+        }
+        line.enabled = false;
+        return line;
     }
     public void OnPointerEnter(PointerEventData e) { if (CanInteract) { peek = true; OnHover.Invoke(); } }
     public void OnPointerExit(PointerEventData e) { if (!dragging) peek = false; }
@@ -134,7 +178,7 @@ public class CardJuiceController : MonoBehaviour, IPointerEnterHandler,
         ReturnHome();
     }
 
-    public IEnumerator Fly(Vector3 target, float duration, bool slam, Action beforeContact, Action impact = null) {
+    public IEnumerator Fly(Vector3 target, float duration, bool slam, Action beforeContact, Action impact = null, bool gesture = false) {
         CancelPose();
         animating = true;
         transform.DOKill();
@@ -142,14 +186,25 @@ public class CardJuiceController : MonoBehaviour, IPointerEnterHandler,
         if (ReducedMotion || duration <= 0) {
             Position(target); beforeContact?.Invoke(); animating = false; yield break;
         }
+        if (gesture) {
+            var windup = 0f;
+            while (windup < .1f) {
+                var t = Mathf.Clamp01(windup / .1f);
+                if (visual != null) { visual.localScale = Vector3.one * (1 + .2f * t);
+                    visual.localPosition = new Vector3(0, .1f * t, -.06f * t); }
+                windup += Time.unscaledDeltaTime; yield return null;
+            }
+        }
         var elapsed = 0f; var contacted = false;
         while (elapsed < duration) {
             var t = Mathf.Clamp01(elapsed / duration);
-            var eased = 1 - Mathf.Pow(1 - t, 3);
+            var eased = gesture ? t * t * t : 1 - Mathf.Pow(1 - t, 3);
             Position(Vector3.LerpUnclamped(start, target, eased)
                 + Vector3.up * Mathf.Sin(t * Mathf.PI) * .22f);
             if (visual != null) visual.localRotation = Quaternion.Euler(0,
                 Mathf.Sin(t * Mathf.PI) * 7, Mathf.Sin(t * Mathf.PI) * -5);
+            if (gesture && visual != null) { visual.localScale = Vector3.one * (1 + .2f * (1 - eased));
+                visual.localPosition = new Vector3(0, .1f * (1 - eased), -.06f * (1 - eased)); }
             if (!contacted && elapsed >= duration - .03f) {
                 contacted = true; beforeContact?.Invoke();
             }
@@ -160,6 +215,7 @@ public class CardJuiceController : MonoBehaviour, IPointerEnterHandler,
         if (slam) { OnSlam.Invoke(); yield return new WaitForSecondsRealtime(.05f); impact?.Invoke(); }
         if (visual != null && (slam || duration <= .22f)) {
             visual.localRotation = Quaternion.identity;
+            visual.localScale = Vector3.one; visual.localPosition = Vector3.zero;
             punch = visual.DOPunchScale(new Vector3(slam ? .055f : .025f, -.025f, .025f), .12f, 1, .4f).SetUpdate(true);
             yield return punch.WaitForCompletion();
         }
@@ -187,6 +243,7 @@ public class CardJuiceController : MonoBehaviour, IPointerEnterHandler,
         if (returning != null) StopCoroutine(returning);
         returning = null; punch?.Kill(); punch = null;
         animating = false; dragging = false; peek = false; pointer = null;
+        queuedSelection = slamSelection = false; SetRims(false, false);
         velocity = scaleVelocity = Vector3.zero; dragVelocity = Vector2.zero;
         externalDrag = 0;
         if (visual != null) { visual.DOKill(); visual.localPosition = Vector3.zero;
@@ -194,5 +251,5 @@ public class CardJuiceController : MonoBehaviour, IPointerEnterHandler,
         if (face != null) face.sortingOrder = BaseSortingOrder;
     }
     void OnDisable() { CancelPose(); transform.DOKill(); }
-    void OnDestroy() { CancelPose(); }
+    void OnDestroy() { CancelPose(); if (rimMaterial != null) Destroy(rimMaterial); }
 }

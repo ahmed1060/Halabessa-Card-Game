@@ -82,6 +82,7 @@ class BoardCardsWidget extends StatelessWidget {
   final Widget Function(double, double)? backBuilder;
   final Widget Function(game_card.Card, double, double)? cardBuilder;
   final void Function(String id, bool slam)? onContact;
+  final Set<String> gestureSlams;
 
   const BoardCardsWidget({
     super.key,
@@ -99,6 +100,7 @@ class BoardCardsWidget extends StatelessWidget {
     this.captureOffset,
     this.backBuilder,
     this.onContact,
+    this.gestureSlams = const {},
   });
 
   @override
@@ -145,6 +147,8 @@ class BoardCardsWidget extends StatelessWidget {
         : const Duration(milliseconds: 240);
 
     return CardTableImpact(
+      contactDelay: gestureSlams.isEmpty ? const Duration(milliseconds: 190)
+        : const Duration(milliseconds: 430),
       identity: isCapturing
           ? '$capturingTeam:${cards.map((c) => c.firebaseKey).join(',')}'
           : null,
@@ -290,8 +294,9 @@ class BoardCardsWidget extends StatelessWidget {
     key: ValueKey('board-${card.firebaseKey}'),
     origin: arrivalOffsets[card.firebaseKey] ?? const Offset(0, -95),
     alreadyArrived: alreadyPresented.contains(card.firebaseKey),
+    gestureSlam: gestureSlams.contains(card.firebaseKey),
     travelDuration: Duration(milliseconds: isCapturing ? 220 : 320),
-    onContact: isCapturing
+    onContact: isCapturing && !gestureSlams.contains(card.firebaseKey)
         ? null
         : () => onContact?.call('play:${card.firebaseKey}', false),
     child: child,

@@ -100,11 +100,13 @@ class CardTableImpact extends StatefulWidget {
   final String? identity;
   final Widget child;
   final VoidCallback? onContact;
+  final Duration contactDelay;
   const CardTableImpact({
     super.key,
     required this.child,
     this.identity,
     this.onContact,
+    this.contactDelay = const Duration(milliseconds: 190),
   });
   @override
   State<CardTableImpact> createState() => _CardTableImpactState();
@@ -153,7 +155,7 @@ class _CardTableImpactState extends State<CardTableImpact>
     _contacted = false;
     if (_started == null || !cardJuiceEnabled) return;
     _contact = Timer(
-      Duration(milliseconds: _reduced ? 0 : 190),
+      _reduced ? Duration.zero : widget.contactDelay,
       _notifyContact,
     );
   }

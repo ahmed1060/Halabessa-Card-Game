@@ -380,6 +380,18 @@ void main() {
       );
       expect(find.byKey(const ValueKey('history-our-count')), findsOneWidget);
       expect(find.byKey(const ValueKey('history-rival-count')), findsOneWidget);
+      for (final badgeKey in ['history-our-count', 'history-rival-count']) {
+        final badge = find.byKey(ValueKey(badgeKey));
+        final decoration =
+            tester.widget<Container>(badge).decoration as BoxDecoration;
+        expect(decoration.shape, BoxShape.circle);
+        final badgeSize = tester.getSize(badge);
+        expect(
+          badgeSize.width,
+          badgeSize.height,
+          reason: 'capture count badges must be circles, not ovals',
+        );
+      }
       Rect? fixedDeck;
       for (var dealer = 0; dealer < 4; dealer++) {
         // ignore: invalid_use_of_protected_member, invalid_use_of_visible_for_testing_member

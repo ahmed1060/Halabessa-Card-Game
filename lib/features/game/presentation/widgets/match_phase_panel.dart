@@ -12,6 +12,7 @@ class MatchPhasePanel extends StatefulWidget {
   final String failureMessage;
   final bool deckSide;
   final bool shuffleIntro;
+  final bool compact;
   final DateTime? startedAt;
   final String? shuffleTitle, shuffleMessage, shuffleNext;
   const MatchPhasePanel({
@@ -23,6 +24,7 @@ class MatchPhasePanel extends StatefulWidget {
     required this.failureMessage,
     this.deckSide = false,
     this.shuffleIntro = false,
+    this.compact = false,
     this.startedAt,
     this.shuffleTitle,
     this.shuffleMessage,
@@ -85,103 +87,144 @@ class _MatchPhasePanelState extends State<MatchPhasePanel> {
   }
 
   @override
-  Widget build(BuildContext context) => Stack(
-    clipBehavior: Clip.none,
-    children: [
-      if (widget.deckSide)
-        Positioned(
-          left:
-              MediaQuery.sizeOf(context).width >
-                  MediaQuery.sizeOf(context).height
-              ? 64
-              : -8,
-          top:
-              MediaQuery.sizeOf(context).width >
-                  MediaQuery.sizeOf(context).height
-              ? -8
-              : 28,
-          child: Transform.rotate(
-            angle: .785398,
-            child: const SizedBox(
-              width: 18,
-              height: 18,
-              child: ColoredBox(color: TableStyle.ivory),
+  Widget build(BuildContext context) {
+    if (widget.compact) {
+      return Semantics(
+        label: '${widget.title}. ${widget.message}',
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (widget.onAction != null && widget.actionLabel != null)
+              FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: TableStyle.brass,
+                  foregroundColor: TableStyle.ink,
+                  minimumSize: const Size(120, 48),
+                ),
+                onPressed: _pending ? null : _act,
+                child: _pending
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Text(widget.actionLabel!),
+              )
+            else
+              Text(
+                widget.message,
+                textAlign: TextAlign.center,
+                style: TableStyle.detail,
+              ),
+            if (_failed)
+              Text(
+                widget.failureMessage,
+                textAlign: TextAlign.center,
+                style: TableStyle.detail,
+              ),
+          ],
+        ),
+      );
+    }
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        if (widget.deckSide)
+          Positioned(
+            left:
+                MediaQuery.sizeOf(context).width >
+                    MediaQuery.sizeOf(context).height
+                ? 64
+                : -8,
+            top:
+                MediaQuery.sizeOf(context).width >
+                    MediaQuery.sizeOf(context).height
+                ? -8
+                : 28,
+            child: Transform.rotate(
+              angle: .785398,
+              child: const SizedBox(
+                width: 18,
+                height: 18,
+                child: ColoredBox(color: TableStyle.ivory),
+              ),
             ),
           ),
-        ),
-      SizedBox(
-        width: double.infinity,
-        child: LanternPanel(
-          selected: widget.deckSide,
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Semantics(
-                liveRegion: true,
-                child: Text(
-                  _shuffling
-                      ? widget.shuffleTitle ?? widget.title
-                      : widget.title,
-                  textAlign: TextAlign.center,
-                  style: TableStyle.label.copyWith(
-                    color: TableStyle.ink,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                _failed
-                    ? widget.failureMessage
-                    : _shuffling
-                    ? widget.shuffleMessage ?? widget.message
-                    : widget.message,
-                textAlign: TextAlign.center,
-                style: TableStyle.label.copyWith(color: TableStyle.ink),
-              ),
-              if (_shuffling) ...[
-                const SizedBox(height: 8),
-                const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: TableStyle.brass,
-                  ),
-                ),
-                if (widget.shuffleNext != null && widget.onAction == null) ...[
-                  const SizedBox(height: 6),
-                  Text(
-                    widget.shuffleNext!,
+        SizedBox(
+          width: double.infinity,
+          child: LanternPanel(
+            selected: widget.deckSide,
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Semantics(
+                  liveRegion: true,
+                  child: Text(
+                    _shuffling
+                        ? widget.shuffleTitle ?? widget.title
+                        : widget.title,
                     textAlign: TextAlign.center,
-                    style: TableStyle.detail.copyWith(color: TableStyle.ink),
+                    style: TableStyle.label.copyWith(
+                      color: TableStyle.ink,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  _failed
+                      ? widget.failureMessage
+                      : _shuffling
+                      ? widget.shuffleMessage ?? widget.message
+                      : widget.message,
+                  textAlign: TextAlign.center,
+                  style: TableStyle.label.copyWith(color: TableStyle.ink),
+                ),
+                if (_shuffling) ...[
+                  const SizedBox(height: 8),
+                  const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: TableStyle.brass,
+                    ),
+                  ),
+                  if (widget.shuffleNext != null &&
+                      widget.onAction == null) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      widget.shuffleNext!,
+                      textAlign: TextAlign.center,
+                      style: TableStyle.detail.copyWith(color: TableStyle.ink),
+                    ),
+                  ],
+                ],
+                // The cosmetic shuffle never disables a legal cut or extends its deadline.
+                if (widget.onAction != null && widget.actionLabel != null) ...[
+                  const SizedBox(height: 8),
+                  FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: TableStyle.brass,
+                      foregroundColor: TableStyle.ink,
+                      minimumSize: const Size(120, 48),
+                    ),
+                    onPressed: _pending ? null : _act,
+                    child: _pending
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Text(widget.actionLabel!),
                   ),
                 ],
               ],
-              // The cosmetic shuffle never disables a legal cut or extends its deadline.
-              if (widget.onAction != null && widget.actionLabel != null) ...[
-                const SizedBox(height: 8),
-                FilledButton(
-                  style: FilledButton.styleFrom(
-                    backgroundColor: TableStyle.brass,
-                    foregroundColor: TableStyle.ink,
-                    minimumSize: const Size(120, 48),
-                  ),
-                  onPressed: _pending ? null : _act,
-                  child: _pending
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : Text(widget.actionLabel!),
-                ),
-              ],
-            ],
+            ),
           ),
         ),
-      ),
-    ],
-  );
+      ],
+    );
+  }
 }
