@@ -35,7 +35,6 @@ import '../widgets/match_phase_panel.dart';
 import '../widgets/match_choice_panel.dart';
 import '../widgets/match_result_view.dart';
 import '../widgets/round_summary_panel.dart';
-import 'package:halabessa/core/widgets/user_avatar.dart';
 import '../widgets/match_waiting_room_panel.dart';
 import '../widgets/match_recovery_view.dart';
 import '../../../home/presentation/widgets/practice_difficulty_dialog.dart';
@@ -51,6 +50,8 @@ import '../providers/unity_communication_service.dart';
 import '../providers/unity_layer_provider.dart';
 import '../../domain/models/card_feature_state.dart';
 import '../widgets/shown_card_layer.dart';
+import '../widgets/hand_card_placement.dart';
+import '../widgets/special_move_counters.dart';
 
 // Local review only. Never call an undeployed command on a production room.
 const _cardInteractionsPreview = bool.fromEnvironment(
@@ -76,6 +77,25 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
   bool _isEmoteWheelOpen = false;
   bool _offlinePracticeEnded = false;
   bool _anchorSyncScheduled = false;
+  final _releaseScales = <String, double>{};
+  String? _specialIntent;
+
+  void _rememberReleaseScale(
+    game_card.Card card,
+    CardPlayOrigin origin,
+    RenderBox? board,
+  ) {
+    if (!cardUiRefinements || board == null) return;
+    final unit =
+        (board.localToGlobal(const Offset(1, 0)) -
+                board.localToGlobal(Offset.zero))
+            .distance;
+    if (unit > 0)
+      _releaseScales[card.firebaseKey] =
+          (origin.bounds.width / (OptionBGeometry.tableCardSize.width * unit))
+              .clamp(.5, 3)
+              .toDouble();
+  }
 
   void _syncVisualAnchors(MatchState state) {
     if (_anchorSyncScheduled) return;
@@ -114,6 +134,16 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
         g.hand.width,
         spread: OptionBGeometry.localHandSpread,
       );
+      final publicIds =
+          cardUiRefinements &&
+              _cardInteractionsPreview &&
+              state.id.startsWith('OFFLINE_')
+          ? CardFeatureState(state).visible
+                .where((c) => c.ownerUid == ref.read(currentUserProvider)?.uid)
+                .map((c) => c.card.firebaseKey)
+                .toSet()
+          : <String>{};
+      final placement = HandCardPlacement(hand, publicIds, fan);
       final cardWidth = fan.width;
       final cardHeight = fan.height;
       final spacing = fan.spacing;
@@ -128,13 +158,17 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
             'hand$i',
             g.hand.center +
                 Offset(
-                  (i - (hand.length - 1) / 2) * spacing,
-                  6 -
-                      7 *
-                          (2.25 - pow(i - (hand.length - 1) / 2, 2)).clamp(
-                            0,
-                            2.25,
-                          ),
+                  cardUiRefinements
+                      ? placement.offset(hand[i]).dx +
+                            cardWidth / 2 -
+                            placement.extent / 2
+                      : (i - (hand.length - 1) / 2) * spacing,
+                  cardUiRefinements
+                      ? 6 - placement.offset(hand[i]).dy
+                      : 6 -
+                            7 *
+                                (2.25 - pow(i - (hand.length - 1) / 2, 2))
+                                    .clamp(0, 2.25),
                 ),
             cardSize,
           ),
@@ -319,6 +353,8 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
       }
       if (next.roomClosed) return;
       if (previous?.id != next.id || previous?.roundCount != next.roundCount) {
+        _releaseScales.clear();
+        _specialIntent = null;
         // Card IDs repeat on the next deck. Old local tap coordinates must not
         // make a bot's future card appear to arrive from the human's hand.
         ref.read(localPlayOriginsProvider.notifier).state = {};
@@ -630,6 +666,7 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
         !isSpectator &&
         (!show3DHand ||
             (ref.watch(unityCardInteractionsReadyProvider) &&
+                (!cardUiRefinements || ref.watch(unityCardUiReadyProvider)) &&
                 ref
                     .read(unityCommunicationServiceProvider)
                     .supportsVisualActions));
@@ -654,8 +691,12 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
         name: offset == 0 && !isSpectator
             ? 'table_you'.tr()
             : user.uid.startsWith('bot_')
-            ? '${user.displayName.replaceAll('🤖', '').trim()}${offset == 2 ? '' : ' · ${'bot_difficulty_${parseBotDifficulty(state.botDifficulties[user.uid]).name}'.tr()}'}'
+            ? user.displayName.replaceAll('🤖', '').trim()
             : user.displayName,
+        showTooltip: offset != 0 || isSpectator,
+        revealedHandCount: !featurePreview || !cardUiRefinements
+            ? 0
+            : features.visible.where((c) => c.ownerUid == user.uid).length,
         optionB: true,
         compactAvatar: offset != 0,
         handOnRight: offset == 2,
@@ -680,8 +721,12 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
         isBot: user.uid.startsWith('bot_'),
         active: active,
         detail: user.uid.startsWith('bot_')
-            ? 'bot_difficulty_${parseBotDifficulty(state.botDifficulties[user.uid]).name}'
-                  .tr()
+            ? 'table_difficulty_value'.tr(
+                args: [
+                  'bot_difficulty_${parseBotDifficulty(state.botDifficulties[user.uid]).name}'
+                      .tr(),
+                ],
+              )
             : active
             ? 'table_playing'.tr()
             : 'cards_count'.tr(
@@ -729,6 +774,7 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
       cardBuilder: _cardFace,
       submit: (card, geometry) {
         final box = _boardKey.currentContext?.findRenderObject() as RenderBox?;
+        _rememberReleaseScale(card, geometry, box);
         final origin = box == null
             ? Offset.zero
             : box.globalToLocal(geometry.center) - box.size.center(Offset.zero);
@@ -738,6 +784,15 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
       },
       builder: (hiddenCard, presented, play) => OptionBTable(
         sceneKey: _sceneKey,
+        specialMoves: !featurePreview || !cardUiRefinements
+            ? null
+            : SpecialMoveCounters(
+                slams: features.remaining(myUid, slam: true),
+                reveals: features.remaining(myUid),
+                slamLabel: 'table_slam_remaining'.tr(),
+                revealLabel: 'table_reveal_remaining'.tr(),
+                activeMove: _specialIntent,
+              ),
         shownCards: !featurePreview
             ? null
             : (geometry) => ShownCardLayer(
@@ -751,6 +806,12 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
                       state.playerIds[_getAbsoluteIndex(state, myUid, offset)],
                 ),
                 localUid: myUid,
+                ownerInHand: cardUiRefinements,
+                heldCounts: {
+                  for (final uid in state.playerIds)
+                    uid: state.cardsRemainingFor(uid),
+                },
+                dealerUid: state.playerIds[state.dealerIndex],
                 geometry: geometry,
                 faceBuilder: _cardFace,
                 backBuilder: _cardBack,
@@ -878,6 +939,16 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
                           .read(unityCommunicationServiceProvider)
                           .updateHandSelection(card.firebaseKey, queued, slam),
                 cards: state.handCards[myUid] ?? [],
+                publicCardIds: !featurePreview || !cardUiRefinements
+                    ? const {}
+                    : features.visible
+                          .where((c) => c.ownerUid == myUid)
+                          .map((c) => c.card.firebaseKey)
+                          .toSet(),
+                onSpecialIntentChanged: (value) {
+                  if (mounted && value != _specialIntent)
+                    setState(() => _specialIntent = value);
+                },
                 isMyTurn: myTurn,
                 interactionEnabled: playing && playReady && hiddenCard == null,
                 hiddenCard: hiddenCard,
@@ -896,6 +967,8 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
                         final box =
                             _boardKey.currentContext?.findRenderObject()
                                 as RenderBox?;
+                        if (box != null)
+                          _rememberReleaseScale(card, geometry, box);
                         final origin = box == null
                             ? Offset.zero
                             : box.globalToLocal(geometry.center) -
@@ -1360,6 +1433,9 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
       isCapturing: isCapturing,
       capturingTeam: matchState.capturingTeam,
       capturingStage: matchState.capturingStage,
+      arrivalScales: cardUiRefinements
+          ? Map.unmodifiable(_releaseScales)
+          : const {},
       arrivalOffsets: {
         for (final card in matchState.board) card.firebaseKey: seatOrigin(card),
       },

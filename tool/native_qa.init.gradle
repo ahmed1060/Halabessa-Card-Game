@@ -1,0 +1,31 @@
+// Explicit local QA only; never loaded by normal Flutter builds or CI.
+gradle.settingsEvaluated { settings ->
+    def checkout = settings.settingsDir.parentFile.canonicalFile
+    // Init scripts also see Flutter's included Gradle build: leave it alone.
+    if (settings.settingsDir.name != 'android' ||
+            !new File(checkout, 'pubspec.yaml').isFile()) return
+    if (gradle.startParameter.projectProperties['halabessaNativeQa'] != 'true') {
+        throw new GradleException('Native QA requires -PhalabessaNativeQa=true.')
+    }
+    def ignoredBuild = new File(checkout, 'build').canonicalFile
+    def library = new File(ignoredBuild,
+            'unity-native-qa-2026-10-22/android/unityLibrary').canonicalFile
+    if (!library.path.startsWith(ignoredBuild.path + File.separator) ||
+            !new File(library, 'build.gradle').isFile()) {
+        throw new GradleException('Expected the isolated native QA Unity export.')
+    }
+    settings.project(':unityLibrary').projectDir = library
+    println "Native QA Unity library: ${library}"
+}
+
+gradle.beforeProject { project ->
+    if (project.path != ':app' || project.rootDir.name != 'android' ||
+            !new File(project.rootDir.parentFile, 'pubspec.yaml').isFile()) return
+    project.plugins.withId('com.android.application') {
+        // Flutter configures ABI defaults later; constrain the completed DSL.
+        project.androidComponents.finalizeDsl { android ->
+            android.defaultConfig.ndk.abiFilters.clear()
+            android.defaultConfig.ndk.abiFilters.add('arm64-v8a')
+        }
+    }
+}

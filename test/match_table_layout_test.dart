@@ -369,10 +369,7 @@ void main() {
           tester.getRect(find.byKey(const ValueKey('partner'))),
           seatBefore,
         );
-        expect(
-          (decoration().border! as Border).top.color,
-          Colors.transparent,
-        );
+        expect((decoration().border! as Border).top.color, Colors.transparent);
         expect(tester.takeException(), isNull);
       },
     );
@@ -435,9 +432,13 @@ void main() {
         ),
       ),
     );
-    final tooltip = tester.widget<Tooltip>(find.byType(Tooltip));
-    final decoration = tooltip.decoration! as BoxDecoration;
-    expect(decoration.color, TableStyle.ink);
-    expect(tooltip.textStyle!.color, TableStyle.ivory);
+    final tooltips = tester.widgetList<Tooltip>(find.byType(Tooltip));
+    expect(tooltips, hasLength(2), reason: 'portrait and name targets only');
+    for (final tooltip in tooltips) {
+      final decoration = tooltip.decoration! as BoxDecoration;
+      expect(decoration.color, TableStyle.ink);
+      expect(tooltip.textStyle!.color, TableStyle.ivory);
+      expect(tooltip.message, 'Playing now');
+    }
   });
 }

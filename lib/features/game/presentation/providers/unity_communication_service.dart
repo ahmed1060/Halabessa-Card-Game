@@ -15,6 +15,7 @@ import 'unity_startup_state.dart';
 import 'unity_visual_presentation.dart';
 import 'card_feedback.dart';
 import 'visual_action_queue.dart';
+import '../widgets/hand_card_placement.dart';
 
 final unityCommunicationServiceProvider = Provider((ref) {
   final service = UnityCommunicationService(ref)..init();
@@ -23,6 +24,7 @@ final unityCommunicationServiceProvider = Provider((ref) {
 });
 // Optional rebuilt-renderer capability; old exports never enable new gestures.
 final unityCardInteractionsReadyProvider = StateProvider<bool>((ref) => false);
+final unityCardUiReadyProvider = StateProvider<bool>((ref) => false);
 const _cardInteractionsPreview = bool.fromEnvironment(
   'HALABESSA_CARD_INTERACTIONS',
 );
@@ -91,6 +93,10 @@ class UnityCommunicationService {
     if (_handPoses[cardId] == message) return;
     if (_handPoses.length > 8) _handPoses.clear();
     _handPoses[cardId] = message;
+    if (cardUiRefinements && _visual.refinedCapable) {
+      _visual.updateHandPose(cardId, peek, dragFraction, velocity);
+      return;
+    }
     postMessage('UnityBridge', 'OnFlutterMessage', message);
   }
 
@@ -182,6 +188,7 @@ class UnityCommunicationService {
   }
 
   void _fallbackTo2D() {
+    _ref.read(unityCardUiReadyProvider.notifier).state = false;
     _ref.read(unityCardInteractionsReadyProvider.notifier).state = false;
     _startup.handleEvent('UNITY_FAILED');
     _visual.clear();
@@ -340,6 +347,7 @@ class UnityCommunicationService {
       if (!isReady.value || _startup.hasFailed) return;
       final settings = _ref.read(settingsProvider);
       if (event == 'UNITY_VISUAL_READY') {
+        _ref.read(unityCardUiReadyProvider.notifier).state = false;
         _ref.read(unityCardInteractionsReadyProvider.notifier).state = false;
         _visual.negotiate(data['data'] == '1' ? 1 : 0);
         final state = _ref.read(matchStateProvider);
@@ -349,6 +357,14 @@ class UnityCommunicationService {
       if (event == 'UNITY_CARD_FEEL_READY' && data['data'] == '1') {
         _visual.negotiate(1, interactions: true);
         _ref.read(unityCardInteractionsReadyProvider.notifier).state = true;
+        final state = _ref.read(matchStateProvider);
+        if (state != null) syncState(state);
+        return;
+      }
+      if (event == 'UNITY_CARD_UI_READY' && data['data'] == '1') {
+        _visual.negotiate(1, interactions: true, refinedHand: true);
+        _ref.read(unityCardInteractionsReadyProvider.notifier).state = true;
+        _ref.read(unityCardUiReadyProvider.notifier).state = true;
         final state = _ref.read(matchStateProvider);
         if (state != null) syncState(state);
         return;

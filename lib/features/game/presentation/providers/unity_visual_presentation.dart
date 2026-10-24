@@ -2,6 +2,7 @@ import 'dart:async';
 import '../../domain/models/card_feature_state.dart';
 import '../../domain/models/match_state.dart';
 import 'visual_action_queue.dart';
+import '../widgets/hand_card_placement.dart';
 
 /// Optional protocol extension. Old Unity builds continue consuming SYNC_STATE.
 /// This class observes accepted state; it can emit only visual messages.
@@ -22,10 +23,13 @@ class UnityVisualPresentation {
   bool _managedLayout = false;
   bool _interactionsCapable = false, _interactionPreview = false;
   final _selections = <String, Map<String, dynamic>>{};
+  final _poses = <String, Map<String, dynamic>>{};
+  bool _refinedCapable = false;
   Timer? _captureContact;
   final _seenCaptures = <String>{};
   List<Map<String, dynamic>> anchors = const [];
   bool get capable => _capable;
+  bool get refinedCapable => _capable && _refinedCapable;
   bool get interactionsCapable => _capable && _interactionsCapable;
   int get generation => _queue.generation;
   UnityVisualPresentation({
@@ -45,6 +49,9 @@ class UnityVisualPresentation {
           for (final pose in _selections.values) {
             send({'type': 'HAND_SELECTION', 'generation': generation, ...pose});
           }
+          for (final pose in _poses.values) {
+            send({'type': 'HAND_POSE', 'generation': generation, ...pose});
+          }
         }
       },
       onFinish: (_, timedOut) {
@@ -62,12 +69,32 @@ class UnityVisualPresentation {
     );
   }
 
-  void negotiate(int protocol, {bool interactions = false}) {
+  void negotiate(
+    int protocol, {
+    bool interactions = false,
+    bool refinedHand = false,
+  }) {
     if (protocol != 1 || !cardJuiceEnabled) return;
     _capable = true;
     _managedLayout = true;
     _interactionsCapable = interactions;
+    _refinedCapable = refinedHand;
     resync();
+  }
+
+  void updateHandPose(String cardId, bool peek, double drag, double velocity) {
+    if (!refinedCapable ||
+        !_active ||
+        !(_latest?.handCards[_uid] ?? []).any((c) => c.firebaseKey == cardId))
+      return;
+    final pose = {
+      'cardId': cardId,
+      'peek': peek,
+      'dragFraction': drag,
+      'velocity': velocity,
+    };
+    _poses[cardId] = pose;
+    send({'type': 'HAND_POSE', 'generation': generation, ...pose});
   }
 
   /// Private renderer state only. Never includes an opponent's selection.
@@ -92,6 +119,14 @@ class UnityVisualPresentation {
   Map<String, dynamic> _snapshot(MatchState state) => {
     'type': 'SYNC_STATE',
     'instant': _managedLayout,
+    if (refinedCapable && cardUiRefinements) 'refinedHand': true,
+    if (refinedCapable && cardUiRefinements)
+      'publicHandIds': CardFeatureState(state).visible
+          .where((c) => _interactionPreview && c.ownerUid == _uid)
+          .map((c) => c.card.firebaseKey)
+          .toList(),
+    if (refinedCapable && cardUiRefinements)
+      'handPoses': _poses.values.toList(),
     // The cut reveal belongs to Flutter. Previous-round cards can remain in
     // authoritative state until the deal, but must not leak into this reveal.
     'board': switch (state.phase) {
@@ -178,6 +213,10 @@ class UnityVisualPresentation {
     _uid = uid;
     _interactionPreview = interactions;
     if (scope != _scope || !active) _selections.clear();
+    if (scope != _scope || !active) _poses.clear();
+    _poses.removeWhere(
+      (id, _) => !(state.handCards[uid] ?? []).any((c) => c.firebaseKey == id),
+    );
     _selections.removeWhere(
       (id, _) => !(state.handCards[uid] ?? []).any((c) => c.firebaseKey == id),
     );
@@ -241,7 +280,11 @@ class UnityVisualPresentation {
           state,
           cards: state.board.map((c) => c.toJson()).toList(),
           team: state.capturingTeam ?? '',
-          duration: gestureId.isEmpty ? 220 : 470,
+          duration: gestureId.isEmpty
+              ? 220
+              : cardUiRefinements
+              ? 500
+              : 470,
           gestureId: slamFor(state.board.map((c) => c.toJson()).toList()),
         );
       }
@@ -260,7 +303,11 @@ class UnityVisualPresentation {
         actor: state.playerIds.indexOf(
           state.cardOwnership[c.firebaseKey] ?? '',
         ),
-        duration: gestureId.isEmpty ? 350 : 470,
+        duration: gestureId.isEmpty
+            ? 350
+            : cardUiRefinements
+            ? 500
+            : 470,
         gestureId: slamFor([c.toJson()]),
       );
     } else if ((state.handCards[uid]?.length ?? 0) >
@@ -349,6 +396,7 @@ class UnityVisualPresentation {
   void clear() {
     _captureContact?.cancel();
     _selections.clear();
+    _poses.clear();
     _queue.reset();
     _previous = null;
     _latest = null;

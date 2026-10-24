@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:halabessa/features/game/domain/models/card.dart' as game;
 import 'package:halabessa/features/game/presentation/widgets/fanned_hand_widget.dart';
+import 'package:halabessa/features/game/presentation/widgets/hand_card_placement.dart';
 
 void main() {
   test('roomier local fan preserves card size while increasing separation', () {
@@ -118,7 +119,7 @@ void main() {
     await tester.pump(const Duration(seconds: 2));
     expect(
       find.byKey(ValueKey('hand-outline-${cards[1].firebaseKey}')),
-      findsOneWidget,
+      cardUiRefinements ? findsNothing : findsOneWidget,
     );
     expect(find.byIcon(Icons.hourglass_top), findsNothing);
     final pendingSemantics = tester.widget<Semantics>(

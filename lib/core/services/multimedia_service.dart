@@ -1,21 +1,21 @@
-import 'dart:convert';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/settings_provider.dart';
 import '../providers/global_settings_provider.dart';
-import 'default_audio_assets.dart';
+import 'game_audio_sources.dart';
 import '../providers/native_play_provider.dart';
 
 class MultimediaService extends ChangeNotifier {
-  final AudioPlayer _musicPlayer = AudioPlayer();
-  final AudioPlayer _sfxPlayer = AudioPlayer();
+  final AudioPlayer _musicPlayer;
+  final AudioPlayer _sfxPlayer;
+  final AudioPlayer Function() _createPresentationPlayer;
   final List<AudioPlayer> _presentationVoices = [];
   int _nextPresentationVoice = 0;
   AudioPlayer _presentationVoice() {
     if (_presentationVoices.length < 3) {
-      final voice = AudioPlayer();
+      final voice = _createPresentationPlayer();
       _presentationVoices.add(voice);
       return voice;
     }
@@ -26,20 +26,30 @@ class MultimediaService extends ChangeNotifier {
 
   final Ref _ref;
 
-  MultimediaService(this._ref) {
+  MultimediaService(
+    this._ref, {
+    AudioPlayer? musicPlayer,
+    AudioPlayer? sfxPlayer,
+    AudioPlayer Function()? presentationPlayerFactory,
+  }) : _musicPlayer = musicPlayer ?? AudioPlayer(),
+       _sfxPlayer = sfxPlayer ?? AudioPlayer(),
+       _createPresentationPlayer =
+           presentationPlayerFactory ?? AudioPlayer.new {
     // Notify listeners when state changes so UI can update icons
     _musicPlayer.onPlayerStateChanged.listen((_) => notifyListeners());
     _sfxPlayer.onPlayerStateChanged.listen((_) => notifyListeners());
 
     // Auto-rescue music when global settings overrides are loaded
     _ref.listen(globalSettingsProvider, (previous, next) {
-      if (_pendingMusic != null && next.musicOverrideUrl != null) {
+      if (_musicWanted &&
+          _currentMusicPath != null &&
+          (_roomMusic
+              ? previous?.roomMusicOverrideUrl != next.roomMusicOverrideUrl
+              : previous?.musicOverrideUrl != next.musicOverrideUrl)) {
         debugPrint(
           'MultimediaService: Global settings loaded. Rescuing pending music: $_pendingMusic',
         );
-        final musicToRescue = _pendingMusic!;
-        _pendingMusic = null;
-        playMusic(musicToRescue);
+        _resumeMusic();
       }
     });
 
@@ -50,7 +60,7 @@ class MultimediaService extends ChangeNotifier {
       } else if (previous?.isMusicEnabled == false &&
           next.isMusicEnabled == true) {
         if (_currentMusicPath != null) {
-          playMusic(_currentMusicPath!);
+          _resumeMusic();
         }
       } else if (previous?.musicVolume != next.musicVolume) {
         _musicPlayer.setVolume(next.musicVolume);
@@ -73,15 +83,15 @@ class MultimediaService extends ChangeNotifier {
   String? _pendingMusic;
 
   void handleInteraction() {
-    if (!_hasInteracted) {
+    final first = !_hasInteracted;
+    _hasInteracted = true;
+    if (first) {
       debugPrint('MultimediaService: Interaction detected. Rescuing audio...');
-      _hasInteracted = true;
-      final musicToRescue = _pendingMusic;
-      if (musicToRescue != null) {
-        _pendingMusic = null;
-        playMusic(musicToRescue);
-      }
       notifyListeners();
+    }
+    if (_pendingMusic != null) {
+      _pendingMusic = null;
+      _resumeMusic();
     }
   }
 
@@ -95,6 +105,8 @@ class MultimediaService extends ChangeNotifier {
 
   // Audio - Background Music
   String? _currentMusicPath;
+  bool _roomMusic = false, _currentLoop = true, _musicWanted = false;
+  int _musicRequest = 0;
   String? _lastPlayedUrl;
   String? get currentMusicPath => _currentMusicPath;
   PlayerState get musicState => _musicPlayer.state;
@@ -103,149 +115,95 @@ class MultimediaService extends ChangeNotifier {
   Stream<PlayerState> get musicStateStream => _musicPlayer.onPlayerStateChanged;
   Stream<PlayerState> get sfxStateStream => _sfxPlayer.onPlayerStateChanged;
 
-  Source _localSource(String dataUri) => kIsWeb
-      ? UrlSource(dataUri)
-      : BytesSource(
-          base64Decode(dataUri.substring(dataUri.indexOf(',') + 1)),
-          mimeType: 'audio/wav',
-        );
+  void _resumeMusic() {
+    final path = _currentMusicPath;
+    if (path != null) {
+      _playMusicContext(path, room: _roomMusic, loop: _currentLoop);
+    }
+  }
 
-  Future<void> _playLocalMusic(String assetPath, bool loop) async {
+  Future<void> playMusic(String assetPath, {bool loop = true}) =>
+      _playMusicContext(assetPath, room: false, loop: loop);
+
+  Future<void> playRoomMusic(String assetPath, {bool loop = true}) =>
+      _playMusicContext(assetPath, room: true, loop: loop);
+
+  Future<void> _playMusicContext(
+    String assetPath, {
+    required bool room,
+    required bool loop,
+  }) async {
+    final request = ++_musicRequest;
+    _currentMusicPath = assetPath;
+    _roomMusic = room;
+    _currentLoop = loop;
+    _musicWanted = true;
     try {
-      _currentMusicPath = assetPath;
       final settings = _ref.read(settingsProvider);
       if (!settings.isMusicEnabled) return;
+
       if (!_hasInteracted) {
         _pendingMusic = assetPath;
         return;
       }
+
+      final offline = _ref.read(offlineSessionProvider);
+      final global = offline ? null : _ref.read(globalSettingsProvider);
+      final overrideUrl = room
+          ? global?.roomMusicOverrideUrl
+          : global?.musicOverrideUrl;
+      final source = GameAudioSources.resolve(
+        assetPath,
+        overrideUrl: overrideUrl,
+        allowRemote: !offline,
+      );
+      if (source == null) return;
+      final identity = overrideUrl == null || overrideUrl.isEmpty
+          ? 'bundled:$assetPath:$loop'
+          : '$overrideUrl:$loop';
+
+      // Force restart if different URL even if playing
       if (_musicPlayer.state == PlayerState.playing &&
-          _lastPlayedUrl == 'local:$assetPath') {
+          _lastPlayedUrl == identity) {
         await _musicPlayer.setVolume(settings.musicVolume);
         return;
       }
-      _lastPlayedUrl = 'local:$assetPath';
+
       await _musicPlayer.setVolume(settings.musicVolume);
+      if (request != _musicRequest) return;
       await _musicPlayer.setReleaseMode(
         loop ? ReleaseMode.loop : ReleaseMode.release,
       );
-      await _musicPlayer.play(_localSource(DefaultAudioAssets.getMusic()));
+      if (request != _musicRequest ||
+          !_ref.read(settingsProvider).isMusicEnabled) {
+        return;
+      }
+      try {
+        await _musicPlayer.play(source);
+      } catch (error) {
+        if (request != _musicRequest) return;
+        if (error.toString().contains('NotAllowedError')) {
+          _pendingMusic = assetPath;
+          return;
+        }
+        // A broken custom upload must not silence the selected bundled track.
+        if (overrideUrl == null || overrideUrl.isEmpty) rethrow;
+        await _musicPlayer.play(
+          GameAudioSources.resolve(assetPath, allowRemote: false)!,
+        );
+      }
+      if (request != _musicRequest) return;
+      _lastPlayedUrl = identity;
       _pendingMusic = null;
-    } catch (error) {
-      if (kDebugMode) debugPrint('Local music unavailable: $error');
-    }
-  }
-
-  Future<void> playMusic(String assetPath, {bool loop = true}) async {
-    if (_ref.read(offlineSessionProvider))
-      return _playLocalMusic(assetPath, loop);
-    try {
-      _currentMusicPath = assetPath;
-      final settings = _ref.read(settingsProvider);
-
-      if (!settings.isMusicEnabled) return;
-
-      if (!_hasInteracted) {
-        debugPrint(
-          'MultimediaService: Autoplay blocked. Queueing music: $assetPath',
-        );
-        _pendingMusic = assetPath;
-        return;
-      }
-
-      final globalSettings = _ref.read(globalSettingsProvider);
-      final overrideUrl = globalSettings.musicOverrideUrl;
-
-      if (overrideUrl == null || overrideUrl.isEmpty) {
-        debugPrint(
-          'MultimediaService: No override URL for $assetPath. Queueing.',
-        );
-        _pendingMusic = assetPath;
-        return;
-      }
-
-      // Force restart if different URL even if playing
-      if (_musicPlayer.state == PlayerState.playing &&
-          _lastPlayedUrl == overrideUrl) {
-        await _musicPlayer.setVolume(
-          settings.musicVolume,
-        ); // Still update volume
-        return;
-      }
-
-      debugPrint('MultimediaService: Playing music from $overrideUrl');
-      _lastPlayedUrl = overrideUrl;
-      await _musicPlayer.setVolume(settings.musicVolume);
-      await _musicPlayer.setReleaseMode(
-        loop ? ReleaseMode.loop : ReleaseMode.release,
-      );
-      await _musicPlayer
-          .play(UrlSource(overrideUrl))
-          .then((_) {
-            _pendingMusic = null;
-            notifyListeners();
-          })
-          .catchError((e) {
-            if (e.toString().contains('NotAllowedError')) {
-              _pendingMusic = assetPath;
-            } else {
-              debugPrint('MultimediaService: Music Playback error: $e');
-            }
-          });
-    } catch (e) {
-      debugPrint('MultimediaService: Failed to play music $assetPath: $e');
-    }
-  }
-
-  Future<void> playRoomMusic(String assetPath, {bool loop = true}) async {
-    if (_ref.read(offlineSessionProvider))
-      return _playLocalMusic(assetPath, loop);
-    try {
-      _currentMusicPath = assetPath;
-      final settings = _ref.read(settingsProvider);
-      if (!settings.isMusicEnabled) return;
-
-      if (!_hasInteracted) {
-        _pendingMusic = assetPath;
-        return;
-      }
-
-      final globalSettings = _ref.read(globalSettingsProvider);
-      final overrideUrl = globalSettings.roomMusicOverrideUrl;
-
-      if (overrideUrl == null || overrideUrl.isEmpty) {
-        _pendingMusic = assetPath;
-        return;
-      }
-
-      // Force restart if different URL even if playing
-      if (_musicPlayer.state == PlayerState.playing &&
-          _lastPlayedUrl == overrideUrl) {
-        return;
-      }
-
-      _lastPlayedUrl = overrideUrl;
-      await _musicPlayer.setVolume(settings.musicVolume);
-      await _musicPlayer.setReleaseMode(
-        loop ? ReleaseMode.loop : ReleaseMode.release,
-      );
-      await _musicPlayer
-          .play(UrlSource(overrideUrl))
-          .then((_) {
-            _pendingMusic = null;
-            notifyListeners();
-          })
-          .catchError((e) {
-            if (e.toString().contains('NotAllowedError')) {
-              _pendingMusic = assetPath;
-            }
-          });
+      notifyListeners();
     } catch (e) {
       debugPrint('MultimediaService: Failed to play room music: $e');
     }
   }
 
   Future<void> stopMusic() async {
+    _musicRequest++;
+    _musicWanted = false;
     try {
       await _musicPlayer.stop();
       _pendingMusic = null; // Clear pending on manual stop
@@ -280,8 +238,9 @@ class MultimediaService extends ChangeNotifier {
   Future<void> _playSfx(String assetPath, {bool presentation = false}) async {
     if (!presentation &&
         _deckAudioOwner != null &&
-        (assetPath == 'sfx/cut.mp3' || assetPath == 'sfx/shuffle.mp3'))
+        (assetPath == 'sfx/cut.mp3' || assetPath == 'sfx/shuffle.mp3')) {
       return;
+    }
     if (!presentation &&
         _cardAudioOwner != null &&
         (assetPath == 'sfx/play.mp3' || assetPath == 'sfx/capture.mp3')) {
@@ -290,19 +249,15 @@ class MultimediaService extends ChangeNotifier {
     try {
       final settings = _ref.read(settingsProvider);
       if (settings.isSoundEnabled) {
-        final globalSettings = _ref.read(globalSettingsProvider);
-        final overrideUrl = globalSettings.sfxOverrides[assetPath];
-
-        Source? source;
-        if (overrideUrl != null && overrideUrl.isNotEmpty) {
-          source = UrlSource(overrideUrl);
-        } else {
-          // Zero-network fallback: use procedural embedded audio
-          final defaultDataUri = DefaultAudioAssets.getSfx(assetPath);
-          if (defaultDataUri != null) {
-            source = _localSource(defaultDataUri);
-          }
-        }
+        final offline = _ref.read(offlineSessionProvider);
+        final overrideUrl = offline
+            ? null
+            : _ref.read(globalSettingsProvider).sfxOverrides[assetPath];
+        final source = GameAudioSources.resolve(
+          assetPath,
+          overrideUrl: overrideUrl,
+          allowRemote: !offline,
+        );
 
         if (source != null) {
           final player = presentation ? _presentationVoice() : _sfxPlayer;
@@ -314,11 +269,20 @@ class MultimediaService extends ChangeNotifier {
               .then((_) {
                 handleInteraction(); // Success! Mark interaction and rescue music
               })
-              .catchError((e) {
+              .catchError((e) async {
                 if (e.toString().contains('NotAllowedError')) {
                   debugPrint('MultimediaService: Autoplay blocked for SFX.');
                 } else {
                   debugPrint('MultimediaService: SFX Playback error: $e');
+                  if (overrideUrl != null &&
+                      overrideUrl.isNotEmpty &&
+                      _ref.read(settingsProvider).isSoundEnabled) {
+                    final fallback = GameAudioSources.resolve(
+                      assetPath,
+                      allowRemote: false,
+                    );
+                    if (fallback != null) await player.play(fallback);
+                  }
                 }
               });
         }
@@ -337,7 +301,9 @@ class MultimediaService extends ChangeNotifier {
     }
   }
 
+  @override
   void dispose() {
+    _musicRequest++;
     _musicPlayer.dispose();
     _sfxPlayer.dispose();
     for (final voice in _presentationVoices) {

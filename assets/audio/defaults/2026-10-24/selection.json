@@ -1,0 +1,155 @@
+{
+  "schema": 1,
+  "localOnly": true,
+  "date": "2026-10-24",
+  "selected": {
+    "sfx/pick.mp3": {
+      "event": "pick",
+      "choice": "b",
+      "label": "Crisp corner flick",
+      "file": "audio/pick-b.wav",
+      "fnv1a32": 4217340065
+    },
+    "sfx/return.mp3": {
+      "event": "return",
+      "choice": "b",
+      "label": "Soft paper brush",
+      "file": "audio/return-b.wav",
+      "fnv1a32": 2344670598
+    },
+    "sfx/play.mp3": {
+      "event": "play",
+      "choice": "d",
+      "label": "Double paper tick",
+      "file": "audio/play-d.wav",
+      "fnv1a32": 2988773034
+    },
+    "sfx/deal.mp3": {
+      "event": "deal",
+      "choice": "b",
+      "label": "Two-stage slide",
+      "file": "audio/deal-b.wav",
+      "fnv1a32": 2605642188
+    },
+    "sfx/reveal.mp3": {
+      "event": "reveal",
+      "choice": "d",
+      "label": "Bright flip and tick",
+      "file": "audio/reveal-d.wav",
+      "fnv1a32": 512312161
+    },
+    "sfx/slam_0.mp3": {
+      "event": "slam",
+      "choice": "current",
+      "label": "Current — approved slam A",
+      "file": "audio/slam-current.wav",
+      "fnv1a32": 3132475412
+    },
+    "sfx/slam_1.mp3": {
+      "event": "slam",
+      "choice": "current",
+      "label": "Current — approved slam A",
+      "file": "audio/slam-current.wav",
+      "fnv1a32": 3132475412
+    },
+    "sfx/slam_2.mp3": {
+      "event": "slam",
+      "choice": "current",
+      "label": "Current — approved slam A",
+      "file": "audio/slam-current.wav",
+      "fnv1a32": 3132475412
+    },
+    "sfx/capture.mp3": {
+      "event": "capture",
+      "choice": "b",
+      "label": "Warm collection accent",
+      "file": "audio/capture-b.wav",
+      "fnv1a32": 1139667874
+    },
+    "sfx/shuffle.mp3": {
+      "event": "shuffle",
+      "choice": "current",
+      "label": "Current bundled sound",
+      "file": "audio/shuffle-current.wav",
+      "fnv1a32": 623685250
+    },
+    "sfx/cut.mp3": {
+      "event": "cut",
+      "choice": "a",
+      "label": "Two packet taps",
+      "file": "audio/cut-a.wav",
+      "fnv1a32": 1490053086
+    },
+    "sfx/win.mp3": {
+      "event": "win",
+      "choice": "e",
+      "label": "Quiet resolved chord",
+      "file": "audio/win-e.wav",
+      "fnv1a32": 1374481921
+    },
+    "sfx/lose.mp3": {
+      "event": "lose",
+      "choice": "current",
+      "label": "Current bundled sound",
+      "file": "audio/lose-current.wav",
+      "fnv1a32": 93536750
+    },
+    "sfx/purchase.mp3": {
+      "event": "purchase",
+      "choice": "a",
+      "label": "Light coin tick",
+      "file": "audio/purchase-a.wav",
+      "fnv1a32": 1129833342
+    },
+    "music/bg_music.mp3": {
+      "event": "home-music",
+      "choice": "e",
+      "label": "Still courtyard pad",
+      "file": "audio/home-music-e.wav",
+      "fnv1a32": 2478972
+    },
+    "music/room_music.mp3": {
+      "event": "room-music",
+      "choice": "b",
+      "label": "Felt ambience",
+      "file": "audio/room-music-b.wav",
+      "fnv1a32": 129433914
+    }
+  },
+  "bundledFiles": {
+    "sfx/pick.mp3": "audio/defaults/2026-10-24/pick-b-fb5f80a1.wav",
+    "sfx/return.mp3": "audio/defaults/2026-10-24/return-b-8bc0d586.wav",
+    "sfx/play.mp3": "audio/defaults/2026-10-24/play-d-b2250eaa.wav",
+    "sfx/deal.mp3": "audio/defaults/2026-10-24/deal-b-9b4ef1cc.wav",
+    "sfx/reveal.mp3": "audio/defaults/2026-10-24/reveal-d-1e894361.wav",
+    "sfx/slam_0.mp3": "audio/defaults/2026-10-24/slam-current-bab5c814.wav",
+    "sfx/slam_1.mp3": "audio/defaults/2026-10-24/slam-current-bab5c814.wav",
+    "sfx/slam_2.mp3": "audio/defaults/2026-10-24/slam-current-bab5c814.wav",
+    "sfx/capture.mp3": "audio/defaults/2026-10-24/capture-b-43edf3a2.wav",
+    "sfx/shuffle.mp3": "audio/defaults/2026-10-24/shuffle-current-252cae82.wav",
+    "sfx/cut.mp3": "audio/defaults/2026-10-24/cut-a-58d067de.wav",
+    "sfx/win.mp3": "audio/defaults/2026-10-24/win-e-51ecee01.wav",
+    "sfx/lose.mp3": "audio/defaults/2026-10-24/lose-current-59341ee.wav",
+    "sfx/purchase.mp3": "audio/defaults/2026-10-24/purchase-a-4357e37e.wav",
+    "music/bg_music.mp3": "audio/defaults/2026-10-24/home-music-e-25d37c.wav",
+    "music/room_music.mp3": "audio/defaults/2026-10-24/room-music-b-7b7013a.wav"
+  },
+  "fingerprints": {
+    "sfx/pick.mp3": 4217340065,
+    "sfx/return.mp3": 2344670598,
+    "sfx/play.mp3": 2988773034,
+    "sfx/deal.mp3": 2605642188,
+    "sfx/reveal.mp3": 512312161,
+    "sfx/slam_0.mp3": 3132475412,
+    "sfx/slam_1.mp3": 3132475412,
+    "sfx/slam_2.mp3": 3132475412,
+    "sfx/capture.mp3": 1139667874,
+    "sfx/shuffle.mp3": 623685250,
+    "sfx/cut.mp3": 1490053086,
+    "sfx/win.mp3": 1374481921,
+    "sfx/lose.mp3": 93536750,
+    "sfx/purchase.mp3": 1129833342,
+    "music/bg_music.mp3": 2478972,
+    "music/room_music.mp3": 129433914
+  }
+}

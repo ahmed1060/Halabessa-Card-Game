@@ -22,6 +22,7 @@ import 'package:halabessa/features/game/presentation/pages/game_board_screen.dar
 import 'package:halabessa/features/game/presentation/pages/offline_practice_app.dart';
 import 'package:halabessa/features/game/presentation/widgets/table_seat.dart';
 import 'package:halabessa/features/game/presentation/widgets/option_b_table.dart';
+import 'package:halabessa/features/game/presentation/widgets/hand_card_placement.dart';
 import 'package:halabessa/features/game/presentation/widgets/match_phase_panel.dart';
 import 'package:halabessa/features/game/presentation/widgets/match_choice_panel.dart';
 import 'offline_practice_isolation_test.dart' show QuietLocalAudio;
@@ -318,7 +319,7 @@ void main() {
             final folder = Directory('build/design-review')
               ..createSync(recursive: true);
             await File(
-              '${folder.path}/tabletop-${size.width.toInt()}-$scenario${revealReference ? '-reveals' : ''}.png',
+              '${folder.path}/tabletop-${size.width.toInt()}-$scenario${revealReference ? '-reveals' : ''}${cardUiRefinements ? '-refined' : ''}.png',
             ).writeAsBytes(bytes!.buffer.asUint8List());
             image.dispose();
           });
@@ -334,11 +335,26 @@ void main() {
                     .byKey(const ValueKey('avatar-feedback-circle'))
                     .evaluate())
               tester.getRect(find.byWidget(avatar.widget)),
-            for (final fan
-                in find.byKey(const ValueKey('seat-horizontal-fan')).evaluate())
-              tester.getRect(find.byWidget(fan.widget)),
+            if (!cardUiRefinements)
+              for (final fan
+                  in find
+                      .byKey(const ValueKey('seat-horizontal-fan'))
+                      .evaluate())
+                tester.getRect(find.byWidget(fan.widget)),
           ];
           for (final card in shown) {
+            if (cardUiRefinements && card.ownerUid == 'LOCAL_reference') {
+              expect(
+                find.byKey(ValueKey('shown-${card.eventId}')),
+                findsNothing,
+                reason: 'owner has one interactive card, not an overlay copy',
+              );
+              expect(
+                find.byKey(ValueKey('hand-card-${card.card.firebaseKey}')),
+                findsOneWidget,
+              );
+              continue;
+            }
             final rect = tester.getRect(
               find.byKey(ValueKey('shown-${card.eventId}')),
             );

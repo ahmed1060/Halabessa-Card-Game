@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Choose the game sounds | Halabessa</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <a class="skip" href="#sounds">Skip to sound choices</a>
+  <header>
+    <div class="brand" lang="ar">حلبسة <span lang="en">Halabessa</span></div>
+    <h1>Your table.<br>Your soundtrack.</h1>
+    <p>Compare the current sounds with five alternatives for every event—84 clips in total.
+      Choose individually; mixing A, B, C, D and E is welcome.</p>
+    <p class="subtle">New: C explores warmer materials and modal tones, D is crisper or more detailed,
+      and E is quieter and more minimal. Your previous selections are kept.</p>
+    <p class="notice">Local review only. Choosing a sound does not change the game or publish anything.</p>
+    <p class="subtle">All alternatives are procedural sketches—not recorded Foley or real-instrument recordings.
+      Your approved dry paper-edge slam A is retained as the current choice.</p>
+  </header>
+  <section class="listening" aria-labelledby="playing-title">
+    <div>
+      <h2 id="playing-title">Listen before choosing</h2>
+      <p id="now-playing">Nothing playing</p>
+      <audio id="player" controls preload="none" aria-labelledby="now-playing"></audio>
+    </div>
+    <div class="player-actions">
+      <label for="volume">Review volume <output id="volume-value" for="volume">35%</output></label>
+      <input id="volume" type="range" min="0" max="100" value="35">
+      <label class="loop"><input id="loop" type="checkbox"> Loop music sketches</label>
+      <button id="stop" type="button">Stop audio</button>
+    </div>
+  </section>
+  <main id="sounds" tabindex="-1">
+    <div class="toolbar">
+      <label for="category">Show <select id="category">
+        <option value="all">All sounds</option><option>Card handling</option>
+        <option>Table and deck</option><option>Results and rewards</option><option>Music</option>
+      </select></label>
+      <p id="progress">Loading catalog…</p>
+      <button id="export" type="button" disabled>Export my choices</button>
+      <button id="summary" type="button" disabled>Show choices to copy</button>
+      <button id="clear" type="button" disabled>Reset review choices</button>
+    </div>
+    <p id="status" role="status"></p>
+    <div id="catalog"></div>
+    <section id="selection-summary" hidden>
+      <h2>Your choices</h2>
+      <p>Copy this into our chat, or attach the exported JSON file. Unchosen sounds stay unchosen.</p>
+      <label for="choice-text">Selection summary</label>
+      <textarea id="choice-text" rows="16" readonly></textarea>
+    </section>
+    <section class="review" aria-labelledby="review-title">
+      <h2 id="review-title">The existing sound-management UI</h2>
+      <p>These are renders of your actual Flutter screens using local fixtures, not redesign mockups.
+        No uploads or cloud saves were performed.</p>
+      <div class="review-images">
+        <figure><a href="admin-sfx-en-empty.png"><img src="admin-sfx-en-empty.png" loading="lazy" width="390" height="844" alt="Existing SFX page with bundled sounds incorrectly labeled No Sound Set"></a><figcaption>Fresh sound-effects settings</figcaption></figure>
+        <figure><a href="admin-sfx-ar-custom.png"><img src="admin-sfx-ar-custom.png" loading="lazy" width="390" height="844" alt="Existing Arabic SFX page with custom and saved-default states"></a><figcaption>Arabic custom/default states</figcaption></figure>
+        <figure><a href="admin-music-en-empty.png"><img src="admin-music-en-empty.png" loading="lazy" width="390" height="844" alt="Existing background and room music-management page"></a><figcaption>Music settings</figcaption></figure>
+      </div>
+      <ul class="findings">
+        <li><strong>Restore is not reliable yet.</strong> Same-slot uploads overwrite the same storage object, so a saved default URL can point to the new file too. Use immutable versions before relying on restore.</li>
+        <li><strong>Built-in is not “No sound set.”</strong> Show Built-in, Saved default or Custom accurately; make factory reset and saved-default restore separate actions.</li>
+        <li><strong>Preview should identify one row.</strong> Currently every SFX row shows a pause icon whenever any effect is playing.</li>
+        <li><strong>Arabic needs a more flexible row.</strong> The current custom/default status overflows by 13 pixels at 390 px width and by up to 83 pixels at 320 px in the rendered fixtures.</li>
+        <li><strong>Music needs a consistent fallback.</strong> Local home/room music share one ambience; online music with no remote URL currently waits instead of using that default.</li>
+        <li><strong>Saving a clip should not rewrite match settings.</strong> The shared save method also writes the timer, target score and every loaded override.</li>
+      </ul>
+      <p>Proposed order after selection: custom override → chosen saved default → bundled factory default.
+        Keep the current offline/no-cloud boundary; downloaded offline overrides need an explicit cache policy.</p>
+    </section>
+  </main>
+  <footer>14 event groups cover all 16 configured paths. Three slam routing paths share one selection.
+    No new hover, countdown or chat sound is being silently added.</footer>
+</body>
+</html>

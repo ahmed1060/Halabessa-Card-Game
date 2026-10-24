@@ -7,6 +7,17 @@ in historical checkpoints is superseded by that approval. Merge is gated on fres
 Android and iOS CI success; main's existing Hosting workflow then publishes normally.
 No app-store upload or separate Supabase rollout is authorized.
 
+## Native continuation — 22 October 2026
+
+See `docs/native-qualification-2026-10-22.md` for the current native ledger.
+PR #6 merged; all Android/iOS/Hosting merge-commit checks succeeded. Fresh
+isolated Android and iOS Unity exports now succeed. Fresh-library ARM64 offline
+QA and normal-entry APKs pass packaged launcher, signature, current protocol and
+16 KB native/ZIP alignment checks. The Editor is restored to WebGL and its scene
+is clean. This continuation remains local; committed native libraries are not
+replaced. Physical Android/Mac/iPhone and final sound/feel review remain pending.
+The older export/build limitations below are historical checkpoints.
+
 ## Latest closeout ledger — 21 October 2026
 
 This ledger supersedes older checkpoint counts/pending-layout notes below; those

@@ -75,6 +75,7 @@ class BoardCardsWidget extends StatelessWidget {
   final String? capturingTeam;
   final int capturingStage;
   final Map<String, Offset> arrivalOffsets;
+  final Map<String, double> arrivalScales;
   final Set<String> alreadyPresented;
   final bool captureToBottom;
   final String? captureLabel;
@@ -93,6 +94,7 @@ class BoardCardsWidget extends StatelessWidget {
     this.capturingTeam,
     this.capturingStage = 0,
     this.arrivalOffsets = const {},
+    this.arrivalScales = const {},
     this.alreadyPresented = const {},
     this.captureToBottom = false,
     this.captureLabel,
@@ -147,8 +149,9 @@ class BoardCardsWidget extends StatelessWidget {
         : const Duration(milliseconds: 240);
 
     return CardTableImpact(
-      contactDelay: gestureSlams.isEmpty ? const Duration(milliseconds: 190)
-        : const Duration(milliseconds: 430),
+      contactDelay: gestureSlams.isEmpty
+          ? const Duration(milliseconds: 190)
+          : const Duration(milliseconds: 430),
       identity: isCapturing
           ? '$capturingTeam:${cards.map((c) => c.firebaseKey).join(',')}'
           : null,
@@ -290,9 +293,19 @@ class BoardCardsWidget extends StatelessWidget {
     );
   }
 
-  Widget _arrivingCard(game_card.Card card, Widget child) => BoardCardMotion(
+  Widget _arrivingCard(
+    game_card.Card card,
+    Widget child,
+    Offset targetOffset,
+  ) => BoardCardMotion(
     key: ValueKey('board-${card.firebaseKey}'),
-    origin: arrivalOffsets[card.firebaseKey] ?? const Offset(0, -95),
+    origin:
+        (arrivalOffsets[card.firebaseKey] ?? const Offset(0, -95)) -
+        (arrivalScales.containsKey(card.firebaseKey)
+            ? targetOffset
+            : Offset.zero),
+    initialScale: arrivalScales[card.firebaseKey],
+    initialOpacity: arrivalScales.containsKey(card.firebaseKey) ? 1 : .75,
     alreadyArrived: alreadyPresented.contains(card.firebaseKey),
     gestureSlam: gestureSlams.contains(card.firebaseKey),
     travelDuration: Duration(milliseconds: isCapturing ? 220 : 320),
@@ -323,7 +336,7 @@ class BoardCardsWidget extends StatelessWidget {
         duration: duration,
         curve: Curves.easeOutCubic,
         turns: isCapturing ? 0 : angle / (2 * pi),
-        child: _arrivingCard(card, child),
+        child: _arrivingCard(card, child, isCapturing ? Offset.zero : position),
       ),
     ),
   );

@@ -4,10 +4,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/global_settings.dart';
 import 'dart:async';
 import 'native_play_provider.dart';
+import '../services/audio_override_store.dart';
 
 class GlobalSettingsNotifier extends StateNotifier<GlobalSettings> {
   final List<StreamSubscription<dynamic>> _subscriptions = [];
-  GlobalSettingsNotifier({bool listenRemote = true}) : super(GlobalSettings()) {
+  AudioOverrideStore? _audioStore;
+  AudioOverrideStore get _audio =>
+      _audioStore ??= FirestoreAudioOverrideStore();
+  GlobalSettingsNotifier({
+    bool listenRemote = true,
+    AudioOverrideStore? audioStore,
+  }) : _audioStore = audioStore,
+       super(GlobalSettings()) {
     if (listenRemote) _listenToSettings();
   }
 
@@ -51,7 +59,6 @@ class GlobalSettingsNotifier extends StateNotifier<GlobalSettings> {
               for (var doc in snapshot.docs) {
                 final data = doc.data();
                 final url = data['url'] as String?;
-                final isBackup = data['isBackup'] as bool? ?? false;
                 final assetPath = data['assetPath'] as String?;
 
                 if (doc.id == 'music') {
@@ -143,75 +150,37 @@ class GlobalSettingsNotifier extends StateNotifier<GlobalSettings> {
   }
 
   Future<void> markAsDefault(String assetPath, String type) async {
-    final mainDoc = FirebaseFirestore.instance
-        .collection('settings')
-        .doc('global');
-    final overridesColl = mainDoc.collection('overrides');
-
-    if (type == 'music') {
-      if (state.musicOverrideUrl != null) {
-        await overridesColl.doc('music_backup').set({
-          'url': state.musicOverrideUrl,
-          'isBackup': true,
-        });
-      }
-    } else if (type == 'room_music') {
-      if (state.roomMusicOverrideUrl != null) {
-        await overridesColl.doc('room_music_backup').set({
-          'url': state.roomMusicOverrideUrl,
-          'isBackup': true,
-        });
-      }
-    } else {
-      final url = state.sfxOverrides[assetPath];
-      if (url != null) {
-        final safeId = assetPath.replaceAll('/', '_');
-        await overridesColl.doc('sfx_${safeId}_backup').set({
-          'assetPath': assetPath,
-          'url': url,
-          'isBackup': true,
-        });
-      }
-    }
+    final id = audioDocumentId(assetPath, type);
+    final copied = await _audio.copy(id, '${id}_backup', backup: true);
+    if (!copied) throw StateError('audio_override_missing');
   }
 
-  Future<bool> clearOverride(String assetPath, String type) async {
-    final mainDoc = FirebaseFirestore.instance
-        .collection('settings')
-        .doc('global');
-    final overridesColl = mainDoc.collection('overrides');
+  /// Save only the changed sound, never match settings or other overrides.
+  Future<void> updateAudioOverride(
+    String assetPath,
+    String type,
+    String url,
+  ) async {
+    final id = audioDocumentId(assetPath, type);
+    if (url.isEmpty) throw ArgumentError('Empty audio URL');
+    await _audio.write(id, {
+      'url': url,
+      if (type == 'sfx') 'assetPath': assetPath,
+    });
+  }
 
-    if (type == 'music') {
-      if (state.musicBackupUrl != null) {
-        await overridesColl.doc('music').set({'url': state.musicBackupUrl});
-        return true;
-      } else {
-        await overridesColl.doc('music').delete();
-        return false;
-      }
-    } else if (type == 'room_music') {
-      if (state.roomMusicBackupUrl != null) {
-        await overridesColl.doc('room_music').set({
-          'url': state.roomMusicBackupUrl,
-        });
-        return true;
-      } else {
-        await overridesColl.doc('room_music').delete();
-        return false;
-      }
-    } else {
-      final safeId = assetPath.replaceAll('/', '_');
-      if (state.sfxBackups.containsKey(assetPath)) {
-        await overridesColl.doc('sfx_$safeId').set({
-          'assetPath': assetPath,
-          'url': state.sfxBackups[assetPath],
-        });
-        return true;
-      } else {
-        await overridesColl.doc('sfx_$safeId').delete();
-        return false;
-      }
-    }
+  /// Independent of saved remote backups: selected bundled files never change.
+  Future<void> restoreBundledAudio(String assetPath, String type) =>
+      _audio.delete(audioDocumentId(assetPath, type));
+
+  Future<bool> clearOverride(String assetPath, String type) {
+    final id = audioDocumentId(assetPath, type);
+    return _audio.copy(
+      '${id}_backup',
+      id,
+      backup: false,
+      deleteTargetWhenMissing: true,
+    );
   }
 }
 

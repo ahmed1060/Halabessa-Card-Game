@@ -15,6 +15,7 @@ public class CardJuiceController : MonoBehaviour, IPointerEnterHandler,
     public UnityEvent OnReturn = new UnityEvent();
     public bool ReducedMotion;
     public bool Managed;
+    public bool RefinedHand;
     public int BaseSortingOrder;
     private Transform visual;
     private MeshRenderer face;
@@ -33,12 +34,19 @@ public class CardJuiceController : MonoBehaviour, IPointerEnterHandler,
     private bool queuedSelection, slamSelection;
     private LineRenderer selectionRim, slamRim;
     private Material rimMaterial;
+    public Vector3 RenderedCenter => visual != null ? visual.position : transform.position;
+    public void PreserveReleasePose() {
+        var position = RenderedCenter;
+        var scale = visual != null ? Vector3.Scale(transform.localScale, visual.localScale) : transform.localScale;
+        CancelPose(); Position(position);
+        transform.localScale = scale;
+    }
     public void SetHandSelection(bool queued, bool slam) {
         if (!Managed || !localHand) return;
         queuedSelection = queued; slamSelection = slam;
     }
     public void SetHandPose(bool raised, float dragFraction, float speed) {
-        if (!Managed || !localHand || animating) return;
+        if (!Managed || !localHand) return;
         peek = raised; externalDrag = Mathf.Clamp(dragFraction, -.5f, .25f);
         dragVelocity = new Vector2(0, speed);
     }
@@ -83,11 +91,12 @@ public class CardJuiceController : MonoBehaviour, IPointerEnterHandler,
     void LateUpdate() {
         if (!Managed || visual == null || animating) return;
         var raised = peek || queuedSelection || slamSelection;
-        SetRims(queuedSelection || slamSelection, slamSelection);
-        var targetScale = Vector3.one * (raised ? 1.2f : 1f);
+        var zoom = RefinedHand ? peek : raised;
+        SetRims(!RefinedHand && (queuedSelection || slamSelection), !RefinedHand && slamSelection);
+        var targetScale = Vector3.one * (zoom ? 1.2f : 1f);
         visual.localScale = ReducedMotion ? targetScale : Vector3.SmoothDamp(
             visual.localScale, targetScale, ref scaleVelocity, .07f, Mathf.Infinity, Time.unscaledDeltaTime);
-        var target = new Vector3(0, (raised ? .06f : 0) - externalDrag, raised ? -.06f : 0);
+        var target = new Vector3(0, (zoom ? .06f : 0) - externalDrag, zoom ? -.06f : 0);
         visual.localPosition = ReducedMotion ? target : Vector3.SmoothDamp(
             visual.localPosition, target, ref velocity, .06f, Mathf.Infinity, Time.unscaledDeltaTime);
         var tilt = ReducedMotion ? Vector3.zero : new Vector3(
@@ -178,20 +187,24 @@ public class CardJuiceController : MonoBehaviour, IPointerEnterHandler,
         ReturnHome();
     }
 
-    public IEnumerator Fly(Vector3 target, float duration, bool slam, Action beforeContact, Action impact = null, bool gesture = false) {
+    public IEnumerator Fly(Vector3 target, float duration, bool slam, Action beforeContact, Action impact = null, bool gesture = false, Vector3? releasedScale = null) {
         CancelPose();
         animating = true;
         transform.DOKill();
         var start = transform.position;
+        var targetScale = transform.localScale;
+        var releaseScale = releasedScale ?? targetScale;
+        if (releasedScale.HasValue) transform.localScale = releaseScale;
         if (ReducedMotion || duration <= 0) {
-            Position(target); beforeContact?.Invoke(); animating = false; yield break;
+            Position(target); transform.localScale = targetScale; beforeContact?.Invoke(); animating = false; yield break;
         }
         if (gesture) {
             var windup = 0f;
-            while (windup < .1f) {
-                var t = Mathf.Clamp01(windup / .1f);
-                if (visual != null) { visual.localScale = Vector3.one * (1 + .2f * t);
-                    visual.localPosition = new Vector3(0, .1f * t, -.06f * t); }
+            var anticipation = RefinedHand ? .14f : .1f;
+            while (windup < anticipation) {
+                var t = Mathf.Clamp01(windup / anticipation);
+                if (visual != null) { visual.localScale = Vector3.one * (1 + (RefinedHand ? .6f : .2f) * t);
+                    visual.localPosition = new Vector3(0, (RefinedHand ? .22f : .1f) * t, -.06f * t); }
                 windup += Time.unscaledDeltaTime; yield return null;
             }
         }
@@ -199,24 +212,27 @@ public class CardJuiceController : MonoBehaviour, IPointerEnterHandler,
         while (elapsed < duration) {
             var t = Mathf.Clamp01(elapsed / duration);
             var eased = gesture ? t * t * t : 1 - Mathf.Pow(1 - t, 3);
+            if (releasedScale.HasValue) transform.localScale = Vector3.Lerp(releaseScale, targetScale, eased);
             Position(Vector3.LerpUnclamped(start, target, eased)
                 + Vector3.up * Mathf.Sin(t * Mathf.PI) * .22f);
             if (visual != null) visual.localRotation = Quaternion.Euler(0,
                 Mathf.Sin(t * Mathf.PI) * 7, Mathf.Sin(t * Mathf.PI) * -5);
-            if (gesture && visual != null) { visual.localScale = Vector3.one * (1 + .2f * (1 - eased));
-                visual.localPosition = new Vector3(0, .1f * (1 - eased), -.06f * (1 - eased)); }
+            if (gesture && visual != null) { visual.localScale = Vector3.one * (1 + (RefinedHand ? .6f : .2f) * (1 - eased));
+                visual.localPosition = new Vector3(0, (RefinedHand ? .22f : .1f) * (1 - eased), -.06f * (1 - eased)); }
             if (!contacted && elapsed >= duration - .03f) {
                 contacted = true; beforeContact?.Invoke();
             }
             elapsed += Time.unscaledDeltaTime; yield return null;
         }
         Position(target);
+        transform.localScale = targetScale;
         if (!contacted) beforeContact?.Invoke();
         if (slam) { OnSlam.Invoke(); yield return new WaitForSecondsRealtime(.05f); impact?.Invoke(); }
         if (visual != null && (slam || duration <= .22f)) {
             visual.localRotation = Quaternion.identity;
             visual.localScale = Vector3.one; visual.localPosition = Vector3.zero;
-            punch = visual.DOPunchScale(new Vector3(slam ? .055f : .025f, -.025f, .025f), .12f, 1, .4f).SetUpdate(true);
+            punch = visual.DOPunchScale(new Vector3(slam ? (RefinedHand && gesture ? .12f : .055f) : .025f,
+                RefinedHand && gesture ? -.04f : -.025f, .025f), RefinedHand && gesture ? .15f : .12f, 1, .4f).SetUpdate(true);
             yield return punch.WaitForCompletion();
         }
         animating = false;
@@ -226,6 +242,24 @@ public class CardJuiceController : MonoBehaviour, IPointerEnterHandler,
         if (!Managed) return;
         CancelPose();
         returning = StartCoroutine(Return());
+    }
+    public void PublicArrival(Vector3 from) {
+        CancelPose();
+        if (!ReducedMotion) returning = StartCoroutine(ParkPublic(from));
+    }
+    private IEnumerator ParkPublic(Vector3 from) {
+        animating = true;
+        var start = transform.InverseTransformPoint(from);
+        var elapsed = 0f;
+        while (elapsed < .52f && visual != null) {
+            var flight = Mathf.Clamp01((elapsed - .1f) / .22f);
+            var lift = elapsed < .1f ? elapsed / .1f : 1 - Mathf.Clamp01((elapsed - .1f) / .42f);
+            visual.localPosition = Vector3.Lerp(start, Vector3.zero, flight * flight * flight);
+            visual.localScale = Vector3.one * (1 + .35f * lift);
+            elapsed += Time.unscaledDeltaTime; yield return null;
+        }
+        if (visual != null) { visual.localPosition = Vector3.zero; visual.localScale = Vector3.one; }
+        animating = false; returning = null;
     }
     private IEnumerator Return() {
         animating = true; transform.DOKill(); OnReturn.Invoke();

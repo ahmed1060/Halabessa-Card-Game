@@ -67,10 +67,35 @@ public static class UnityCardFeelQa {
             () => reduced.TrySetResult(true)));
         await reduced.Task;
         Check(contactCount == 1, "Reduced motion lost or duplicated contact.");
+        // The optional UI capability must work without legacy gold rims.
+        Send("{\"type\":\"SYNC_STATE\",\"instant\":true,\"refinedHand\":true,\"board\":[],\"handCards\":[{\"suit\":\"clubs\",\"rank\":\"six\"}],\"handSelections\":[{\"cardId\":\"clubs_six\",\"queued\":true}],\"handPoses\":[{\"cardId\":\"clubs_six\",\"dragFraction\":-0.3}],\"anchors\":[{\"name\":\"hand\",\"x\":0.5,\"y\":0.8,\"width\":0.07,\"height\":0.15}]}");
+        await Task.Delay(220);
+        Check(!rim.enabled && !doubleRim.enabled && visual.localPosition.y > .2f && visual.localScale.x < 1.05f,
+            "Refined queue must stay raised without gold marking or hover zoom.");
+        var publicFrom = root.transform.position + Vector3.right * .7f;
+        juice.PublicArrival(publicFrom);
+        await Task.Delay(50);
+        Check(Vector3.Distance(juice.RenderedCenter, publicFrom) < .05f,
+            "Public arrival snapped to target before its approach beat.");
+        await Task.Delay(550);
+        Check(Vector3.Distance(juice.RenderedCenter, root.transform.position) < .005f,
+            "Public arrival did not settle on the same card instance.");
+        juice.SetHandSelection(false, false); juice.SetHandPose(false, 0, 0);
+        started = Time.realtimeSinceStartup;
+        var refinedContact = 0; var refinedAt = 0f;
+        var refined = new TaskCompletionSource<bool>();
+        juice.StartCoroutine(Observe(juice.Fly(target, .16f, true,
+            () => { refinedContact++; refinedAt = Time.realtimeSinceStartup - started; },
+            null, true), () => refined.TrySetResult(true)));
+        await Task.Delay(115);
+        Check(visual.localScale.x > 1.35f, "Refined slam lift is not clearly distinct from normal play.");
+        await refined.Task;
+        Check(refinedContact == 1 && refinedAt > .24f && refinedAt < .5f,
+            "Refined slam contact was lost, duplicated or mistimed.");
         Send("{\"type\":\"CANCEL_VISUALS\",\"generation\":81}");
         Send("{\"type\":\"SYNC_STATE\",\"instant\":true,\"board\":[],\"handCards\":[]}");
-        return new { passed = true, checks = 8, contactMs = contactAt * 1000,
-            totalMs = elapsed * 1000, sceneSaved = false };
+        return new { passed = true, checks = 13, contactMs = contactAt * 1000,
+            totalMs = elapsed * 1000, refinedContactMs = refinedAt * 1000, sceneSaved = false };
         } finally { Application.runInBackground = background; }
     }
 }

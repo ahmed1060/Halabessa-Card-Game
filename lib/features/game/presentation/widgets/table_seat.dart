@@ -10,6 +10,8 @@ import '../../domain/logic/online_match_clock.dart';
 class TableSeat extends StatefulWidget {
   final String name;
   final String detail;
+  final bool showTooltip;
+  final int revealedHandCount;
   final String? avatarUrl;
   final String? portraitAsset;
   final String? dealerLabel;
@@ -36,6 +38,8 @@ class TableSeat extends StatefulWidget {
     super.key,
     required this.name,
     required this.detail,
+    this.showTooltip = true,
+    this.revealedHandCount = 0,
     this.avatarUrl,
     this.portraitAsset,
     this.dealerLabel,
@@ -126,19 +130,8 @@ class _TableSeatState extends State<TableSeat> {
           : compact
           ? 146
           : 110 + 4 * line,
-      child: Tooltip(
-        message: [
-          widget.name,
-          widget.detail,
-          if (widget.dealerLabel != null) widget.dealerLabel!,
-          if (message != null) message,
-        ].join('\n'),
-        decoration: BoxDecoration(
-          color: TableStyle.ink,
-          border: Border.all(color: TableStyle.brass.withValues(alpha: .5)),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        textStyle: TableStyle.detail.copyWith(color: TableStyle.ivory),
+      child: Semantics(
+        container: true,
         child: Material(
           color: Colors.transparent,
           child: InkWell(
@@ -223,42 +216,48 @@ class _TableSeatState extends State<TableSeat> {
                             ),
                           ),
                           ClipOval(
-                            child: SizedBox(
-                              width: widget.optionB
-                                  ? (smallAvatar ? 56 : 70)
-                                  : 64,
-                              height: widget.optionB
-                                  ? (smallAvatar ? 56 : 70)
-                                  : 64,
-                              child: url == null || url.isEmpty || widget.isBot
-                                  ? Image.asset(
-                                      fallback,
-                                      fit: BoxFit.cover,
-                                      cacheWidth: 160,
-                                      errorBuilder: (_, __, ___) => const Icon(
-                                        Icons.person_outline,
-                                        color: TableStyle.ivory,
+                            child: _hint(
+                              SizedBox(
+                                width: widget.optionB
+                                    ? (smallAvatar ? 56 : 70)
+                                    : 64,
+                                height: widget.optionB
+                                    ? (smallAvatar ? 56 : 70)
+                                    : 64,
+                                child:
+                                    url == null || url.isEmpty || widget.isBot
+                                    ? Image.asset(
+                                        fallback,
+                                        fit: BoxFit.cover,
+                                        cacheWidth: 160,
+                                        errorBuilder: (_, __, ___) =>
+                                            const Icon(
+                                              Icons.person_outline,
+                                              color: TableStyle.ivory,
+                                            ),
+                                      )
+                                    : url.startsWith('assets/')
+                                    ? Image.asset(
+                                        url,
+                                        fit: BoxFit.cover,
+                                        cacheWidth: 160,
+                                        errorBuilder: (_, __, ___) =>
+                                            const Icon(
+                                              Icons.person_outline,
+                                              color: TableStyle.ivory,
+                                            ),
+                                      )
+                                    : Image.network(
+                                        url,
+                                        fit: BoxFit.cover,
+                                        cacheWidth: 160,
+                                        errorBuilder: (_, __, ___) =>
+                                            const Icon(
+                                              Icons.person_outline,
+                                              color: TableStyle.ivory,
+                                            ),
                                       ),
-                                    )
-                                  : url.startsWith('assets/')
-                                  ? Image.asset(
-                                      url,
-                                      fit: BoxFit.cover,
-                                      cacheWidth: 160,
-                                      errorBuilder: (_, __, ___) => const Icon(
-                                        Icons.person_outline,
-                                        color: TableStyle.ivory,
-                                      ),
-                                    )
-                                  : Image.network(
-                                      url,
-                                      fit: BoxFit.cover,
-                                      cacheWidth: 160,
-                                      errorBuilder: (_, __, ___) => const Icon(
-                                        Icons.person_outline,
-                                        color: TableStyle.ivory,
-                                      ),
-                                    ),
+                              ),
                             ),
                           ),
                           if (widget.chatBadge)
@@ -283,25 +282,27 @@ class _TableSeatState extends State<TableSeat> {
                       ),
                     ),
                     const SizedBox(height: 2),
-                    Container(
-                      height: line + 2,
-                      padding: const EdgeInsets.symmetric(horizontal: 5),
-                      decoration: BoxDecoration(
-                        color: TableStyle.ink,
-                        border: Border.all(
-                          color: compact && widget.dealerLabel != null
-                              ? TableStyle.brass
-                              : widget.accent,
+                    _hint(
+                      Container(
+                        height: line + 2,
+                        padding: const EdgeInsets.symmetric(horizontal: 5),
+                        decoration: BoxDecoration(
+                          color: TableStyle.ink,
+                          border: Border.all(
+                            color: compact && widget.dealerLabel != null
+                                ? TableStyle.brass
+                                : widget.accent,
+                          ),
+                          borderRadius: BorderRadius.circular(8),
                         ),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        widget.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TableStyle.detail.copyWith(
-                          color: TableStyle.ivory,
-                          fontWeight: FontWeight.w700,
+                        child: Text(
+                          widget.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TableStyle.detail.copyWith(
+                            color: TableStyle.ivory,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
                     ),
@@ -497,7 +498,7 @@ class _TableSeatState extends State<TableSeat> {
 
   Widget _horizontalHand() {
     final count = widget.hiddenHandCount!;
-    final n = count.clamp(0, 4);
+    final n = (count - widget.revealedHandCount).clamp(0, 4);
     return SizedBox(
       key: const ValueKey('seat-horizontal-fan'),
       width: 118,
@@ -507,7 +508,15 @@ class _TableSeatState extends State<TableSeat> {
         children: [
           for (var i = 0; i < n; i++)
             Positioned(
-              left: 7 + (i + (4 - n) / 2) * 24,
+              left:
+                  7 +
+                  (i +
+                          (4 -
+                                  (widget.revealedHandCount > 0
+                                      ? count.clamp(0, 4)
+                                      : n)) /
+                              2) *
+                      24,
               top: (i - (n - 1) / 2).abs() * 2,
               child: Transform.rotate(
                 angle: (i - (n - 1) / 2) * .12,
@@ -548,4 +557,17 @@ class _TableSeatState extends State<TableSeat> {
       ),
     );
   }
+
+  Widget _hint(Widget child) => !widget.showTooltip || widget.detail.isEmpty
+      ? child
+      : Tooltip(
+          message: widget.detail,
+          decoration: BoxDecoration(
+            color: TableStyle.ink,
+            border: Border.all(color: TableStyle.brass.withValues(alpha: .5)),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          textStyle: TableStyle.detail.copyWith(color: TableStyle.ivory),
+          child: child,
+        );
 }

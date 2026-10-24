@@ -18,6 +18,9 @@ public class UnityBridge : MonoBehaviour {
     private Coroutine visualAction;
     private int visualGeneration;
     private bool managedVisuals;
+    private bool refinedHand, reducedVisuals, hasHandSnapshot;
+    private readonly HashSet<string> publicHand = new HashSet<string>();
+    private readonly Dictionary<string, Vector3> pendingPublic = new Dictionary<string, Vector3>();
     private List<VisualAnchor> visualAnchors = new List<VisualAnchor>();
     private Tween cameraShake;
     private Tween collection;
@@ -65,6 +68,7 @@ public class UnityBridge : MonoBehaviour {
         NotifyFlutter("UNITY_READY", "Unity initialized");
         NotifyFlutter("UNITY_VISUAL_READY", "1");
         NotifyFlutter("UNITY_CARD_FEEL_READY", "1");
+        NotifyFlutter("UNITY_CARD_UI_READY", "1");
     }
 
     private void EnsurePointerInput() {
@@ -116,7 +120,11 @@ public class UnityBridge : MonoBehaviour {
                 if (data.generation > visualGeneration) seenVisuals.Clear();
                 if (!seenVisuals.Add(data.eventId)) return;
                 if (seenVisuals.Count > 256) { seenVisuals.Clear(); seenVisuals.Add(data.eventId); }
-                CancelVisuals(); visualGeneration = data.generation; managedVisuals = true;
+                var movingId = data.cards != null && data.cards.Count > 0
+                    ? GetCardId(data.cards[data.cards.Count - 1]) : null;
+                CancelVisuals(movingId, data.refinedHand);
+                visualGeneration = data.generation; managedVisuals = true;
+                refinedHand = data.refinedHand; reducedVisuals = data.reducedMotion;
                 visualAnchors = data.anchors ?? visualAnchors;
                 visualAction = StartCoroutine(PerformVisualAction(data)); return;
             }
@@ -133,9 +141,11 @@ public class UnityBridge : MonoBehaviour {
                     handCard.GetComponent<CardJuiceController>()?.SetHandPose(data.peek, data.dragFraction, data.velocity);
             } else if (data.type == "SYNC_STATE") {
                 managedVisuals = data.instant;
+                refinedHand = data.refinedHand; reducedVisuals = data.reducedMotion;
                 visualAnchors = data.anchors ?? visualAnchors;
-                HandleSyncState(data.board, data.handCards, data.instant);
+                HandleSyncState(data.board, data.handCards, data.instant, data.publicHandIds, true);
                 ApplyHandSelections(data.handSelections);
+                ApplyHandPoses(data.handPoses);
                 foreach (var card in activeCards.Values) {
                     var juice = card.GetComponent<CardJuiceController>();
                     if (juice != null) juice.ReducedMotion = data.reducedMotion;
@@ -170,8 +180,17 @@ public class UnityBridge : MonoBehaviour {
             card.GetComponent<CardJuiceController>()?.SetHandSelection(pose != null && pose.queued, pose != null && pose.slam);
         }
     }
+    private void ApplyHandPoses(List<HandPose> poses) {
+        if (!refinedHand || poses == null) return;
+        foreach (var pose in poses) {
+            GameObject card;
+            if (localHandIds.Contains(pose.cardId ?? "") && activeCards.TryGetValue(pose.cardId, out card))
+                card.GetComponent<CardJuiceController>()?.SetHandPose(pose.peek, pose.dragFraction, pose.velocity);
+        }
+    }
 
-    private void HandleSyncState(List<CardJson> boardCards, List<CardJson> handCards, bool instant = false) {
+    private void HandleSyncState(List<CardJson> boardCards, List<CardJson> handCards, bool instant = false,
+        List<string> publicIds = null, bool animatePublic = false) {
         boardCards = boardCards ?? new List<CardJson>(); handCards = handCards ?? new List<CardJson>();
         localHandIds.Clear();
         foreach (var card in handCards) localHandIds.Add(GetCardId(card));
@@ -241,6 +260,12 @@ public class UnityBridge : MonoBehaviour {
                     : radians[Mathf.Clamp(boardIndex, 0, 3)]) * Mathf.Rad2Deg;
             }
 
+            var existed = activeCards.ContainsKey(id);
+            var from = existed ? (activeCards[id].GetComponent<CardJuiceController>()?.RenderedCenter ?? activeCards[id].transform.position) : targetPos;
+            if (refinedHand && inHand && existed && hasHandSnapshot && animatePublic &&
+                publicIds != null && publicIds.Contains(id) && !publicHand.Contains(id))
+                pendingPublic[id] = from;
+            if (refinedHand && inHand && publicIds != null && publicIds.Contains(id)) roll = 0;
             if (!activeCards.ContainsKey(id)) {
                 // Spawn new
                 GameObject newCard = Instantiate(cardPrefab);
@@ -334,12 +359,24 @@ public class UnityBridge : MonoBehaviour {
             }
             if (juice != null) {
                 juice.Managed = managedVisuals;
+                juice.RefinedHand = refinedHand;
+                juice.ReducedMotion = reducedVisuals;
                 juice.BaseSortingOrder = inHand ? 60 + handCards.FindIndex(c => GetCardId(c) == id)
                     : boardCards.FindIndex(c => GetCardId(c) == id);
                 juice.ConfigureInput(inHand);
                 if (inHand) juice.RememberHome(targetPos, activeCards[id].transform.rotation);
+                Vector3 publicFrom;
+                if (refinedHand && inHand && pendingPublic.TryGetValue(id, out publicFrom) &&
+                    Vector3.Distance(publicFrom, targetPos) > .005f) {
+                    pendingPublic.Remove(id); juice.PublicArrival(publicFrom);
+                }
             }
         }
+        publicHand.Clear();
+        if (publicIds != null) foreach (var id in publicIds) publicHand.Add(id);
+        foreach (var id in new List<string>(pendingPublic.Keys))
+            if (!localHandIds.Contains(id) || !publicHand.Contains(id)) pendingPublic.Remove(id);
+        hasHandSnapshot = true;
     }
 
     private Vector3 Anchor(string name, Vector3 fallback) {
@@ -375,9 +412,12 @@ public class UnityBridge : MonoBehaviour {
         // Gesture delivery is independent of capture rules and legacy CardSlammed.
         var gesture = data.deliveryStyle == "slam";
         var oldPositions = new Dictionary<string, Vector3>();
+        var oldScales = new Dictionary<string, Vector3>();
         foreach (var entry in activeCards) if (entry.Value != null) oldPositions[entry.Key] = entry.Value.transform.position;
+        foreach (var entry in activeCards) if (entry.Value != null) oldScales[entry.Key] = entry.Value.transform.localScale;
         var displayedBoard = capture && data.cards != null ? data.cards : data.board;
-        HandleSyncState(displayedBoard, data.handCards, true);
+        HandleSyncState(displayedBoard, data.handCards, true, data.publicHandIds);
+        ApplyHandSelections(data.handSelections); ApplyHandPoses(data.handPoses);
         foreach (var card in activeCards.Values) {
             var juice = card.GetComponent<CardJuiceController>();
             if (juice != null) juice.ReducedMotion = data.reducedMotion;
@@ -397,8 +437,10 @@ public class UnityBridge : MonoBehaviour {
                     card.GetComponent<CardInstance>()?.SetPresentationPosition(oldPositions.TryGetValue(id, out previous) ? previous
                         : Anchor("seat" + data.actor, target + Vector3.up * 2));
                     var juice = card.GetComponent<CardJuiceController>();
-                    if (juice != null) yield return juice.Fly(target, data.reducedMotion ? 0 : gesture ? .2f : .22f, capture || gesture, contact,
-                        () => Impact(target, capture ? data.team == data.ownTeam : data.actor == 0 || data.actor == 2), gesture);
+                    Vector3 releaseScale;
+                    if (juice != null) yield return juice.Fly(target, data.reducedMotion ? 0 : gesture ? (refinedHand ? .16f : .2f) : .22f, capture || gesture, contact,
+                        () => Impact(target, capture ? data.team == data.ownTeam : data.actor == 0 || data.actor == 2), gesture,
+                        refinedHand && oldScales.TryGetValue(id, out releaseScale) ? (Vector3?)releaseScale : null);
                     else { card.transform.position = target; contact(); }
                 }
             }
@@ -467,15 +509,21 @@ public class UnityBridge : MonoBehaviour {
         impactParticles.Emit(12);
     }
 
-    private void CancelVisuals() {
+    private void CancelVisuals(string movingCardId = null, bool preserveHand = false) {
+        if (!preserveHand) { pendingPublic.Clear(); publicHand.Clear(); hasHandSnapshot = false; }
         submittedCard = null;
         if (visualAction != null) StopCoroutine(visualAction);
         visualAction = null;
         collection?.Kill(); collection = null;
         foreach (var child in visualChildren) if (child != null) StopCoroutine(child);
         visualChildren.Clear();
-        foreach (var card in activeCards.Values) if (card != null) {
-            card.transform.DOKill(); card.GetComponent<CardJuiceController>()?.CancelPose();
+        foreach (var entry in activeCards) if (entry.Value != null) {
+            var card = entry.Value;
+            if (preserveHand && localHandIds.Contains(entry.Key) && entry.Key != movingCardId) continue;
+            card.transform.DOKill();
+            var juice = card.GetComponent<CardJuiceController>();
+            if (preserveHand && entry.Key == movingCardId) juice?.PreserveReleasePose();
+            else juice?.CancelPose();
         }
         if (cameraShake != null) { cameraShake.Kill(); cameraShake = null;
             if (Camera.main != null) Camera.main.transform.position = cameraHome; }
@@ -516,11 +564,13 @@ public class UnityBridge : MonoBehaviour {
     public class MessageData {
         public int protocol, generation, durationMs, contactLeadMs, pauseMs, shakeMs, actor;
         public string eventId, kind, team, ownTeam, deliveryStyle;
-        public bool instant, reducedMotion, peek, queued, slam, trace;
+        public bool instant, reducedMotion, peek, queued, slam, trace, refinedHand;
         public float dragFraction, velocity;
         public List<CardJson> cards;
         public List<VisualAnchor> anchors;
         public List<HandSelection> handSelections;
+        public List<HandPose> handPoses;
+        public List<string> publicHandIds;
         public string type;
         public string cardId;
         public float x;
@@ -533,6 +583,7 @@ public class UnityBridge : MonoBehaviour {
     }
     [Serializable] public class VisualAnchor { public string name; public float x, y, width, height; }
     [Serializable] public class HandSelection { public string cardId; public bool queued, slam; }
+    [Serializable] public class HandPose { public string cardId; public bool peek; public float dragFraction, velocity; }
     [Serializable] private class StringSignal { public string @event, data; }
     [Serializable] private class VisualSignal { public string @event, eventId; public int generation; }
 

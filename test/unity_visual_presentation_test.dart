@@ -5,6 +5,7 @@ import 'package:fake_async/fake_async.dart';
 import 'package:halabessa/features/game/domain/models/match_state.dart';
 import 'package:halabessa/features/game/domain/models/card.dart' as game;
 import 'package:halabessa/features/game/presentation/providers/unity_visual_presentation.dart';
+import 'package:halabessa/features/game/presentation/widgets/hand_card_placement.dart';
 
 final time = DateTime.utc(2026, 10, 14);
 MatchState state(
@@ -251,7 +252,7 @@ void main() {
         final action = sent.last;
         expect(action['kind'], 'CardPlayed');
         expect(action['deliveryStyle'], 'slam');
-        expect(action['durationMs'], 470);
+        expect(action['durationMs'], cardUiRefinements ? 500 : 470);
         expect(
           renderer.contact(action['eventId'], renderer.generation),
           isTrue,
