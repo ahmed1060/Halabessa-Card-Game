@@ -6,6 +6,7 @@ import '../../domain/models/card_feature_state.dart';
 import '../providers/visual_action_queue.dart';
 import 'option_b_table.dart';
 import 'table_style.dart';
+import 'hand_card_placement.dart';
 
 /// Accepted public copies only. This layer cannot play, capture or own a card.
 /// Flutter owns this overlay for both card renderers. A native adapter must
@@ -14,6 +15,9 @@ class ShownCardLayer extends StatefulWidget {
   final List<ShownCard> cards;
   final List<String> seats;
   final String localUid;
+  final bool ownerInHand;
+  final Map<String, int> heldCounts;
+  final String? dealerUid;
   final OptionBGeometry geometry;
   final Widget Function(game.Card, double, double) faceBuilder;
   final Widget Function(double, double) backBuilder;
@@ -23,6 +27,9 @@ class ShownCardLayer extends StatefulWidget {
     required this.cards,
     required this.seats,
     required this.localUid,
+    this.ownerInHand = false,
+    this.heldCounts = const {},
+    this.dealerUid,
     required this.geometry,
     required this.faceBuilder,
     required this.backBuilder,
@@ -48,7 +55,11 @@ class _ShownCardLayerState extends State<ShownCardLayer>
       _contact?.cancel();
       _contact = Timer(
         Duration(
-          milliseconds: (action.duration.inMilliseconds * .64 - 30).round(),
+          milliseconds:
+              (action.duration.inMilliseconds *
+                          (cardUiRefinements ? 320 / 520 : .64) -
+                      30)
+                  .round(),
         ),
         () {
           if (mounted && widget.cards.any((c) => c.eventId == action.id)) {
@@ -120,7 +131,11 @@ class _ShownCardLayerState extends State<ShownCardLayer>
         VisualAction(
           card.eventId,
           card,
-          Duration(milliseconds: _queue.active == null ? 470 : 180),
+          Duration(
+            milliseconds: _queue.active == null
+                ? (cardUiRefinements ? 520 : 470)
+                : 180,
+          ),
         ),
       );
     }
@@ -149,12 +164,32 @@ class _ShownCardLayerState extends State<ShownCardLayer>
   );
 
   List<Widget> _seatCards(String uid, int seat) {
+    if (widget.ownerInHand && uid == widget.localUid) return const [];
     final cards = widget.cards.where((c) => c.ownerUid == uid).take(3).toList();
     final g = widget.geometry;
-    final width = g.landscape ? 30.0 : 24.0, height = width * 1.44;
+    final width = cardUiRefinements
+            ? 32.0
+            : g.landscape
+            ? 30.0
+            : 24.0,
+        height = width * 1.44;
     final group = width * 3 + 6;
     Rect area;
-    if (!g.landscape) {
+    if (cardUiRefinements && seat != 0) {
+      final base = seat == 1
+          ? g.right
+          : seat == 2
+          ? g.partner
+          : g.left;
+      final total = (widget.heldCounts[uid] ?? 4).clamp(0, 4);
+      final hidden = (total - cards.length).clamp(0, 4);
+      area = Rect.fromLTWH(
+        base.left + 11 + (seat == 2 ? 92 : 0) + (hidden + (4 - total) / 2) * 24,
+        base.top + (seat == 2 ? 24 : 88 + (widget.dealerUid == uid ? 16 : 0)),
+        group,
+        height,
+      );
+    } else if (!g.landscape) {
       // One compact, seat-ordered disclosure rail, separated from live cards.
       area = Rect.fromLTWH(
         (g.size.width - group * 4 - 12) / 2 + seat * (group + 4),
@@ -187,7 +222,12 @@ class _ShownCardLayerState extends State<ShownCardLayer>
         if (!_waiting.contains(cards[i].eventId))
           _copy(
             cards[i],
-            Rect.fromLTWH(area.left + i * (width + 3), area.top, width, height),
+            Rect.fromLTWH(
+              area.left + i * (cardUiRefinements ? 24 : width + 3),
+              area.top,
+              width,
+              height,
+            ),
             seat,
           ),
     ];
@@ -196,9 +236,18 @@ class _ShownCardLayerState extends State<ShownCardLayer>
   Widget _copy(ShownCard card, Rect target, int seat) {
     final active = _queue.active?.id == card.eventId;
     final t = active ? _motion.value : 1.0;
-    final flight = ((t - .21) / .43).clamp(0.0, 1.0);
-    final approach = (t / .21).clamp(0.0, 1.0);
-    final settle = ((t - .75) / .25).clamp(0.0, 1.0);
+    final flight =
+        ((t - (cardUiRefinements ? 100 / 520 : .21)) /
+                (cardUiRefinements ? 220 / 520 : .43))
+            .clamp(0.0, 1.0);
+    final approach = (t / (cardUiRefinements ? 100 / 520 : .21)).clamp(
+      0.0,
+      1.0,
+    );
+    final settle =
+        ((t - (cardUiRefinements ? 370 / 520 : .75)) /
+                (cardUiRefinements ? 150 / 520 : .25))
+            .clamp(0.0, 1.0);
     final from = seat == 0
         ? widget.geometry.hand.center
         : switch (seat) {
@@ -211,7 +260,9 @@ class _ShownCardLayerState extends State<ShownCardLayer>
       target.center,
       Curves.easeInCubic.transform(flight),
     )!;
-    final scale = t < .64 ? 1 + .5 * approach * (1 - flight) : 1.0;
+    final scale = t < (cardUiRefinements ? 320 / 520 : .64)
+        ? 1 + (cardUiRefinements ? 1.5 : .5) * approach * (1 - flight)
+        : 1.0;
     final punch = math.sin(math.pi * settle) * .06;
     final flip = card.ownerUid == widget.localUid || !active ? 1.0 : flight;
     final front = flip >= .5;

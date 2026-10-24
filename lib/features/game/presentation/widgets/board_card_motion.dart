@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import 'dart:math' as math;
 import '../providers/visual_action_queue.dart';
+import 'hand_card_placement.dart';
 
 /// One-shot travel for a card arriving on the board. The card's identity is
 /// supplied as the widget key, so unrelated table rebuilds do not replay it.
@@ -14,6 +15,7 @@ class BoardCardMotion extends StatefulWidget {
   final bool alreadyArrived;
   final VoidCallback? onContact;
   final bool gestureSlam;
+  final double? initialScale;
 
   const BoardCardMotion({
     super.key,
@@ -25,6 +27,7 @@ class BoardCardMotion extends StatefulWidget {
     required this.child,
     this.onContact,
     this.gestureSlam = false,
+    this.initialScale,
   });
 
   @override
@@ -37,7 +40,9 @@ class _BoardCardMotionState extends State<BoardCardMotion>
   late final AnimationController _controller = AnimationController(
     vsync: this,
     duration:
-        (_slam ? const Duration(milliseconds: 470) : widget.travelDuration) +
+        (_slam
+            ? Duration(milliseconds: cardUiRefinements ? 500 : 470)
+            : widget.travelDuration) +
         widget.delay,
   );
   Timer? _contact;
@@ -84,19 +89,28 @@ class _BoardCardMotionState extends State<BoardCardMotion>
     builder: (context, child) {
       if (_slam) {
         final ms =
-            _controller.value * (470 + widget.delay.inMilliseconds) -
+            _controller.value *
+                ((cardUiRefinements ? 500 : 470) +
+                    widget.delay.inMilliseconds) -
             widget.delay.inMilliseconds;
-        final flight = ((ms - 100) / 200).clamp(0.0, 1.0);
+        final flight =
+            ((ms - (cardUiRefinements ? 140 : 100)) /
+                    (cardUiRefinements ? 160 : 200))
+                .clamp(0.0, 1.0);
         final eased = Curves.easeInCubic.transform(flight);
-        final windup = (ms / 100).clamp(0.0, 1.0);
-        final settle = ((ms - 350) / 120).clamp(0.0, 1.0);
-        final punch = math.sin(math.pi * settle) * .06;
+        final windup = (ms / (cardUiRefinements ? 140 : 100)).clamp(0.0, 1.0);
+        final settle = ((ms - 350) / (cardUiRefinements ? 150 : 120)).clamp(
+          0.0,
+          1.0,
+        );
+        final punch =
+            math.sin(math.pi * settle) * (cardUiRefinements ? .12 : .06);
         return Transform.translate(
           offset:
               widget.origin * (1 - eased) +
               Offset(
                 math.sin(settle * math.pi * 6) * 1.5 * (1 - settle),
-                -14 * windup * (1 - eased),
+                -(cardUiRefinements ? 32 : 14) * windup * (1 - eased),
               ),
           child: Transform(
             alignment: Alignment.center,
@@ -104,12 +118,19 @@ class _BoardCardMotionState extends State<BoardCardMotion>
               ..setEntry(3, 2, .001)
               ..rotateX(-.15 * math.sin(math.pi * flight))
               ..scaleByDouble(
-                1 + .2 * windup * (1 - eased) + punch,
-                1 + .2 * windup * (1 - eased) - punch,
+                1 +
+                    (cardUiRefinements ? .6 : .2) * windup * (1 - eased) +
+                    punch,
+                1 +
+                    (cardUiRefinements ? .6 : .2) * windup * (1 - eased) -
+                    punch,
                 1,
                 1,
               ),
-            child: child,
+            child: Transform.scale(
+              scale: (widget.initialScale ?? 1) * (1 - eased) + eased,
+              child: child,
+            ),
           ),
         );
       }
@@ -126,8 +147,8 @@ class _BoardCardMotionState extends State<BoardCardMotion>
             Offset(0, cardJuiceEnabled ? -math.sin(math.pi * travel) * 12 : 0),
         child: Transform.scale(
           scale:
-              0.84 +
-              0.16 * progress +
+              (widget.initialScale ?? .84) * (1 - progress) +
+              progress +
               (cardJuiceEnabled
                   ? math.sin(math.pi * ((travel - .75) / .25).clamp(0, 1)) *
                         .025

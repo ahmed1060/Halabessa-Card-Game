@@ -5,6 +5,7 @@ import 'package:halabessa/features/game/domain/models/card_feature_state.dart';
 import 'package:halabessa/features/game/presentation/widgets/shown_card_layer.dart';
 import 'package:halabessa/features/game/presentation/widgets/option_b_table.dart';
 import 'package:halabessa/features/game/presentation/widgets/board_card_motion.dart';
+import 'package:halabessa/features/game/presentation/widgets/hand_card_placement.dart';
 
 const seats = ['a', 'b', 'c', 'd'];
 final copies = [
@@ -98,7 +99,21 @@ void main() {
         }
         for (var a = 0; a < boxes.length; a++)
           for (var b = a + 1; b < boxes.length; b++) {
-            expect(boxes[a].overlaps(boxes[b]), false);
+            if (!cardUiRefinements ||
+                copies[a].ownerUid != copies[b].ownerUid) {
+              expect(
+                boxes[a].overlaps(boxes[b]),
+                false,
+                reason: 'different players never share a public slot',
+              );
+            } else {
+              expect(
+                boxes[a].intersect(boxes[b]).width,
+                lessThan(12),
+                reason:
+                    'only slight same-owner fan overlap; ranks remain exposed',
+              );
+            }
           }
         await tester.pumpWidget(scene(copies.skip(1).toList()));
         expect(find.byKey(const ValueKey('shown-0:0')), findsNothing);
@@ -124,7 +139,7 @@ void main() {
     );
     await tester.pumpWidget(scene([]));
     await tester.pumpWidget(scene([copies.first]));
-    await tester.pump(const Duration(milliseconds: 269));
+    await tester.pump(Duration(milliseconds: cardUiRefinements ? 289 : 269));
     expect(contacts, 0);
     await tester.pump(const Duration(milliseconds: 2));
     expect(contacts, 1);

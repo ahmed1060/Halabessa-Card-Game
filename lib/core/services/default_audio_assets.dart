@@ -9,13 +9,21 @@ class DefaultAudioAssets {
   static final Map<String, String> _cache = {};
 
   /// Quiet, seamless local ambience. No downloaded music or remote overrides.
-  static String getMusic() => _cache.putIfAbsent('local_music', () =>
-    _synthesize(durationSeconds: 4, generator: (t) {
-      // Integer-cycle frequencies make the four-second loop continuous.
-      final slow = .7 + .3 * sin(2 * pi * .25 * t);
-      return (sin(2 * pi * 130.75 * t) + .5 * sin(2 * pi * 196 * t) +
-        .3 * sin(2 * pi * 261.5 * t)) * slow * .08;
-    }));
+  static String getMusic() => _cache.putIfAbsent(
+    'local_music',
+    () => _synthesize(
+      durationSeconds: 4,
+      generator: (t) {
+        // Integer-cycle frequencies make the four-second loop continuous.
+        final slow = .7 + .3 * sin(2 * pi * .25 * t);
+        return (sin(2 * pi * 130.75 * t) +
+                .5 * sin(2 * pi * 196 * t) +
+                .3 * sin(2 * pi * 261.5 * t)) *
+            slow *
+            .08;
+      },
+    ),
+  );
 
   static String? getSfx(String assetPath) {
     if (_cache.containsKey(assetPath)) {
@@ -30,104 +38,145 @@ class DefaultAudioAssets {
   }
 
   static String? _generateSfx(String assetPath) {
+    if (const bool.fromEnvironment('HALABESSA_CARD_UI_REFINEMENTS') &&
+        RegExp(r'^sfx/slam_[0-2]\.mp3$').hasMatch(assetPath)) {
+      // Approved candidate A, 24 Oct 2026. Keep every existing routing slot,
+      // but use only the selected waveform, not an unapproved alternate sound.
+      return _cache.putIfAbsent('approved_dry_paper_edge', _dryPaperEdge);
+    }
     // Bounded, cached local fallbacks, distinct from capture/scoring chimes.
     if (RegExp(r'^sfx/slam_[0-2]\.mp3$').hasMatch(assetPath) ||
         assetPath == 'sfx/reveal.mp3') {
-      final variant = assetPath == 'sfx/reveal.mp3' ? 0 : int.parse(assetPath[9]);
+      final variant = assetPath == 'sfx/reveal.mp3'
+          ? 0
+          : int.parse(assetPath[9]);
       final random = Random(8701 + variant);
       final strong = assetPath != 'sfx/reveal.mp3';
-      return _synthesize(durationSeconds: strong ? .14 : .10, generator: (t) {
-        final snap = (random.nextDouble() * 2 - 1) * exp(-t * (strong ? 85 : 100));
-        final body = sin(2 * pi * (190 + variant * 17) * t) * exp(-t * 43);
-        final flutter = sin(2 * pi * 47 * t) *
-          (random.nextDouble() * 2 - 1) * exp(-t * 35);
-        return (snap * .64 + body * .24 + flutter * .12) * (strong ? .9 : .6);
-      });
+      return _synthesize(
+        durationSeconds: strong ? .14 : .10,
+        generator: (t) {
+          final snap =
+              (random.nextDouble() * 2 - 1) * exp(-t * (strong ? 85 : 100));
+          final body = sin(2 * pi * (190 + variant * 17) * t) * exp(-t * 43);
+          final flutter =
+              sin(2 * pi * 47 * t) *
+              (random.nextDouble() * 2 - 1) *
+              exp(-t * 35);
+          return (snap * .64 + body * .24 + flutter * .12) * (strong ? .9 : .6);
+        },
+      );
     }
     if (assetPath == 'sfx/pick.mp3' || assetPath == 'sfx/return.mp3') {
       final random = Random(394);
-      return _synthesize(durationSeconds: .045, generator: (t) =>
-        (random.nextDouble() * 2 - 1) * exp(-t * 110) * .14);
+      return _synthesize(
+        durationSeconds: .045,
+        generator: (t) => (random.nextDouble() * 2 - 1) * exp(-t * 110) * .14,
+      );
     }
     switch (assetPath) {
       case 'sfx/play.mp3':
         // Crisp card snap on felt table: short noise burst with steep exponential decay
-        return _synthesize(durationSeconds: 0.08, generator: (t) {
-          final decay = exp(-t * 60);
-          final noise = (Random().nextDouble() * 2 - 1) * 0.7;
-          final tone = sin(2 * pi * 320 * t) * 0.3;
-          return (noise + tone) * decay;
-        });
+        return _synthesize(
+          durationSeconds: 0.08,
+          generator: (t) {
+            final decay = exp(-t * 60);
+            final noise = (Random().nextDouble() * 2 - 1) * 0.7;
+            final tone = sin(2 * pi * 320 * t) * 0.3;
+            return (noise + tone) * decay;
+          },
+        );
 
       case 'sfx/deal.mp3':
         // Card whoosh / slide: rising gentle noise sweep
-        return _synthesize(durationSeconds: 0.12, generator: (t) {
-          final progress = t / 0.12;
-          final envelope = sin(pi * progress);
-          final freq = 400 + progress * 600;
-          final noise = (Random().nextDouble() * 2 - 1) * 0.4;
-          return (sin(2 * pi * freq * t) * 0.6 + noise) * envelope * 0.5;
-        });
+        return _synthesize(
+          durationSeconds: 0.12,
+          generator: (t) {
+            final progress = t / 0.12;
+            final envelope = sin(pi * progress);
+            final freq = 400 + progress * 600;
+            final noise = (Random().nextDouble() * 2 - 1) * 0.4;
+            return (sin(2 * pi * freq * t) * 0.6 + noise) * envelope * 0.5;
+          },
+        );
 
       case 'sfx/capture.mp3':
         // Capture / sweep: bright ascending chime
-        return _synthesize(durationSeconds: 0.28, generator: (t) {
-          final decay = exp(-t * 12);
-          final f1 = sin(2 * pi * 523.25 * t); // C5
-          final f2 = sin(2 * pi * 659.25 * t); // E5
-          final f3 = sin(2 * pi * 783.99 * t); // G5
-          final f4 = sin(2 * pi * 1046.50 * t); // C6
-          return (f1 * 0.3 + f2 * 0.3 + f3 * 0.25 + f4 * 0.25) * decay;
-        });
+        return _synthesize(
+          durationSeconds: 0.28,
+          generator: (t) {
+            final decay = exp(-t * 12);
+            final f1 = sin(2 * pi * 523.25 * t); // C5
+            final f2 = sin(2 * pi * 659.25 * t); // E5
+            final f3 = sin(2 * pi * 783.99 * t); // G5
+            final f4 = sin(2 * pi * 1046.50 * t); // C6
+            return (f1 * 0.3 + f2 * 0.3 + f3 * 0.25 + f4 * 0.25) * decay;
+          },
+        );
 
       case 'sfx/shuffle.mp3':
         // Card riffle flutter: rapid micro-ticks
-        return _synthesize(durationSeconds: 0.35, generator: (t) {
-          final tick = sin(2 * pi * 25 * t);
-          final envelope = sin(pi * (t / 0.35));
-          final noise = (Random().nextDouble() * 2 - 1) * (tick > 0.4 ? 0.9 : 0.1);
-          return noise * envelope * 0.6;
-        });
+        return _synthesize(
+          durationSeconds: 0.35,
+          generator: (t) {
+            final tick = sin(2 * pi * 25 * t);
+            final envelope = sin(pi * (t / 0.35));
+            final noise =
+                (Random().nextDouble() * 2 - 1) * (tick > 0.4 ? 0.9 : 0.1);
+            return noise * envelope * 0.6;
+          },
+        );
 
       case 'sfx/cut.mp3':
         // Deck cut thud: low knock
-        return _synthesize(durationSeconds: 0.10, generator: (t) {
-          final decay = exp(-t * 45);
-          final low = sin(2 * pi * 140 * t) * 0.8;
-          final sub = sin(2 * pi * 70 * t) * 0.5;
-          return (low + sub) * decay;
-        });
+        return _synthesize(
+          durationSeconds: 0.10,
+          generator: (t) {
+            final decay = exp(-t * 45);
+            final low = sin(2 * pi * 140 * t) * 0.8;
+            final sub = sin(2 * pi * 70 * t) * 0.5;
+            return (low + sub) * decay;
+          },
+        );
 
       case 'sfx/win.mp3':
         // Victory fanfare: bright ascending triad
-        return _synthesize(durationSeconds: 0.65, generator: (t) {
-          double freq = 523.25; // C5
-          if (t > 0.15) freq = 659.25; // E5
-          if (t > 0.30) freq = 783.99; // G5
-          if (t > 0.45) freq = 1046.50; // C6
-          final noteTime = t % 0.15;
-          final decay = exp(-noteTime * 10);
-          final harmonic = sin(2 * pi * freq * 2 * t) * 0.2;
-          return (sin(2 * pi * freq * t) * 0.8 + harmonic) * decay * 0.7;
-        });
+        return _synthesize(
+          durationSeconds: 0.65,
+          generator: (t) {
+            double freq = 523.25; // C5
+            if (t > 0.15) freq = 659.25; // E5
+            if (t > 0.30) freq = 783.99; // G5
+            if (t > 0.45) freq = 1046.50; // C6
+            final noteTime = t % 0.15;
+            final decay = exp(-noteTime * 10);
+            final harmonic = sin(2 * pi * freq * 2 * t) * 0.2;
+            return (sin(2 * pi * freq * t) * 0.8 + harmonic) * decay * 0.7;
+          },
+        );
 
       case 'sfx/lose.mp3':
         // Defeat tone: descending minor chime
-        return _synthesize(durationSeconds: 0.45, generator: (t) {
-          final progress = t / 0.45;
-          final freq = 380 - progress * 140;
-          final decay = exp(-t * 7);
-          return sin(2 * pi * freq * t) * decay * 0.6;
-        });
+        return _synthesize(
+          durationSeconds: 0.45,
+          generator: (t) {
+            final progress = t / 0.45;
+            final freq = 380 - progress * 140;
+            final decay = exp(-t * 7);
+            return sin(2 * pi * freq * t) * decay * 0.6;
+          },
+        );
 
       case 'sfx/purchase.mp3':
         // Coin clink: dual high pitch bells
-        return _synthesize(durationSeconds: 0.25, generator: (t) {
-          final decay = exp(-t * 18);
-          final bell1 = sin(2 * pi * 1567.98 * t) * 0.6; // G6
-          final bell2 = sin(2 * pi * 2093.00 * t) * 0.4; // C7
-          return (bell1 + bell2) * decay;
-        });
+        return _synthesize(
+          durationSeconds: 0.25,
+          generator: (t) {
+            final decay = exp(-t * 18);
+            final bell1 = sin(2 * pi * 1567.98 * t) * 0.6; // G6
+            final bell2 = sin(2 * pi * 2093.00 * t) * 0.4; // C7
+            return (bell1 + bell2) * decay;
+          },
+        );
 
       default:
         return null;
@@ -135,10 +184,32 @@ class DefaultAudioAssets {
   }
 
   /// Synthesizes 16-bit Mono PCM WAV audio and returns a Data URI.
+  static String _dryPaperEdge() {
+    final random = Random(9260);
+    var low = 0.0, paper = 0.0;
+    return _synthesize(
+      durationSeconds: .22,
+      sampleRate: 44100,
+      roundPcm: true,
+      generator: (t) {
+        final noise = random.nextDouble() * 2 - 1;
+        low += .055 * (noise - low);
+        paper += .38 * (noise - paper);
+        final click = (noise - paper) * exp(-t * 1100) * .65;
+        final edge = paper * exp(-pow((t - .007) / .004, 2)) * 1.8;
+        final flex =
+            (noise - low) * exp(-t * 95) * (.14 + .1 * sin(2 * pi * 75 * t));
+        final body = (low * 1.6 + sin(2 * pi * 185 * t) * .16) * exp(-t * 70);
+        return ((click + edge + flex + body) * .8).clamp(-.95, .95);
+      },
+    );
+  }
+
   static String _synthesize({
     required double durationSeconds,
     required double Function(double t) generator,
     int sampleRate = 22050,
+    bool roundPcm = false,
   }) {
     final int numSamples = (durationSeconds * sampleRate).toInt();
     final int byteRate = sampleRate * 2;
@@ -153,8 +224,8 @@ class DefaultAudioAssets {
     bytes.setUint8(2, 0x46); // 'F'
     bytes.setUint8(3, 0x46); // 'F'
     bytes.setUint32(4, totalFileSize, Endian.little);
-    bytes.setUint8(8, 0x57);  // 'W'
-    bytes.setUint8(9, 0x41);  // 'A'
+    bytes.setUint8(8, 0x57); // 'W'
+    bytes.setUint8(9, 0x41); // 'A'
     bytes.setUint8(10, 0x56); // 'V'
     bytes.setUint8(11, 0x45); // 'E'
 
@@ -164,11 +235,15 @@ class DefaultAudioAssets {
     bytes.setUint8(14, 0x74); // 't'
     bytes.setUint8(15, 0x20); // ' '
     bytes.setUint32(16, 16, Endian.little); // Subchunk1Size (16 for PCM)
-    bytes.setUint16(20, 1, Endian.little);  // AudioFormat (1 = PCM)
-    bytes.setUint16(22, 1, Endian.little);  // NumChannels (1 = Mono)
+    bytes.setUint16(20, 1, Endian.little); // AudioFormat (1 = PCM)
+    bytes.setUint16(22, 1, Endian.little); // NumChannels (1 = Mono)
     bytes.setUint32(24, sampleRate, Endian.little);
     bytes.setUint32(28, byteRate, Endian.little);
-    bytes.setUint16(32, 2, Endian.little);  // BlockAlign (NumChannels * BitsPerSample/8)
+    bytes.setUint16(
+      32,
+      2,
+      Endian.little,
+    ); // BlockAlign (NumChannels * BitsPerSample/8)
     bytes.setUint16(34, 16, Endian.little); // BitsPerSample (16 bits)
 
     // "data" sub-chunk
@@ -183,7 +258,11 @@ class DefaultAudioAssets {
     for (int i = 0; i < numSamples; i++) {
       final double t = i / sampleRate;
       final double sample = generator(t).clamp(-1.0, 1.0);
-      final int pcm16 = (sample * 32767).toInt().clamp(-32768, 32767);
+      final value = sample * 32767;
+      final int pcm16 = (roundPcm ? value.round() : value.toInt()).clamp(
+        -32768,
+        32767,
+      );
       bytes.setInt16(byteOffset, pcm16, Endian.little);
       byteOffset += 2;
     }

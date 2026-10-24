@@ -12,34 +12,15 @@ import 'local_card_play_layer.dart';
 import 'card_juice_controller.dart';
 import 'option_b_table.dart' show OptionBGeometry;
 import '../providers/visual_action_queue.dart';
+import 'hand_card_placement.dart';
+export 'hand_card_placement.dart' show HandFanGeometry;
 export 'local_card_play_layer.dart' show CardPlayOrigin;
-
-/// Shared by the Flutter hit targets and Unity's normalized visual anchors.
-class HandFanGeometry {
-  final double width, height, spacing;
-  const HandFanGeometry._(this.width, this.height, this.spacing);
-  factory HandFanGeometry(
-    double available, {
-    bool compact = false,
-    double spread = 1,
-  }) {
-    // Widen the fan without scaling the card artwork itself.
-    final sizingWidth = available / spread;
-    final width = math.min(
-      compact ? 60.0 : 118.0,
-      math.max(40.0, (sizingWidth - 24) / 3.2),
-    );
-    return HandFanGeometry._(
-      width,
-      width * 1.43,
-      math.max(0.0, (available - 16 - width) / 3),
-    );
-  }
-}
 
 /// Bounded, keyboard-accessible hand. Queued cards use identity, not list index.
 class FannedHandWidget extends StatefulWidget {
   final List<game_card.Card> cards;
+  final Set<String> publicCardIds;
+  final ValueChanged<String?>? onSpecialIntentChanged;
   final FutureOr<void> Function(game_card.Card, CardPlayOrigin origin)
   onCardTap;
   final game_card.Card? hiddenCard;
@@ -74,6 +55,8 @@ class FannedHandWidget extends StatefulWidget {
   const FannedHandWidget({
     super.key,
     required this.cards,
+    this.publicCardIds = const {},
+    this.onSpecialIntentChanged,
     required this.onCardTap,
     this.isMyTurn = false,
     this.interactionEnabled = true,
@@ -112,6 +95,21 @@ class _FannedHandWidgetState extends State<FannedHandWidget>
   CardPlayOrigin _queuedOrigin = const CardPlayOrigin(Rect.zero, 0);
   game_card.Card? _focused;
   final _geometry = <game_card.Card, CardPlayOrigin Function()>{};
+  final _artKeys = <game_card.Card, GlobalKey>{};
+  final _freshPublic = <String>{};
+  bool _dragging = false;
+  double _queuedLift = 0, _pendingLift = 0, _cardHeight = 120;
+  String? _publishedIntent;
+
+  double _lift(game_card.Card card) => !cardUiRefinements
+      ? 0
+      : _pressed == card && _dragging
+      ? -_dragDistance.clamp(-handLiftSpace + 8, 28).toDouble()
+      : _pendingCard == card
+      ? _pendingLift
+      : _queued == card
+      ? _queuedLift
+      : 0;
   Timer? _autoPlay;
   Timer? _tapGuard;
   bool _submitting = false;
@@ -184,6 +182,7 @@ class _FannedHandWidgetState extends State<FannedHandWidget>
     _pressed = null;
     _dragDistance = 0;
     _dragVelocity = 0;
+    _dragging = false;
     if (!mounted) return;
     // A recognizer can cancel while a card is removed or its callbacks are
     // disabled during layout. Clear intent now; repaint after the locked tree.
@@ -234,6 +233,13 @@ class _FannedHandWidgetState extends State<FannedHandWidget>
       _stopHoldFeedback(rebuild: false);
     }
     _geometry.removeWhere((card, _) => !widget.cards.contains(card));
+    _artKeys.removeWhere((card, _) => !widget.cards.contains(card));
+    _freshPublic.removeWhere((id) => !widget.publicCardIds.contains(id));
+    _freshPublic.addAll(
+      widget.publicCardIds
+          .difference(oldWidget.publicCardIds)
+          .where((id) => oldWidget.cards.any((c) => c.firebaseKey == id)),
+    );
     if (!widget.cards.contains(_queued)) {
       _queued = null;
       _autoPlay?.cancel();
@@ -263,6 +269,8 @@ class _FannedHandWidgetState extends State<FannedHandWidget>
     CardPlayOrigin origin, {
     bool slam = false,
     bool fromQueue = false,
+    bool fromSwipe = false,
+    double? releaseLift,
   }) async {
     if (!widget.interactionEnabled ||
         _submitting ||
@@ -272,7 +280,7 @@ class _FannedHandWidgetState extends State<FannedHandWidget>
     _autoPlay?.cancel();
     // A short tap on the queued card cancels even during the 300ms turn-entry
     // window. The automatic execution path must not cancel its own selection.
-    if (!fromQueue && !slam && _queued == card) {
+    if (!fromQueue && !fromSwipe && !slam && _queued == card) {
       setState(() {
         _queued = null;
         _queuedSlam = false;
@@ -287,16 +295,22 @@ class _FannedHandWidgetState extends State<FannedHandWidget>
       widget.onUnavailable?.call();
       return; // Exhausted slam must never fall through to normal play.
     }
-    origin = _geometry[card]?.call() ?? origin;
+    if (!cardUiRefinements || fromQueue)
+      origin = _geometry[card]?.call() ?? origin;
     if (!widget.isMyTurn) {
       setState(() {
         _queued = card;
         _queuedSlam = slam;
         _queuedOrigin = origin;
+        _queuedLift = (releaseLift ?? _cardHeight * .25).clamp(
+          _cardHeight * .2,
+          math.min(handLiftSpace - 8, _cardHeight * .35),
+        );
       });
       return;
     }
     setState(() {
+      _pendingLift = releaseLift ?? _lift(card);
       _queued = null;
       _submitting = true;
       _pendingCard = card;
@@ -333,6 +347,7 @@ class _FannedHandWidgetState extends State<FannedHandWidget>
         _submitting ||
         !widget.cards.contains(card))
       return;
+    if (widget.publicCardIds.contains(card.firebaseKey)) return;
     if (widget.onCardReveal == null || widget.revealUsesRemaining <= 0) {
       widget.onUnavailable?.call();
       return;
@@ -352,6 +367,19 @@ class _FannedHandWidgetState extends State<FannedHandWidget>
 
   @override
   Widget build(BuildContext context) {
+    final intent = widget.cards.isEmpty
+        ? null
+        : _slamArmed || (_queued != null && _queuedSlam)
+        ? 'slam'
+        : _pressed != null && _dragDistance > 18 && widget.onCardReveal != null
+        ? 'reveal'
+        : null;
+    if (_publishedIntent != intent) {
+      _publishedIntent = intent;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) widget.onSpecialIntentChanged?.call(intent);
+      });
+    }
     if (widget.cards.isEmpty) return const SizedBox.shrink();
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -371,14 +399,21 @@ class _FannedHandWidgetState extends State<FannedHandWidget>
         );
         final width = geometry.width;
         final height = geometry.height;
+        _cardHeight = height;
         final spacing = geometry.spacing;
         final fanWidth = width + spacing * 3;
         final totalWidth = width + spacing * (widget.cards.length - 1);
         final firstCardLeft = (fanWidth - totalWidth) / 2;
+        final placement = HandCardPlacement(
+          widget.cards,
+          widget.publicCardIds,
+          geometry,
+        );
+        final liftSpace = cardUiRefinements ? handLiftSpace : 0.0;
         final reducedMotion = MediaQuery.disableAnimationsOf(context);
         final raised = _pressed ?? _hovered ?? _focused ?? _queued;
         final order = [
-          for (var i = 0; i < widget.cards.length; i++)
+          for (final i in placement.ordered.map(widget.cards.indexOf))
             if (widget.cards[i] != raised) i,
           for (var i = 0; i < widget.cards.length; i++)
             if (widget.cards[i] == raised) i,
@@ -387,11 +422,11 @@ class _FannedHandWidgetState extends State<FannedHandWidget>
           heightFactor: 1,
           child: OverflowBox(
             fit: OverflowBoxFit.deferToChild,
-            minHeight: height + 28,
-            maxHeight: height + 28,
+            minHeight: height + 28 + liftSpace,
+            maxHeight: height + 28 + liftSpace,
             child: SizedBox(
               width: fanWidth,
-              height: height + 28,
+              height: height + 28 + liftSpace,
               child: Stack(
                 clipBehavior: Clip.none,
                 children: [
@@ -400,19 +435,48 @@ class _FannedHandWidgetState extends State<FannedHandWidget>
                       key: ValueKey(
                         'hand-slot-${widget.cards[index].firebaseKey}',
                       ),
-                      duration: reducedMotion
+                      duration:
+                          reducedMotion ||
+                              (cardUiRefinements &&
+                                  _pressed == widget.cards[index] &&
+                                  _dragging)
                           ? Duration.zero
-                          : const Duration(milliseconds: 180),
-                      curve: Curves.easeOutCubic,
-                      left: firstCardLeft + index * spacing,
+                          : cardUiRefinements &&
+                                _freshPublic.contains(
+                                  widget.cards[index].firebaseKey,
+                                )
+                          ? const Duration(milliseconds: 520)
+                          : Duration(
+                              milliseconds: cardUiRefinements ? 140 : 180,
+                            ),
+                      curve:
+                          cardUiRefinements &&
+                              _freshPublic.contains(
+                                widget.cards[index].firebaseKey,
+                              )
+                          ? const Interval(
+                              100 / 520,
+                              320 / 520,
+                              curve: Curves.easeInCubic,
+                            )
+                          : Curves.easeOutCubic,
+                      left: cardUiRefinements
+                          ? placement.offset(widget.cards[index]).dx
+                          : firstCardLeft + index * spacing,
                       bottom:
                           8 +
                           (cardJuiceEnabled
-                              ? handArc(index, widget.cards.length)
-                              : 0),
+                              ? (cardUiRefinements
+                                    ? placement.offset(widget.cards[index]).dy
+                                    : handArc(index, widget.cards.length))
+                              : 0) +
+                          _lift(widget.cards[index]),
                       child: Builder(
                         builder: (cardContext) {
                           final card = widget.cards[index];
+                          final public =
+                              cardUiRefinements &&
+                              widget.publicCardIds.contains(card.firebaseKey);
                           final pending = _pendingCard == card;
                           final selected = _queued == card || pending;
                           final slamSelected =
@@ -439,11 +503,18 @@ class _FannedHandWidgetState extends State<FannedHandWidget>
                                 );
                             });
                           }
-                          final angle =
-                              (index - (widget.cards.length - 1) / 2) * .035;
+                          final angle = cardUiRefinements
+                              ? placement.angle(card)
+                              : (index - (widget.cards.length - 1) / 2) * .035;
+                          final peek =
+                              card == raised &&
+                              !pending &&
+                              (!cardUiRefinements ||
+                                  (_queued != card && !_dragging));
                           if (widget.onVisualPose != null) {
-                            final peek = card == raised && !pending;
-                            final drag = _pressed == card
+                            final drag = cardUiRefinements
+                                ? -_lift(card) / height
+                                : _pressed == card
                                 ? _dragDistance.clamp(-48, 20) / height
                                 : 0.0;
                             final velocity = _pressed == card
@@ -468,7 +539,11 @@ class _FannedHandWidgetState extends State<FannedHandWidget>
 
                           _geometry[card] = () {
                             final box =
-                                cardContext.findRenderObject() as RenderBox?;
+                                (cardUiRefinements
+                                        ? _artKeys[card]?.currentContext
+                                              ?.findRenderObject()
+                                        : cardContext.findRenderObject())
+                                    as RenderBox?;
                             return CardPlayOrigin(
                               Rect.fromPoints(
                                 box?.localToGlobal(Offset.zero) ?? Offset.zero,
@@ -487,8 +562,8 @@ class _FannedHandWidgetState extends State<FannedHandWidget>
                             ),
                             offset: Offset(holdVibration, 0),
                             child: CardJuiceController(
-                              peek: card == raised && !pending,
-                              drag: _pressed == card
+                              peek: peek,
+                              drag: !cardUiRefinements && _pressed == card
                                   ? Offset(0, _dragDistance.clamp(-48, 20))
                                   : Offset.zero,
                               velocity: _pressed == card ? _dragVelocity : 0,
@@ -500,6 +575,10 @@ class _FannedHandWidgetState extends State<FannedHandWidget>
                                 child: ExcludeSemantics(
                                   child: IgnorePointer(
                                     child: SizedBox(
+                                      key: _artKeys.putIfAbsent(
+                                        card,
+                                        GlobalKey.new,
+                                      ),
                                       width: width,
                                       height: height,
                                       child: Stack(
@@ -514,9 +593,12 @@ class _FannedHandWidgetState extends State<FannedHandWidget>
                                                 width: width,
                                                 height: height,
                                               ),
-                                          if (selected ||
-                                              slamSelected ||
-                                              _focused == card)
+                                          if ((!cardUiRefinements &&
+                                                  (selected ||
+                                                      slamSelected ||
+                                                      _focused == card)) ||
+                                              (cardUiRefinements &&
+                                                  _focused == card))
                                             Positioned.fill(
                                               child: DecoratedBox(
                                                 key: ValueKey(
@@ -531,13 +613,16 @@ class _FannedHandWidgetState extends State<FannedHandWidget>
                                                         ),
                                                       ),
                                                   border: Border.all(
-                                                    color: TableStyle.brass,
+                                                    color: cardUiRefinements
+                                                        ? TableStyle.mint
+                                                        : TableStyle.brass,
                                                     width: 2,
                                                   ),
                                                 ),
                                               ),
                                             ),
-                                          if (slamSelected)
+                                          if (slamSelected &&
+                                              !cardUiRefinements)
                                             Positioned.fill(
                                               child: Padding(
                                                 padding: const EdgeInsets.all(
@@ -642,7 +727,11 @@ class _FannedHandWidgetState extends State<FannedHandWidget>
                                 onVerticalDragStart: widget.interactionEnabled
                                     ? (details) {
                                         _stopHoldFeedback(rebuild: false);
-                                        _dragDistance = 0;
+                                        _dragging = true;
+                                        _dragDistance =
+                                            cardUiRefinements && _queued == card
+                                            ? -_queuedLift
+                                            : 0;
                                         _dragVelocity = 0;
                                         _dragTime = details.sourceTimeStamp;
                                         setState(() => _pressed = card);
@@ -669,11 +758,24 @@ class _FannedHandWidgetState extends State<FannedHandWidget>
                                 onVerticalDragEnd: widget.interactionEnabled
                                     ? (_) {
                                         if (_dragDistance < -36) {
-                                          activate();
+                                          _activate(
+                                            card,
+                                            _geometry[card]!(),
+                                            fromSwipe: true,
+                                            releaseLift: cardUiRefinements
+                                                ? -_dragDistance
+                                                      .clamp(
+                                                        -handLiftSpace + 8,
+                                                        28,
+                                                      )
+                                                      .toDouble()
+                                                : null,
+                                          );
                                         } else if (_dragDistance > 36) {
                                           _reveal(card);
                                         }
                                         _dragDistance = 0;
+                                        _dragging = false;
                                         setState(() {
                                           _pressed = null;
                                           _dragVelocity = 0;
@@ -733,7 +835,11 @@ class _FannedHandWidgetState extends State<FannedHandWidget>
                                                   delay: Duration(
                                                     milliseconds: index * 70,
                                                   ),
-                                                  child: artwork,
+                                                  child: _publicArrival(
+                                                    card,
+                                                    public,
+                                                    artwork,
+                                                  ),
                                                 )
                                               : BoardCardMotion(
                                                   key: ValueKey(
@@ -758,10 +864,15 @@ class _FannedHandWidgetState extends State<FannedHandWidget>
                                                   initialOpacity: 0.65,
                                                   // Keep the hit target fixed while only the
                                                   // dealt card artwork travels into the hand.
-                                                  child: artwork,
+                                                  child: _publicArrival(
+                                                    card,
+                                                    public,
+                                                    artwork,
+                                                  ),
                                                 ),
                                         ),
-                                        if (preparingSlam || preparingReveal)
+                                        if (!cardUiRefinements &&
+                                            (preparingSlam || preparingReveal))
                                           Positioned(
                                             top: 0,
                                             right: 0,
@@ -825,6 +936,42 @@ class _FannedHandWidgetState extends State<FannedHandWidget>
                 ],
               ),
             ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _publicArrival(game_card.Card card, bool public, Widget child) {
+    if (!public) return child;
+    return TweenAnimationBuilder<double>(
+      key: ValueKey('public-arrival-${card.firebaseKey}'),
+      tween: Tween(
+        begin: _freshPublic.contains(card.firebaseKey) ? 0 : 1,
+        end: 1,
+      ),
+      duration: MediaQuery.disableAnimationsOf(context)
+          ? Duration.zero
+          : const Duration(milliseconds: 520),
+      onEnd: () {
+        if (mounted && _freshPublic.remove(card.firebaseKey)) setState(() {});
+      },
+      child: child,
+      builder: (_, t, art) {
+        final lift = t < .2 ? t / .2 : 1 - ((t - .2) / .8).clamp(0, 1);
+        return Transform.scale(
+          scale: 1 + .35 * lift,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              art!,
+              Positioned(
+                bottom: -4,
+                left: 10,
+                right: 10,
+                child: Container(height: 2, color: TableStyle.mint),
+              ),
+            ],
           ),
         );
       },

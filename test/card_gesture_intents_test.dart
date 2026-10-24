@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:halabessa/features/game/domain/models/card.dart' as game;
 import 'package:halabessa/features/game/presentation/widgets/fanned_hand_widget.dart';
+import 'package:halabessa/features/game/presentation/widgets/hand_card_placement.dart';
 
 const cards = [
   game.Card(game.Suit.clubs, game.Rank.six),
@@ -103,7 +104,7 @@ void main() {
       final markedPulses = holdPulses;
       expect(
         find.byKey(ValueKey('hand-slam-outline-${cards[0].firebaseKey}')),
-        findsOneWidget,
+        cardUiRefinements ? findsNothing : findsOneWidget,
       );
       await tester.pump(
         const Duration(milliseconds: 300),
@@ -314,7 +315,7 @@ void main() {
       await hold(tester, 0);
       expect(
         find.byKey(const ValueKey('hand-slam-outline-clubs_six')),
-        findsOneWidget,
+        cardUiRefinements ? findsNothing : findsOneWidget,
       );
       await tester.pumpWidget(hand(true));
       await tester.pump(const Duration(milliseconds: 301));
@@ -332,7 +333,7 @@ void main() {
     expect(slams, isEmpty);
     expect(
       find.byKey(const ValueKey('hand-slam-outline-clubs_six')),
-      findsOneWidget,
+      cardUiRefinements ? findsNothing : findsOneWidget,
     );
     await tester.tap(slot(0));
     await tester.pumpWidget(hand(true));
@@ -425,7 +426,7 @@ void main() {
       await tester.pump();
       expect(
         find.byKey(const ValueKey('hand-remaining-clubs_six')),
-        findsOneWidget,
+        cardUiRefinements ? findsNothing : findsOneWidget,
       );
       await gesture.up();
       await tester.pump();

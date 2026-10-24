@@ -6,6 +6,7 @@ import '../../domain/models/match_state.dart';
 import 'deck_action_presentation.dart';
 import 'team_capture_stack.dart';
 import 'table_style.dart';
+import 'hand_card_placement.dart';
 
 /// Physical table coordinates never depend on the language's reading direction.
 /// Every motion origin and tap target inherits the same scene transform.
@@ -87,6 +88,20 @@ class OptionBGeometry {
           width: 166,
           height: 208,
         );
+  Rect get handInput => cardUiRefinements
+      ? Rect.fromLTRB(
+          hand.left,
+          hand.top - handLiftSpace,
+          hand.right,
+          hand.bottom,
+        )
+      : hand;
+  Rect get specialMoves => Rect.fromLTWH(
+    size.width - (landscape ? 166 : 144),
+    size.height - 38,
+    112,
+    30,
+  );
   // The phase prompt uses the real deck anchor, never a second presentation deck.
   Rect get cutDeck => deck;
   // Preserve the approved pre-deal popover space; no hand is shown yet.
@@ -147,6 +162,7 @@ class OptionBTable extends StatelessWidget {
   final String shuffleLabel;
   final bool deckVotePhase;
   final Widget? activeDeckPhase;
+  final Widget? specialMoves;
   const OptionBTable({
     super.key,
     required this.local,
@@ -174,6 +190,7 @@ class OptionBTable extends StatelessWidget {
     this.shuffleLabel = '',
     this.deckVotePhase = false,
     this.activeDeckPhase,
+    this.specialMoves,
   });
 
   @override
@@ -200,7 +217,9 @@ class OptionBTable extends StatelessWidget {
           slot('right', g.right, right),
           slot('our-pile', g.ourPile, ourPile),
           slot('rival-pile', g.rivalPile, rivalPile),
-          slot('hand', g.hand, SizedBox.expand(child: hand)),
+          slot('hand', g.handInput, SizedBox.expand(child: hand)),
+          if (specialMoves != null)
+            slot('special-moves', g.specialMoves, specialMoves!),
           slot('history', g.history, history),
           slot('menu', g.menu, menu),
           slot('scores', g.scores, scores),
@@ -609,13 +628,12 @@ class TeamCapturePreview extends StatelessWidget {
     width: 24,
     height: 24,
     alignment: Alignment.center,
-    decoration: BoxDecoration(color: accent, shape: BoxShape.circle),
     child: Text(
       '$count',
       textAlign: TextAlign.center,
       textScaler: TextScaler.noScaling,
       style: TableStyle.label.copyWith(
-        color: TableStyle.ink,
+        color: accent,
         fontSize: 16,
         fontWeight: FontWeight.w800,
       ),

@@ -1,4 +1,5 @@
 class GlobalSettings {
+  static const _unchanged = Object();
   final Map<String, String> sfxOverrides; // assetPath -> remoteUrl
   final Map<String, String> sfxBackups; // assetPath -> firstUploadedUrl
   final String? musicOverrideUrl;
@@ -48,20 +49,28 @@ class GlobalSettings {
   GlobalSettings copyWith({
     Map<String, String>? sfxOverrides,
     Map<String, String>? sfxBackups,
-    String? musicOverrideUrl,
-    String? musicBackupUrl,
-    String? roomMusicOverrideUrl,
-    String? roomMusicBackupUrl,
+    Object? musicOverrideUrl = _unchanged,
+    Object? musicBackupUrl = _unchanged,
+    Object? roomMusicOverrideUrl = _unchanged,
+    Object? roomMusicBackupUrl = _unchanged,
     int? defaultTurnTimer,
     int? defaultTargetScore,
   }) {
     return GlobalSettings(
       sfxOverrides: sfxOverrides ?? this.sfxOverrides,
       sfxBackups: sfxBackups ?? this.sfxBackups,
-      musicOverrideUrl: musicOverrideUrl ?? this.musicOverrideUrl,
-      musicBackupUrl: musicBackupUrl ?? this.musicBackupUrl,
-      roomMusicOverrideUrl: roomMusicOverrideUrl ?? this.roomMusicOverrideUrl,
-      roomMusicBackupUrl: roomMusicBackupUrl ?? this.roomMusicBackupUrl,
+      musicOverrideUrl: identical(musicOverrideUrl, _unchanged)
+          ? this.musicOverrideUrl
+          : musicOverrideUrl as String?,
+      musicBackupUrl: identical(musicBackupUrl, _unchanged)
+          ? this.musicBackupUrl
+          : musicBackupUrl as String?,
+      roomMusicOverrideUrl: identical(roomMusicOverrideUrl, _unchanged)
+          ? this.roomMusicOverrideUrl
+          : roomMusicOverrideUrl as String?,
+      roomMusicBackupUrl: identical(roomMusicBackupUrl, _unchanged)
+          ? this.roomMusicBackupUrl
+          : roomMusicBackupUrl as String?,
       defaultTurnTimer: defaultTurnTimer ?? this.defaultTurnTimer,
       defaultTargetScore: defaultTargetScore ?? this.defaultTargetScore,
     );

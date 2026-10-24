@@ -11,6 +11,7 @@ import 'package:halabessa/features/game/domain/models/game_action.dart';
 import 'package:halabessa/features/game/domain/models/match_state.dart';
 import 'package:halabessa/features/game/presentation/providers/unity_visual_presentation.dart';
 import 'package:halabessa/features/game/presentation/widgets/fanned_hand_widget.dart';
+import 'package:halabessa/features/game/presentation/widgets/hand_card_placement.dart';
 import 'package:halabessa/features/game/presentation/widgets/option_b_table.dart';
 import 'package:halabessa/features/game/presentation/widgets/shown_card_layer.dart';
 
@@ -223,7 +224,7 @@ void main() {
       expect(CardFeatureState(f.state).remaining(local), 3);
       final slam = f.wire.lastWhere((m) => m['type'] == 'VISUAL_ACTION');
       expect(slam['deliveryStyle'], 'slam');
-      expect(slam['durationMs'], 470);
+      expect(slam['durationMs'], cardUiRefinements ? 500 : 470);
       expect(f.renderer.contact(slam['eventId'], slam['generation']), true);
       expect(f.renderer.contact(slam['eventId'], slam['generation']), false);
       expect(f.slaps, hasLength(1));

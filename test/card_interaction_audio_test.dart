@@ -50,10 +50,34 @@ void main() {
           ByteData.sublistView(bytes).getUint32(40, Endian.little),
           bytes.length - 44,
         );
-        expect(bytes.length, lessThan(7000));
+        const refined = bool.fromEnvironment('HALABESSA_CARD_UI_REFINEMENTS');
+        final approvedSlam = refined && name.startsWith('slam');
+        expect(bytes.length, lessThan(approvedSlam ? 20000 : 7000));
+        if (approvedSlam) {
+          expect(
+            ByteData.sublistView(bytes).getUint32(24, Endian.little),
+            44100,
+          );
+          expect(bytes.length, 19448);
+          var fingerprint = 2166136261;
+          for (final byte in bytes) {
+            fingerprint = ((fingerprint ^ byte) * 16777619) & 0xffffffff;
+          }
+          expect(
+            fingerprint,
+            3132475412,
+            reason: 'must be the exact candidate A the user reviewed',
+          );
+        }
         if (name.startsWith('slam')) variants.add(sound);
       }
-      expect(variants.toSet(), hasLength(3));
+      expect(
+        variants.toSet(),
+        hasLength(
+          const bool.fromEnvironment('HALABESSA_CARD_UI_REFINEMENTS') ? 1 : 3,
+        ),
+        reason: 'refinements use only the user-selected candidate A',
+      );
     },
   );
 }

@@ -20,6 +20,7 @@ import 'package:halabessa/features/game/domain/providers/game_providers.dart';
 import 'package:halabessa/features/game/presentation/pages/offline_practice_app.dart';
 import 'package:halabessa/features/game/presentation/pages/game_board_screen.dart';
 import 'package:halabessa/features/game/presentation/widgets/option_b_table.dart';
+import 'package:halabessa/features/game/presentation/widgets/table_style.dart';
 import 'package:halabessa/features/game/presentation/widgets/table_seat.dart';
 import 'package:halabessa/features/game/presentation/widgets/match_phase_panel.dart';
 import 'package:halabessa/features/game/presentation/widgets/team_capture_stack.dart';
@@ -382,14 +383,13 @@ void main() {
       expect(find.byKey(const ValueKey('history-rival-count')), findsOneWidget);
       for (final badgeKey in ['history-our-count', 'history-rival-count']) {
         final badge = find.byKey(ValueKey(badgeKey));
-        final decoration =
-            tester.widget<Container>(badge).decoration as BoxDecoration;
-        expect(decoration.shape, BoxShape.circle);
-        final badgeSize = tester.getSize(badge);
+        expect(tester.widget<Container>(badge).decoration, isNull);
+        final numeral = tester.widget<Text>(
+          find.descendant(of: badge, matching: find.byType(Text)),
+        );
         expect(
-          badgeSize.width,
-          badgeSize.height,
-          reason: 'capture count badges must be circles, not ovals',
+          numeral.style!.color,
+          badgeKey == 'history-our-count' ? TableStyle.mint : TableStyle.red,
         );
       }
       Rect? fixedDeck;
