@@ -61,6 +61,7 @@ jobs:
           functions/test/edge_deletion_realtime_data.test.ts
           functions/test/edge_deletion_worker.test.ts
           functions/test/unity_web_startup.test.js functions/test/web_build_versioning.test.mjs
+          functions/test/web_card_gesture_rollout.test.mjs
           functions/test/web_viewport.test.mjs
           functions/test/release_pages.test.mjs
           functions/test/search_landing.test.mjs
@@ -87,6 +88,15 @@ jobs:
       # Fatal on errors only -- see android-build.yml for why.
       - run: flutter analyze --no-fatal-warnings --no-fatal-infos
       - run: flutter test
+      - name: Test web card gesture rollout
+        run: >-
+          flutter test
+          --dart-define=HALABESSA_CARD_INTERACTIONS=true
+          --dart-define=HALABESSA_CARD_UI_REFINEMENTS=true
+          --dart-define=HALABESSA_ONLINE_CARD_INTERACTIONS=true
+          test/card_interaction_policy_test.dart test/card_gesture_intents_test.dart
+          test/card_ui_refinements_test.dart test/card_reveal_two_client_test.dart
+          test/refined_unity_pose_test.dart
       # Backend mutations run in Supabase Edge Functions because Firebase
       # Functions requires the Blaze plan. Firebase remains responsible for
       # Hosting, Authentication, and the existing database rules.
@@ -98,7 +108,13 @@ jobs:
           echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_HALABESSA_CARD_GAME1 }}' > "$GOOGLE_APPLICATION_CREDENTIALS"
           npx firebase-tools@15.32.1 deploy --only firestore:indexes --project halabessa-card-game1 --non-interactive
           npx firebase-tools@15.32.1 deploy --only firestore:rules,database --project halabessa-card-game1 --non-interactive
-      - run: flutter build web --release --base-href / --pwa-strategy=none
+      # Backend gesture support must be deployed before this release is merged.
+      # Native build defaults are deliberately unchanged by this web-only rollout.
+      - run: >-
+          flutter build web --release --base-href / --pwa-strategy=none
+          --dart-define=HALABESSA_CARD_INTERACTIONS=true
+          --dart-define=HALABESSA_CARD_UI_REFINEMENTS=true
+          --dart-define=HALABESSA_ONLINE_CARD_INTERACTIONS=true
       - name: Fingerprint Flutter entrypoints
         run: node scripts/version-web-build.mjs
       # One-time user-approved cleanup, not a recurring retention policy.

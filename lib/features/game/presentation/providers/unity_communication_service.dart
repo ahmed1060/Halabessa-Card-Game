@@ -14,6 +14,7 @@ import 'package:halabessa/features/game/presentation/providers/unity_layer_provi
 import 'unity_startup_state.dart';
 import 'unity_visual_presentation.dart';
 import 'card_feedback.dart';
+import 'card_interaction_policy.dart';
 import 'visual_action_queue.dart';
 import '../widgets/hand_card_placement.dart';
 
@@ -25,9 +26,6 @@ final unityCommunicationServiceProvider = Provider((ref) {
 // Optional rebuilt-renderer capability; old exports never enable new gestures.
 final unityCardInteractionsReadyProvider = StateProvider<bool>((ref) => false);
 final unityCardUiReadyProvider = StateProvider<bool>((ref) => false);
-const _cardInteractionsPreview = bool.fromEnvironment(
-  'HALABESSA_CARD_INTERACTIONS',
-);
 // Explicit local QA only. Never log card/room/player identity or hand payloads.
 const _visualTrace = bool.fromEnvironment('HALABESSA_VISUAL_TRACE');
 
@@ -147,7 +145,7 @@ class UnityCommunicationService {
           isReady.value &&
           _ref.read(unityLayerActiveProvider),
       reduced: settings.reducedMotion || _platformReduced,
-      interactions: _cardInteractionsPreview && state.id.startsWith('OFFLINE_'),
+      interactions: cardInteractionsFor(state),
     );
   }
 

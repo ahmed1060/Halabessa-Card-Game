@@ -42,7 +42,7 @@
   <!-- One unscaled host owns both the painted Flutter view and its hit tests. -->
   <div id="game-host"></div>
   <!-- Unity WebGL Engine Loader (Canvas is dynamically injected by Flutter) -->
-  <script src="Build/web.loader.js"></script>
+  <script src="Build/web.loader.js?v=card-ui-20261024-09af62cddf6d"></script>
   <script>
     var unityInstance = null;
     var unityStartupState = 'idle';
@@ -85,7 +85,7 @@
       });
 
       var buildUrl = "Build";
-      var cacheBuster = "?v=" + Date.now();
+      var cacheBuster = "?v=card-ui-20261024-09af62cddf6d";
 
       Promise.resolve().then(function () { return createUnityInstance(canvasElement, {
         dataUrl: buildUrl + "/web.data.unityweb" + cacheBuster,

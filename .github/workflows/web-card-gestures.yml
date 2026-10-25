@@ -1,0 +1,50 @@
+name: Web card gesture release check
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: web-card-gestures-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Check renderer payloads, privacy and startup fallback
+        run: >-
+          node --test functions/test/web_card_gesture_rollout.test.mjs
+          functions/test/unity_web_startup.test.js functions/test/web_build_versioning.test.mjs
+          functions/test/card_reveal.test.ts
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.47.2"
+          cache: true
+      - run: flutter pub get
+      - name: Test release-enabled online and practice gestures
+        run: >-
+          flutter test
+          --dart-define=HALABESSA_CARD_INTERACTIONS=true
+          --dart-define=HALABESSA_CARD_UI_REFINEMENTS=true
+          --dart-define=HALABESSA_ONLINE_CARD_INTERACTIONS=true
+          test/card_interaction_policy_test.dart test/card_gesture_intents_test.dart
+          test/card_ui_refinements_test.dart test/card_reveal_two_client_test.dart
+          test/refined_unity_pose_test.dart
+      - name: Compile the actual web release entrypoint
+        run: >-
+          flutter build web --release --base-href / --pwa-strategy=none
+          --dart-define=HALABESSA_CARD_INTERACTIONS=true
+          --dart-define=HALABESSA_CARD_UI_REFINEMENTS=true
+          --dart-define=HALABESSA_ONLINE_CARD_INTERACTIONS=true
+      - name: Verify deployable entrypoint fingerprinting
+        run: node scripts/version-web-build.mjs

@@ -1,0 +1,14 @@
+{
+  "id": "card-ui-20261024-09af62cddf6d",
+  "sourceReview": "docs/card-ui-refinements-local-review-2026-10-24.md",
+  "files": {
+    "Build/web.loader.js": "a9ae5b753e5ba93a7079d6dc0d29823a02f07d5d9ae6bb3a79aeb4b2435e03e8",
+    "Build/web.data.unityweb": "0e840d5606b4a56561c353ac2438de02f88c41649f703667e81527dc2ece48c5",
+    "Build/web.framework.js.unityweb": "0e789506e5452754145eb28d0679619e889d855e370863e0e491b5c71028a9a0",
+    "Build/web.wasm.unityweb": "36a0b4d377fe7fe423c59edfae9a5be0d7414ebb64d45cb139dda16668fd967a"
+  },
+  "sources": {
+    "unity/Halabessa/Assets/Scripts/UnityBridge.cs": "6ce70c204a308a147f718e6b0ed714b48d843599fba1fb73277efe18da3a9700",
+    "unity/Halabessa/Assets/Scripts/CardJuiceController.cs": "8401146106b8343bfe854ac0487d9252d2f7f9a857e2bd2e6b6f7c73d6a01871"
+  }
+}
