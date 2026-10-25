@@ -1,4 +1,4 @@
-enum ChatChannel { public, team, game }
+enum ChatChannel { public, game }
 
 class ChatMessage {
   final String id;
@@ -7,6 +7,7 @@ class ChatMessage {
   final String text;
   final DateTime timestamp;
   final bool isQuickChat;
+  final String? presetId;
 
   ChatMessage({
     required this.id,
@@ -15,6 +16,7 @@ class ChatMessage {
     required this.text,
     required this.timestamp,
     this.isQuickChat = false,
+    this.presetId,
   });
 
   Map<String, dynamic> toJson() {
@@ -25,6 +27,7 @@ class ChatMessage {
       'text': text,
       'timestamp': timestamp.millisecondsSinceEpoch,
       'isQuickChat': isQuickChat,
+      if (presetId != null) 'presetId': presetId,
     };
   }
 
@@ -36,6 +39,7 @@ class ChatMessage {
       text: json['text'] ?? '',
       timestamp: DateTime.fromMillisecondsSinceEpoch(json['timestamp'] ?? 0),
       isQuickChat: json['isQuickChat'] ?? false,
+      presetId: json['presetId'] is String ? json['presetId'] as String : null,
     );
   }
 }

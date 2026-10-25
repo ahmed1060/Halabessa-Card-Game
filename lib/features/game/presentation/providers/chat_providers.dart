@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../domain/models/chat_message.dart';
 import '../../domain/providers/game_providers.dart';
 import 'dart:async';
+import '../../domain/logic/online_match_clock.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
 import 'package:easy_localization/easy_localization.dart';
 
@@ -16,7 +17,6 @@ final chatMessagesProvider = StreamProvider.autoDispose<List<ChatMessage>>((
   final matchId = ref.watch(matchStateProvider.select((s) => s?.id));
   if (matchId == null) return Stream.value([]);
   final channel = ref.watch(chatChannelProvider);
-  final uid = ref.watch(currentUserProvider.select((user) => user?.uid));
   if (channel == ChatChannel.game) {
     final state = ref.watch(matchStateProvider);
     final history = state?.playHistory ?? [];
@@ -43,26 +43,33 @@ final chatMessagesProvider = StreamProvider.autoDispose<List<ChatMessage>>((
           .toList(),
     );
   }
-  // Practice has no shared chat storage. Mounting the hidden overlay/bubbles
-  // must not create a database client just to subscribe to an offline room.
-  if (matchId.startsWith('OFFLINE_')) return Stream.value([]);
-  final (seat, protocol) = ref.watch(
-    matchStateProvider.select(
-      (state) => (
-        state?.playerIds.indexOf(uid ?? '') ?? -1,
-        state?.protocolVersion ?? 0,
-      ),
-    ),
-  );
-  if (seat < 0) return Stream.value([]);
-  if (protocol == 0 && channel == ChatChannel.team) return Stream.value([]);
-  final storage = channel == ChatChannel.team
-      ? (seat.isEven ? 'teamA' : 'teamB')
-      : 'public';
-
   return ref
-      .read(multiplayerSyncServiceProvider)
-      .watchChatMessages(matchId, channel: storage, legacy: protocol == 0);
+      .watch(roomChatMessagesProvider)
+      .when(
+        data: (messages) => Stream.value(messages),
+        loading: () => const Stream.empty(),
+        error: (error, stack) => Stream.error(error, stack),
+      );
+});
+
+// Room messages remain subscribed when the player looks at the game log.
+final roomChatMessagesProvider = StreamProvider.autoDispose<List<ChatMessage>>((
+  ref,
+) {
+  final room = ref.watch(
+    matchStateProvider.select((s) => (s?.id, s?.protocolVersion ?? 0)),
+  );
+  final uid = ref.watch(currentUserProvider.select((u) => u?.uid));
+  if (room.$1 == null ||
+      room.$1!.startsWith('OFFLINE_') ||
+      room.$2 == 0 ||
+      uid == null ||
+      !(ref.watch(
+        matchStateProvider.select((s) => s?.playerIds.contains(uid) ?? false),
+      ))) {
+    return Stream.value([]);
+  }
+  return ref.read(multiplayerSyncServiceProvider).watchChatMessages(room.$1!);
 });
 
 class ChatState {
@@ -70,7 +77,7 @@ class ChatState {
   final DateTime lastSeenTimestamp;
 
   ChatState({this.isOverlayOpen = false, DateTime? lastSeenTimestamp})
-    : lastSeenTimestamp = lastSeenTimestamp ?? DateTime.now();
+    : lastSeenTimestamp = lastSeenTimestamp ?? OnlineMatchClock.instance.now();
 
   ChatState copyWith({bool? isOverlayOpen, DateTime? lastSeenTimestamp}) {
     return ChatState(
@@ -99,7 +106,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
   }
 
   void markAllSeen() {
-    state = state.copyWith(lastSeenTimestamp: DateTime.now());
+    state = state.copyWith(lastSeenTimestamp: OnlineMatchClock.instance.now());
   }
 }
 
@@ -121,22 +128,27 @@ class ChatBubblesState {
 class ChatBubblesNotifier extends StateNotifier<ChatBubblesState> {
   final Ref ref;
   final Map<String, Timer> _timers = {};
+  Set<String>? _seen;
 
   ChatBubblesNotifier(this.ref) : super(ChatBubblesState()) {
-    // Listen to new messages and update bubbles
-    ref.listen<AsyncValue<List<ChatMessage>>>(chatMessagesProvider, (
+    ref.listen<AsyncValue<List<ChatMessage>>>(roomChatMessagesProvider, (
       prev,
       next,
     ) {
       next.whenData((messages) {
-        if (messages.isEmpty ||
-            ref.read(chatChannelProvider) == ChatChannel.game)
-          return;
-        final latest = messages.last;
-
-        // Only show bubbles for messages sent in the last 2 seconds to avoid old messages popping up on load
-        if (DateTime.now().difference(latest.timestamp).inSeconds.abs() < 2) {
-          _updateBubble(latest);
+        final ids = messages.map((m) => m.id).toSet();
+        final before = _seen;
+        _seen = ids;
+        if (before == null) return; // Never replay a transcript on subscribe.
+        for (final message in messages) {
+          if (!before.contains(message.id) &&
+              OnlineMatchClock.instance
+                      .now()
+                      .difference(message.timestamp)
+                      .abs() <
+                  const Duration(seconds: 5)) {
+            _updateBubble(message);
+          }
         }
       });
     });
@@ -154,7 +166,7 @@ class ChatBubblesNotifier extends StateNotifier<ChatBubblesState> {
     state = state.copyWith(bubbles: newBubbles);
 
     // Set new timer to clear
-    _timers[userId] = Timer(const Duration(seconds: 5), () {
+    _timers[userId] = Timer(const Duration(milliseconds: 3180), () {
       final updatedBubbles = Map<String, ChatMessage>.from(state.bubbles);
       updatedBubbles.remove(userId);
       state = state.copyWith(bubbles: updatedBubbles);
@@ -175,6 +187,8 @@ final chatBubblesProvider =
     StateNotifierProvider.autoDispose<ChatBubblesNotifier, ChatBubblesState>((
       ref,
     ) {
+      ref.watch(matchStateProvider.select((s) => s?.id));
+      ref.watch(currentUserProvider.select((u) => u?.uid));
       return ChatBubblesNotifier(ref);
     });
 
@@ -189,7 +203,7 @@ final lastMessageForUserProvider = Provider.family<ChatMessage?, String>((
 
 // Robust unread count based on lastSeenTimestamp and current user filtering
 final unreadMessagesCountProvider = Provider.autoDispose<int>((ref) {
-  final messagesAsync = ref.watch(chatMessagesProvider);
+  final messagesAsync = ref.watch(roomChatMessagesProvider);
   final chatState = ref.watch(chatStateProvider);
   final currentUser = ref.read(currentUserProvider);
 

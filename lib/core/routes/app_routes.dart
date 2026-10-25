@@ -12,6 +12,7 @@ import '../../features/home/presentation/pages/store_screen.dart';
 import 'package:halabessa/features/home/presentation/pages/admin_music_management_screen.dart';
 import 'package:halabessa/features/home/presentation/pages/admin_sfx_management_screen.dart';
 import '../../features/home/presentation/pages/admin_user_management_screen.dart';
+import '../../features/home/presentation/pages/admin_quick_chat_screen.dart';
 import '../../features/home/presentation/pages/leaderboard_screen.dart';
 
 class AppRoutes {
@@ -27,6 +28,7 @@ class AppRoutes {
   static const String adminMusic = '/admin/music';
   static const String adminSfx = '/admin/sfx';
   static const String adminUsers = '/admin/users';
+  static const String adminQuickChat = '/admin/quick-chat';
 
   static Map<String, WidgetBuilder> get routes => {
     initial: (context) => const AuthWrapper(),
@@ -48,6 +50,7 @@ class AppRoutes {
     adminMusic: (context) => const AdminMusicManagementScreen(),
     adminSfx: (context) => const AdminSfxManagementScreen(),
     adminUsers: (context) => const AdminUserManagementScreen(),
+    adminQuickChat: (context) => const AdminQuickChatScreen(),
   };
 }
 

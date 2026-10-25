@@ -25,6 +25,7 @@ import { commitAndQueue, earlyAckEnabled, publicationLease, publishDetachedRoom,
 import { progressEnabled } from './match_progress.ts';
 import { runRoomProgress, ProgressRevisionFailure } from './match_progress_worker.ts';
 import { declareCapturePresentation } from './capture_presentation.ts';
+import { readQuickPhrases, updateQuickPhrase, roomChatPolicy, canonicalChatMessage, publishRoomChat, quickChatSuperadmin } from './table_chat.ts';
 
 const firebaseProject = "halabessa-card-game1";
 const firebaseKeys = createRemoteJWKSet(new URL(
@@ -514,6 +515,13 @@ Deno.serve(async (request) => {
       search?: unknown;
       category?: unknown;
       week?: unknown;
+      messageId?: unknown;
+      text?: unknown;
+      channel?: unknown;
+      presetId?: unknown;
+      locale?: unknown;
+      phrase?: unknown;
+      revision?: unknown;
     };
     // Firestore-only discovery must not hold a scarce Postgres connection.
     if (body.action === 'getPublicProfile' || body.action === 'queryPublicProfiles') {
@@ -551,6 +559,51 @@ Deno.serve(async (request) => {
         if (['audio_store_unavailable', 'audio_asset_unavailable', 'audio_transaction_conflict'].includes(message)) {
           return reply({error: message}, 503, origin);
         }
+        throw error;
+      }
+    }
+    if (['getQuickChatPresets', 'getQuickChatAdminStatus', 'updateQuickChatPhrase',
+      'getTableChatPolicy', 'sendTableChat'].includes(body.action ?? '')) {
+      try {
+        const adminAction = body.action === 'getQuickChatAdminStatus' || body.action === 'updateQuickChatPhrase';
+        let canManage = false;
+        if (adminAction) {
+          const account = await createFirebaseIdentityStore(firebaseProject, firebaseAccessToken).lookup(user.uid);
+          canManage = quickChatSuperadmin(account, user.authTime, primaryAdminEmail);
+          if (body.action === 'updateQuickChatPhrase' && !canManage) throw Error('superadmin_required');
+        }
+        const policy = await withDatabaseGuard<Client, {canType: boolean; humanCount: number}>(
+          runDatabase, checkDeletionGuard, async connection => {
+          const blocked = await connection.queryObject`select 1 from halabessa.account_deletion_jobs where firebase_uid = ${user.uid}`;
+          if (blocked.rows.length) throw Error('unauthenticated');
+          if (body.action !== 'getTableChatPolicy' && body.action !== 'sendTableChat') return {canType: false, humanCount: 0};
+          const id = validRoomId(body.roomId);
+          if (!id) throw Error('invalid_room_id');
+          const result = await connection.queryObject<{state: MatchState}>`
+            select state from halabessa.rooms where room_id = ${id}
+              and (expires_at is null or expires_at > now())`;
+          const state = result.rows[0]?.state;
+          if (!state) throw Error('not_room_participant');
+          const edges = await connection.queryObject<{owner_uid: string; friend_uid: string}>`
+            select owner_uid, friend_uid from halabessa.friendships
+            where owner_uid in (select jsonb_array_elements_text(${JSON.stringify(state.playerIds ?? [])}::jsonb))
+              and friend_uid in (select jsonb_array_elements_text(${JSON.stringify(state.playerIds ?? [])}::jsonb))`;
+          return roomChatPolicy(state, user.uid, edges.rows);
+        });
+        // Release scarce SQL admission before Firebase config/transcript I/O.
+        if (body.action === 'getQuickChatAdminStatus') return reply({canManage}, 200, origin);
+        if (body.action === 'updateQuickChatPhrase') return reply(await updateQuickPhrase(firebaseRequest, body), 200, origin);
+        const config = await readQuickPhrases(firebaseRequest);
+        if (body.action !== 'sendTableChat') return reply({...config, ...policy}, 200, origin);
+        const message = canonicalChatMessage(body, {uid: user.uid, name: user.name}, policy.canType, config, Date.now());
+        return reply(await publishRoomChat(firebaseRequest, validRoomId(body.roomId)!, message), 200, origin);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'chat_unavailable';
+        if (['superadmin_required', 'not_room_participant', 'chat_typing_locked'].includes(message)) return reply({error: message}, 403, origin);
+        if (['invalid_chat_phrase', 'invalid_chat_message', 'invalid_chat_channel', 'invalid_room_id', 'chat_phrase_limit'].includes(message)) return reply({error: message}, 400, origin);
+        if (['chat_config_conflict', 'chat_message_conflict'].includes(message)) return reply({error: message}, 409, origin);
+        if (message === 'chat_rate_limited') return reply({error: message}, 429, origin);
+        if (message === 'chat_unavailable') return reply({error: message}, 503, origin);
         throw error;
       }
     }
