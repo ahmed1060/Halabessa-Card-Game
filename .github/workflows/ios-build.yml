@@ -18,6 +18,7 @@ concurrency:
 
 jobs:
     build:
+        name: iOS validation
         # App Store Connect requires Xcode 26 or later. Keep this build on the
         # store toolchain so a green run is meaningful for release readiness.
         runs-on: macos-26
