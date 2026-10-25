@@ -11,6 +11,7 @@ import { createFirestoreRewardStore } from "./firestore_rewards.ts";
 import { createPublicProfileStore } from "./public_profiles.ts";
 import { assertNotDeletionBlocked } from "./deletion_access.ts";
 import { storeAsset, type AssetUploadBody } from "./asset_upload.ts";
+import { authorizeAudioSettings, createAudioSettingsStore, updateAudioSetting } from './audio_settings.ts';
 import { beginDeletion } from './account_deletion.ts';
 import { createDeletionJobStore, deletionReceiptHash, recoverDeletion } from './deletion_job_store.ts';
 import { createFirebaseIdentityStore, assertActiveIdentity } from './firebase_identity.ts';
@@ -502,6 +503,8 @@ Deno.serve(async (request) => {
       contentType?: unknown;
       base64?: unknown;
       assetKey?: unknown;
+      operation?: unknown;
+      url?: unknown;
       commandId?: unknown;
       commandType?: unknown;
       expectedVersion?: unknown;
@@ -524,6 +527,32 @@ Deno.serve(async (request) => {
           if (error instanceof Error && error.message === 'invalid_profile_query') return reply({error: error.message}, 400, origin);
           throw error;
         }
+    }
+    if (body.action === 'updateAudioSetting') {
+      try {
+        return reply(await updateAudioSetting(body, {
+          authorize: () => authorizeAudioSettings(user,
+            uid => createFirebaseIdentityStore(firebaseProject, firebaseAccessToken).lookup(uid), async actor => {
+            // Release the scarce Postgres admission before Firestore/Storage I/O.
+            const permitted = await withDatabaseGuard<Client, boolean>(runDatabase, checkDeletionGuard, async connection => {
+              const blocked = await connection.queryObject`select 1 from halabessa.account_deletion_jobs where firebase_uid = ${user.uid}`;
+              if (blocked.rows.length) throw new Error('unauthenticated');
+              return isAdmin(connection, actor);
+            });
+            return permitted;
+          }),
+          store: createAudioSettingsStore(firebaseProject, firebaseAccessToken),
+          storageUrl: Deno.env.get('SUPABASE_URL') ?? '',
+        }), 200, origin);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'audio_store_unavailable';
+        if (message === 'admin_required') return reply({error: message}, 403, origin);
+        if (['invalid_audio_setting', 'audio_override_missing'].includes(message)) return reply({error: message}, 400, origin);
+        if (['audio_store_unavailable', 'audio_asset_unavailable', 'audio_transaction_conflict'].includes(message)) {
+          return reply({error: message}, 503, origin);
+        }
+        throw error;
+      }
     }
     return await withDatabaseGuard<Client, Response>(runDatabase, checkDeletionGuard, async (connection) => {
       // Defense in depth: once durable deletion is accepted, no ordinary API

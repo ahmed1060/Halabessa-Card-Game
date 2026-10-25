@@ -26,6 +26,7 @@ jobs:
           node --test functions/test/web_card_gesture_rollout.test.mjs
           functions/test/unity_web_startup.test.js functions/test/web_build_versioning.test.mjs
           functions/test/card_reveal.test.ts
+          functions/test/edge_audio_settings.test.ts
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: "3.47.2"
@@ -40,6 +41,7 @@ jobs:
           test/card_interaction_policy_test.dart test/card_gesture_intents_test.dart
           test/card_ui_refinements_test.dart test/card_reveal_two_client_test.dart
           test/refined_unity_pose_test.dart
+          test/backend_audio_override_store_test.dart
       - name: Compile the actual web release entrypoint
         run: >-
           flutter build web --release --base-href / --pwa-strategy=none
