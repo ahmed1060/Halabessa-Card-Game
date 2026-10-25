@@ -60,6 +60,7 @@ jobs:
           functions/test/edge_avatar_upload_policy.test.ts
           functions/test/edge_asset_upload.test.ts
           functions/test/edge_audio_settings.test.ts
+          functions/test/edge_table_chat.test.ts
           functions/test/edge_deletion_realtime_data.test.ts
           functions/test/edge_deletion_worker.test.ts
           functions/test/unity_web_startup.test.js functions/test/web_build_versioning.test.mjs

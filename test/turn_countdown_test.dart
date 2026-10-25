@@ -87,6 +87,8 @@ void main() {
     );
     expect(find.text('👑'), findsOneWidget);
     await tester.pump(const Duration(seconds: 4));
+    // The public bubble fades away after the unchanged server expiry.
+    await tester.pumpAndSettle();
     expect(find.text('👑'), findsNothing);
     await tester.pumpWidget(const SizedBox());
     expect(tester.takeException(), isNull);

@@ -1,3 +1,5 @@
+import 'table_social_review_panels.dart';
+import 'package:halabessa/features/game/presentation/providers/chat_providers.dart';
 // Local design-review entry point. Never initialize cloud clients or create
 // online accounts/rooms here. Production continues to use lib/main.dart.
 import 'package:easy_localization/easy_localization.dart';
@@ -44,6 +46,8 @@ Future<void> main() async {
   final container = ProviderContainer(
     overrides: [
       sharedPreferencesProvider.overrideWithValue(preferences),
+      if (Uri.base.queryParameters.containsKey('socialReview'))
+        roomChatMessagesProvider.overrideWith((ref) => socialReviewStream()),
       if (Uri.base.queryParameters['mobileWeb'] == '1')
         mobileWebOrientationGateProvider.overrideWithValue(true),
       ...offlinePlayOverrides(
@@ -105,7 +109,7 @@ class _PreviewLayers extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final settings = ref.watch(settingsProvider);
-    return MediaQuery(
+    final layers = MediaQuery(
       data: MediaQuery.of(context).copyWith(
         disableAnimations:
             settings.reducedMotion || MediaQuery.disableAnimationsOf(context),
@@ -127,6 +131,7 @@ class _PreviewLayers extends ConsumerWidget {
         ),
       ),
     );
+    return layers;
   }
 }
 
@@ -165,7 +170,25 @@ class _PreviewGameState extends ConsumerState<_PreviewGame> {
     ref.listen(unityLayerVisibilityProvider, (_, __) => _syncRenderer());
     ref.listen(unityFailedProvider, (_, __) => _syncRenderer());
     _syncRenderer();
-    return const GameBoardScreen();
+    final mode = Uri.base.queryParameters['socialReview'];
+    if (mode == null) return const GameBoardScreen();
+    // Only the isolated fixture binds chat bubbles; real practice stays isolated.
+    // Keep its fields and dialogs beneath Navigator's Overlay like the real HUD.
+    return ProviderScope(
+      overrides: [
+        lastMessageForUserProvider.overrideWith(
+          (ref, uid) => ref.watch(chatBubblesProvider).bubbles[uid],
+        ),
+      ],
+      child: Stack(
+        children: [
+          const GameBoardScreen(),
+          Positioned.fill(
+            child: SocialReviewPanels(mode: mode, uid: _playerUid),
+          ),
+        ],
+      ),
+    );
   }
 }
 

@@ -18,6 +18,7 @@ concurrency:
 
 jobs:
   build:
+    name: Android validation
     # Was windows-latest -- roughly twice the Actions minute cost of Ubuntu
     # for the same APK, and nothing about this build is Windows-specific.
     runs-on: ubuntu-latest

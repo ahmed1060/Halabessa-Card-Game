@@ -17,6 +17,7 @@ import 'package:halabessa/core/widgets/settings_overlay.dart';
 import 'package:halabessa/core/providers/settings_provider.dart';
 import 'package:halabessa/features/game/presentation/providers/chat_providers.dart';
 import 'package:halabessa/features/game/presentation/widgets/chat_overlay.dart';
+import 'package:halabessa/features/game/presentation/widgets/table_leave_dialog.dart';
 import 'package:confetti/confetti.dart';
 import '../widgets/player_profile_preview.dart';
 import '../widgets/board_cards_widget.dart';
@@ -680,7 +681,8 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
           playing &&
           playReady &&
           state.currentTurnIndex == _getAbsoluteIndex(state, myUid, offset);
-      final chat = ref.watch(lastMessageForUserProvider(user.uid))?.text;
+      final chatMessage = ref.watch(lastMessageForUserProvider(user.uid));
+      final chat = chatMessage?.text;
       final message = chat ?? _getPlayerEmoji(state, myUid, offset);
       final avatar = TableSeat(
         name: offset == 0 && !isSpectator
@@ -736,6 +738,8 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
             ? botThinkDuration
             : Duration(seconds: state.timerDurationSeconds),
         message: message,
+        messageIdentity:
+            chatMessage?.id ?? state.playerEmojiExpiresAt[user.uid],
         messageExpiresAt: chat == null
             ? DateTime.tryParse(state.playerEmojiExpiresAt[user.uid] ?? '')
             : null,
@@ -1005,7 +1009,14 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
             tooltip: 'table_more'.tr(),
             color: TableStyle.ink,
             icon: const Icon(Icons.more_horiz, color: TableStyle.ivory),
-            constraints: const BoxConstraints(minWidth: 160),
+            constraints: const BoxConstraints(minWidth: 210),
+            position: PopupMenuPosition.under,
+            offset: const Offset(0, 8),
+            elevation: 14,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: const BorderSide(color: TableStyle.brass),
+            ),
             onSelected: (action) {
               switch (action) {
                 case 'settings':
@@ -1017,8 +1028,6 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
                   );
                 case 'reactions':
                   setState(() => _isEmoteWheelOpen = !_isEmoteWheelOpen);
-                case 'captures':
-                  _showCaptures(context);
                 case 'leave':
                   _confirmLeave(context, ref);
               }
@@ -1026,26 +1035,32 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
             itemBuilder: (_) => [
               PopupMenuItem(
                 value: 'settings',
-                child: Text('settings'.tr(), style: TableStyle.label),
+                child: _tableMenuLabel(
+                  Icons.settings_outlined,
+                  'settings'.tr(),
+                ),
               ),
               if (!state.id.startsWith('OFFLINE_'))
                 PopupMenuItem(
                   value: 'room',
-                  child: Text(state.id, style: TableStyle.label),
+                  child: _tableMenuLabel(Icons.copy_outlined, state.id),
                 ),
               if (!isSpectator)
                 PopupMenuItem(
                   value: 'reactions',
-                  child: Text('table_reactions'.tr(), style: TableStyle.label),
+                  child: _tableMenuLabel(
+                    Icons.sentiment_satisfied_alt,
+                    'table_reactions'.tr(),
+                  ),
                 ),
-              if (!isSpectator)
-                PopupMenuItem(
-                  value: 'captures',
-                  child: Text('table_captures'.tr(), style: TableStyle.label),
-                ),
+              const PopupMenuDivider(),
               PopupMenuItem(
                 value: 'leave',
-                child: Text('leave_game_title'.tr(), style: TableStyle.label),
+                child: _tableMenuLabel(
+                  Icons.logout_rounded,
+                  'leave_game_title'.tr(),
+                  color: TableStyle.red,
+                ),
               ),
             ],
           ),
@@ -1252,73 +1267,31 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
     );
   }
 
-  void _confirmLeave(BuildContext context, WidgetRef ref) {
-    showDialog(
+  Widget _tableMenuLabel(
+    IconData icon,
+    String text, {
+    Color color = TableStyle.ivory,
+  }) => Row(
+    children: [
+      Icon(icon, size: 22, color: color),
+      const SizedBox(width: 12),
+      Expanded(
+        child: Text(text, style: TableStyle.label.copyWith(color: color)),
+      ),
+    ],
+  );
+
+  Future<void> _confirmLeave(BuildContext context, WidgetRef ref) async {
+    final left = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1A1A),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(24),
-          side: const BorderSide(color: Colors.white10),
-        ),
-        title: Row(
-          children: [
-            const Icon(Icons.warning_amber_rounded, color: Colors.redAccent),
-            const SizedBox(width: 12),
-            Text(
-              'leave_game_title'.tr(),
-              style: const TextStyle(
-                color: Colors.white,
-                fontFamily: ThemeConfig.fontHeading,
-              ),
-            ),
-          ],
-        ),
-        content: Text(
-          (ref.read(matchStateProvider)?.id.startsWith('OFFLINE_') == true
-                  ? 'offline_leave_warning'
-                  : 'leave_game_warning')
-              .tr(),
-          style: const TextStyle(color: Colors.white70, fontSize: 14),
-        ),
-        actionsPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 12,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              'cancel'.tr(),
-              style: const TextStyle(color: Colors.white38),
-            ),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.redAccent,
-              foregroundColor: Colors.white,
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-            ),
-            onPressed: () async {
-              final left = await ref
-                  .read(matchStateProvider.notifier)
-                  .leaveMatch();
-              if (!left || !context.mounted) return;
-              Navigator.pop(context); // Close dialog
-              if (mounted) _returnToHome();
-            },
-            child: Text(
-              'leave'.tr(),
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-          ),
-        ],
+      barrierDismissible: false,
+      builder: (_) => TableLeaveDialog(
+        offline:
+            ref.read(matchStateProvider)?.id.startsWith('OFFLINE_') == true,
+        onLeave: () => ref.read(matchStateProvider.notifier).leaveMatch(),
       ),
     );
+    if (left == true && mounted) _returnToHome();
   }
 
   String? _getPlayerEmoji(MatchState matchState, String myUid, int offset) {

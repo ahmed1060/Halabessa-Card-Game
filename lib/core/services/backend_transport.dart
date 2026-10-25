@@ -40,6 +40,9 @@ class BackendTransport {
 
   static const readActions = {
     'getAdminStatus',
+    'getQuickChatPresets',
+    'getQuickChatAdminStatus',
+    'getTableChatPolicy',
     'getSocialGraph',
     'getPublicProfile',
     'queryPublicProfiles',

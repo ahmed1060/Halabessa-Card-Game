@@ -28,10 +28,13 @@ class MultiplayerSyncService with WidgetsBindingObserver {
     if (_clockStarted || _disposed) return;
     _clockStarted = true;
     WidgetsBinding.instance.addObserver(this);
-    _clockSubscription = _db.ref('.info/serverTimeOffset').onValue.listen(
-      (event) => OnlineMatchClock.instance.calibrate(event.snapshot.value),
-      onError: (Object _) {},
-    );
+    _clockSubscription = _db
+        .ref('.info/serverTimeOffset')
+        .onValue
+        .listen(
+          (event) => OnlineMatchClock.instance.calibrate(event.snapshot.value),
+          onError: (Object _) {},
+        );
     _clockConnection = _db.ref('.info/connected').onValue.listen((event) {
       if (event.snapshot.value == true) unawaited(_refreshClock());
     }, onError: (Object _) {});
@@ -41,7 +44,9 @@ class MultiplayerSyncService with WidgetsBindingObserver {
     try {
       final value = await _db.ref('.info/serverTimeOffset').get();
       if (!_disposed) OnlineMatchClock.instance.calibrate(value.value);
-    } catch (_) { /* Keep the last monotonic sample; never extend a turn. */ }
+    } catch (_) {
+      /* Keep the last monotonic sample; never extend a turn. */
+    }
   }
 
   @override
@@ -699,24 +704,17 @@ class MultiplayerSyncService with WidgetsBindingObserver {
     bool legacy = false,
   }) async {
     if (matchId.isEmpty || matchId.startsWith('OFFLINE_')) return;
-    if (!['public', 'teamA', 'teamB'].contains(channel))
-      throw StateError('invalid_chat_channel');
-    if (legacy) {
-      if (channel != 'public') throw StateError('legacy_team_chat_unavailable');
-      final chatRef = matchRef.child(matchId).child('chat').push();
-      await chatRef.set({...message.toJson(), 'id': chatRef.key});
-      return;
-    }
-    final root = _db.ref('matchChat').child(matchId);
-    final chatRef = root.child(channel).push();
-    await root.update({
-      '$channel/${chatRef.key}': {
-        ...message.toJson(),
-        'id': chatRef.key,
-        'timestamp': ServerValue.timestamp,
+    if (channel != 'public' || legacy) throw StateError('invalid_chat_channel');
+    if (message.isQuickChat) throw StateError('canonical_chat_phrase_required');
+    await SupabaseBackendService.call(
+      'sendTableChat',
+      data: {
+        'roomId': matchId,
+        'messageId': message.id,
+        'text': message.text,
+        'channel': 'public',
       },
-      'rate/${message.senderId}': ServerValue.timestamp,
-    });
+    );
   }
 
   Stream<List<ChatMessage>> watchChatMessages(
@@ -727,12 +725,12 @@ class MultiplayerSyncService with WidgetsBindingObserver {
     if (matchId.isEmpty || matchId.startsWith('OFFLINE_'))
       return Stream.value([]);
 
-    if (!['public', 'teamA', 'teamB'].contains(channel))
+    if (channel != 'public' || legacy)
       return Stream.error(StateError('invalid_chat_channel'));
     return (legacy
             ? matchRef.child(matchId).child('chat')
             : _db.ref('matchChat').child(matchId).child(channel))
-        .orderByKey()
+        .orderByChild('timestamp')
         .limitToLast(50)
         .onValue
         .map((event) {

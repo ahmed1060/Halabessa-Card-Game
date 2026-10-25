@@ -94,11 +94,11 @@ test('sender-indexed chat queries remain bounded and cannot bypass team privacy'
   await assertFails(get(authored(db('bob'),'matchChat/SERVER/teamA')));
   await assertFails(get(authored(db('stranger'),'matchChat/SERVER/public')));
 });
-test('new team chat excludes opponents, outsiders and released seats', async () => {
+test('private team chat is closed for every player and public reads require an active seat', async () => {
   await env.withSecurityRulesDisabled(async context => {
     await set(ref(context.database(), 'matchChat/SERVER/teamA/one'), {...message(), id: 'one'});
   });
-  await assertSucceeds(get(ref(db('alice'), 'matchChat/SERVER/teamA')));
+  await assertFails(get(ref(db('alice'), 'matchChat/SERVER/teamA')));
   await assertFails(get(ref(db('bob'), 'matchChat/SERVER/teamA')));
   await assertFails(get(ref(db('stranger'), 'matchChat/SERVER/teamA')));
   await assertFails(get(ref(db('alice'), 'matchChat/SERVER')));
@@ -109,7 +109,7 @@ test('new team chat excludes opponents, outsiders and released seats', async () 
   });
   await assertFails(get(ref(db('alice'), 'matchChat/SERVER/teamA')));
 });
-test('chat sender, server timestamp and rate guard are enforced atomically', async () => {
+test('client chat writes cannot bypass server friendship, preset or rate checks', async () => {
   const root = ref(db('alice'), 'matchChat/SERVER');
   const send = (id, channel = 'public', sender = 'alice') => update(root, {
     [`${channel}/${id}`]: {...message(sender), id, timestamp: serverTimestamp()},
@@ -117,7 +117,10 @@ test('chat sender, server timestamp and rate guard are enforced atomically', asy
   });
   await assertFails(send('opponent', 'teamB'));
   await assertFails(send('spoof', 'public', 'bob'));
-  await assertSucceeds(send('valid', 'teamA'));
+  await assertFails(send('valid', 'teamA'));
+  await assertFails(send('valid-public', 'public'));
+  await assertFails(set(ref(db('alice'), 'quickChatPresets'), {revision:1,items:[]}));
+  await assertFails(get(ref(db('alice'), 'quickChatPresets')));
   await assertFails(send('too-fast'));
   await assertFails(set(ref(db('alice'), 'matchChat/SERVER/public/no-rate'), {...message(), id:'no-rate'}));
   await assertFails(set(ref(db('alice'), 'matchChat/SERVER/game/fake'), {...message(), id:'fake'}));
@@ -200,9 +203,19 @@ test('released player loses private-hand access and presence write authority', a
   await assertFails(get(ref(db('alice'), 'matchHands/SERVER/alice')));
   await assertFails(set(ref(db('alice'), 'matches/SERVER/presence/alice'), true));
 });
-test('chat is append-only, bounded and tied to actual authenticated sender', async () => {
+test('legacy chat cannot bypass trusted room chat through direct or parent writes', async () => {
   const alice = db('alice');
-  await assertSucceeds(set(ref(alice, 'matches/SERVER/chat/message1'), message()));
+  await env.withSecurityRulesDisabled(async context => {
+    await set(ref(context.database(),'matches/SERVER/chat/message1'),message());
+  });
+  await assertFails(set(ref(alice,'matches/SERVER/chat/client'),message()));
+  await assertFails(set(ref(alice,'matches/LEGACY/chat/bypass'),message()));
+  await assertFails(update(ref(alice,'matches/LEGACY'),{chat:{bypass:message()}}));
+  // Existing protocol-0 full snapshots may omit their obsolete chat field.
+  await env.withSecurityRulesDisabled(async context => {
+    await set(ref(context.database(),'matches/LEGACY/chat/old'),message());
+  });
+  await assertSucceeds(set(ref(alice,'matches/LEGACY'),{protocolVersion:0,players:{alice:true,bob:true},phase:'playing'}));
   await assertFails(set(ref(alice, 'matches/SERVER/chat/message1/text'), 'edited'));
   await assertFails(remove(ref(alice, 'matches/SERVER/chat/message1')));
   await assertFails(set(ref(alice, 'matches/SERVER/chat/forged'), message('bob')));

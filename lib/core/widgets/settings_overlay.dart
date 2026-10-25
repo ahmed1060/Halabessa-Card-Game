@@ -1,3 +1,4 @@
+import '../../features/game/presentation/providers/quick_chat_providers.dart';
 import 'package:halabessa/features/game/presentation/widgets/match_table_layout.dart';
 import 'dart:ui';
 import 'package:flutter/material.dart';
@@ -264,6 +265,19 @@ class SettingsOverlay extends ConsumerWidget {
                                 AppRoutes.adminSfx,
                               ),
                             ),
+                            if (ref
+                                    .watch(quickChatAdminProvider)
+                                    .asData
+                                    ?.value ==
+                                true)
+                              _buildAdminTile(
+                                'quick_chat_manage'.tr(),
+                                Icons.chat_bubble_outline,
+                                () => Navigator.pushNamed(
+                                  context,
+                                  AppRoutes.adminQuickChat,
+                                ),
+                              ),
                           ],
                         ],
                       ),

@@ -7,7 +7,7 @@ const root = new URL('../../', import.meta.url);
 for (const kind of ['privacy', 'terms']) {
   test(`${kind} website matches the same English/Arabic source used in the app`, async () => {
     const html = await readFile(new URL(`web/${kind}.html`, root), 'utf8');
-    assert.equal(html, await releasePage(kind));
+    assert.equal(html.replace(/\r\n/g, '\n'), await releasePage(kind));
     const copy = JSON.parse(await readFile(new URL(`assets/legal/${kind}.json`, root), 'utf8'));
     for (const language of ['en', 'ar']) {
       assert.ok(copy[language].sections.length >= 5);
