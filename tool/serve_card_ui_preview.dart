@@ -37,20 +37,27 @@ Future<void> main(List<String> arguments) async {
           request.response.statusCode = 404;
         } else {
           final extension = path.split('.').last;
-          final mime = switch (extension) {
-            'html' => 'text/html',
-            'js' => 'application/javascript',
-            'json' => 'application/json',
-            'css' => 'text/css',
-            'png' => 'image/png',
-            'jpg' || 'jpeg' => 'image/jpeg',
-            'svg' => 'image/svg+xml',
-            'wasm' => 'application/wasm',
-            'woff2' => 'font/woff2',
-            'wav' => 'audio/wav',
-            _ => 'application/octet-stream',
-          };
+          final mime = path.endsWith('.wasm.unityweb')
+              ? 'application/wasm'
+              : path.endsWith('.framework.js.unityweb')
+              ? 'application/javascript'
+              : switch (extension) {
+                  'html' => 'text/html',
+                  'js' => 'application/javascript',
+                  'json' => 'application/json',
+                  'css' => 'text/css',
+                  'png' => 'image/png',
+                  'jpg' || 'jpeg' => 'image/jpeg',
+                  'svg' => 'image/svg+xml',
+                  'wasm' => 'application/wasm',
+                  'woff2' => 'font/woff2',
+                  'wav' => 'audio/wav',
+                  _ => 'application/octet-stream',
+                };
           request.response.headers.set('Content-Type', mime);
+          if (path.endsWith('.unityweb')) {
+            request.response.headers.set('Content-Encoding', 'br');
+          }
           request.response.headers.set('Cache-Control', 'no-store');
           request.response.contentLength = await file.length();
           if (path.contains('audio/defaults/')) {

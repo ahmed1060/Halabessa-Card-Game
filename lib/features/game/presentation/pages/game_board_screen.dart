@@ -47,16 +47,13 @@ import 'package:halabessa/core/services/multimedia_service.dart';
 import 'package:halabessa/core/utils/error_handler.dart';
 import 'package:halabessa/core/routes/app_routes.dart';
 import '../providers/unity_communication_service.dart';
+import '../providers/card_interaction_policy.dart';
 import '../providers/unity_layer_provider.dart';
 import '../../domain/models/card_feature_state.dart';
 import '../widgets/shown_card_layer.dart';
 import '../widgets/hand_card_placement.dart';
 import '../widgets/special_move_counters.dart';
 
-// Local review only. Never call an undeployed command on a production room.
-const _cardInteractionsPreview = bool.fromEnvironment(
-  'HALABESSA_CARD_INTERACTIONS',
-);
 const _deckSpicesPreview = bool.fromEnvironment('HALABESSA_DECK_SPICES');
 
 class GameBoardScreen extends ConsumerStatefulWidget {
@@ -134,10 +131,7 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
         g.hand.width,
         spread: OptionBGeometry.localHandSpread,
       );
-      final publicIds =
-          cardUiRefinements &&
-              _cardInteractionsPreview &&
-              state.id.startsWith('OFFLINE_')
+      final publicIds = cardUiRefinements && cardInteractionsFor(state)
           ? CardFeatureState(state).visible
                 .where((c) => c.ownerUid == ref.read(currentUserProvider)?.uid)
                 .map((c) => c.card.firebaseKey)
@@ -660,16 +654,17 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
     );
     final firstIsA = myTeam != 'teamB';
     final playing = state.phase == GamePhase.playing;
-    final featurePreview =
-        _cardInteractionsPreview &&
-        state.id.startsWith('OFFLINE_') &&
-        !isSpectator &&
-        (!show3DHand ||
-            (ref.watch(unityCardInteractionsReadyProvider) &&
-                (!cardUiRefinements || ref.watch(unityCardUiReadyProvider)) &&
-                ref
-                    .read(unityCommunicationServiceProvider)
-                    .supportsVisualActions));
+    final featurePreview = cardInteractionInputFor(
+      state,
+      spectator: isSpectator,
+      unityHand: show3DHand,
+      unityInteractionsReady: ref.watch(unityCardInteractionsReadyProvider),
+      unityRefinementsReady: ref.watch(unityCardUiReadyProvider),
+      visualActionsReady: ref
+          .read(unityCommunicationServiceProvider)
+          .supportsVisualActions,
+      refinedHand: cardUiRefinements,
+    );
     final features = CardFeatureState(state);
     final myTurn =
         playing &&
@@ -1402,8 +1397,7 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
     return BoardCardsWidget(
       key: ValueKey('board-${matchState.id}'),
       cards: matchState.board,
-      gestureSlams:
-          !_cardInteractionsPreview || !matchState.id.startsWith('OFFLINE_')
+      gestureSlams: !cardInteractionsFor(matchState)
           ? const {}
           : {
               for (final card in matchState.board)
@@ -1413,8 +1407,7 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
       onContact: (id, capture) {
         final features = CardFeatureState(matchState);
         if (!capture &&
-            _cardInteractionsPreview &&
-            matchState.id.startsWith('OFFLINE_') &&
+            cardInteractionsFor(matchState) &&
             matchState.board.any(
               (card) =>
                   id == 'play:${card.firebaseKey}' &&
