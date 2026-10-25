@@ -5,12 +5,12 @@ import '../models/global_settings.dart';
 import 'dart:async';
 import 'native_play_provider.dart';
 import '../services/audio_override_store.dart';
+import '../services/backend_audio_override_store.dart';
 
 class GlobalSettingsNotifier extends StateNotifier<GlobalSettings> {
   final List<StreamSubscription<dynamic>> _subscriptions = [];
   AudioOverrideStore? _audioStore;
-  AudioOverrideStore get _audio =>
-      _audioStore ??= FirestoreAudioOverrideStore();
+  AudioOverrideStore get _audio => _audioStore ??= BackendAudioOverrideStore();
   GlobalSettingsNotifier({
     bool listenRemote = true,
     AudioOverrideStore? audioStore,
