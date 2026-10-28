@@ -32,6 +32,10 @@ test('new integration requires Flutter launch and a separately built Unity frame
 
 test('payload text hashes survive checkout line ending conversion; binary changes fail identity', () => {
   assert.equal(digest(Buffer.from('one\r\ntwo\r\n'), 'generated.cpp'), digest(Buffer.from('one\ntwo\n'), 'generated.cpp'));
+  assert.equal(digest(Buffer.from('%YAML 1.1\r\ncontroller: value\r\n'), 'demo.controller'), digest(Buffer.from('%YAML 1.1\ncontroller: value\n'), 'demo.controller'));
+  for (const name of ['bridge.jslib', 'Documentation.XML']) {
+    assert.equal(digest(Buffer.from('one\r\ntwo\r\n'), name), digest(Buffer.from('one\ntwo\n'), name));
+  }
   assert.notEqual(digest(Buffer.from([0, 13, 10]), 'player.so'), digest(Buffer.from([0, 10]), 'player.so'));
 });
 

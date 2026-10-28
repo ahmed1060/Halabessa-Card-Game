@@ -5,9 +5,14 @@ import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import { verify } from './prepare_unity_release.mjs';
 
-export const textPayload = /\.(cs|meta|asset|unity|prefab|json|xml|gradle|properties|txt|shader|hlsl|asmdef|h|c|cpp|m|mm|pbxproj|xcscheme|js|sh|plist|storyboard)$/;
+export const textPayload = /\.(cs|meta|asset|unity|prefab|json|xml|gradle|properties|txt|shader|hlsl|asmdef|h|c|cpp|m|mm|pbxproj|xcscheme|js|jslib|sh|plist|storyboard)$/i;
 export function digest(bytes, name) {
-  if (textPayload.test(name)) bytes = Buffer.from(bytes.toString('utf8').replaceAll('\r\n', '\n'));
+  // Unity serializes controllers/animations/materials as YAML regardless of
+  // extension. Git normalizes those files on Linux/macOS checkouts too.
+  if (textPayload.test(name) || bytes.subarray(0, 16).toString('utf8').startsWith('%YAML') ||
+      /\.(shadergraph|shadersubgraph)$/.test(name)) {
+    bytes = Buffer.from(bytes.toString('utf8').replaceAll('\r\n', '\n'));
+  }
   return createHash('sha256').update(bytes).digest('hex');
 }
 export function normalizeIosProject(text) {
