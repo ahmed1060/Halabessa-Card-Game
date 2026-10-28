@@ -43,6 +43,7 @@ test('payload mapping is limited to the three named integration roots', () => {
 });
 
 async function fixture() {
+  await fs.mkdir(fileURLToPath(new URL('../build/', import.meta.url)), { recursive: true });
   const root = await fs.mkdtemp(path.join(fileURLToPath(new URL('../build/', import.meta.url)), 'integrated-player-test-'));
   const write = async (name, bytes) => {
     await fs.mkdir(path.dirname(path.join(root, name)), { recursive: true });

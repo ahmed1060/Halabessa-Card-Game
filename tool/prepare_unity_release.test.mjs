@@ -16,6 +16,7 @@ async function put(root, name, bytes) {
 }
 async function fixture() {
   // Keep tiny fixtures in ignored build/; never delete an arbitrary directory.
+  await fs.mkdir(path.join(repo, 'build'), { recursive: true });
   const root = await fs.mkdtemp(path.join(repo, 'build/unity-staging-test-'));
   const input = path.join(root, 'build/export');
   const output = path.join(root, 'build/candidate');
