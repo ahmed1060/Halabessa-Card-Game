@@ -83,10 +83,10 @@ try {
     }
     [byte[]]$metadata = EntryBytes ($archive.GetEntry('assets/bin/Data/Managed/Metadata/global-metadata.dat'))
     $metadataText = [Text.Encoding]::UTF8.GetString($metadata)
-    foreach ($marker in @('UNITY_CARD_FEEL_READY', 'HAND_SELECTION', 'VISUAL_CONTACT', 'VISUAL_ACTION_COMPLETE')) {
+    foreach ($marker in @('UNITY_CARD_FEEL_READY', 'HAND_SELECTION', 'VISUAL_CONTACT', 'VISUAL_ACTION_COMPLETE', 'REQUEST_READY', 'UNITY_VIEWPORT_CHANGED')) {
         if (-not $metadataText.Contains($marker)) { throw "Missing current native protocol: $marker" }
     }
-    $exportMetadata = Join-Path $checkout 'build/unity-native-qa-2026-10-22/android/unityLibrary/src/main/assets/bin/Data/Managed/Metadata/global-metadata.dat'
+    $exportMetadata = Join-Path $checkout 'androidBuild/unityExport/unityLibrary/src/main/assets/bin/Data/Managed/Metadata/global-metadata.dat'
     if ((BytesHash $metadata) -ne (Get-FileHash -LiteralPath $exportMetadata).Hash.ToLowerInvariant()) {
         throw 'Packaged metadata differs from the fresh native export.'
     }

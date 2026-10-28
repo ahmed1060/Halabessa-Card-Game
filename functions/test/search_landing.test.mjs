@@ -3,12 +3,10 @@ import assert from 'node:assert/strict';
 import { readFile, access, mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import vm from 'node:vm';
 import { versionWebBuild } from '../../scripts/version-web-build.mjs';
 
 const root = new URL('../../', import.meta.url);
-const homepage = await readFile(new URL('web/landing.html', root), 'utf8');
-const routing = await readFile(new URL('web/landing-route.js', root), 'utf8');
+const homepage = await readFile(new URL('web/index.html', root), 'utf8');
 const origin = 'https://halabessa-card-game1.web.app';
 
 test('Google ownership file retains the supplied verification response', async () => {
@@ -16,33 +14,24 @@ test('Google ownership file retains the supplied verification response', async (
   assert.equal(verification.trim(), 'google-site-verification: google902e70cc206e0f62.html');
 });
 
-test('homepage exposes honest bilingual search content without the app runtime', async () => {
-  assert.match(homepage, /<!DOCTYPE html>/);
-  assert.match(homepage, /<html lang="ar" dir="rtl">/);
+test('root opens the game directly while keeping canonical metadata', async () => {
   assert.match(homepage, /<title>Halabessa Card Game \| لعبة حلبسة<\/title>/);
-  assert.equal((homepage.match(/<h1\b/g) ?? []).length, 1);
   assert.match(homepage, /<meta name="robots" content="index, follow/);
-  assert.match(homepage, /<link rel="canonical" href="https:\/\/halabessa-card-game1\.web\.app\/">/);
-  assert.match(homepage, /<section id="english" lang="en" dir="ltr"/);
-  assert.match(homepage, /href="play.html"/);
-  assert.doesNotMatch(homepage, /flutter_bootstrap|web\.loader|main\.dart|<canvas|userAgent|aggregateRating/);
+  assert.ok(homepage.includes('<link rel="canonical" href="'+origin+'/">'));
+  assert.match(homepage, /id="game-host"/);
+  assert.match(homepage, /src="flutter_bootstrap\.js"/);
+  assert.doesNotMatch(homepage, /landing-route|landing\.css|class="hero"|class="play-button"/);
+  await assert.rejects(access(new URL('web/landing.html', root)));
   const structured = JSON.parse(homepage.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)[1]);
-  assert.equal(structured['@type'], 'WebSite');
-  assert.equal(structured.url, `${origin}/`);
+  assert.equal(structured.url, origin+'/');
   assert.equal(structured.name, 'Halabessa');
-  assert.ok(structured.alternateName.includes('لعبه حلبسه'));
-  const english = homepage.match(/<section id="english"[\s\S]*?<\/section>/)[0];
-  for (const name of ['7alabessa', 'halabesa', '7alabesa']) {
-    assert.ok(structured.alternateName.includes(name), `${name} is an alternate website name`);
-    assert.ok(english.includes(name), `${name} is visible to visitors without running JavaScript`);
+  const fallback = homepage.match(/<noscript>([\s\S]*?)<\/noscript>/)[1];
+  for (const name of ['7alabessa', 'halabesa', '7alabesa', 'لعبه حلبسه']) {
+    assert.ok(structured.alternateName.includes(name));
   }
-  for (const [, path] of homepage.matchAll(/(?:href|src)="([^"#]+)"/g)) {
-    if (/^(https?:|mailto:)/.test(path) || path === '/' || path === 'play.html') continue;
-    await access(new URL(`web/${path}`, root));
-  }
-  const png = await readFile(new URL('web/images/halabessa-game-preview.png', root));
-  assert.equal(png.readUInt32BE(16), 1506);
-  assert.equal(png.readUInt32BE(20), 645);
+  assert.match(fallback, /Enable JavaScript/);
+  assert.match(fallback, /lang="ar" dir="rtl"/);
+  assert.doesNotMatch(homepage, /userAgent|aggregateRating/);
 });
 
 test('discovery files advertise only canonical public pages, not private hash views', async () => {
@@ -63,27 +52,7 @@ test('discovery files advertise only canonical public pages, not private hash vi
   }
 });
 
-for (const [path, expected] of [
-  ['/', null],
-  ['/?renderer=unity', null],
-  ['/#about', null],
-  ['/#english', null],
-  ['/#/game', '/play.html#/game'],
-  ['/?renderer=unity#/game', '/play.html?renderer=unity#/game'],
-  ['/#/account/delete', '/play.html#/account/delete'],
-  ['/?code=test%2Bvalue#/home', '/play.html?code=test%2Bvalue#/home'],
-]) {
-  test(`legacy routing preserves destinations and queries for ${path}`, () => {
-    const source = new URL(path, origin);
-    let destination = null;
-    const location = { href: source.href, search: source.search, hash: source.hash,
-      replace(value) { destination = value; } };
-    vm.runInNewContext(routing, { window: { location }, URL });
-    assert.equal(destination, expected === null ? null : `${origin}${expected}`);
-  });
-}
-
-test('web packaging keeps matching fingerprinted game code beside indexable HTML', async () => {
+test('root and play links select matching game code without a landing detour', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'halabessa-landing-'));
   try {
     await mkdir(join(directory, 'assets'));
@@ -92,9 +61,11 @@ test('web packaging keeps matching fingerprinted game code beside indexable HTML
     await writeFile(join(directory, 'flutter_bootstrap.js'), '_flutter.buildConfig={"builds":[{"mainJsPath":"main.dart.js"}]};');
     const shell = await readFile(new URL('web/index.html', root), 'utf8');
     await writeFile(join(directory, 'index.html'), shell);
-    await writeFile(join(directory, 'landing.html'), homepage);
     const result = await versionWebBuild(directory);
-    assert.equal(await readFile(join(directory, 'index.html'), 'utf8'), homepage);
+    const index = await readFile(join(directory, 'index.html'), 'utf8');
+    assert.ok(index.includes(result.bootstrapName));
+    assert.match(index, /name="robots" content="index, follow/);
+    assert.ok(index.includes('id="game-host"'));
     const playable = await readFile(join(directory, 'play.html'), 'utf8');
     assert.match(playable, new RegExp(result.bootstrapName));
     assert.match(playable, /name="robots" content="noindex, follow"/);

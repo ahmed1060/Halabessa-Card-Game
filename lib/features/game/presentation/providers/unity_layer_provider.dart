@@ -9,6 +9,9 @@ final unityInitializedProvider = StateProvider<bool>((ref) => false);
 /// A failed engine stays hidden for this app session, including late messages.
 final unityFailedProvider = StateProvider<bool>((ref) => false);
 
+/// A disconnected viewer must catch up before producing more visual effects.
+final unityVisualSuspendedProvider = StateProvider<bool>((ref) => false);
+
 final unityLayerActiveProvider = Provider<bool>((ref) =>
     ref.watch(unityLayerVisibilityProvider) &&
     ref.watch(unityInitializedProvider) &&

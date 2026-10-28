@@ -4,6 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import '../providers/settings_provider.dart';
 import '../providers/native_play_provider.dart';
+import '../providers/age_eligibility_provider.dart';
+import 'age_eligibility_screen.dart';
+import '../../features/lan/presentation/lan_play_app.dart';
 import '../../features/auth/domain/models/app_user.dart';
 import '../../features/game/presentation/pages/offline_practice_app.dart';
 import '../../features/game/presentation/widgets/table_style.dart';
@@ -19,12 +22,13 @@ class NativePlayEntry extends ConsumerStatefulWidget {
 class _NativePlayEntryState extends ConsumerState<NativePlayEntry> {
   bool _onlinePending = false;
   bool _practice = false;
+  bool _lan = false;
   AppUser? _player;
   String? _error;
   int _entryGeneration = 0;
   bool _localPending = false;
 
-  Future<void> _startPractice() async {
+  Future<void> _startPractice({bool lan = false}) async {
     if (_localPending) return;
     final generation = ++_entryGeneration;
     ref.read(nativeOnlineEnabledProvider.notifier).state = false;
@@ -56,6 +60,7 @@ class _NativePlayEntryState extends ConsumerState<NativePlayEntry> {
           avatarUrl: 'assets/images/avatars/avatar1.png',
         );
         _practice = true;
+        _lan = lan;
         _localPending = false;
       });
     } catch (_) {
@@ -93,12 +98,23 @@ class _NativePlayEntryState extends ConsumerState<NativePlayEntry> {
 
   @override
   Widget build(BuildContext context) {
-    if (_practice && _player != null)
+    if (_practice && _player != null) {
+      if (ref.watch(ageEligibilityProvider) != AgeEligibility.eligible) {
+        return const AgeEligibilityScreen();
+      }
+      if (_lan) {
+        return LanPlayApp(
+          preferences: ref.read(sharedPreferencesProvider),
+          player: _player!,
+          onExit: () => setState(() => _practice = false),
+        );
+      }
       return OfflinePracticeApp(
         preferences: ref.read(sharedPreferencesProvider),
         player: _player!,
         onExit: () => setState(() => _practice = false),
       );
+    }
     return LanternPageFrame(
       child: Scaffold(
         backgroundColor: Colors.transparent,
@@ -140,6 +156,15 @@ class _NativePlayEntryState extends ConsumerState<NativePlayEntry> {
                       'offline_practice_description'.tr(),
                       textAlign: TextAlign.center,
                       style: TableStyle.detail.copyWith(fontSize: 15),
+                    ),
+                    const SizedBox(height: 16),
+                    OutlinedButton.icon(
+                      key: const ValueKey('native-lan'),
+                      onPressed: _localPending
+                          ? null
+                          : () => _startPractice(lan: true),
+                      icon: const Icon(Icons.wifi),
+                      label: Text('lan_title'.tr()),
                     ),
                     if (_onlinePending)
                       const Padding(

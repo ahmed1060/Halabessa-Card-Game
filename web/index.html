@@ -10,8 +10,9 @@
     content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
   <meta name="theme-color" content="#3B274C">
   <meta name="description" content="Play Halabessa, the Egyptian card game. العب حلبسة مع صحابك أو اتدرّب مع البوت.">
-  <!-- The public HTML homepage is indexed; this interactive shell is /play.html. -->
-  <meta name="robots" content="noindex, follow">
+  <!-- The root URL opens the game directly and remains the canonical URL. -->
+  <meta name="robots" content="index, follow, max-image-preview:large">
+  <link rel="canonical" href="https://halabessa-card-game1.web.app/">
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
@@ -25,7 +26,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="icons/halabessa-lantern-favicon-32-v1.png" />
   <link rel="icon" type="image/png" sizes="16x16" href="icons/halabessa-lantern-favicon-16-v1.png" />
 
-  <title>Halabessa</title>
+  <title>Halabessa Card Game | لعبة حلبسة</title>
   <link rel="manifest" href="manifest.json">
 
   <!-- Permanent Font Fix: Google Fonts CDN -->
@@ -36,13 +37,47 @@
     rel="stylesheet">
   <link rel="stylesheet" href="canvas.css">
 
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Halabessa">
+  <meta property="og:title" content="Halabessa Card Game | لعبة حلبسة">
+  <meta property="og:description" content="قعدة كوتشينة مصرية، في أي وقت. العب حلبسة مع صحابك أو اتدرّب مع البوت من المتصفح.">
+  <meta property="og:url" content="https://halabessa-card-game1.web.app/">
+  <meta property="og:locale" content="ar_EG">
+  <meta property="og:locale:alternate" content="en_US">
+  <meta property="og:image" content="https://halabessa-card-game1.web.app/images/halabessa-game-preview.png">
+  <meta property="og:image:width" content="1506">
+  <meta property="og:image:height" content="645">
+  <meta property="og:image:alt" content="واجهة لعبة حلبسة بطاولة بنفسجية وأوراق الكوتشينة — Halabessa card game">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Halabessa Card Game | لعبة حلبسة">
+  <meta name="twitter:description" content="العب حلبسة من المتصفح — Egyptian card play with friends or bots.">
+  <meta name="twitter:image" content="https://halabessa-card-game1.web.app/images/halabessa-game-preview.png">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "@id": "https://halabessa-card-game1.web.app/#website",
+    "url": "https://halabessa-card-game1.web.app/",
+    "name": "Halabessa",
+    "alternateName": ["Halabessa Card Game", "7alabessa", "halabesa", "7alabesa", "حلبسة", "حلبسه", "لعبة حلبسة", "لعبه حلبسه"],
+    "inLanguage": ["ar", "en"]
+  }
+  </script>
 </head>
 
 <body>
+  <noscript>
+    <main>
+      <h1>Halabessa Card Game — لعبة حلبسة</h1>
+      <p lang="en">Play Halabessa, the Egyptian card game, online with friends or practice with bots. Also known as 7alabessa, halabesa and 7alabesa. Enable JavaScript to open the game.</p>
+      <p lang="ar" dir="rtl">العب حلبسة مع صحابك أو اتدرّب مع البوت. فعّل JavaScript لفتح اللعبة.</p>
+      <p><a href="privacy.html">Privacy / الخصوصية</a> · <a href="terms.html">Terms / الشروط</a> · <a href="support.html">Support / الدعم</a></p>
+    </main>
+  </noscript>
   <!-- One unscaled host owns both the painted Flutter view and its hit tests. -->
   <div id="game-host"></div>
   <!-- Unity WebGL Engine Loader (Canvas is dynamically injected by Flutter) -->
-  <script src="Build/web.loader.js?v=card-ui-20261024-09af62cddf6d"></script>
+  <script src="Build/web.loader.js?v=lan-unity-20261028-548d2ccbc40a"></script>
   <script>
     var unityInstance = null;
     var unityStartupState = 'idle';
@@ -85,7 +120,7 @@
       });
 
       var buildUrl = "Build";
-      var cacheBuster = "?v=card-ui-20261024-09af62cddf6d";
+      var cacheBuster = "?v=lan-unity-20261028-548d2ccbc40a";
 
       Promise.resolve().then(function () { return createUnityInstance(canvasElement, {
         dataUrl: buildUrl + "/web.data.unityweb" + cacheBuster,

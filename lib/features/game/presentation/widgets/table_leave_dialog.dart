@@ -8,8 +8,10 @@ class TableLeaveDialog extends StatefulWidget {
     super.key,
     required this.offline,
     required this.onLeave,
+    this.localNetwork = false,
   });
   final bool offline;
+  final bool localNetwork;
   final Future<bool> Function() onLeave;
   @override
   State<TableLeaveDialog> createState() => _TableLeaveDialogState();
@@ -78,7 +80,9 @@ class _TableLeaveDialogState extends State<TableLeaveDialog> {
                       const SizedBox(width: 12),
                       Flexible(
                         child: Text(
-                          (widget.offline
+                          (widget.localNetwork
+                                  ? 'lan_leave_title'
+                                  : widget.offline
                                   ? 'table_leave_practice'
                                   : 'leave_game_title')
                               .tr(),
@@ -92,7 +96,9 @@ class _TableLeaveDialogState extends State<TableLeaveDialog> {
                   ),
                   const SizedBox(height: 18),
                   Text(
-                    (widget.offline
+                    (widget.localNetwork
+                            ? 'lan_leave_warning'
+                            : widget.offline
                             ? 'offline_leave_warning'
                             : 'leave_game_warning')
                         .tr(),

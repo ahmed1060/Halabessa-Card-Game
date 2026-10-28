@@ -7,7 +7,8 @@ import 'release_policy_screen.dart';
 import '../../features/game/presentation/widgets/table_style.dart';
 
 class AgeEligibilityScreen extends ConsumerStatefulWidget {
-  const AgeEligibilityScreen({super.key});
+  const AgeEligibilityScreen({super.key, this.footer});
+  final Widget? footer;
   @override
   ConsumerState<AgeEligibilityScreen> createState() =>
       _AgeEligibilityScreenState();
@@ -57,6 +58,7 @@ class _AgeEligibilityScreenState extends ConsumerState<AgeEligibilityScreen> {
                         ),
                         const SizedBox(height: 16),
                         const ReleasePolicyLinks(),
+                        if (widget.footer != null) widget.footer!,
                         if (!blocked) ...[
                           const SizedBox(height: 24),
                           OutlinedButton.icon(

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'auth_screen.dart';
+import '../widgets/profile_birth_date.dart';
 import '../providers/auth_providers.dart';
 import '../../../home/presentation/pages/home_screen.dart';
 import '../../../../core/utils/error_handler.dart';
@@ -109,7 +110,7 @@ class _AuthWrapperState extends ConsumerState<AuthWrapper> {
     return authState.when(
       data: (user) {
         if (user != null) {
-          return const HomeScreen();
+          return const AccountBirthDateGate(child: HomeScreen());
         }
         return const AuthScreen();
       },

@@ -182,7 +182,21 @@ class UnityCommunicationService {
   }
 
   void setController(UnityWidgetController controller) {
+    if (_disposed) return;
     _controller = controller;
+    requestNativeReady();
+  }
+
+  /// A native player survives platform-view disposal. A new scoped viewer must
+  /// negotiate again rather than assume the old engine's Start() will rerun.
+  /// Older exports ignore this optional message and retain cold-start support.
+  void requestNativeReady() {
+    if (_disposed || kIsWeb) return;
+    postMessage(
+      'UnityBridge',
+      'OnFlutterMessage',
+      jsonEncode({'type': 'REQUEST_READY'}),
+    );
   }
 
   void _fallbackTo2D() {
@@ -311,6 +325,7 @@ class UnityCommunicationService {
   }
 
   void handleUnityMessage(String message) {
+    if (_disposed) return;
     try {
       final data = jsonDecode(message);
       if (data is! Map) return;
@@ -343,6 +358,11 @@ class UnityCommunicationService {
         return;
       }
       if (!isReady.value || _startup.hasFailed) return;
+      if (event == 'UNITY_VIEWPORT_CHANGED') {
+        // A cosmetic camera/viewport change cannot advance or replay a move.
+        resyncVisuals();
+        return;
+      }
       final settings = _ref.read(settingsProvider);
       if (event == 'UNITY_VISUAL_READY') {
         _ref.read(unityCardUiReadyProvider.notifier).state = false;

@@ -195,7 +195,8 @@ class SettingsOverlay extends ConsumerWidget {
                               Navigator.pushNamed(context, AppRoutes.help);
                             },
                           ),
-                          if (!ref.watch(offlineSessionProvider))
+                          if (!ref.watch(offlineSessionProvider) ||
+                              ref.watch(localUnityEnabledProvider))
                             _buildToggleTile(
                               'mode_3d'.tr(),
                               settings.is3DModeEnabled,

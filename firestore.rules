@@ -24,11 +24,22 @@ service cloud.firestore {
     // (grantAdminIfEligible, setUserAdminClaim, sendFriendRequest,
     // respondToFriendRequest), which bypasses these rules and validates the
     // caller server-side. See HAL-07 and HAL-08.
+    function validBirthDate(data) {
+      let birth = data.get('dateOfBirth', null);
+      return birth == null || (birth is timestamp
+        && birth >= timestamp.date(1900, 1, 1)
+        && birth == timestamp.date(birth.year(), birth.month(), birth.day())
+        && (birth.year() < request.time.year() - 13 ||
+          (birth.year() == request.time.year() - 13 &&
+            (birth.month() < request.time.month() ||
+              (birth.month() == request.time.month() && birth.day() <= request.time.day())))));
+    }
     match /users/{uid} {
       allow read: if activeAccount() &&
         (request.auth.uid == uid || request.auth.token.get('admin', false) == true);
 
       allow create: if activeAccount() && request.auth.uid == uid
+        && validBirthDate(request.resource.data)
         && request.resource.data.get('isAdmin', false) == false
         && request.resource.data.get('friends', []) == []
         && request.resource.data.get('pendingFriendRequests', []) == []
@@ -38,6 +49,8 @@ service cloud.firestore {
         && request.resource.data.get('weeklyRanking', {}) == {};
 
       allow update: if activeAccount() && request.auth.uid == uid
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['dateOfBirth'])
+          || (request.resource.data.dateOfBirth is timestamp && validBirthDate(request.resource.data)))
         && request.resource.data.get('isAdmin', false) == resource.data.get('isAdmin', false)
         && request.resource.data.get('friends', []) == resource.data.get('friends', [])
         && request.resource.data.get('pendingFriendRequests', []) == resource.data.get('pendingFriendRequests', [])

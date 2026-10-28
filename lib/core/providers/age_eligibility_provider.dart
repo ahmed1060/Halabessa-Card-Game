@@ -23,8 +23,16 @@ class AgeEligibilityNotifier extends StateNotifier<AgeEligibility> {
         'blocked' => AgeEligibility.blocked,
         _ => AgeEligibility.unknown,
       });
-  Future<void> submit(DateTime birthDate, {DateTime? today}) async {
-    if (state != AgeEligibility.unknown || _submitting) return;
+  Future<void> submit(
+    DateTime birthDate, {
+    DateTime? today,
+    bool recheck = false,
+  }) async {
+    if (state == AgeEligibility.blocked ||
+        (state == AgeEligibility.eligible && !recheck) ||
+        _submitting) {
+      return;
+    }
     _submitting = true;
     final next = isAtLeast13(birthDate, today ?? DateTime.now())
         ? AgeEligibility.eligible

@@ -9,8 +9,6 @@ import 'core/theme/theme_config.dart';
 import 'core/providers/settings_provider.dart';
 import 'core/services/multimedia_service.dart';
 import 'core/services/player_presence.dart';
-import 'core/providers/age_eligibility_provider.dart';
-import 'core/widgets/age_eligibility_screen.dart';
 import 'core/widgets/app_orientation_scope.dart';
 import 'core/widgets/web_orientation_gate.dart';
 import 'core/providers/native_play_provider.dart';
@@ -67,23 +65,6 @@ class HalabessaApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final settings = ref.watch(settingsProvider);
-    // Gate every route (including deep links) before reading the auth stream or
-    // mounting provider buttons, account screens, presence or the Unity overlay.
-    if (ref.watch(ageEligibilityProvider) != AgeEligibility.eligible) {
-      return MaterialApp(
-        key: const ValueKey('age-gate'),
-        title: 'Halabessa',
-        initialRoute: '/',
-        localizationsDelegates: context.localizationDelegates,
-        supportedLocales: context.supportedLocales,
-        locale: context.locale,
-        theme: ThemeConfig.lightTheme,
-        darkTheme: ThemeConfig.darkTheme,
-        themeMode: settings.themeMode,
-        debugShowCheckedModeBanner: false,
-        home: const AgeEligibilityScreen(),
-      );
-    }
     if (isNativeMobile && !ref.watch(nativeOnlineEnabledProvider)) {
       return MaterialApp(
         key: const ValueKey('native-local-entry'),

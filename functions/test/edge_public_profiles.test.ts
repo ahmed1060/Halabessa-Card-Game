@@ -5,6 +5,7 @@ const document = { name: 'projects/qa/databases/(default)/documents/users/alice'
   displayName: {stringValue: 'Alice'}, points: {integerValue: '50'}, email: {stringValue: 'private@example.test'},
   coins: {integerValue: '900'}, inventory: {mapValue: {fields: {secret: {integerValue: '1'}}}},
   friends: {stringValue: 'private'}, isAdmin: {booleanValue: true},
+  dateOfBirth: {timestampValue: '2000-02-29T00:00:00Z'},
   weeklyRanking: {mapValue: {fields: {week: {stringValue: '2026-10-05'}, points: {integerValue: '50'}, email: {stringValue: 'private'}}}},
 }};
 test('public view allowlists fields and rejects nested private ranking fields', () => {

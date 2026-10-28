@@ -30,6 +30,8 @@ public class UnityBridge : MonoBehaviour {
     private readonly HashSet<string> seenVisuals = new HashSet<string>();
     private readonly HashSet<string> localHandIds = new HashSet<string>();
     private string submittedCard;
+    private bool started;
+    private int viewportWidth, viewportHeight;
     public bool CanSubmitVisualIntent => managedVisuals && submittedCard == null;
     public bool SubmitVisualIntent(CardInstance card) {
         if (!CanSubmitVisualIntent || card == null || !localHandIds.Contains(card.cardId)) return false;
@@ -65,6 +67,11 @@ public class UnityBridge : MonoBehaviour {
             // Debug.Log("UnityBridge: Forced Camera transparency (Alpha 0)");
         }
         EnsurePointerInput();
+        started = true;
+        AnnounceReady();
+    }
+
+    private void AnnounceReady() {
         NotifyFlutter("UNITY_READY", "Unity initialized");
         NotifyFlutter("UNITY_VISUAL_READY", "1");
         NotifyFlutter("UNITY_CARD_FEEL_READY", "1");
@@ -87,6 +94,12 @@ public class UnityBridge : MonoBehaviour {
     }
 
     void Update() {
+        // Flutter may supply new normalized anchors before the native/WebGL
+        // camera has resized. Reconcile again after Screen reflects that size.
+        if (started && (viewportWidth != Screen.width || viewportHeight != Screen.height)) {
+            viewportWidth = Screen.width; viewportHeight = Screen.height;
+            NotifyFlutter("UNITY_VIEWPORT_CHANGED");
+        }
 #if UNITY_WEBGL && !UNITY_EDITOR
         if (WebGLInput.captureAllKeyboardInput) {
             WebGLInput.captureAllKeyboardInput = false;
@@ -109,6 +122,18 @@ public class UnityBridge : MonoBehaviour {
         try {
             MessageData data = JsonUtility.FromJson<MessageData>(messageJson);
             if (data == null) return;
+            // UaaL retains its player when a Flutter platform view is detached.
+            // A new private viewer scope needs a clean visual session and the
+            // same explicit capability handshake; no game state lives here.
+            if (data.type == "REQUEST_READY") {
+                if (!started) return; // Start will announce the cold player.
+                CancelVisuals();
+                foreach (var card in activeCards.Values) if (card != null) Destroy(card);
+                activeCards.Clear(); localHandIds.Clear(); seenVisuals.Clear();
+                visualAnchors.Clear(); visualGeneration = 0;
+                managedVisuals = false; refinedHand = false;
+                AnnounceReady(); return;
+            }
             if (data.trace && (data.type == "VISUAL_ACTION" || data.type == "CANCEL_VISUALS"))
                 Debug.Log($"Visual QA native {data.type} {data.kind} generation={data.generation} frame={Time.frameCount} focused={Application.isFocused} background={Application.runInBackground}");
             if (data.type == "CANCEL_VISUALS") {

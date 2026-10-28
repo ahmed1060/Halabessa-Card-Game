@@ -61,6 +61,7 @@ jobs:
           test "$(head -c 4 androidBuild/unityExport/unityLibrary/src/main/jniLibs/arm64-v8a/libil2cpp.so | xxd -p)" = '7f454c46'
           test "$(head -c 4 androidBuild/unityExport/unityLibrary/src/main/jniLibs/arm64-v8a/libunity.so | xxd -p)" = '7f454c46'
           test "$(head -c 4 androidBuild/unityExport/unityLibrary/src/main/jniLibs/arm64-v8a/libmain.so | xxd -p)" = '7f454c46'
+          node tool/verify_unity_players.mjs android
 
       - name: Set up Java
         uses: actions/setup-java@v4

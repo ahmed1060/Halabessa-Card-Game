@@ -191,7 +191,7 @@ class BackendTransport {
       }
       Map<String, dynamic> result;
       try {
-        final decoded = jsonDecode(response.body);
+        final decoded = jsonDecode(utf8.decode(response.bodyBytes));
         if (decoded is! Map<String, dynamic>) throw const FormatException();
         result = decoded;
       } on FormatException {

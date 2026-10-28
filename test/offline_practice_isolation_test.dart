@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:halabessa/core/providers/settings_provider.dart';
+import 'package:halabessa/core/providers/age_eligibility_provider.dart';
+import 'package:halabessa/core/widgets/age_eligibility_screen.dart';
 import 'package:halabessa/core/routes/app_routes.dart';
 import 'package:halabessa/core/providers/native_play_provider.dart';
 import 'package:halabessa/core/providers/global_settings_provider.dart';
@@ -337,10 +339,42 @@ void main() {
     },
   );
 
+  testWidgets(
+    'native birth date prompt starts only after choosing local practice',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      final prefs = await SharedPreferences.getInstance();
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            sharedPreferencesProvider.overrideWithValue(prefs),
+            sessionUidProvider.overrideWith(
+              (ref) => throw StateError('no cloud session in local entry'),
+            ),
+          ],
+          child: MaterialApp(home: NativePlayEntry(onOnline: () async {})),
+        ),
+      );
+      expect(find.byType(AgeEligibilityScreen), findsNothing);
+      expect(find.byKey(const ValueKey('native-online')), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('native-offline')));
+      await tester.pumpAndSettle();
+      expect(find.byType(AgeEligibilityScreen), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('start-offline-practice')),
+        findsNothing,
+      );
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
+
   testWidgets('native entry allows local mode even while Online cannot start', (
     tester,
   ) async {
-    SharedPreferences.setMockInitialValues({});
+    SharedPreferences.setMockInitialValues({
+      AgeEligibilityNotifier.key: 'eligible',
+    });
     final prefs = await SharedPreferences.getInstance();
     final online = Completer<void>();
     await tester.pumpWidget(
@@ -381,7 +415,9 @@ void main() {
   testWidgets(
     'successful Online preparation activates only the current choice',
     (tester) async {
-      SharedPreferences.setMockInitialValues({});
+      SharedPreferences.setMockInitialValues({
+        AgeEligibilityNotifier.key: 'eligible',
+      });
       final prefs = await SharedPreferences.getInstance();
       final online = Completer<void>();
       await tester.pumpWidget(
@@ -409,7 +445,9 @@ void main() {
   testWidgets(
     'a stale Online failure cannot replace local play with an error',
     (tester) async {
-      SharedPreferences.setMockInitialValues({});
+      SharedPreferences.setMockInitialValues({
+        AgeEligibilityNotifier.key: 'eligible',
+      });
       final prefs = await SharedPreferences.getInstance();
       final online = Completer<void>();
       await tester.pumpWidget(
