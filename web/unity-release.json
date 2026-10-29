@@ -1,14 +1,14 @@
 {
-  "id": "card-ui-20261024-09af62cddf6d",
-  "sourceReview": "docs/card-ui-refinements-local-review-2026-10-24.md",
+  "id": "lan-unity-20261028-548d2ccbc40a",
+  "sourceReview": "docs/unity-export-integration-review-2026-10-28.md",
   "files": {
-    "Build/web.loader.js": "a9ae5b753e5ba93a7079d6dc0d29823a02f07d5d9ae6bb3a79aeb4b2435e03e8",
-    "Build/web.data.unityweb": "0e840d5606b4a56561c353ac2438de02f88c41649f703667e81527dc2ece48c5",
+    "Build/web.loader.js": "a67573469ed66e1b803365ee3abe1d8d907b1c87466b251fc6641d9f60313adb",
+    "Build/web.data.unityweb": "9a5340a3051895f415884d8f2d4c48643515289edf59d79e9f4428c76389a573",
     "Build/web.framework.js.unityweb": "0e789506e5452754145eb28d0679619e889d855e370863e0e491b5c71028a9a0",
-    "Build/web.wasm.unityweb": "36a0b4d377fe7fe423c59edfae9a5be0d7414ebb64d45cb139dda16668fd967a"
+    "Build/web.wasm.unityweb": "cacd77a8bdca026e64d7183e6b5e5458d4a3e3c21362cdc8b3f13e2188325d86"
   },
   "sources": {
-    "unity/Halabessa/Assets/Scripts/UnityBridge.cs": "6ce70c204a308a147f718e6b0ed714b48d843599fba1fb73277efe18da3a9700",
+    "unity/Halabessa/Assets/Scripts/UnityBridge.cs": "31aa1a9dd67467f669ab770691ac4074c48fa340bc17def8a590c7644d35b613",
     "unity/Halabessa/Assets/Scripts/CardJuiceController.cs": "8401146106b8343bfe854ac0487d9252d2f7f9a857e2bd2e6b6f7c73d6a01871"
   }
 }

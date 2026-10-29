@@ -2,3 +2,6 @@
 * text=auto
 *.a filter=lfs diff=lfs merge=lfs -text
 *.so filter=lfs diff=lfs merge=lfs -text
+# Preserve Unity's generated C/C++ verbatim; IL2CPP emits trailing spaces.
+# Release-manifest hashes verify these artifacts instead of reformatting them.
+ios/UnityLibrary/Il2CppOutputProject/Source/** -whitespace

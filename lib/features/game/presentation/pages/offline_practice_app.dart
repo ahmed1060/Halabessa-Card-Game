@@ -15,6 +15,8 @@ import '../../../home/presentation/widgets/practice_difficulty_dialog.dart';
 import '../../domain/models/bot_difficulty.dart';
 import '../../domain/providers/game_providers.dart';
 import '../providers/chat_providers.dart';
+import '../providers/quick_chat_providers.dart';
+import '../../domain/models/quick_chat_phrase.dart';
 import '../widgets/table_style.dart';
 import 'game_board_screen.dart';
 
@@ -24,6 +26,7 @@ offlinePlayOverrides(
   SharedPreferences preferences,
   AppUser player, {
   MultimediaService Function(Ref)? audioFactory,
+  MatchStateNotifier Function(Ref)? matchFactory,
 }) => [
   offlineSessionProvider.overrideWithValue(true),
   currentUserProvider.overrideWithValue(player),
@@ -58,8 +61,11 @@ offlinePlayOverrides(
   multimediaServiceProvider.overrideWith(
     (ref) => (audioFactory ?? MultimediaService.new)(ref),
   ),
-  matchStateProvider.overrideWith((ref) => MatchStateNotifier(ref)),
+  matchStateProvider.overrideWith((ref) =>
+      (matchFactory ?? MatchStateNotifier.new)(ref)),
   chatMessagesProvider.overrideWith((ref) => Stream.value([])),
+  roomChatMessagesProvider.overrideWith((ref) => Stream.value([])),
+  tableChatPolicyProvider.overrideWith((ref) => Stream.value(const TableChatPolicy())),
   chatStateProvider.overrideWith((ref) => ChatNotifier()),
   chatBubblesProvider.overrideWith((ref) => ChatBubblesNotifier(ref)),
   lastMessageForUserProvider.overrideWith((ref, uid) => null),

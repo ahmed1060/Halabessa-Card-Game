@@ -30,11 +30,16 @@ jobs:
             # reports every .a as an "unknown file type".
             - uses: actions/checkout@v4
 
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: "24"
+
             - name: Verify Unity static libraries
               run: |
                   git lfs pull --include="ios/UnityLibrary/**" --exclude=""
                   test "$(head -c 7 ios/UnityLibrary/Libraries/libiPhone-lib.a)" = '!<arch>'
                   test "$(head -c 7 ios/UnityLibrary/Libraries/baselib.a)" = '!<arch>'
+                  node tool/verify_unity_players.mjs ios
 
             - name: Verify App Store toolchain
               run: |
@@ -107,12 +112,10 @@ jobs:
                     -configuration Release \
                     -sdk iphoneos \
                     -showBuildSettings)"
-                  for framework in FirebaseAnalytics FirebaseAuth FirebaseCore FirebaseDatabase; do
-                    if ! printf '%s\n' "$unity_settings" | grep -E "^ *OTHER_LDFLAGS =.*${framework}"; then
-                      echo "UnityFramework is missing CocoaPods linkage for ${framework}." >&2
-                      exit 1
-                    fi
-                  done
+                  if printf '%s\n' "$unity_settings" | grep -E '^ *OTHER_LDFLAGS =.*Firebase'; then
+                    echo 'The visual-only UnityFramework must not link Firebase.' >&2
+                    exit 1
+                  fi
 
             - name: Analyze
               # Fatal on errors only -- see android-build.yml for why.

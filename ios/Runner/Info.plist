@@ -24,10 +24,14 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Find and join Halabessa games with nearby players on the same Wi-Fi, without internet.</string>
+	<key>NSBonjourServices</key>
+	<array><string>_halabessa._tcp</string></array>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Choose a photo from your library for your Halabessa profile.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>Capture a photo for your Halabessa profile if you choose to use the camera.</string>
+	<string>Scan a same-Wi-Fi room invitation or capture a profile photo when you choose to use the camera.</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>

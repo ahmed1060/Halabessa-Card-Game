@@ -1,9 +1,8 @@
 # Uncomment this line to define a global platform for your project
 platform :ios, '15.0'
 
-# The checked-in Unity export was generated with Firebase Apple SDK 12.10.0.
-# Keep FlutterFire and the temporary Unity compatibility target on that exact
-# native SDK version so Xcode sees one Firebase implementation and ABI.
+# Keep FlutterFire on its existing native SDK version. Unity is a visual-only
+# framework and no longer links a second Firebase implementation.
 $FirebaseSDKVersion = '12.10.0'
 
 # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
@@ -15,9 +14,8 @@ project 'Runner', {
   'Release' => :release,
 }
 
-# This Podfile integrates both Runner.xcodeproj and Unity's external Xcode
-# project. CocoaPods cannot infer which workspace owns multiple projects, so
-# bind both integrations to Flutter's existing workspace explicitly.
+# Keep Flutter's existing workspace, which also contains the separate Unity
+# project built explicitly by Runner's scheme.
 workspace 'Runner.xcworkspace'
 
 def flutter_root
@@ -54,31 +52,10 @@ target 'Runner' do
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
 end
 
-# The current Unity source no longer contains Firebase, but the checked-in iOS
-# export still contains Firebase C++ static libraries. Until that export is
-# regenerated from Unity, satisfy those native symbols with the same CocoaPods
-# Firebase build used by Flutter instead of a second Swift Package Manager
-# copy. This target can be removed with the stale Firebase export artifacts.
-target 'UnityFramework' do
-  project 'UnityLibrary/Unity-iPhone.xcodeproj'
-  use_frameworks!
-  use_modular_headers!
-
-  pod 'Firebase/CoreOnly', $FirebaseSDKVersion
-  pod 'Firebase/Auth', $FirebaseSDKVersion
-  pod 'Firebase/Database', $FirebaseSDKVersion
-  pod 'Firebase/Analytics', $FirebaseSDKVersion
-end
-
 post_install do |installer|
   installer.pods_project.targets.each do |target|
-    # Adding the external Unity project gives the Pods project Unity's
-    # ReleaseForRunning and ReleaseForProfiling configurations in addition to
-    # Flutter's Debug/Profile/Release configurations. CocoaPods otherwise
-    # generates a mixture of 10.0 and 15.0 deployment targets, and Flutter's
-    # pod helper refuses to resolve a target with multiple deployment values.
-    # Normalize first so the helper sees the same minimum supported iOS
-    # version in every generated configuration.
+    # Normalize all pod configurations to the app's existing minimum before
+    # Flutter's helper resolves their deployment settings.
     target.build_configurations.each do |config|
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
     end
@@ -87,11 +64,8 @@ post_install do |installer|
 
     # CocoaPods applies the plugin's xcconfig to its generated privacy bundle
     # target as well as to the plugin framework.  That xcconfig links
-    # UnityFramework, whose stale Unity export still has Firebase SPM
-    # dependencies. Xcode consequently treats every transitive Firebase
-    # resource bundle as a resource of flutter_unity_widget_privacy and tries
-    # to copy those products before they exist. This target contains only the
-    # privacy manifest and must not link frameworks.
+    # UnityFramework. This target contains only the privacy manifest and must
+    # not link frameworks or acquire the plugin's transitive resources.
     if target.name == 'flutter_unity_widget-flutter_unity_widget_privacy'
       target.build_configurations.each do |config|
         config.build_settings['OTHER_LDFLAGS'] = ''

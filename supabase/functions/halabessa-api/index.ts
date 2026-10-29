@@ -51,7 +51,7 @@ function headers(origin: string | null) {
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Access-Control-Max-Age": "600",
     "Cache-Control": "no-store",
-    "Content-Type": "application/json",
+    "Content-Type": "application/json; charset=utf-8",
     Vary: "Origin",
   };
 }

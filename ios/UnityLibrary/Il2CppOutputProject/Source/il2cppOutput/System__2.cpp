@@ -1369,9 +1369,6 @@ struct StringBuilder_t  : public RuntimeObject
 struct StringComparer_t6268F19CA34879176651429C0D8A3D0002BB8E06  : public RuntimeObject
 {
 };
-struct StringExtensions_t56E0C46EA5A72082D6735CCD9691C209F533984E  : public RuntimeObject
-{
-};
 struct UriBuilder_t7931690A4195FCF7400D95D3107C3FB1D55A1C72  : public RuntimeObject
 {
 	bool ____changed;
@@ -4005,9 +4002,6 @@ IL2CPP_EXTERN_C IL2CPP_METHOD_ATTR bool Int32_TryFormat_m09C5DAC7B8CB25D5D7FAEB7
 IL2CPP_EXTERN_C IL2CPP_METHOD_ATTR bool UInt16_TryFormat_mFBBE717EEAC00E6B5ABC83B6D3AD7C7C5E310281 (uint16_t* __this, Span_1_tEDDF15FCF9EC6DEBA0F696BAACDDBAB9D92C252D ___0_destination, int32_t* ___1_charsWritten, ReadOnlySpan_1_t59614EA6E51A945A32B02AB17FBCBDF9A5C419C1 ___2_format, RuntimeObject* ___3_provider, const RuntimeMethod* method) ;
 IL2CPP_EXTERN_C IL2CPP_METHOD_ATTR bool IPv6AddressHelper_InternalIsValid_mDF9ADFBBDDD76F8B77EC140686B6280F4BD53478 (Il2CppChar* ___0_name, int32_t ___1_start, int32_t* ___2_end, bool ___3_validateStrictAddress, const RuntimeMethod* method) ;
 IL2CPP_EXTERN_C IL2CPP_METHOD_ATTR void NotImplementedException__ctor_m8339D1A685E8D77CAC9D3260C06B38B5C7CA7742 (NotImplementedException_t6366FE4DCF15094C51F4833B91A2AE68D4DA90E8* __this, String_t* ___0_message, const RuntimeMethod* method) ;
-IL2CPP_EXTERN_C IL2CPP_METHOD_ATTR Il2CppChar String_get_Chars_mC49DF0CD2D3BE7BE97B3AD9C995BE3094F8E36D3 (String_t* __this, int32_t ___0_index, const RuntimeMethod* method) ;
-IL2CPP_EXTERN_C IL2CPP_METHOD_ATTR bool Char_IsWhiteSpace_m02AEC6EA19513CAFC6882CFCA54C45794D2B5924 (Il2CppChar ___0_c, const RuntimeMethod* method) ;
-IL2CPP_EXTERN_C IL2CPP_METHOD_ATTR String_t* String_Substring_mB1D94F47935D22E130FF2C01DBB6A4135FBB76CE (String_t* __this, int32_t ___0_startIndex, int32_t ___1_length, const RuntimeMethod* method) ;
 IL2CPP_EXTERN_C IL2CPP_METHOD_ATTR void UriBuilder_Init_m5A6628A92532D3CAACD649C7528C15261C17A99D (UriBuilder_t7931690A4195FCF7400D95D3107C3FB1D55A1C72* __this, Uri_t1500A52B5F71A04F5D05C0852D0F2A0941842A0E* ___0_uri, const RuntimeMethod* method) ;
 IL2CPP_EXTERN_C IL2CPP_METHOD_ATTR String_t* Uri_get_Fragment_m3CB7AD14DA9618ADE406039D4713F67D6951D835 (Uri_t1500A52B5F71A04F5D05C0852D0F2A0941842A0E* __this, const RuntimeMethod* method) ;
 IL2CPP_EXTERN_C IL2CPP_METHOD_ATTR String_t* Uri_get_Query_m17DEC663263C486C8C8177AF9C4BFE2FFBE51178 (Uri_t1500A52B5F71A04F5D05C0852D0F2A0941842A0E* __this, const RuntimeMethod* method) ;
@@ -4019,6 +4013,7 @@ IL2CPP_EXTERN_C IL2CPP_METHOD_ATTR bool Uri_get_HasAuthority_m2180FC17FB6FE7A11E
 IL2CPP_EXTERN_C IL2CPP_METHOD_ATTR String_t* Uri_get_UserInfo_mC0189C851F71ACF0B48A462E74C7F3EB86501C8D (Uri_t1500A52B5F71A04F5D05C0852D0F2A0941842A0E* __this, const RuntimeMethod* method) ;
 IL2CPP_EXTERN_C IL2CPP_METHOD_ATTR int32_t String_IndexOf_mE21E78F35EF4A7768E385A72814C88D22B689966 (String_t* __this, Il2CppChar ___0_value, const RuntimeMethod* method) ;
 IL2CPP_EXTERN_C IL2CPP_METHOD_ATTR String_t* String_Substring_m6BA4A3FA3800FE92662D0847CC8E1EEF940DF472 (String_t* __this, int32_t ___0_startIndex, const RuntimeMethod* method) ;
+IL2CPP_EXTERN_C IL2CPP_METHOD_ATTR String_t* String_Substring_mB1D94F47935D22E130FF2C01DBB6A4135FBB76CE (String_t* __this, int32_t ___0_startIndex, int32_t ___1_length, const RuntimeMethod* method) ;
 IL2CPP_EXTERN_C IL2CPP_METHOD_ATTR void UriBuilder_SetFieldsFromUri_mB6015DF5AA0D123A1B2749378D88FA26D409788E (UriBuilder_t7931690A4195FCF7400D95D3107C3FB1D55A1C72* __this, Uri_t1500A52B5F71A04F5D05C0852D0F2A0941842A0E* ___0_uri, const RuntimeMethod* method) ;
 IL2CPP_EXTERN_C IL2CPP_METHOD_ATTR String_t* String_Replace_m86403DC5F422D8D5E1CFAAF255B103CB807EDAAF (String_t* __this, Il2CppChar ___0_oldChar, Il2CppChar ___1_newChar, const RuntimeMethod* method) ;
 IL2CPP_EXTERN_C IL2CPP_METHOD_ATTR String_t* Uri_InternalEscapeString_m55F51767085D66CA5A6580714F969B24862E1D3B (String_t* ___0_rawString, const RuntimeMethod* method) ;
@@ -4030,6 +4025,7 @@ IL2CPP_EXTERN_C IL2CPP_METHOD_ATTR bool UriParser_InFact_m3C07C3050DE1E69F6B0BC8
 IL2CPP_EXTERN_C IL2CPP_METHOD_ATTR bool UriParser_NotAny_mCE6CF6736414BE547215F6E44C3E1283DEA05F56 (UriParser_t920B0868286118827C08B08A15A9456AF6C19D81* __this, int32_t ___0_flags, const RuntimeMethod* method) ;
 IL2CPP_EXTERN_C IL2CPP_METHOD_ATTR String_t* String_Concat_m9E3155FB84015C823606188F53B47CB44C444991 (String_t* ___0_str0, String_t* ___1_str1, const RuntimeMethod* method) ;
 IL2CPP_EXTERN_C IL2CPP_METHOD_ATTR String_t* Int32_ToString_m030E01C24E294D6762FB0B6F37CB541581F55CA5 (int32_t* __this, const RuntimeMethod* method) ;
+IL2CPP_EXTERN_C IL2CPP_METHOD_ATTR Il2CppChar String_get_Chars_mC49DF0CD2D3BE7BE97B3AD9C995BE3094F8E36D3 (String_t* __this, int32_t ___0_index, const RuntimeMethod* method) ;
 IL2CPP_EXTERN_C IL2CPP_METHOD_ATTR String_t* String_Concat_m647EBF831F54B6DF7D5AFA5FD012CF4EE7571B6A (StringU5BU5D_t7674CD946EC0CE7B3AE0BE70E6EE85F2ECD9F248* ___0_values, const RuntimeMethod* method) ;
 IL2CPP_EXTERN_C IL2CPP_METHOD_ATTR void SecurityUtils_DemandReflectionAccess_mC171CFC613F3B33A9637DFC2A46C01801628A4E8 (Type_t* ___0_type, const RuntimeMethod* method) ;
 IL2CPP_EXTERN_C IL2CPP_METHOD_ATTR RuntimeObject* SecurityUtils_SecureCreateInstance_mA233BC3B5B2CB0765C7F0628E6526F04DE273F98 (Type_t* ___0_type, ObjectU5BU5D_t8061030B0A12A55D5AD8652A20C922FE99450918* ___1_args, bool ___2_allowNonPublic, const RuntimeMethod* method) ;
@@ -22135,145 +22131,6 @@ IL2CPP_EXTERN_C IL2CPP_METHOD_ATTR Exception_t* NotImplemented_ByDesignWithMessa
 #pragma clang diagnostic ignored "-Winvalid-offsetof"
 #pragma clang diagnostic ignored "-Wunused-variable"
 #endif
-IL2CPP_EXTERN_C IL2CPP_METHOD_ATTR String_t* StringExtensions_SubstringTrim_mFE0BE086CF1854B8AE6C4938878402D1A68E12CA (String_t* ___0_value, int32_t ___1_startIndex, int32_t ___2_length, const RuntimeMethod* method) 
-{
-	int32_t V_0 = 0;
-	int32_t V_1 = 0;
-	{
-		int32_t L_0 = ___2_length;
-		if (L_0)
-		{
-			goto IL_0009;
-		}
-	}
-	{
-		String_t* L_1 = ((String_t_StaticFields*)il2cpp_codegen_static_fields_for(il2cpp_defaults.string_class))->___Empty;
-		return L_1;
-	}
-
-IL_0009:
-	{
-		int32_t L_2 = ___1_startIndex;
-		int32_t L_3 = ___2_length;
-		V_0 = ((int32_t)il2cpp_codegen_subtract(((int32_t)il2cpp_codegen_add(L_2, L_3)), 1));
-		goto IL_0016;
-	}
-
-IL_0011:
-	{
-		int32_t L_4 = ___1_startIndex;
-		___1_startIndex = ((int32_t)il2cpp_codegen_add(L_4, 1));
-	}
-
-IL_0016:
-	{
-		int32_t L_5 = ___1_startIndex;
-		int32_t L_6 = V_0;
-		if ((((int32_t)L_5) > ((int32_t)L_6)))
-		{
-			goto IL_002e;
-		}
-	}
-	{
-		String_t* L_7 = ___0_value;
-		int32_t L_8 = ___1_startIndex;
-		NullCheck(L_7);
-		Il2CppChar L_9;
-		L_9 = String_get_Chars_mC49DF0CD2D3BE7BE97B3AD9C995BE3094F8E36D3(L_7, L_8, NULL);
-		il2cpp_codegen_runtime_class_init_inline(il2cpp_defaults.char_class);
-		bool L_10;
-		L_10 = Char_IsWhiteSpace_m02AEC6EA19513CAFC6882CFCA54C45794D2B5924(L_9, NULL);
-		if (L_10)
-		{
-			goto IL_0011;
-		}
-	}
-	{
-		goto IL_002e;
-	}
-
-IL_002a:
-	{
-		int32_t L_11 = V_0;
-		V_0 = ((int32_t)il2cpp_codegen_subtract(L_11, 1));
-	}
-
-IL_002e:
-	{
-		int32_t L_12 = V_0;
-		int32_t L_13 = ___1_startIndex;
-		if ((((int32_t)L_12) < ((int32_t)L_13)))
-		{
-			goto IL_0040;
-		}
-	}
-	{
-		String_t* L_14 = ___0_value;
-		int32_t L_15 = V_0;
-		NullCheck(L_14);
-		Il2CppChar L_16;
-		L_16 = String_get_Chars_mC49DF0CD2D3BE7BE97B3AD9C995BE3094F8E36D3(L_14, L_15, NULL);
-		il2cpp_codegen_runtime_class_init_inline(il2cpp_defaults.char_class);
-		bool L_17;
-		L_17 = Char_IsWhiteSpace_m02AEC6EA19513CAFC6882CFCA54C45794D2B5924(L_16, NULL);
-		if (L_17)
-		{
-			goto IL_002a;
-		}
-	}
-
-IL_0040:
-	{
-		int32_t L_18 = V_0;
-		int32_t L_19 = ___1_startIndex;
-		V_1 = ((int32_t)il2cpp_codegen_add(((int32_t)il2cpp_codegen_subtract(L_18, L_19)), 1));
-		int32_t L_20 = V_1;
-		if (!L_20)
-		{
-			goto IL_005d;
-		}
-	}
-	{
-		int32_t L_21 = V_1;
-		String_t* L_22 = ___0_value;
-		NullCheck(L_22);
-		int32_t L_23;
-		L_23 = String_get_Length_m42625D67623FA5CC7A44D47425CE86FB946542D2_inline(L_22, NULL);
-		if ((((int32_t)L_21) == ((int32_t)L_23)))
-		{
-			goto IL_005b;
-		}
-	}
-	{
-		String_t* L_24 = ___0_value;
-		int32_t L_25 = ___1_startIndex;
-		int32_t L_26 = V_1;
-		NullCheck(L_24);
-		String_t* L_27;
-		L_27 = String_Substring_mB1D94F47935D22E130FF2C01DBB6A4135FBB76CE(L_24, L_25, L_26, NULL);
-		return L_27;
-	}
-
-IL_005b:
-	{
-		String_t* L_28 = ___0_value;
-		return L_28;
-	}
-
-IL_005d:
-	{
-		String_t* L_29 = ((String_t_StaticFields*)il2cpp_codegen_static_fields_for(il2cpp_defaults.string_class))->___Empty;
-		return L_29;
-	}
-}
-#ifdef __clang__
-#pragma clang diagnostic pop
-#endif
-#ifdef __clang__
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Winvalid-offsetof"
-#pragma clang diagnostic ignored "-Wunused-variable"
-#endif
 IL2CPP_EXTERN_C IL2CPP_METHOD_ATTR void UriBuilder__ctor_mD45945E23BE6C1AA8C56E64DEC181E36EE826C25 (UriBuilder_t7931690A4195FCF7400D95D3107C3FB1D55A1C72* __this, Uri_t1500A52B5F71A04F5D05C0852D0F2A0941842A0E* ___0_uri, const RuntimeMethod* method) 
 {
 	static bool s_Il2CppMethodInitialized;
@@ -23367,6 +23224,16 @@ IL_0040:
 		return L_14;
 	}
 }
+IL2CPP_EXTERN_C IL2CPP_METHOD_ATTR RuntimeObject* SecurityUtils_SecureCreateInstance_mB208AB1046AAACA85AD10C83C46AA9BDE75B3310 (Type_t* ___0_type, ObjectU5BU5D_t8061030B0A12A55D5AD8652A20C922FE99450918* ___1_args, const RuntimeMethod* method) 
+{
+	{
+		Type_t* L_0 = ___0_type;
+		ObjectU5BU5D_t8061030B0A12A55D5AD8652A20C922FE99450918* L_1 = ___1_args;
+		RuntimeObject* L_2;
+		L_2 = SecurityUtils_SecureCreateInstance_mA233BC3B5B2CB0765C7F0628E6526F04DE273F98(L_0, L_1, (bool)0, NULL);
+		return L_2;
+	}
+}
 IL2CPP_EXTERN_C IL2CPP_METHOD_ATTR RuntimeObject* SecurityUtils_SecureConstructorInvoke_m2E6522DAEC75A0B3C0AE947F5BB7A27B774887E0 (Type_t* ___0_type, TypeU5BU5D_t97234E1129B564EB38B8D85CAC2AD8B5B9522FFB* ___1_argTypes, ObjectU5BU5D_t8061030B0A12A55D5AD8652A20C922FE99450918* ___2_args, bool ___3_allowNonPublic, const RuntimeMethod* method) 
 {
 	{
@@ -23498,7 +23365,7 @@ IL2CPP_EXTERN_C IL2CPP_METHOD_ATTR bool SecurityUtils_GenericArgumentsAreVisible
 		MethodInfo_t* L_0 = ___0_method;
 		NullCheck(L_0);
 		bool L_1;
-		L_1 = VirtualFuncInvoker0< bool >::Invoke(25, L_0);
+		L_1 = VirtualFuncInvoker0< bool >::Invoke(26, L_0);
 		if (!L_1)
 		{
 			goto IL_0029;
@@ -23508,7 +23375,7 @@ IL2CPP_EXTERN_C IL2CPP_METHOD_ATTR bool SecurityUtils_GenericArgumentsAreVisible
 		MethodInfo_t* L_2 = ___0_method;
 		NullCheck(L_2);
 		TypeU5BU5D_t97234E1129B564EB38B8D85CAC2AD8B5B9522FFB* L_3;
-		L_3 = VirtualFuncInvoker0< TypeU5BU5D_t97234E1129B564EB38B8D85CAC2AD8B5B9522FFB* >::Invoke(27, L_2);
+		L_3 = VirtualFuncInvoker0< TypeU5BU5D_t97234E1129B564EB38B8D85CAC2AD8B5B9522FFB* >::Invoke(28, L_2);
 		V_0 = L_3;
 		V_1 = 0;
 		goto IL_0023;

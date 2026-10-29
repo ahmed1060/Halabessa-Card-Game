@@ -95,6 +95,15 @@ android {
     }
 }
 
+// Flutter adds its ABI defaults after the ordinary Android DSL is evaluated.
+// Finalize the app to the embedded player's supported ABI after that step.
+androidComponents {
+    finalizeDsl { appDsl ->
+        appDsl.defaultConfig.ndk.abiFilters.clear()
+        appDsl.defaultConfig.ndk.abiFilters.add('arm64-v8a')
+    }
+}
+
 flutter {
     source '../..'
 }

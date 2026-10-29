@@ -22,6 +22,59 @@ void main() {
   );
   setUp(() => session = 'A:1');
 
+  test('JSON bytes preserve Arabic with or without a charset header', () async {
+    for (final contentType in [
+      null,
+      'application/json',
+      'application/json; charset=utf-8',
+    ]) {
+      final backend = transport(
+        (_) async => http.Response.bytes(
+          utf8.encode(
+            jsonEncode({
+              'revision': 0,
+              'items': [
+                {'id': 'gg', 'en': 'GG!', 'ar': 'ماتش حلو!'},
+              ],
+            }),
+          ),
+          200,
+          headers: {if (contentType != null) 'content-type': contentType},
+        ),
+      );
+      final result = await backend.call('getQuickChatPresets');
+      expect((result['items'] as List).single['ar'], 'ماتش حلو!');
+    }
+  });
+
+  test(
+    'UTF-8 server error details are preserved and invalid bytes fail closed',
+    () async {
+      final denied = transport(
+        (_) async => http.Response.bytes(
+          utf8.encode(jsonEncode({'error': 'denied', 'message': 'غير مسموح'})),
+          403,
+          headers: {'content-type': 'application/json'},
+        ),
+      );
+      await expectLater(
+        denied.call('getQuickChatPresets'),
+        throwsA(
+          isA<SupabaseBackendException>().having(
+            (e) => e.details?['message'],
+            'Arabic details',
+            'غير مسموح',
+          ),
+        ),
+      );
+      final invalid = transport((_) async => http.Response.bytes([0xff], 200));
+      await expectLater(
+        invalid.call('getQuickChatPresets'),
+        throwsA(isA<SupabaseBackendException>()),
+      );
+    },
+  );
+
   test(
     'command route outage cools down subsequent calls, not auth refusals',
     () async {

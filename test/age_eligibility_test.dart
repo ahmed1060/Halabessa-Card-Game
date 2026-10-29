@@ -7,6 +7,27 @@ import 'package:halabessa/core/providers/settings_provider.dart';
 import 'package:halabessa/core/widgets/age_eligibility_screen.dart';
 
 void main() {
+  test(
+    'a new account birth date rechecks an eligible device and cannot unblock a rejection',
+    () async {
+      SharedPreferences.setMockInitialValues({
+        AgeEligibilityNotifier.key: 'eligible',
+      });
+      final prefs = await SharedPreferences.getInstance();
+      final notifier = AgeEligibilityNotifier(prefs);
+      await notifier.submit(
+        DateTime(2020),
+        today: DateTime(2026, 10, 26),
+        recheck: true,
+      );
+      expect(notifier.state, AgeEligibility.blocked);
+      await notifier.submit(DateTime(2000), recheck: true);
+      expect(notifier.state, AgeEligibility.blocked);
+      expect(prefs.getKeys(), {AgeEligibilityNotifier.key});
+      notifier.dispose();
+    },
+  );
+
   for (final size in [const Size(390, 844), const Size(844, 390)]) {
     for (final direction in TextDirection.values) {
       testWidgets(

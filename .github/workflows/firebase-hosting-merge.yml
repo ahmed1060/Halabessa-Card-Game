@@ -20,6 +20,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "24"
+      - name: Verify current Unity web player before release
+        run: node tool/verify_unity_players.mjs web
       - name: Typecheck deletion adapters
         run: >-
           npm exec --yes --package=typescript@5.9.3 -- tsc --noEmit

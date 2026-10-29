@@ -7,7 +7,10 @@ import '../../domain/providers/game_providers.dart';
 import '../providers/unity_layer_provider.dart';
 
 class UnityGameView extends ConsumerStatefulWidget {
-  const UnityGameView({super.key});
+  const UnityGameView({super.key, this.nativeView});
+
+  /// Test seam: keep the real subscriptions/lifecycle without a platform view.
+  final Widget? nativeView;
 
   @override
   ConsumerState<UnityGameView> createState() => _UnityGameViewState();
@@ -23,7 +26,8 @@ class _UnityGameViewState extends ConsumerState<UnityGameView>
     ref
         .read(unityCommunicationServiceProvider)
         .setVisualForeground(
-          lifecycle == null || lifecycle == AppLifecycleState.resumed,
+          (lifecycle == null || lifecycle == AppLifecycleState.resumed) &&
+              !ref.read(unityVisualSuspendedProvider),
         );
   }
 
@@ -37,11 +41,23 @@ class _UnityGameViewState extends ConsumerState<UnityGameView>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     ref
         .read(unityCommunicationServiceProvider)
-        .setVisualForeground(state == AppLifecycleState.resumed);
+        .setVisualForeground(
+          state == AppLifecycleState.resumed &&
+              !ref.read(unityVisualSuspendedProvider),
+        );
   }
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(unityVisualSuspendedProvider, (_, suspended) {
+      final lifecycle = WidgetsBinding.instance.lifecycleState;
+      ref
+          .read(unityCommunicationServiceProvider)
+          .setVisualForeground(
+            !suspended &&
+                (lifecycle == null || lifecycle == AppLifecycleState.resumed),
+          );
+    });
     ref.listen(unityLayerActiveProvider, (_, __) {
       final state = ref.read(matchStateProvider);
       if (state != null) {
@@ -60,7 +76,9 @@ class _UnityGameViewState extends ConsumerState<UnityGameView>
     final comms = ref.watch(unityCommunicationServiceProvider);
 
     Widget unityWidget;
-    if (kIsWeb) {
+    if (widget.nativeView != null) {
+      unityWidget = widget.nativeView!;
+    } else if (kIsWeb) {
       unityWidget = HtmlElementView(
         viewType: 'unity-web-view',
         onPlatformViewCreated: (id) {

@@ -43,6 +43,10 @@ functions/node_modules/
 .pub-cache/
 .pub/
 /build/
+/android/build/
+/androidBuild/unityExport/unityLibrary/.cxx/
+/ios/UnityLibrary/Il2CppTempDirArtifacts/
+/ios/UnityLibrary/build/
 **/local.properties
 
 # Mobile Library Exports (We WANT to commit these for CI/CD)

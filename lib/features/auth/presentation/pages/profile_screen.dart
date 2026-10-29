@@ -14,6 +14,7 @@ import '../providers/auth_providers.dart';
 import '../widgets/avatar_picker.dart';
 import '../widgets/guest_progress_panel.dart';
 import '../widgets/profile_identity_title.dart';
+import '../widgets/profile_birth_date.dart';
 import '../../../game/presentation/widgets/table_style.dart';
 import '../../domain/models/app_user.dart';
 import '../../../../core/utils/error_handler.dart';
@@ -115,6 +116,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                const ProfileBirthDateTile(),
+                const SizedBox(height: 16),
                 // Header Section: Avatar & Level
                 Center(
                   child: Column(

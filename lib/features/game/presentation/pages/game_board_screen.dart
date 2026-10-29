@@ -211,7 +211,8 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
       // Unity is optional. Keep its startup/error screen from covering the
       // Flutter board when the player has disabled 3D mode.
       ref.read(unityLayerVisibilityProvider.notifier).state =
-          !ref.read(offlineSessionProvider) &&
+          (!ref.read(offlineSessionProvider) ||
+              ref.read(localUnityEnabledProvider)) &&
           ref.read(settingsProvider).is3DModeEnabled;
     });
   }
@@ -332,7 +333,8 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
     ref.listen<SettingsState>(settingsProvider, (previous, next) {
       if (previous?.is3DModeEnabled != next.is3DModeEnabled) {
         ref.read(unityLayerVisibilityProvider.notifier).state =
-            !ref.read(offlineSessionProvider) && next.is3DModeEnabled;
+            (!ref.read(offlineSessionProvider) ||
+                ref.read(localUnityEnabledProvider)) && next.is3DModeEnabled;
       }
     });
 
@@ -1286,6 +1288,7 @@ class _GameBoardScreenState extends ConsumerState<GameBoardScreen> {
       context: context,
       barrierDismissible: false,
       builder: (_) => TableLeaveDialog(
+        localNetwork: ref.read(matchStateProvider)?.id.startsWith('OFFLINE_LAN_') == true,
         offline:
             ref.read(matchStateProvider)?.id.startsWith('OFFLINE_') == true,
         onLeave: () => ref.read(matchStateProvider.notifier).leaveMatch(),

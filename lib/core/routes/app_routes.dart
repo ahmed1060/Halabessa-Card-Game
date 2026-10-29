@@ -8,6 +8,7 @@ import '../../features/auth/presentation/pages/auth_wrapper.dart';
 import '../../features/home/presentation/pages/home_screen.dart';
 import '../../features/game/presentation/pages/game_board_screen.dart';
 import '../../features/auth/presentation/pages/profile_screen.dart';
+import '../../features/auth/presentation/widgets/profile_birth_date.dart';
 import '../../features/home/presentation/pages/store_screen.dart';
 import 'package:halabessa/features/home/presentation/pages/admin_music_management_screen.dart';
 import 'package:halabessa/features/home/presentation/pages/admin_sfx_management_screen.dart';
@@ -32,13 +33,16 @@ class AppRoutes {
 
   static Map<String, WidgetBuilder> get routes => {
     initial: (context) => const AuthWrapper(),
-    home: (context) => const HomeScreen(),
-    play: (context) => const HomeScreen(playFocus: true),
-    collection: (context) => const StoreScreen(initialOwnedOnly: true),
-    game: (context) => const GameBoardScreen(),
-    profile: (context) => const ProfileScreen(),
-    store: (context) => const StoreScreen(),
-    leaderboard: (context) => const LeaderboardScreen(),
+    home: (context) => const AccountBirthDateGate(child: HomeScreen()),
+    play: (context) =>
+        const AccountBirthDateGate(child: HomeScreen(playFocus: true)),
+    collection: (context) =>
+        const AccountBirthDateGate(child: StoreScreen(initialOwnedOnly: true)),
+    game: (context) => const AccountBirthDateGate(child: GameBoardScreen()),
+    profile: (context) => const AccountBirthDateGate(child: ProfileScreen()),
+    store: (context) => const AccountBirthDateGate(child: StoreScreen()),
+    leaderboard: (context) =>
+        const AccountBirthDateGate(child: LeaderboardScreen()),
     help: (context) => const LanternHelpScreen(),
     '/account/data': (context) => const AccountInformationScreen(),
     '/account/delete': (context) => const AccountDeletionScreen(),
@@ -47,10 +51,14 @@ class AppRoutes {
     '/terms': (context) =>
         const ReleasePolicyScreen(policy: ReleasePolicy.terms),
     '/support': (context) => const AccountInformationScreen(support: true),
-    adminMusic: (context) => const AdminMusicManagementScreen(),
-    adminSfx: (context) => const AdminSfxManagementScreen(),
-    adminUsers: (context) => const AdminUserManagementScreen(),
-    adminQuickChat: (context) => const AdminQuickChatScreen(),
+    adminMusic: (context) =>
+        const AccountBirthDateGate(child: AdminMusicManagementScreen()),
+    adminSfx: (context) =>
+        const AccountBirthDateGate(child: AdminSfxManagementScreen()),
+    adminUsers: (context) =>
+        const AccountBirthDateGate(child: AdminUserManagementScreen()),
+    adminQuickChat: (context) =>
+        const AccountBirthDateGate(child: AdminQuickChatScreen()),
   };
 }
 

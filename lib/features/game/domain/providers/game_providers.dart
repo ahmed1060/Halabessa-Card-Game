@@ -1087,6 +1087,38 @@ class MatchStateNotifier extends StateNotifier<MatchState?> {
     bindToMatch(created.id);
   }
 
+  /// Called only by the isolated LAN authority container, never by a peer UI.
+  void startLocalNetworkMatch(MatchState initial) {
+    if (state != null || !initial.id.startsWith('OFFLINE_LAN_') ||
+        initial.phase != GamePhase.waitingForPlayers ||
+        initial.playerIds.length != 4 || initial.playerIds.toSet().length != 4 ||
+        initial.playerIds.any((id) => id.startsWith('waiting_')) ||
+        initial.usesServerCommands) {
+      throw StateError('invalid_local_network_match');
+    }
+    _bindingGeneration++;
+    lastBoundMatchId = initial.id;
+    state = initial;
+    // Reuse the existing local lobby/phase/bot progression. No recovery ID,
+    // remote listener, wallet update or Firebase identity is created.
+    unawaited(_evaluateBotActions(initial));
+  }
+
+  Future<void> setLocalNetworkPresence(String uid, bool connected) async {
+    final current = state;
+    if (current == null || !current.id.startsWith('OFFLINE_LAN_') ||
+        !current.playerIds.contains(uid) || uid.startsWith('bot_')) return;
+    await _publishState(current.copyWith(playerOnlineStatus: {
+      ...current.playerOnlineStatus, uid: connected,
+    }));
+  }
+
+  void tickLocalNetworkHost() {
+    final current = state;
+    if (current == null || !current.id.startsWith('OFFLINE_LAN_')) return;
+    unawaited(_evaluateBotActions(current));
+  }
+
   void startOfflinePracticeMatch(String playerId, String displayName, {GameMode mode = GameMode.classic, int maxPoints = 41,
       BotDifficulty difficulty = BotDifficulty.medium}) {
     final offlineId = 'OFFLINE_${DateTime.now().millisecondsSinceEpoch}';
