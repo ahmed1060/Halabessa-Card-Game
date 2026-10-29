@@ -3,15 +3,20 @@ import * as fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
+import { isUtf8 } from 'node:buffer';
 import { verify } from './prepare_unity_release.mjs';
 
 export const textPayload = /\.(cs|meta|asset|unity|prefab|json|xml|gradle|properties|txt|shader|hlsl|asmdef|h|c|cpp|m|mm|pbxproj|xcscheme|js|jslib|sh|plist|storyboard)$/i;
 export function digest(bytes, name) {
-  // Unity serializes controllers/animations/materials as YAML regardless of
-  // extension. Git normalizes those files on Linux/macOS checkouts too.
-  if (textPayload.test(name) || bytes.subarray(0, 16).toString('utf8').startsWith('%YAML') ||
-      /\.(shadergraph|shadersubgraph)$/.test(name)) {
-    bytes = Buffer.from(bytes.toString('utf8').replaceAll('\r\n', '\n'));
+  // Git normalizes text regardless of Unity's extension (.controller, .config,
+  // .bak, etc.). Native/media artifacts remain byte-exact, even if a tiny
+  // synthetic binary happens to contain valid UTF-8 and no NUL byte.
+  const base = name.replace(/\.bak$/i, '');
+  const binary = /\.(a|so|dll|jar|zip|pdb|png|jpe?g|webp|wav|mp3|ttf|otf|woff2?|assets|ress|dat|bin|bundle|unityweb)$/i.test(base);
+  if (!binary && !bytes.includes(0) && (textPayload.test(base) || isUtf8(bytes))) {
+    // Latin-1 here preserves every byte while replacing only CRLF pairs; it
+    // does not decode/re-encode or replace any non-ASCII source character.
+    bytes = Buffer.from(bytes.toString('latin1').replaceAll('\r\n', '\n'), 'latin1');
   }
   return createHash('sha256').update(bytes).digest('hex');
 }
